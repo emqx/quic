@@ -1,2 +1,9 @@
-# quic
-Erlang implementation of QUIC Protocol
+quic
+=====
+
+An OTP library
+
+Build
+-----
+
+    $ rebar3 compile
