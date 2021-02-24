@@ -1,13 +1,13 @@
-{application, quic,
- [{description, "An OTP library"},
-  {vsn, "0.1.0"},
+{application, quicer,
+ [{description, "msquic nif binding"},
+  {vsn, "git"},
   {registered, []},
   {applications,
    [kernel,
     stdlib
    ]},
   {env,[]},
-  {modules, []},
+  {modules, [quicer_nif]},
 
   {licenses, ["Apache 2.0"]},
   {links, []}

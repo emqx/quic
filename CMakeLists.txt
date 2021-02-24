@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(quicer)
+
+SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
+SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
+
+EXECUTE_PROCESS(
+        COMMAND         erl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt
+        OUTPUT_VARIABLE Erlang_OTP_ROOT_DIR
+        )
+
+if (NOT DEFINED CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE DEBUG)
+endif()
+
+if (NOT DEFINED QUIC_ENABLE_LOGGING)
+  set(QUIC_ENABLE_LOGGING ON)
+endif()
+
+# src files
+set(SOURCES
+  c_src/quicer_nif.c
+  c_src/quicer_nif.h
+  )
+
+add_subdirectory(submodules/msquic)
+
+add_library(quicer_static STATIC ${SOURCES})
+target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ submodules/msquic/src/inc/)
+target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,--no-gc-sections")
+# @todo clean complier warnings in the code
+target_compile_options(quicer_static PRIVATE "-Wno-unused-parameter" "-Wno-unused-variable")
+
+add_library(quicer_nif SHARED ${SOURCES})
+target_link_libraries(quicer_nif PRIVATE quicer_static  "-Wl,--no-gc-sections") # no gc becase of erlang nif symbols
+target_include_directories(quicer_nif PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ submodules/msquic/src/inc/)
+
+add_dependencies(quicer_nif quicer_static)
+add_dependencies(quicer_static msquic)
+
+set_target_properties(quicer_nif
+    PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/priv/
+)

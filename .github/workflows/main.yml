@@ -1,0 +1,18 @@
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: [22.3.4.9]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - uses: gleam-lang/setup-erlang@v1.1.2
+        with:
+          otp-version: ${{ matrix.otp  }}
+      - name: release build with debug log off
+        run: cmake -B c_build -DCMAKE_BUILD_TYPE=Release -DQUIC_ENABLE_LOGGING=OFF && make test

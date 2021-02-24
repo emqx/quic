@@ -15,3 +15,10 @@ deps
 .rebar3
 _build/
 _checkouts/
+
+# nif dynamic linked lib
+priv/*.so
+
+# language server caches
+.ccls-cache/
+.els_cache/
