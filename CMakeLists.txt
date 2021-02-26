@@ -31,7 +31,7 @@ add_library(quicer_static STATIC ${SOURCES})
 target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ submodules/msquic/src/inc/)
 target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,--no-gc-sections")
 # @todo clean complier warnings in the code
-target_compile_options(quicer_static PRIVATE "-Wno-unused-parameter" "-Wno-unused-variable")
+target_compile_options(quicer_static PUBLIC "-g" "-Wno-unused-parameter" "-Wno-unused-variable")
 
 add_library(quicer_nif SHARED ${SOURCES})
 target_link_libraries(quicer_nif PRIVATE quicer_static  "-Wl,--no-gc-sections") # no gc becase of erlang nif symbols

@@ -101,6 +101,8 @@ tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
 
 tc_open_lib_test(_Config) ->
+  ok = quicer_nif:open_lib(),
+  %% verify that reopen lib success.
   ok = quicer_nif:open_lib().
 
 tc_lib_registration(_Config) ->

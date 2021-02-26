@@ -122,6 +122,11 @@ static ERL_NIF_TERM openLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   return ATOM_OK;
 }
 
+static ERL_NIF_TERM closeLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+  MsQuicClose(MsQuic);
+  return ATOM_OK;
+}
+
 static ERL_NIF_TERM registration(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     QUIC_STATUS status = QUIC_STATUS_SUCCESS;
     if (QUIC_FAILED(status = MsQuic->RegistrationOpen(&RegConfig, &Registration))) {
@@ -135,8 +140,9 @@ static ErlNifFunc nif_funcs[] =
 /* |  name  | arity| funptr | flags|
  *
 */
-    {"open_lib", 1, openLib,  0},
-    {"reg_open", 0, registration, 0}
+    {"open_lib",  1, openLib,  0},
+    {"close_lib", 0, closeLib,  0},
+    {"reg_open",  0, registration, 0}
 };
 
 ERL_NIF_INIT(quicer_nif, nif_funcs, &on_load, NULL, &on_upgrade, &on_unload);

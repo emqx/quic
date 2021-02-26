@@ -15,6 +15,7 @@
 %%--------------------------------------------------------------------
 -module(quicer_nif).
 -export([ open_lib/0
+        , close_lib/0
         , reg_open/0
         ]).
 
@@ -28,6 +29,9 @@ open_lib() ->
   open_lib(code:priv_dir(quicer)).
 
 open_lib(_PrivDir) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+close_lib() ->
   erlang:nif_error(nif_library_not_loaded).
 
 reg_open() ->
