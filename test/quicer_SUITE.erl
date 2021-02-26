@@ -31,7 +31,9 @@
 %% test cases
 -export([ tc_nif_module_load/1
         , tc_open_lib_test/1
+        , tc_close_lib_test/1
         , tc_lib_registration/1
+        , tc_lib_re_registration/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -105,8 +107,21 @@ tc_open_lib_test(_Config) ->
   %% verify that reopen lib success.
   ok = quicer_nif:open_lib().
 
+tc_close_lib_test(_Config) ->
+  ok = quicer_nif:open_lib(),
+  ok = quicer_nif:close_lib(),
+  ok = quicer_nif:close_lib().
+
 tc_lib_registration(_Config) ->
-  ok = quicer_nif:reg_open().
+  ok = quicer_nif:reg_open(),
+  ok = quicer_nif:reg_close().
+
+tc_lib_re_registration(_Config) ->
+  ok = quicer_nif:reg_open(),
+  ok = quicer_nif:reg_open(),
+  ok = quicer_nif:reg_close(),
+  ok = quicer_nif:reg_close().
+
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

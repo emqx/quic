@@ -17,6 +17,7 @@
 -export([ open_lib/0
         , close_lib/0
         , reg_open/0
+        , reg_close/0
         ]).
 
 -on_load(init/0).
@@ -35,4 +36,7 @@ close_lib() ->
   erlang:nif_error(nif_library_not_loaded).
 
 reg_open() ->
+  erlang:nif_error(nif_library_not_loaded).
+
+reg_close() ->
   erlang:nif_error(nif_library_not_loaded).

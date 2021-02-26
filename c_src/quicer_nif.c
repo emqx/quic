@@ -75,6 +75,10 @@ ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE    ;
 HQUIC Registration;
 const QUIC_API_TABLE* MsQuic;
 
+// @todo, these flags are not threads safe, wrap it in a context
+BOOLEAN isRegistered = false;
+BOOLEAN isLibOpened = false;
+
 const QUIC_REGISTRATION_CONFIG RegConfig = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
 static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM loadinfo)
@@ -119,11 +123,17 @@ static ERL_NIF_TERM openLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic))) {
     return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ETERM_INT(status));
   }
+
+  isLibOpened = true;
   return ATOM_OK;
 }
 
 static ERL_NIF_TERM closeLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
-  MsQuicClose(MsQuic);
+  if(isLibOpened && MsQuic) {
+    MsQuicClose(MsQuic);
+    isLibOpened = false;
+  }
+
   return ATOM_OK;
 }
 
@@ -131,6 +141,15 @@ static ERL_NIF_TERM registration(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
     QUIC_STATUS status = QUIC_STATUS_SUCCESS;
     if (QUIC_FAILED(status = MsQuic->RegistrationOpen(&RegConfig, &Registration))) {
       return ERROR_TUPLE_3(ATOM_REG_FAILED, ETERM_INT(status));
+    }
+    isRegistered = true;
+    return ATOM_OK;
+}
+
+static ERL_NIF_TERM deregistration(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+    if (isRegistered && Registration) {
+      MsQuic->RegistrationClose(Registration);
+      isRegistered = false;
     }
     return ATOM_OK;
 }
@@ -140,9 +159,10 @@ static ErlNifFunc nif_funcs[] =
 /* |  name  | arity| funptr | flags|
  *
 */
-    {"open_lib",  1, openLib,  0},
-    {"close_lib", 0, closeLib,  0},
-    {"reg_open",  0, registration, 0}
+    {"open_lib",   1, openLib,  0},
+    {"close_lib",  0, closeLib,  0},
+    {"reg_open",   0, registration, 0},
+    {"reg_close",  0, deregistration, 0}
 };
 
 ERL_NIF_INIT(quicer_nif, nif_funcs, &on_load, NULL, &on_upgrade, &on_unload);
