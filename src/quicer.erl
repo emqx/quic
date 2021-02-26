@@ -18,3 +18,14 @@
 
 -export([]).
 
+-on_load(init/0).
+
+init() ->
+  quicer_nif:open_lib(),
+  quicer_nif:reg_open().
+
+%%%_* Emacs ====================================================================
+%%% Local Variables:
+%%% allout-layout: t
+%%% erlang-indent-level: 2
+%%% End:

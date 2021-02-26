@@ -22,6 +22,7 @@ endif()
 set(SOURCES
   c_src/quicer_nif.c
   c_src/quicer_nif.h
+  c_src/quicer_eterms.h
   )
 
 add_subdirectory(submodules/msquic)

@@ -32,3 +32,5 @@ cover:
 dialyzer:
 	$(REBAR) dialyzer
 
+.PHONY: test
+test: ct

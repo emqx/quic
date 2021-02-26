@@ -22,3 +22,4 @@ priv/*.so
 # language server caches
 .ccls-cache/
 .els_cache/
+compile_commands.json

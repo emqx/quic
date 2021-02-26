@@ -1,9 +1,20 @@
-quicer
-=====
+# quicer
 
-An OTP library
+Erlang msquic nif binding.
 
-Build
------
-    $ git submodule update --init --recursive
-    $ rebar3 compile
+# Build
+
+``` sh
+$ git submodule update --init --recursive
+$ rebar3 compile 
+# OR
+$ make
+
+```
+
+# TEST
+
+``` sh
+$ make test
+```
+

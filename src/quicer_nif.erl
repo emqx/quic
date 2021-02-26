@@ -14,10 +14,21 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 -module(quicer_nif).
--export([]).
+-export([ open_lib/0
+        , reg_open/0
+        ]).
 
 -on_load(init/0).
 
 init() ->
-  Niflib = filename:join([filename:dirname(code:which(?MODULE)), "..", "priv/libquicer_nif"]),
+  Niflib = filename:join([code:priv_dir(quicer), "libquicer_nif"]),
   ok = erlang:load_nif(Niflib, 0).
+
+open_lib() ->
+  open_lib(code:priv_dir(quicer)).
+
+open_lib(_PrivDir) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+reg_open() ->
+  erlang:nif_error(nif_library_not_loaded).
