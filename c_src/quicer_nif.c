@@ -81,7 +81,7 @@ BOOLEAN isLibOpened = false;
 
 const QUIC_REGISTRATION_CONFIG RegConfig = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
-static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM loadinfo)
+static int on_load(ErlNifEnv* env,  __unused_parm__ void** priv_data, __unused_parm__ ERL_NIF_TERM loadinfo)
 {
   int ret_val = 0;
 
@@ -93,17 +93,19 @@ static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM loadinfo)
   return ret_val;
 }
 
-static int on_upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_NIF_TERM load_info)
+static int on_upgrade(__unused_parm__ ErlNifEnv* env, __unused_parm__ void** priv_data,
+                      __unused_parm__ void** old_priv_data, __unused_parm__ ERL_NIF_TERM load_info)
 {
   return 0;
 }
 
-static void on_unload(ErlNifEnv* env, void* priv_data)
+static void on_unload(__unused_parm__ ErlNifEnv* env, __unused_parm__ void* priv_data)
 {
 }
 
 
-static ERL_NIF_TERM openLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM openLib(ErlNifEnv* env, __unused_parm__ int argc, const ERL_NIF_TERM argv[]) {
+  assert(1 == argc);
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM lttngLib = argv[0];
   char lttngPath[PATH_MAX] = {0};
@@ -128,7 +130,8 @@ static ERL_NIF_TERM openLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
   return ATOM_OK;
 }
 
-static ERL_NIF_TERM closeLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM closeLib(__unused_parm__ ErlNifEnv* env,
+                             __unused_parm__ int argc, __unused_parm__ const ERL_NIF_TERM argv[]) {
   if(isLibOpened && MsQuic) {
     MsQuicClose(MsQuic);
     isLibOpened = false;
@@ -137,7 +140,8 @@ static ERL_NIF_TERM closeLib(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
   return ATOM_OK;
 }
 
-static ERL_NIF_TERM registration(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM registration(ErlNifEnv* env,
+                                 __unused_parm__ int argc, __unused_parm__ const ERL_NIF_TERM argv[]) {
     QUIC_STATUS status = QUIC_STATUS_SUCCESS;
     if (QUIC_FAILED(status = MsQuic->RegistrationOpen(&RegConfig, &Registration))) {
       return ERROR_TUPLE_3(ATOM_REG_FAILED, ETERM_INT(status));
@@ -146,7 +150,8 @@ static ERL_NIF_TERM registration(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
     return ATOM_OK;
 }
 
-static ERL_NIF_TERM deregistration(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM deregistration(__unused_parm__ ErlNifEnv* env,
+                                   __unused_parm__ int argc, __unused_parm__ const ERL_NIF_TERM argv[]) {
     if (isRegistered && Registration) {
       MsQuic->RegistrationClose(Registration);
       isRegistered = false;
