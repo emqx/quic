@@ -68,11 +68,14 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
 
+  ERL_NIF_TERM port = argv[0];
+  ERL_NIF_TERM options = argv[1];
+
   // @todo argc checks
   // @todo read from argv
   QUIC_ADDR Address = {};
   int UdpPort = 0;
-  if (!enif_get_int(env, argv[0], &UdpPort) && UdpPort >= 0)
+  if (!enif_get_int(env, port, &UdpPort) && UdpPort >= 0)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -89,14 +92,16 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
+  QUIC_CREDENTIAL_CONFIG_HELPER *Config = NewCredConfig(env, &options);
+
   // @todo check config
-  if (!ServerLoadConfiguration(&(l_ctx->Configuration)))
+  if (!ServerLoadConfiguration(&l_ctx->Configuration, Config))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }
 
-  if (!ReloadCertConfig(l_ctx->Configuration))
+  if (!ReloadCertConfig(l_ctx->Configuration, Config))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_CERT_ERROR);
@@ -105,7 +110,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // mon will be removed when triggered or when l_ctx is dealloc.
   ErlNifMonitor mon;
 
-  if (0 != enif_monitor_process(env, l_ctx, &(l_ctx->listenerPid), &mon))
+  if (0 != enif_monitor_process(env, l_ctx, &l_ctx->listenerPid, &mon))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_BAD_MON);
@@ -113,7 +118,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (QUIC_FAILED(Status
                   = MsQuic->ListenerOpen(Registration, ServerListenerCallback,
-                                         l_ctx, &(l_ctx->Listener))))
+                                         l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, Status);
@@ -126,6 +131,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, Status);
     }
+
+  DestroyCredConfig(Config);
 
   ERL_NIF_TERM listenHandler = enif_make_resource(env, l_ctx);
   return OK_TUPLE_2(listenHandler);

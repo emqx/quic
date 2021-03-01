@@ -14,7 +14,12 @@ typedef struct QUIC_CREDENTIAL_CONFIG_HELPER
   };
 } QUIC_CREDENTIAL_CONFIG_HELPER;
 
-bool ReloadCertConfig(HQUIC Configuration);
-bool ServerLoadConfiguration(HQUIC *Configuration);
+bool ReloadCertConfig(HQUIC Configuration,
+                      QUIC_CREDENTIAL_CONFIG_HELPER *Config);
+QUIC_CREDENTIAL_CONFIG_HELPER *NewCredConfig(ErlNifEnv *env,
+                                             const ERL_NIF_TERM *option);
+void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *);
+bool ServerLoadConfiguration(HQUIC *Configuration,
+                             QUIC_CREDENTIAL_CONFIG_HELPER *Config);
 
 #endif // __QUICER_CONFIG_H_

@@ -10,10 +10,12 @@
 #include <quic_platform.h>
 #include <stdbool.h>
 
-// for allocator tagging.
+// for allocator tagging. @todo move to common header
 #define QUICER_ACCEPTOR '00rQ'  // Qr00 - QUICER ACCEPTOR
 #define QUICER_SND_BUFF '10rQ'  // Qr01 - QUICER SEND BUFFER
 #define QUICER_OWNER_MON '20rQ' // Qr02 - QUICER OWNER MON
+#define QUICER_CREDENTIAL_CONFIG_HELPER                                       \
+  '30rQ' // QUICER_CREDENTIAL_CONFIG_HELPER
 
 typedef struct ACCEPTOR
 {

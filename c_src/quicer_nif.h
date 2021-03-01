@@ -11,6 +11,8 @@
 #include "quicer_eterms.h"
 #include "quicer_queue.h"
 
+#include <linux/limits.h>
+
 // Global registration
 // @todo avoid use globals
 extern HQUIC Registration;

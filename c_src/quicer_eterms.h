@@ -41,6 +41,10 @@ extern ERL_NIF_TERM ATOM_ERROR_SSL_ERROR;
 extern ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 extern ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
+// option keys
+extern ERL_NIF_TERM ATOM_CERT;
+extern ERL_NIF_TERM ATOM_KEY;
+
 #define ERROR_TUPLE_2(Err) enif_make_tuple2(env, ATOM_ERROR, Err)
 #define ERROR_TUPLE_3(Err1, Err2) enif_make_tuple3(env, ATOM_ERROR, Err1, Err2)
 

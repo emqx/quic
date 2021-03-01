@@ -1,7 +1,7 @@
 #include "quicer_nif.h"
 #include "quicer_listener.h"
 #include <dlfcn.h>
-#include <linux/limits.h>
+
 /*
 ** atoms in use, initialized while load nif
 */
@@ -44,6 +44,10 @@ ERL_NIF_TERM ATOM_ERROR_SSL_ERROR;
 ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
+// option keys
+ERL_NIF_TERM ATOM_CERT;
+ERL_NIF_TERM ATOM_KEY;
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -85,7 +89,9 @@ ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
   ATOM(ATOM_ERROR_SOCKET_ERROR, socket_error);                                \
   ATOM(ATOM_ERROR_SSL_ERROR, ssl_error);                                      \
   ATOM(ATOM_ERROR_USER_CANCELED, user_canceled);                              \
-  ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);
+  ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);                        \
+  ATOM(ATOM_CERT, cert);                                                      \
+  ATOM(ATOM_KEY, key)
 
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;

@@ -3,21 +3,11 @@
 const uint64_t IdleTimeoutMs = 5000;
 
 bool
-ReloadCertConfig(HQUIC Configuration)
+ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
-  QUIC_CREDENTIAL_CONFIG_HELPER Config;
-  // @todo remove hardcoded keys
-  const char *Cert = "/tmp/quicer/cert.pem";
-  const char *KeyFile = "/tmp/quicer/key.pem";
-  memset(&Config, 0, sizeof(Config));
-  Config.CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
-  Config.CertFile.CertificateFile = (char *)Cert;
-  Config.CertFile.PrivateKeyFile = (char *)KeyFile;
-  Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-  Config.CredConfig.CertificateFile = &Config.CertFile;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
-                      Configuration, &Config.CredConfig)))
+                      Configuration, &Config->CredConfig)))
     {
       printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
       return false;
@@ -25,9 +15,65 @@ ReloadCertConfig(HQUIC Configuration)
   return true;
 }
 
+// @todo return status instead
+QUIC_CREDENTIAL_CONFIG_HELPER *
+NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
+{
+  ERL_NIF_TERM cert;
+  ERL_NIF_TERM key;
+  QUIC_CREDENTIAL_CONFIG_HELPER *Config;
+
+  char *cert_path = malloc(PATH_MAX);
+  char *key_path = malloc(PATH_MAX);
+
+  if (!enif_get_map_value(env, *option, ATOM_CERT, &cert))
+    {
+      return NULL;
+    }
+
+  if (!enif_get_map_value(env, *option, ATOM_KEY, &key))
+    {
+      return NULL;
+    }
+
+  if (!enif_get_string(env, cert, cert_path, PATH_MAX, ERL_NIF_LATIN1))
+    {
+      return NULL;
+    }
+
+  if (!enif_get_string(env, key, key_path, PATH_MAX, ERL_NIF_LATIN1))
+    {
+      return NULL;
+    }
+
+  Config = (QUIC_CREDENTIAL_CONFIG_HELPER *)QUIC_ALLOC_NONPAGED(
+      sizeof(QUIC_CREDENTIAL_CONFIG_HELPER), QUICER_CREDENTIAL_CONFIG_HELPER);
+
+  memset(Config, 0, sizeof(QUIC_CREDENTIAL_CONFIG_HELPER));
+  Config->CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
+
+  //
+  // Loads the server's certificate from the file.
+  //
+  Config->CertFile.CertificateFile = cert_path;
+  Config->CertFile.PrivateKeyFile = key_path;
+  Config->CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+  Config->CredConfig.CertificateFile = &Config->CertFile;
+  return Config;
+}
+
+void
+DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+{
+  // free((char *)Config->CertFile.CertificateFile);
+  // free((char *)Config->CertFile.PrivateKeyFile);
+  free(Config);
+}
+
 // todo support per registration.
 bool
-ServerLoadConfiguration(HQUIC *Configuration)
+ServerLoadConfiguration(HQUIC *Configuration,
+                        QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
   QUIC_SETTINGS Settings = { 0 };
   //
@@ -49,20 +95,6 @@ ServerLoadConfiguration(HQUIC *Configuration)
   Settings.PeerBidiStreamCount = 1;
   Settings.IsSet.PeerBidiStreamCount = TRUE;
 
-  QUIC_CREDENTIAL_CONFIG_HELPER Config;
-  memset(&Config, 0, sizeof(Config));
-  Config.CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
-
-  const char *Cert = "/tmp/quicer/cert.pem";
-  const char *KeyFile = "/tmp/quicer/key.pem";
-  //
-  // Loads the server's certificate from the file.
-  //
-  Config.CertFile.CertificateFile = (char *)Cert;
-  Config.CertFile.PrivateKeyFile = (char *)KeyFile;
-  Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-  Config.CredConfig.CertificateFile = &Config.CertFile;
-
   //
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
@@ -80,7 +112,7 @@ ServerLoadConfiguration(HQUIC *Configuration)
   // Loads the TLS credential part of the configuration.
   //
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
-                      *Configuration, &Config.CredConfig)))
+                      *Configuration, &Config->CredConfig)))
     {
       printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
       return false;

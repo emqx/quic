@@ -123,12 +123,18 @@ tc_lib_re_registration(_Config) ->
   ok = quicer_nif:reg_close(),
   ok = quicer_nif:reg_close().
 
-tc_open_listener(_Config) ->
+tc_open_listener(Config) ->
   Port = 4567,
-  {ok, _L} = quicer:listen(Port, []),
+  {ok, _L} = quicer:listen(Port, default_listen_opts(Config)),
   {error,eaddrinuse} = gen_udp:open(Port),
   %% @todo, close port...
   ok.
+
+%% internal helpers
+default_listen_opts(Config) ->
+  DataDir = ?config(data_dir, Config),
+  [ {cert, filename:join(DataDir, "cert.pem")}
+  , {key,  filename:join(DataDir, "key.pem")}].
 
 
 %%%_* Emacs ====================================================================

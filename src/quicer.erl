@@ -22,9 +22,11 @@
 
 -type listener_handler() :: reference().
 
--spec listen(inet:port_number(), proplists:proplists()) ->
+-spec listen(inet:port_number(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
-listen(Port, Opts) ->
+listen(Port, Opts) when is_list(Opts)->
+  listen(Port, maps:from_list(Opts));
+listen(Port, Opts) when is_map(Opts)->
   quicer_nif:listen(Port, Opts).
 
 init() ->
