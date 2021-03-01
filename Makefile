@@ -34,3 +34,10 @@ dialyzer:
 
 .PHONY: test
 test: ct
+
+.PHONY: check
+check: clang-format
+
+.PHONY: clang-format
+clang-format:
+	clang-format-10 --Werror --dry-run c_src/*
