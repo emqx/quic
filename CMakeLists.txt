@@ -23,6 +23,8 @@ set(SOURCES
   c_src/quicer_nif.c
   c_src/quicer_nif.h
   c_src/quicer_eterms.h
+  c_src/quicer_queue.c
+  c_src/quicer_queue.h
   )
 
 add_subdirectory(submodules/msquic)
