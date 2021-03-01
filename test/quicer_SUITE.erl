@@ -34,6 +34,7 @@
         , tc_close_lib_test/1
         , tc_lib_registration/1
         , tc_lib_re_registration/1
+        , tc_open_listener/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -121,6 +122,13 @@ tc_lib_re_registration(_Config) ->
   ok = quicer_nif:reg_open(),
   ok = quicer_nif:reg_close(),
   ok = quicer_nif:reg_close().
+
+tc_open_listener(_Config) ->
+  Port = 4567,
+  {ok, _L} = quicer:listen(Port, []),
+  {error,eaddrinuse} = gen_udp:open(Port),
+  %% @todo, close port...
+  ok.
 
 
 %%%_* Emacs ====================================================================

@@ -18,6 +18,7 @@
         , close_lib/0
         , reg_open/0
         , reg_close/0
+        , listen/2
         ]).
 
 -on_load(init/0).
@@ -39,4 +40,7 @@ reg_open() ->
   erlang:nif_error(nif_library_not_loaded).
 
 reg_close() ->
+  erlang:nif_error(nif_library_not_loaded).
+
+listen(_Port, _Options)->
   erlang:nif_error(nif_library_not_loaded).

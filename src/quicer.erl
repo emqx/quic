@@ -16,9 +16,16 @@
 
 -module(quicer).
 
--export([]).
+-export([listen/2]).
 
 -on_load(init/0).
+
+-type listener_handler() :: reference().
+
+-spec listen(inet:port_number(), proplists:proplists()) ->
+        {ok, listener_handler()} | {error, any()}.
+listen(Port, Opts) ->
+  quicer_nif:listen(Port, Opts).
 
 init() ->
   quicer_nif:open_lib(),

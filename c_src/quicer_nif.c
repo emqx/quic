@@ -1,7 +1,7 @@
 #include "quicer_nif.h"
+#include "quicer_listener.h"
 #include <dlfcn.h>
 #include <linux/limits.h>
-
 /*
 ** atoms in use, initialized while load nif
 */
@@ -10,6 +10,14 @@ ERL_NIF_TERM ATOM_OK;
 ERL_NIF_TERM ATOM_ERROR;
 ERL_NIF_TERM ATOM_REG_FAILED;
 ERL_NIF_TERM ATOM_OPEN_FAILED;
+ERL_NIF_TERM ATOM_CTX_INIT_FAILED;
+ERL_NIF_TERM ATOM_BAD_PID;
+ERL_NIF_TERM ATOM_CONFIG_ERROR;
+ERL_NIF_TERM ATOM_CERT_ERROR;
+ERL_NIF_TERM ATOM_BAD_MON;
+ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
+ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
+ERL_NIF_TERM ATOM_BADARG;
 
 // Mirror 'errors' in msquic_linux.h
 ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -46,6 +54,14 @@ ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
   ATOM(ATOM_ERROR, error);                                                    \
   ATOM(ATOM_REG_FAILED, reg_failed);                                          \
   ATOM(ATOM_OPEN_FAILED, open_failed);                                        \
+  ATOM(ATOM_CTX_INIT_FAILED, ctx_init_failed);                                \
+  ATOM(ATOM_BAD_PID, bad_pid);                                                \
+  ATOM(ATOM_CONFIG_ERROR, config_error);                                      \
+  ATOM(ATOM_CERT_ERROR, cert_error);                                          \
+  ATOM(ATOM_BAD_MON, bad_mon);                                                \
+  ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
+  ATOM(ATOM_LISTENER_START_ERROR, listener_start_error);                      \
+  ATOM(ATOM_BADARG, badarg);                                                  \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
   ATOM(ATOM_ERROR_CONTINUE, contiune);                                        \
@@ -78,8 +94,35 @@ const QUIC_API_TABLE *MsQuic;
 BOOLEAN isRegistered = false;
 BOOLEAN isLibOpened = false;
 
+ErlNifResourceType *ctx_listener_t = NULL;
+ErlNifResourceType *ctx_connection_t = NULL;
+
 const QUIC_REGISTRATION_CONFIG RegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
+const QUIC_BUFFER Alpn = { sizeof("sample") - 1, (uint8_t *)"sample" };
+
+void
+resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
+                                __unused_parm__ void *obj,
+                                __unused_parm__ ErlNifPid *pid,
+                                __unused_parm__ ErlNifMonitor *mon)
+{
+  // todo
+}
+
+void
+resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env, void *obj,
+                            __unused_parm__ ErlNifPid *pid,
+                            __unused_parm__ ErlNifMonitor *mon)
+{
+  QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
+  assert(c_ctx->Connection != NULL);
+  assert(pid == c_ctx->owner);
+  MsQuic->ConnectionShutdown(c_ctx->Connection,
+                             //@todo, check rfc for the error code
+                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                             ERROR_OPERATION_ABORTED);
+}
 
 static int
 on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
@@ -95,6 +138,20 @@ on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
   INIT_ATOMS
 #undef ATOM
 
+  ErlNifResourceFlags flags
+      = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
+  ErlNifResourceTypeInit connInit
+      = { .dtor = NULL, .down = resource_conn_down_callback, .stop = NULL };
+  ErlNifResourceTypeInit listenerInit = {
+    .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
+  };
+  ctx_listener_t = enif_open_resource_type_x(env, "listener_context_resource",
+                                             &listenerInit, // init callbacks
+                                             flags, NULL);
+  ctx_connection_t
+      = enif_open_resource_type_x(env, "connection_context_resource",
+                                  &connInit, // init callbacks
+                                  flags, NULL);
   return ret_val;
 }
 
@@ -183,10 +240,13 @@ static ErlNifFunc nif_funcs[] = {
   /* |  name  | arity| funptr | flags|
    *
    */
+  // clang-format off
   { "open_lib", 1, openLib, 0 },
   { "close_lib", 0, closeLib, 0 },
   { "reg_open", 0, registration, 0 },
-  { "reg_close", 0, deregistration, 0 }
+  { "reg_close", 0, deregistration, 0 },
+  { "listen", 2, listen2, 0},
+  // clang-format on
 };
 
 ERL_NIF_INIT(quicer_nif, nif_funcs, &on_load, NULL, &on_upgrade, &on_unload);
