@@ -366,7 +366,7 @@ async_accept2(ErlNifEnv *env, __unused_parm__ int argc,
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
 
-  printf("conn acceptor enqueued %p\n", acceptor);
+  //printf("conn acceptor enqueued %p\n", acceptor);
 
   assert(enif_is_process_alive(env, &(acceptor->Pid)));
 

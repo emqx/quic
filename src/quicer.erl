@@ -38,11 +38,27 @@ listen(Port, Opts) when is_map(Opts)->
 close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
-connect(Addr, Port, Opts, Timeout) ->
-  quicer_nif:connect(Addr, Port, Opts, Timeout).
+connect(Addr, Port, Opts, _Timeout) ->
+  case quicer_nif:async_connect(Addr, Port, Opts) of
+    {ok, _H} ->
+      receive
+        {quic, connected, Ctx} ->
+          %%io:format("erl nif: connected\n"),
+          {ok, Ctx}
+      end;
+    {error, _} = Err ->
+      Err
+  end.
 
-accept(Listener, Opts, Timeout) ->
-  quicer_nif:accept(Listener, Opts, Timeout).
+accept(LSock, Opts, Timeout) ->
+  % non-blocking
+  {ok, _L} = quicer_nif:async_accept(LSock, Opts),
+  receive
+    {new_conn, C} ->
+      {ok, C}
+  after Timeout ->
+    {error, timeout}
+  end.
 
 close_connection(Conn) ->
   quicer_nif:close_connection(Conn).
