@@ -102,6 +102,7 @@ BOOLEAN isLibOpened = false;
 
 ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
+ErlNifResourceType *ctx_stream_t = NULL;
 
 const QUIC_REGISTRATION_CONFIG RegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
@@ -129,6 +130,15 @@ resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env, void *obj,
                              ERROR_OPERATION_ABORTED);
 }
 
+void
+resource_stream_down_callback(__unused_parm__ ErlNifEnv *caller_env,
+                              __unused_parm__ void *obj,
+                              __unused_parm__ ErlNifPid *pid,
+                              __unused_parm__ ErlNifMonitor *mon)
+{
+  // @todo
+}
+
 static int
 on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
         __unused_parm__ ERL_NIF_TERM loadinfo)
@@ -145,6 +155,9 @@ on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
 
   ErlNifResourceFlags flags
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
+
+  ErlNifResourceTypeInit streamInit
+      = { .dtor = NULL, .down = resource_stream_down_callback, .stop = NULL };
   ErlNifResourceTypeInit connInit
       = { .dtor = NULL, .down = resource_conn_down_callback, .stop = NULL };
   ErlNifResourceTypeInit listenerInit = {
@@ -157,6 +170,10 @@ on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
       = enif_open_resource_type_x(env, "connection_context_resource",
                                   &connInit, // init callbacks
                                   flags, NULL);
+  ctx_stream_t = enif_open_resource_type_x(env, "stream_context_resource",
+                                           &streamInit, // init callbacks
+                                           flags, NULL);
+
   return ret_val;
 }
 

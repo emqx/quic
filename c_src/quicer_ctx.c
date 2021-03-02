@@ -54,3 +54,22 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
     }
   enif_release_resource(c_ctx);
 }
+
+QuicerStreamCTX *
+init_s_ctx()
+{
+  QuicerStreamCTX *s_ctx
+    = enif_alloc_resource(ctx_stream_t, sizeof(QuicerStreamCTX));
+  // @todo would be better to useacceptor's env.
+  s_ctx->env = enif_alloc_env();
+  s_ctx->lock = enif_mutex_create("quicer:s_ctx");
+  return s_ctx;
+}
+
+void
+destroy_s_ctx(QuicerStreamCTX *s_ctx)
+{
+  enif_free_env(s_ctx->env);
+  enif_mutex_destroy(s_ctx->lock);
+  enif_release_resource(s_ctx);
+}
