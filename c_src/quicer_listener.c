@@ -1,17 +1,5 @@
 #include "quicer_listener.h"
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-    _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
-    ServerConnectionCallback(_In_ __unused_parm__ HQUIC Connection,
-                             _In_opt_ __unused_parm__ void *Context,
-                             _Inout_ __unused_parm__
-                                 QUIC_CONNECTION_EVENT *Event)
-{
-  // todo
-  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  return Status;
-}
-
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener, void *Context,
                        QUIC_LISTENER_EVENT *Event)

@@ -18,6 +18,8 @@ ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
 ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
 ERL_NIF_TERM ATOM_BADARG;
+ERL_NIF_TERM ATOM_CONN_OPEN_ERROR;
+ERL_NIF_TERM ATOM_CONN_START_ERROR;
 
 // Mirror 'errors' in msquic_linux.h
 ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -66,6 +68,8 @@ ERL_NIF_TERM ATOM_KEY;
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
   ATOM(ATOM_LISTENER_START_ERROR, listener_start_error);                      \
   ATOM(ATOM_BADARG, badarg);                                                  \
+  ATOM(ATOM_CONN_OPEN_ERROR, conn_open_error);                                \
+  ATOM(ATOM_CONN_START_ERROR, conn_start_error);                              \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
   ATOM(ATOM_ERROR_CONTINUE, contiune);                                        \
@@ -268,7 +272,10 @@ static ErlNifFunc nif_funcs[] = {
   { "reg_open", 0, registration, 0 },
   { "reg_close", 0, deregistration, 0 },
   { "listen", 2, listen2, 0},
-  { "close_listener", 1, close_listener1, 0}
+  { "close_listener", 1, close_listener1, 0},
+  { "async_connect", 3, async_connect3, 0},
+  { "async_accept", 2, async_accept2, 0},
+  { "close_connection", 1, close_connection1, 0}
   // clang-format on
 };
 

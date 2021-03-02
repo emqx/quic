@@ -70,7 +70,7 @@ DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
   free(Config);
 }
 
-// todo support per registration.
+// @todo support per registration.
 bool
 ServerLoadConfiguration(HQUIC *Configuration,
                         QUIC_CREDENTIAL_CONFIG_HELPER *Config)
@@ -113,6 +113,62 @@ ServerLoadConfiguration(HQUIC *Configuration,
   //
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
                       *Configuration, &Config->CredConfig)))
+    {
+      printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
+      return false;
+    }
+
+  return true;
+}
+
+// @todo support per registration.
+bool
+ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
+{
+  QUIC_SETTINGS Settings = { 0 };
+  //
+  // Configures the client's idle timeout.
+  //
+  Settings.IdleTimeoutMs = IdleTimeoutMs;
+  Settings.IsSet.IdleTimeoutMs = TRUE;
+
+  // This is to enable the ability of server initialized stream
+  Settings.IsSet.PeerUnidiStreamCount = TRUE;
+  Settings.PeerUnidiStreamCount = 1;
+  Settings.IsSet.PeerBidiStreamCount = TRUE;
+  Settings.PeerBidiStreamCount = 1;
+  //
+  // Configures a default client configuration, optionally disabling
+  // server certificate validation.
+  //
+  QUIC_CREDENTIAL_CONFIG CredConfig;
+  memset(&CredConfig, 0, sizeof(CredConfig));
+  CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
+  CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
+  if (Unsecure)
+    {
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+    }
+
+  //
+  // Allocate/initialize the configuration object, with the configured ALPN
+  // and settings.
+  //
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
+                      Registration, &Alpn, 1, &Settings, sizeof(Settings),
+                      NULL, Configuration)))
+    {
+      printf("ConfigurationOpen failed, 0x%x!\n", Status);
+      return false;
+    }
+
+  //
+  // Loads the TLS credential part of the configuration. This is required even
+  // on client side, to indicate if a certificate is required or not.
+  //
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
+                                                               &CredConfig)))
     {
       printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
       return false;

@@ -15,6 +15,8 @@ extern ERL_NIF_TERM ATOM_BAD_MON;
 extern ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
 extern ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
 extern ERL_NIF_TERM ATOM_BADARG;
+extern ERL_NIF_TERM ATOM_CONN_OPEN_ERROR;
+extern ERL_NIF_TERM ATOM_CONN_START_ERROR;
 
 // msquic_linux.h 'errors'
 extern ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -45,6 +47,7 @@ extern ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 extern ERL_NIF_TERM ATOM_CERT;
 extern ERL_NIF_TERM ATOM_KEY;
 
+#define SUCCESS(Term) enif_make_tuple(env, 2, ATOM_OK, Term)
 #define ERROR_TUPLE_2(Err) enif_make_tuple2(env, ATOM_ERROR, Err)
 #define ERROR_TUPLE_3(Err1, Err2) enif_make_tuple3(env, ATOM_ERROR, Err1, Err2)
 

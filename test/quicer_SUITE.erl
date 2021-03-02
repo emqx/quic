@@ -36,6 +36,9 @@
         , tc_lib_re_registration/1
         , tc_open_listener/1
         , tc_close_listener/1
+
+        , tc_conn_basic/1
+        , tc_conn_other_port/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -134,7 +137,44 @@ tc_open_listener(Config) ->
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).
 
+tc_conn_basic(Config)->
+  Port = 4567,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_other_port(Config)->
+  Port = 4568,
+  Owner = self(),
+  spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      ok = quicer:close_connection(Conn)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
 %% internal helpers
+simple_conn_server(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Owner ! listener_ready,
+  {ok, _Conn} = quicer:accept(L, [], 5000),
+  receive done ->
+      quicer:close_listener(L),
+      ok
+  end.
+
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
   [ {cert, filename:join(DataDir, "cert.pem")}

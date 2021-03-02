@@ -7,6 +7,7 @@
 #include <msquic.h>
 
 #include "quicer_config.h"
+#include "quicer_connection.h"
 #include "quicer_ctx.h"
 #include "quicer_eterms.h"
 #include "quicer_queue.h"

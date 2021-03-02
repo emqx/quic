@@ -59,7 +59,7 @@ QuicerStreamCTX *
 init_s_ctx()
 {
   QuicerStreamCTX *s_ctx
-    = enif_alloc_resource(ctx_stream_t, sizeof(QuicerStreamCTX));
+      = enif_alloc_resource(ctx_stream_t, sizeof(QuicerStreamCTX));
   // @todo would be better to useacceptor's env.
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");

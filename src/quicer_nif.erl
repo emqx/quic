@@ -20,6 +20,10 @@
         , reg_close/0
         , listen/2
         , close_listener/1
+        , connect/4
+        , async_connect/3
+        , accept/3
+        , close_connection/1
         ]).
 
 -on_load(init/0).
@@ -47,4 +51,32 @@ listen(_Port, _Options)->
   erlang:nif_error(nif_library_not_loaded).
 
 close_listener(_Listener) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+connect(Addr, Port, Opts, _Timeout) ->
+  %% @ H could be ref?
+  _H = async_connect(Addr, Port, Opts),
+  receive
+    {quic, connected, Ctx} ->
+      io:format("erl nif: connected\n"),
+      {ok, Ctx}
+  end.
+
+async_connect(_, _, _)->
+  erlang:nif_error(nif_library_not_loaded).
+
+accept(LSock, Opts, Timeout) ->
+  % non-blocking
+  {ok, _L} = async_accept(LSock, Opts),
+  receive
+    {new_conn, C} ->
+      {ok, C}
+  after Timeout ->
+    {error, timeout}
+  end.
+
+async_accept(_, _) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+close_connection(_) ->
   erlang:nif_error(nif_library_not_loaded).

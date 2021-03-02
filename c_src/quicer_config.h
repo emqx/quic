@@ -21,5 +21,6 @@ QUIC_CREDENTIAL_CONFIG_HELPER *NewCredConfig(ErlNifEnv *env,
 void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *);
 bool ServerLoadConfiguration(HQUIC *Configuration,
                              QUIC_CREDENTIAL_CONFIG_HELPER *Config);
+bool ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure);
 
 #endif // __QUICER_CONFIG_H_

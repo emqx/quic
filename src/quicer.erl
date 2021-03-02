@@ -18,6 +18,9 @@
 
 -export([ listen/2
         , close_listener/1
+        , connect/4
+        , accept/3
+        , close_connection/1
         ]).
 
 -on_load(init/0).
@@ -34,6 +37,15 @@ listen(Port, Opts) when is_map(Opts)->
 -spec close_listener(listener_handler()) -> ok.
 close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
+
+connect(Addr, Port, Opts, Timeout) ->
+  quicer_nif:connect(Addr, Port, Opts, Timeout).
+
+accept(Listener, Opts, Timeout) ->
+  quicer_nif:accept(Listener, Opts, Timeout).
+
+close_connection(Conn) ->
+  quicer_nif:close_connection(Conn).
 
 init() ->
   quicer_nif:open_lib(),

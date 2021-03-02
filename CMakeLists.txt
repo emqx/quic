@@ -31,6 +31,8 @@ set(SOURCES
   c_src/quicer_ctx.h
   c_src/quicer_listener.c
   c_src/quicer_listener.h
+  c_src/quicer_connection.c
+  c_src/quicer_connection.h
   )
 
 add_subdirectory(submodules/msquic)
