@@ -35,6 +35,7 @@
         , tc_lib_registration/1
         , tc_lib_re_registration/1
         , tc_open_listener/1
+        , tc_close_listener/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -125,10 +126,13 @@ tc_lib_re_registration(_Config) ->
 
 tc_open_listener(Config) ->
   Port = 4567,
-  {ok, _L} = quicer:listen(Port, default_listen_opts(Config)),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   {error,eaddrinuse} = gen_udp:open(Port),
-  %% @todo, close port...
+  ok = quicer:close_listener(L),
   ok.
+
+tc_close_listener(_Config) ->
+  {error,badarg} = quicer:close_listener(make_ref()).
 
 %% internal helpers
 default_listen_opts(Config) ->

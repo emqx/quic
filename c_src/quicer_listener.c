@@ -137,3 +137,20 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM listenHandler = enif_make_resource(env, l_ctx);
   return OK_TUPLE_2(listenHandler);
 }
+
+ERL_NIF_TERM
+close_listener1(ErlNifEnv *env, __unused_parm__ int argc,
+                const ERL_NIF_TERM argv[])
+{
+  QuicerListenerCTX *l_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  // @todo error handling here
+  MsQuic->ListenerStop(l_ctx->Listener);
+  MsQuic->ListenerClose(l_ctx->Listener);
+  enif_release_resource(l_ctx);
+  return enif_make_atom(env, "ok");
+}

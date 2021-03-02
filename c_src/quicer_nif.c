@@ -123,7 +123,6 @@ resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env, void *obj,
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   assert(c_ctx->Connection != NULL);
-  assert(pid == c_ctx->owner);
   MsQuic->ConnectionShutdown(c_ctx->Connection,
                              //@todo, check rfc for the error code
                              QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
@@ -252,6 +251,7 @@ static ErlNifFunc nif_funcs[] = {
   { "reg_open", 0, registration, 0 },
   { "reg_close", 0, deregistration, 0 },
   { "listen", 2, listen2, 0},
+  { "close_listener", 1, close_listener1, 0}
   // clang-format on
 };
 

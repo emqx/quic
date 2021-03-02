@@ -16,7 +16,9 @@
 
 -module(quicer).
 
--export([listen/2]).
+-export([ listen/2
+        , close_listener/1
+        ]).
 
 -on_load(init/0).
 
@@ -28,6 +30,10 @@ listen(Port, Opts) when is_list(Opts)->
   listen(Port, maps:from_list(Opts));
 listen(Port, Opts) when is_map(Opts)->
   quicer_nif:listen(Port, Opts).
+
+-spec close_listener(listener_handler()) -> ok.
+close_listener(Listener) ->
+  quicer_nif:close_listener(Listener).
 
 init() ->
   quicer_nif:open_lib(),
