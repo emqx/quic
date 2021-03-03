@@ -9,7 +9,6 @@ ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
                       Configuration, &Config->CredConfig)))
     {
-      printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
       return false;
     }
   return true;
@@ -104,7 +103,6 @@ ServerLoadConfiguration(HQUIC *Configuration,
                       Registration, &Alpn, 1, &Settings, sizeof(Settings),
                       NULL, Configuration)))
     {
-      printf("ConfigurationOpen failed, 0x%x!\n", Status);
       return false;
     }
 
@@ -114,14 +112,13 @@ ServerLoadConfiguration(HQUIC *Configuration,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
                       *Configuration, &Config->CredConfig)))
     {
-      printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
       return false;
     }
 
   return true;
 }
 
-// @todo support per registration.
+// @todo return status instead
 bool
 ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
 {
@@ -159,7 +156,6 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
                       Registration, &Alpn, 1, &Settings, sizeof(Settings),
                       NULL, Configuration)))
     {
-      printf("ConfigurationOpen failed, 0x%x!\n", Status);
       return false;
     }
 
@@ -170,7 +166,6 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
                                                                &CredConfig)))
     {
-      printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
       return false;
     }
 

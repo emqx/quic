@@ -27,20 +27,20 @@ ClientStreamCallback(_In_ HQUIC Stream, _In_opt_ void *Context,
 // The clients's callback for connection events from MsQuic.
 //
 _IRQL_requires_max_(DISPATCH_LEVEL)
-    _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
-    ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
-                             _Inout_ QUIC_CONNECTION_EVENT *Event)
+_Function_class_(QUIC_CONNECTION_CALLBACK)
+QUIC_STATUS QUIC_API
+ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
+                         _Inout_ QUIC_CONNECTION_EVENT *Event)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
+  QuicerStreamCTX *s_ctx = NULL;
   ErlNifEnv *env = c_ctx->env;
-  printf("[client conn][%d] recv event \n", Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
       //
       // The handshake has completed for the connection.
       //
-      printf("C:[conn][%p] Connected\n", Connection);
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
       enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, c_ctx->owner_mon);
@@ -57,9 +57,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // The peer has started/created a new stream. The app MUST set the
       // callback handler before returning.
       //
-      printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
       // maybe alloc later
-      QuicerStreamCTX *s_ctx = init_s_ctx();
+      s_ctx = init_s_ctx();
 
       // @fixit Stream context shouldn't be shared.
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
@@ -68,7 +67,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       if (!acc)
         {
           destroy_s_ctx(s_ctx);
-          //@todo make callback exit
           return QUIC_STATUS_UNREACHABLE;
         }
       s_ctx->owner = acc;
@@ -94,22 +92,17 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // is the expected way for the connection to shut down with this
       // protocol, since we let idle timeout kill the connection.
       //
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
-             Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
       //
       // The connection was explicitly shut down by the peer.
       //
-      printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
-             (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
       //
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      printf("[conn][%p] All done\n", Connection);
       if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
@@ -121,8 +114,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A resumption ticket (also called New Session Ticket or NST) was
       // received from the server.
       //
-      printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection,
-             Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
       for (uint32_t i = 0;
            i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++)
         {
@@ -152,8 +143,7 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       //
       // The handshake has completed for the connection.
       //
-      printf("S:[conn][%p] Connected\n", Connection);
-      QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
+      c_ctx = (QuicerConnCTX *)Context;
       assert(c_ctx->Connection == NULL);
       c_ctx->Connection = Connection;
       acc = c_ctx->owner;
@@ -161,14 +151,11 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
 
       if (!(acc && enif_is_process_alive(c_ctx->env, acc_pid)))
         {
-          printf("no connection owner but new connection established, "
-                 "dequeue...\n");
           acc = AcceptorDequeue(
               c_ctx->l_ctx->acceptor_queue); // dequeue from listener queue!
           acc_pid = &(acc->Pid);
           if (!(acc && acc_pid && enif_is_process_alive(c_ctx->env, acc_pid)))
             {
-              printf("connection established, but acceptor has bad pid\n");
               return QUIC_STATUS_UNREACHABLE;
             }
         }
@@ -181,17 +168,14 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor
       // should pick a 'acceptor' here?
-      printf("new connection, send notifier\n");
       if (!enif_send(NULL, acc_pid, NULL,
                      enif_make_tuple(c_ctx->env, 2,
                                      enif_make_atom(c_ctx->env, "new_conn"),
                                      ConnHandler)))
         {
-          printf("Failed to send new conn notifier");
           //@todo close connection
-          break;
+          return QUIC_STATUS_UNREACHABLE;
         }
-      printf("new connection notify sent\n");
 
       MsQuic->ConnectionSendResumptionTicket(
           Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
@@ -209,15 +193,12 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       //
       // The connection was explicitly shut down by the peer.
       //
-      printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
-             (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
       //
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      printf("[conn][%p] All done\n", Connection);
       MsQuic->ConnectionClose(Connection);
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -225,7 +206,6 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // The peer has started/created a new stream. The app MUST set the
       // callback handler before returning.
       //
-      printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
       c_ctx = (QuicerConnCTX *)Context;
       // maybe alloc later
       QuicerStreamCTX *s_ctx = init_s_ctx();
@@ -238,8 +218,6 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // owner1
       while (!(acc && acc_pid && enif_is_process_alive(env, acc_pid)))
         {
-          printf("[strm][%p] invalid acceptor %p\n",
-                 Event->PEER_STREAM_STARTED.Stream, acc_pid);
           acc = AcceptorDequeue(c_ctx->acceptor_queue);
           acc_pid = &(acc->Pid);
 
@@ -260,10 +238,10 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
                                       enif_make_resource(env, s_ctx))))
         {
           // @todo log and step counter
-          printf("[strm][%p] failed to send msg\n",
-                 Event->PEER_STREAM_STARTED.Stream);
-          // @fixme
+          // @todo, maybe we should just return error code and let msquic
+          // shutdown the connection gracefully.
           MsQuic->ConnectionClose(Connection);
+          return QUIC_STATUS_UNREACHABLE;
         }
       else
         {
@@ -276,10 +254,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // The connection succeeded in doing a TLS resumption of a previous
       // connection's session.
       //
-      printf("[conn][%p] Connection resumed!\n", Connection);
       break;
     default:
-      printf("[conn][%p] Connection unexpected!\n", Connection);
       break;
     }
   return QUIC_STATUS_SUCCESS;
@@ -365,8 +341,6 @@ async_accept2(ErlNifEnv *env, __unused_parm__ int argc,
     }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
-
-  //printf("conn acceptor enqueued %p\n", acceptor);
 
   assert(enif_is_process_alive(env, &(acceptor->Pid)));
 
