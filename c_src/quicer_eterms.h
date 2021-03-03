@@ -17,6 +17,10 @@ extern ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
 extern ERL_NIF_TERM ATOM_BADARG;
 extern ERL_NIF_TERM ATOM_CONN_OPEN_ERROR;
 extern ERL_NIF_TERM ATOM_CONN_START_ERROR;
+extern ERL_NIF_TERM ATOM_STREAM_OPEN_ERROR;
+extern ERL_NIF_TERM ATOM_STREAM_START_ERROR;
+extern ERL_NIF_TERM ATOM_STREAM_SEND_ERROR;
+extern ERL_NIF_TERM ATOM_OWNER_DEAD;
 
 // msquic_linux.h 'errors'
 extern ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -54,5 +58,7 @@ extern ERL_NIF_TERM ATOM_KEY;
 #define OK_TUPLE_2(Term) enif_make_tuple2(env, ATOM_OK, Term)
 
 #define ETERM_INT(i) enif_make_int(env, i)
+
+#define ETERM_UINT_64(i) enif_make_int(env, (uint64_t)i)
 
 #endif // __QUICER_ETERMS_H_

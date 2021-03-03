@@ -39,6 +39,9 @@
 
         , tc_conn_basic/1
         , tc_conn_other_port/1
+
+        , tc_stream_client_init/1
+        , tc_stream_client_send/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -156,20 +159,82 @@ tc_conn_basic(Config)->
 tc_conn_other_port(Config)->
   Port = 4568,
   Owner = self(),
-  spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
+  {SPid, _Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
-      ok = quicer:close_connection(Conn)
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_client_init(Config) ->
+  Port = 4568,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> simple_stream_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      ok = quicer:close_stream(Stm),
+      SPid ! done
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_client_send(Config) ->
+  Port = 4569,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive
+        {quic, <<"pong">>, _, _, _, _} ->
+          ok = quicer:close_stream(Stm);
+        Other ->
+          ct:fail("Unexpected Msg ~p", [Other])
+      end,
+      SPid ! done
   after 1000 ->
       ct:fail("timeout")
   end.
 
 %% internal helpers
+ping_pong_server(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Owner ! listener_ready,
+  ping_pong_server_loop(L).
+
+ping_pong_server_loop(L) ->
+  {ok, Conn} = quicer:accept(L, [], 5000),
+  {ok, Stm} = quicer:accept_stream(Conn, []),
+  true = is_reference(Stm),
+  receive
+    {quic, <<"ping">>, _, _, _, _} ->
+      {ok, 4} = quicer:send(Stm, <<"pong">>),
+      ping_pong_server_loop(L);
+    done ->
+      quicer:close_listener(L)
+  end.
+
 simple_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
   {ok, _Conn} = quicer:accept(L, [], 5000),
+  receive done ->
+      quicer:close_listener(L),
+      ok
+  end.
+
+simple_stream_server(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Owner ! listener_ready,
+  {ok, Conn} = quicer:accept(L, [], 5000),
+  {ok, _Stream }= quicer:accept_stream(Conn, []),
   receive done ->
       quicer:close_listener(L),
       ok

@@ -11,6 +11,7 @@
 #include "quicer_ctx.h"
 #include "quicer_eterms.h"
 #include "quicer_queue.h"
+#include "quicer_stream.h"
 
 #include <linux/limits.h>
 

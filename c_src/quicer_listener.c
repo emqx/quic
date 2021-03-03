@@ -109,7 +109,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                                          l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, Status);
+      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ETERM_INT(Status));
     }
 
   if (QUIC_FAILED(
@@ -117,7 +117,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, Status);
+      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ETERM_INT(Status));
     }
 
   DestroyCredConfig(Config);

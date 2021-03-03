@@ -20,6 +20,10 @@ ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
 ERL_NIF_TERM ATOM_BADARG;
 ERL_NIF_TERM ATOM_CONN_OPEN_ERROR;
 ERL_NIF_TERM ATOM_CONN_START_ERROR;
+ERL_NIF_TERM ATOM_STREAM_OPEN_ERROR;
+ERL_NIF_TERM ATOM_STREAM_START_ERROR;
+ERL_NIF_TERM ATOM_STREAM_SEND_ERROR;
+ERL_NIF_TERM ATOM_OWNER_DEAD;
 
 // Mirror 'errors' in msquic_linux.h
 ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -70,6 +74,10 @@ ERL_NIF_TERM ATOM_KEY;
   ATOM(ATOM_BADARG, badarg);                                                  \
   ATOM(ATOM_CONN_OPEN_ERROR, conn_open_error);                                \
   ATOM(ATOM_CONN_START_ERROR, conn_start_error);                              \
+  ATOM(ATOM_STREAM_OPEN_ERROR, stm_open_error);                               \
+  ATOM(ATOM_STREAM_START_ERROR, stm_start_error);                             \
+  ATOM(ATOM_STREAM_SEND_ERROR, stm_send_error);                               \
+  ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
   ATOM(ATOM_ERROR_CONTINUE, contiune);                                        \
@@ -275,7 +283,11 @@ static ErlNifFunc nif_funcs[] = {
   { "close_listener", 1, close_listener1, 0},
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
-  { "close_connection", 1, close_connection1, 0}
+  { "close_connection", 1, close_connection1, 0},
+  { "async_accept_stream", 2, async_accept_stream2, 0},
+  { "start_stream", 2, async_start_stream2, 0},
+  { "send", 2, send2, 0},
+  { "close_stream", 1, close_stream1, 0}
   // clang-format on
 };
 
