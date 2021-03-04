@@ -30,7 +30,6 @@ API: is not stable, might be changed in the future
 Debug build depedency: [CLOG](https://github.com/microsoft/CLOG) 
 
 ``` sh
-$ git submodule update --init --recursive
 $ rebar3 compile 
 # OR
 $ make
