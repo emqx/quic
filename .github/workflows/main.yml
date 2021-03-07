@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        otp: [22.3.4.9]
+        otp: [22.3.4.9, 23.2]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
