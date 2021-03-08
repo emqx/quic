@@ -179,6 +179,22 @@ quicer:send(Stream, BinaryData) ->
 
 Aync send data over stream.
 
+
+### Passive receive from stream
+
+``` erlang
+quicer:recv(Stream, Len) -> 
+  {ok, binary()} | {error, any()} | {error, any(), ErrorCode::integer()}.
+```
+
+Like gen_tcp:recv, passive recv data from stream.
+
+If Len = 0, return all data in buffer if it is not empty.
+            if buffer is empty, blocking for a quic msg from stack to arrive and return all data from that msg.
+If Len > 0, desired bytes will be returned, other data would be buffered in proc dict.
+
+Suggested to use Len=0 if caller want to buffer or reassemble the data on its own.
+
 ### Shutdown stream
 
 ``` erlang

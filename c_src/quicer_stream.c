@@ -38,12 +38,11 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
                          Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
-
       ERL_NIF_TERM report = enif_make_tuple6(
           env,
           // reserved for port
           enif_make_atom(env, "quic"), enif_make_binary(env, &bin),
-          enif_make_int(env, enif_make_resource(env, Context)),
+          enif_make_resource(env, s_ctx),
           enif_make_int(
               env, Event->RECEIVE.AbsoluteOffset), // @todo check what is this?
           enif_make_int(env, Event->RECEIVE.TotalBufferLength),
@@ -128,7 +127,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           env,
           // reserved for port
           enif_make_atom(env, "quic"), enif_make_binary(env, &bin),
-          enif_make_int(env, enif_make_resource(env, Context)),
+          enif_make_resource(env, s_ctx),
           enif_make_int(env, Event->RECEIVE.AbsoluteOffset),
           enif_make_int(env, Event->RECEIVE.TotalBufferLength),
           enif_make_int(env, Event->RECEIVE.Flags)

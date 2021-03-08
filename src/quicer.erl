@@ -24,6 +24,7 @@
         , accept_stream/2
         , start_stream/2
         , send/2
+        , recv/2
         , close_stream/1
         ]).
 
@@ -97,6 +98,41 @@ start_stream(Conn, Opts) ->
         {ok, Len :: integer()} | {error, any()}.
 send(Stream, Data) ->
   quicer_nif:send(Stream, Data).
+
+-spec recv(stream_handler(), Count::non_neg_integer())
+          -> {ok, binary()} | {error, any()}.
+recv(Stream, Count) ->
+  case get({'__quic_recv_buff__', Stream}) of
+    undefined ->
+      InitBuff = {[], 0},
+      do_recv(Stream, Count, InitBuff);
+    {Buff, BuffLen} when Count == 0 andalso BuffLen =/= 0 ->
+      put({'__quic_recv_buff__', Stream}, {[], 0}),
+      {ok, iolist_to_binary(lists:reverse(Buff))};
+    {Buff, BuffLen} when Count =/= 0 andalso BuffLen >= Count  ->
+      << Out:Count/binary, Left/binary >> = iolist_to_binary(lists:reverse(Buff)),
+      put({'__quic_recv_buff__', Stream}, {[Left], BuffLen- Count}),
+      {ok, Out};
+    {_, _} = Buff ->
+      do_recv(Stream, Count, Buff)
+  end.
+
+
+do_recv(Stream, Count, {Buff, BuffLen}) ->
+  %% @todo check if its stream owner?
+  ct:pal("~p", [get({'__quic_recv_buff__', Stream})]),
+  receive
+    {quic, Bin, Stream, _AbsOffset, _BinLen, _Flags} when 0 == Count ->
+      {ok, Bin};
+    {quic, Bin, Stream, _AbsOffset, BinLen, _Flags}
+      when Count =< BuffLen + BinLen ->
+      << Out:Count/binary, Left/binary >> = iolist_to_binary(lists:reverse([Bin | Buff])),
+      put({'__quic_recv_buff__', Stream},  {[Left], BuffLen + BinLen - Count}),
+      {ok, Out};
+    {quic, Bin, Stream, _AbsOffset, BinLen, _Flags}
+      when Count > BuffLen + BinLen ->
+      do_recv(Stream, Count, {[Bin | Buff], BuffLen + BinLen})
+  end.
 
 -spec close_stream(stream_handler()) -> ok.
 close_stream(Stream) ->
