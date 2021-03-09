@@ -1,0 +1,101 @@
+#+TITLE: Interworking
+* Basic flow [Happy path]
+ note, 'C-c c' to produce.
+#+begin_src plantuml :file basic_flow_happy_path.png
+title
+Server Side: erlang, client init connection and stream
+end title
+
+box beam_process #lightblue
+control stream_acceptor
+control conn_acceptor
+control erl
+end box
+box msquic_worker
+participant msw
+end box
+box network #light_green
+participant client
+end box
+== Start listener ==
+note over erl
+NIF call `listen`
+Register listener callback of *quicer*
+end note
+
+note over msw
+Open listening port
+end note
+
+create conn_acceptor
+erl --> conn_acceptor: spawn listener with listener handler
+note over conn_acceptor
+Nif call `accept_connection`
+self() is enqueued in conn acceptors queue
+end note
+hnote over conn_acceptor: blocking
+== listener started ==
+...  ....
+== Establish Quic Connection ==
+client --> msw : init connection
+
+note over msw
+In Listener Callback:
+dequeue one acceptor
+register connection callback of *quicer*
+end note
+
+msw --> conn_acceptor: erl msg:  '{new_conn, ... }'
+
+hnote over conn_acceptor: unblocked
+
+msw ---> client: continue connection establishment
+== Quic Connection Established ==
+
+create stream_acceptor
+conn_acceptor --> stream_acceptor: spawn new stream acceptor
+
+note over stream_acceptor
+NIF call `accept_stream` with connection handler
+self() is enqueued to stream acceptors queue
+end note
+
+hnote over stream_acceptor: blocking
+
+== Quic START Stream ==
+client --> msw: start stream in the connection.
+
+note over msw
+Execute connection callback:
+Dequeue a stream acceptor and owner pid of stream is set
+
+msw --> stream_acceptor: {new_stream, StreamHandler}
+
+register stream callback of *quicer*
+end note
+
+hnote over stream_acceptor: unblocked
+
+== Quic Stream Started ==
+
+hnote over stream_acceptor: wait for msg with matching stream token.
+
+hnote over stream_acceptor: blocked
+
+client --> msw: << Quic payload part 1 >>
+client --> msw: << Quic payload part 2>>
+client --> msw: << Quic payload part ...>>
+
+note over msw
+Execute stream callback:
+while receiving side threadhold is reached,
+end note
+
+msw --> stream_acceptor : erl msg {quic, Bin, Stream, Offset, Size, Flag}
+
+hnote over stream_acceptor: unblocked
+
+... ....
+#+end_src
+#+results:
+[[file:basic_flow_happy_path.png]]
