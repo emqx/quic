@@ -8,8 +8,7 @@ Project Status: WIP (actively), POC quality
 
 API: is not stable, might be changed in the future
 
-![build](https://github.com/qzhuyan/quic/workflows/main/badge.svg)
-![test](https://github.com/qzhuyan/quic/workflows/main/badge.svg)
+![CI](https://github.com/qzhuyan/quic/workflows/ci/badge.svg)
 
 # OS Support
 | OS      | Status    |
