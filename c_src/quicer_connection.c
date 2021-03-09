@@ -27,6 +27,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                                       enif_make_atom(env, "connected"),
                                       enif_make_resource(env, c_ctx))))
         {
+          // @todo find yet another acceptor?
           return QUIC_STATUS_INTERNAL_ERROR;
         }
       break;
@@ -49,7 +50,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
         }
       s_ctx->owner = acc;
 
-      // @todo add monitor here.
+      enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, s_ctx->owner_mon);
+
       if (!enif_send(NULL, &(acc->Pid), NULL,
                      enif_make_tuple3(env, enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "new_stream"),

@@ -6,9 +6,9 @@ QUIC protocol erlang library.
 
 Project Status: WIP (actively), POC quality
 
-API: is not stable, might be changed in the future
+API: is not stable, might be changed in the future.
 
-![CI](https://github.com/qzhuyan/quic/workflows/ci/badge.svg)
+![CI](https://github.com/emqx/quic/workflows/ci/badge.svg)
 
 # OS Support
 | OS      | Status    |
@@ -57,7 +57,7 @@ LOptions = [ {cert, "cert.pem"}
 {ok, L} = quicer:listen(Port, LOptions),
 {ok, Conn} = quicer:accept(L, [], 5000),
 {ok, Stm} = quicer:accept_stream(Conn, []),
-receive {quic, <<"ping">>, _, _, _, _} -> ok end,
+receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
 {ok, 4} = quicer:send(Stm, <<"pong">>),
 quicer:close_listener(L).
 ```
@@ -69,7 +69,7 @@ Port = 4567,
 {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
 {ok, Stm} = quicer:start_stream(Conn, []),
 {ok, 4} = quicer:send(Stm, <<"ping">>),
-receive {quic, <<"pong">>, _, _, _, _} -> ok end,
+receive {quic, <<"pong">>, Stm, _, _, _} -> ok end,
 ok = quicer:close_connection(Conn).
 ```
 

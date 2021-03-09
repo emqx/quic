@@ -33,6 +33,7 @@ typedef struct
   QuicerConnCTX *c_ctx;
   HQUIC Stream;
   ACCEPTOR *owner;
+  ErlNifMonitor *owner_mon;
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
 } QuicerStreamCTX;
