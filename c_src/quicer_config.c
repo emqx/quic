@@ -187,3 +187,84 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
 
   return true;
 }
+
+ERL_NIF_TERM
+getopt2(ErlNifEnv *env, __unused_parm__ int argc,
+        __unused_parm__ const ERL_NIF_TERM argv[])
+{
+  ERL_NIF_TERM ctx = argv[0];
+  ERL_NIF_TERM eopt = argv[1];
+
+  HQUIC Handle = NULL;
+  uint32_t Param = -1;
+  QUIC_PARAM_LEVEL Level = -1;
+  uint32_t BufferLength = 0;
+  ErlNifBinary bin;
+
+  void *q_ctx;
+  /* QuicerListenerCTX *l_ctx = NULL; */
+  /* QuicerConnCTX *c_ctx = NULL; */
+  /* QuicerStreamCTX *s_ctx = NULL; */
+
+  if (!enif_is_atom(env, eopt))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
+    {
+      Handle = ((QuicerStreamCTX *)q_ctx)->Stream;
+      Level = QUIC_PARAM_LEVEL_STREAM;
+    }
+  else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
+    {
+      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+    }
+  else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
+    {
+      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+      Level = QUIC_PARAM_LEVEL_LISTENER;
+    }
+  else
+    { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
+    {
+      Param = QUIC_PARAM_CONN_QUIC_VERSION;
+      // QUIC_CONNECTION.stats.QuicVersion
+      BufferLength = sizeof(u_int32_t);
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+    }
+
+  // precheck before calling msquic api
+  if (BufferLength == 0 || Param < 0 || Level < 0)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+    }
+
+  // @todo consider use enif_make_binary ?
+  if (!enif_alloc_binary(BufferLength, &bin))
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
+  QUIC_STATUS status
+      = MsQuic->GetParam(Handle, Level, Param, &BufferLength, bin.data);
+
+  if (QUIC_SUCCEEDED(status))
+    {
+      return SUCCESS(enif_make_binary(env, &bin));
+    }
+  else
+    {
+      enif_release_binary(&bin);
+      // @todo translate errno
+      return ERROR_TUPLE_2(enif_make_int(env, status));
+    }
+}

@@ -26,6 +26,7 @@ extern ERL_NIF_TERM ATOM_OPEN_FAILED;
 extern ERL_NIF_TERM ATOM_CTX_INIT_FAILED;
 extern ERL_NIF_TERM ATOM_BAD_PID;
 extern ERL_NIF_TERM ATOM_CONFIG_ERROR;
+extern ERL_NIF_TERM ATOM_PARM_ERROR;
 extern ERL_NIF_TERM ATOM_CERT_ERROR;
 extern ERL_NIF_TERM ATOM_BAD_MON;
 extern ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
@@ -144,5 +145,7 @@ extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 #define ETERM_INT(i) enif_make_int(env, i)
 
 #define ETERM_UINT_64(i) enif_make_int(env, (uint64_t)i)
+
+#define IS_SAME_TERM(x, y) 0 == enif_compare(x, y)
 
 #endif // __QUICER_ETERMS_H_

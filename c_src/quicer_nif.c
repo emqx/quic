@@ -29,6 +29,7 @@ ERL_NIF_TERM ATOM_OPEN_FAILED;
 ERL_NIF_TERM ATOM_CTX_INIT_FAILED;
 ERL_NIF_TERM ATOM_BAD_PID;
 ERL_NIF_TERM ATOM_CONFIG_ERROR;
+ERL_NIF_TERM ATOM_PARM_ERROR;
 ERL_NIF_TERM ATOM_CERT_ERROR;
 ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
@@ -151,6 +152,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
   ATOM(ATOM_CTX_INIT_FAILED, ctx_init_failed);                                \
   ATOM(ATOM_BAD_PID, bad_pid);                                                \
   ATOM(ATOM_CONFIG_ERROR, config_error);                                      \
+  ATOM(ATOM_PARM_ERROR, parm_error);                                          \
   ATOM(ATOM_CERT_ERROR, cert_error);                                          \
   ATOM(ATOM_BAD_MON, bad_mon);                                                \
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
@@ -445,7 +447,8 @@ static ErlNifFunc nif_funcs[] = {
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 2, send2, 0},
   { "close_stream", 1, close_stream1, 0},
-  { "sockname", 1, sockname1, 0}
+  { "sockname", 1, sockname1, 0},
+  { "getopt", 2, getopt2, 0}
   // clang-format on
 };
 
