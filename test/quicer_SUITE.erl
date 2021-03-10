@@ -51,6 +51,7 @@
 
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(PROPTEST(M,F), true = proper:quickcheck(M:F())).
 

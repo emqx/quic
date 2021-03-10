@@ -140,15 +140,7 @@ close_stream(Stream) ->
   quicer_nif:close_stream(Stream).
 
 sockname(Conn) ->
-  {ok, Str} =quicer_nif:sockname(Conn),
-  [AddrStr, PortStr] = string:split(Str, ":", trailing),
-  Addr = case AddrStr of
-    [$[ | Ipv6] ->
-      inet:parse_address(string:trim(Ipv6, trailing, "]"));
-    Ipv4 ->
-      inet:parse_address(Ipv4)
-  end,
-  {ok, {Addr, list_to_integer(PortStr)}}.
+  quicer_nif:sockname(Conn).
 
 init() ->
   quicer_nif:open_lib(),
