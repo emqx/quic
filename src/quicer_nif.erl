@@ -27,6 +27,7 @@
         , start_stream/2
         , send/2
         , close_stream/1
+        , sockname/1
         ]).
 
 -on_load(init/0).
@@ -75,4 +76,7 @@ send(_Stream, _Data) ->
   erlang:nif_error(nif_library_not_loaded).
 
 close_stream(_Stream) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+sockname(_Conn) ->
   erlang:nif_error(nif_library_not_loaded).

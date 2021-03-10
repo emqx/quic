@@ -157,6 +157,7 @@ tc_conn_basic(Config)->
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 1000 ->

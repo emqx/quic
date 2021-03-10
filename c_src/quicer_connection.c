@@ -360,6 +360,36 @@ close_connection1(ErlNifEnv *env, __unused_parm__ int argc,
   return ATOM_OK;
 }
 
+ERL_NIF_TERM
+sockname1(ErlNifEnv *env, __unused_parm__ int args,
+          const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  QUIC_STATUS Status;
+  QUIC_ADDR addr;
+  uint32_t addrSize = sizeof(addr);
+  QUIC_ADDR_STR addrStr = { 0 };
+
+  if (QUIC_FAILED(Status = MsQuic->GetParam(
+                      c_ctx->Connection,
+                      QUIC_PARAM_LEVEL_CONNECTION,
+                      QUIC_PARAM_CONN_LOCAL_ADDRESS,
+                      &addrSize,
+                      &addr)))
+      {
+        return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
+      }
+
+  QuicAddrToString(&addr, &addrStr);
+
+  return SUCCESS(enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

@@ -23,3 +23,7 @@ priv/*.so
 .ccls-cache/
 .els_cache/
 compile_commands.json
+
+# IDE
+/quic.iml
+/.idea/
