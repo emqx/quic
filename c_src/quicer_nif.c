@@ -71,6 +71,73 @@ ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
 
+/*-----------------------------------------*/
+/*         msquic parms starts             */
+/*-----------------------------------------*/
+
+// Parameters for QUIC_PARAM_LEVEL_GLOBAL.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SETTINGS;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_CONFIGURATION.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_LISTENER.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_STATS;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_CONNECTION.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_QUIC_VERSION;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_SETTINGS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
+
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
+
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_TLS.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_STREAM.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_ID;
+ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH;
+ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
+
+/*-----------------------*/
+/* msquic parms ends     */
+/*-----------------------*/
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -119,6 +186,79 @@ ERL_NIF_TERM ATOM_KEY;
   ATOM(ATOM_ERROR_SSL_ERROR, ssl_error);                                      \
   ATOM(ATOM_ERROR_USER_CANCELED, user_canceled);                              \
   ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);                        \
+  /*-----------------------------------------*/                               \
+  /*         msquic parms starts             */                               \
+  /*-----------------------------------------*/                               \
+                                                                              \
+  /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT,                           \
+       param_global_retry_memory_percent);                                    \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS,                             \
+       param_global_supported_versions);                                      \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE,                             \
+       param_global_load_balacing_mode);                                      \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, param_global_perf_counters);     \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, param_global_settings);               \
+                                                                              \
+  /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
+  ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \
+       param_registration_cid_prefix);                                        \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_CONFIGURATION. */                        \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS, param_configuration_settings); \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_LISTENER. */                             \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS, param_listener_local_address); \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_STATS, param_listener_stats);                 \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */                           \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_QUIC_VERSION, param_conn_quic_version);           \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, param_conn_local_address);         \
+  ATOM(ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS, param_conn_remote_address);       \
+  ATOM(ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR, param_conn_ideal_processor);     \
+  ATOM(ATOM_QUIC_PARAM_CONN_SETTINGS, param_conn_settings);                   \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS, param_conn_statistics);               \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT, param_conn_statistics_plat);     \
+  ATOM(ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING, param_conn_share_udp_binding); \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT,                          \
+       param_conn_local_bidi_stream_count);                                   \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT,                         \
+       param_conn_local_unidi_stream_count);                                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS, param_conn_max_stream_ids);       \
+  ATOM(ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE,                              \
+       param_conn_close_reason_phrase);                                       \
+  ATOM(ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME,                         \
+       param_conn_stream_scheduling_scheme);                                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED,                         \
+       param_conn_datagram_receive_enabled);                                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED,                            \
+       param_conn_datagram_send_enabled);                                     \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,                          \
+       param_conn_disable_1rtt_encryption);                                   \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, param_conn_resumption_ticket); \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
+       param_tls_schannel_context_attribute_w);                               \
+                                                                              \
+  /*  Parameters for QUIC_PARAM_LEVEL_STREAM.  */                             \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_STREAM_ID, param_stream_id);                           \
+  ATOM(ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH, param_stream_0rtt_length);         \
+  ATOM(ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE,                         \
+       param_stream_ideal_send_buffer_size);                                  \
+                                                                              \
+  /*-----------------------*/                                                 \
+  /* msquic parms ends     */                                                 \
+  /*-----------------------*/                                                 \
+                                                                              \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key)
 
