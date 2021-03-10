@@ -39,6 +39,7 @@ ERL_NIF_TERM ATOM_CONN_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_OPEN_ERROR;
 ERL_NIF_TERM ATOM_STREAM_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_SEND_ERROR;
+ERL_NIF_TERM ATOM_SOCKNAME_ERROR;
 ERL_NIF_TERM ATOM_OWNER_DEAD;
 
 // Mirror 'errors' in msquic_linux.h
@@ -303,7 +304,8 @@ static ErlNifFunc nif_funcs[] = {
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 2, send2, 0},
-  { "close_stream", 1, close_stream1, 0}
+  { "close_stream", 1, close_stream1, 0},
+  { "sockname", 1, sockname1, 0}
   // clang-format on
 };
 
