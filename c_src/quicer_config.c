@@ -265,6 +265,6 @@ getopt2(ErlNifEnv *env, __unused_parm__ int argc,
     {
       enif_release_binary(&bin);
       // @todo translate errno
-      return ERROR_TUPLE_2(enif_make_int(env, status));
+      return ERROR_TUPLE_2(atom_status(status));
     }
 }

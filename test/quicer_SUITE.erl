@@ -297,6 +297,9 @@ tc_getopt(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
       {ok, <<1,0,0,0>>} = quicer:getopt(Conn, Parm),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {error, buffer_too_small} = quicer:getopt(Stm, Parm),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 1000 ->
