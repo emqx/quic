@@ -28,6 +28,8 @@
         , close_stream/1
         , sockname/1
         , getopt/2
+        , getopt/3
+        , get_stream_id/1
         ]).
 
 -on_load(init/0).
@@ -153,7 +155,16 @@ sockname(Conn) ->
 -spec getopt(Handle::connection_handler() | stream_handler() | listener_handler(),
              Optname::atom()) -> {ok, OptVal::any()} | {error, any()}.
 getopt(Handle, Opt) ->
-  quicer_nif:getopt(Handle, Opt).
+  quicer_nif:getopt(Handle, Opt, true).
+
+-spec getopt(Handle::connection_handler() | stream_handler() | listener_handler(),
+             Optname::atom(), IsRaw::boolean()) -> {ok, OptVal::any()} | {error, any()}.
+getopt(Handle, Opt, IsRaw) ->
+  quicer_nif:getopt(Handle, Opt, IsRaw).
+
+-spec get_stream_id(Stream::stream_handler()) -> {ok, integer()} | {error, any()}.
+get_stream_id(Stream) ->
+  quicer_nif:getopt(Stream, param_stream_id, false).
 
 init() ->
   quicer_nif:open_lib(),

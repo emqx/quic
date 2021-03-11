@@ -21,6 +21,10 @@ limitations under the License.
 /*
 ** atoms in use, initialized while load nif
 */
+
+ERL_NIF_TERM ATOM_TRUE;
+ERL_NIF_TERM ATOM_FALSE;
+
 // quicer internal 'errors'
 ERL_NIF_TERM ATOM_OK;
 ERL_NIF_TERM ATOM_ERROR;
@@ -172,6 +176,9 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 **  Helper macros
 */
 #define INIT_ATOMS                                                            \
+  ATOM(ATOM_TRUE, true);                                                      \
+  ATOM(ATOM_FALSE, false);                                                    \
+                                                                              \
   ATOM(ATOM_OK, ok);                                                          \
   ATOM(ATOM_ERROR, error);                                                    \
   ATOM(ATOM_REG_FAILED, reg_failed);                                          \
@@ -670,7 +677,7 @@ static ErlNifFunc nif_funcs[] = {
   { "send", 2, send2, 0},
   { "close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
-  { "getopt", 2, getopt2, 0}
+  { "getopt", 3, getopt3, 0}
   // clang-format on
 };
 

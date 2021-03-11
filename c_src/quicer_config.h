@@ -42,6 +42,6 @@ bool ServerLoadConfiguration(HQUIC *Configuration,
                              QUIC_CREDENTIAL_CONFIG_HELPER *Config);
 bool ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure);
 
-ERL_NIF_TERM getopt2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 #endif // __QUICER_CONFIG_H_
