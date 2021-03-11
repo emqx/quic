@@ -365,21 +365,41 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args,
           const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
-  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
+  QuicerListenerCTX *l_ctx;
+  QuicerStreamCTX *s_ctx;
+  struct QUIC_HANDLE *handle;
+
+  if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx)) {
+    handle = c_ctx->Connection;
+  } else if (enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx)) {
+    handle = l_ctx->Listener;
+  } else if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx)) {
+    handle = s_ctx->c_ctx->Connection;
+  } else {
+    return ERROR_TUPLE_2(ATOM_BADARG);
+  }
 
   QUIC_STATUS Status;
   QUIC_ADDR addr;
   uint32_t addrSize = sizeof(addr);
 
-  if (QUIC_FAILED(Status = MsQuic->GetParam(
-                      c_ctx->Connection,
-                      QUIC_PARAM_LEVEL_CONNECTION,
-                      QUIC_PARAM_CONN_LOCAL_ADDRESS,
-                      &addrSize,
-                      &addr)))
+  if (l_ctx) {
+    if (QUIC_FAILED(Status = MsQuic->GetParam(
+                                       handle,
+                                       QUIC_PARAM_LEVEL_LISTENER,
+                                       QUIC_PARAM_LISTENER_LOCAL_ADDRESS,
+                                       &addrSize,
+                                       &addr)))
+      {
+        return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
+      }
+  }
+  else if (QUIC_FAILED(Status = MsQuic->GetParam(
+                           handle,
+                           QUIC_PARAM_LEVEL_CONNECTION,
+                           QUIC_PARAM_CONN_LOCAL_ADDRESS,
+                           &addrSize,
+                           &addr)))
       {
         return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
       }

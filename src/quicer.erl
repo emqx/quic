@@ -139,6 +139,8 @@ do_recv(Stream, Count, {Buff, BuffLen}) ->
 close_stream(Stream) ->
   quicer_nif:close_stream(Stream).
 
+-spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
+        {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 sockname(Conn) ->
   quicer_nif:sockname(Conn).
 
