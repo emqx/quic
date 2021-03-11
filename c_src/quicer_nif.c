@@ -489,6 +489,95 @@ atom_status(QUIC_STATUS status)
   ERL_NIF_TERM eterm = ATOM_OK;
   switch (status)
     {
+    case QUIC_STATUS_SUCCESS:
+      eterm = ATOM_QUIC_STATUS_SUCCESS;
+      break;
+    case QUIC_STATUS_PENDING:
+      eterm = ATOM_QUIC_STATUS_PENDING;
+      break;
+    case QUIC_STATUS_CONTINUE:
+      eterm = ATOM_QUIC_STATUS_CONTINUE;
+      break;
+    case QUIC_STATUS_OUT_OF_MEMORY:
+      eterm = ATOM_QUIC_STATUS_OUT_OF_MEMORY;
+      break;
+    case QUIC_STATUS_INVALID_PARAMETER:
+      eterm = ATOM_QUIC_STATUS_INVALID_PARAMETER;
+      break;
+    case QUIC_STATUS_INVALID_STATE:
+      eterm = ATOM_QUIC_STATUS_INVALID_STATE;
+      break;
+    case QUIC_STATUS_NOT_SUPPORTED:
+      eterm = ATOM_QUIC_STATUS_NOT_SUPPORTED;
+      break;
+    case QUIC_STATUS_NOT_FOUND:
+      eterm = ATOM_QUIC_STATUS_NOT_FOUND;
+      break;
+    case QUIC_STATUS_BUFFER_TOO_SMALL:
+      eterm = ATOM_QUIC_STATUS_BUFFER_TOO_SMALL;
+      break;
+    case QUIC_STATUS_HANDSHAKE_FAILURE:
+      eterm = ATOM_QUIC_STATUS_HANDSHAKE_FAILURE;
+      break;
+    case QUIC_STATUS_ABORTED:
+      eterm = ATOM_QUIC_STATUS_ABORTED;
+      break;
+    case QUIC_STATUS_ADDRESS_IN_USE:
+      eterm = ATOM_QUIC_STATUS_ADDRESS_IN_USE;
+      break;
+    case QUIC_STATUS_CONNECTION_TIMEOUT:
+      eterm = ATOM_QUIC_STATUS_CONNECTION_TIMEOUT;
+      break;
+    case QUIC_STATUS_CONNECTION_IDLE:
+      eterm = ATOM_QUIC_STATUS_CONNECTION_IDLE;
+      break;
+    case QUIC_STATUS_INTERNAL_ERROR:
+      eterm = ATOM_QUIC_STATUS_INTERNAL_ERROR;
+      break;
+    case QUIC_STATUS_CONNECTION_REFUSED:
+      eterm = ATOM_QUIC_STATUS_CONNECTION_REFUSED;
+      break;
+    case QUIC_STATUS_PROTOCOL_ERROR:
+      eterm = ATOM_QUIC_STATUS_PROTOCOL_ERROR;
+      break;
+    case QUIC_STATUS_VER_NEG_ERROR:
+      eterm = ATOM_QUIC_STATUS_VER_NEG_ERROR;
+      break;
+    case QUIC_STATUS_UNREACHABLE:
+      eterm = ATOM_QUIC_STATUS_UNREACHABLE;
+      break;
+    case QUIC_STATUS_PERMISSION_DENIED:
+      eterm = ATOM_QUIC_STATUS_PERMISSION_DENIED;
+      break;
+    case QUIC_STATUS_EPOLL_ERROR:
+      eterm = ATOM_QUIC_STATUS_EPOLL_ERROR;
+      break;
+    case QUIC_STATUS_DNS_RESOLUTION_ERROR:
+      eterm = ATOM_QUIC_STATUS_DNS_RESOLUTION_ERROR;
+      break;
+    case QUIC_STATUS_SOCKET_ERROR:
+      eterm = ATOM_QUIC_STATUS_SOCKET_ERROR;
+      break;
+    case QUIC_STATUS_TLS_ERROR:
+      eterm = ATOM_QUIC_STATUS_TLS_ERROR;
+      break;
+    case QUIC_STATUS_USER_CANCELED:
+      eterm = ATOM_QUIC_STATUS_USER_CANCELED;
+      break;
+    case QUIC_STATUS_ALPN_NEG_FAILURE:
+      eterm = ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
+      break;
+    }
+  return eterm;
+}
+
+ERL_NIF_TERM
+atom_errno(int errno)
+{
+  ERL_NIF_TERM eterm = ATOM_OK;
+
+  switch (errno)
+    {
     case NO_ERROR:
       eterm = ATOM_ERROR_NO_ERROR;
       break;
@@ -558,84 +647,6 @@ atom_status(QUIC_STATUS status)
     case ERROR_ALPN_NEG_FAILURE:
       eterm = ATOM_ERROR_ALPN_NEG_FAILURE;
       break;
-    /* case QUIC_STATUS_SUCCESS : */
-    /*   eterm =  ATOM_QUIC_STATUS_SUCCESS; */
-    /*   break; */
-    /* case QUIC_STATUS_PENDING : */
-    /*   eterm =  ATOM_QUIC_STATUS_PENDING; */
-    /*   break; */
-    /* case QUIC_STATUS_CONTINUE : */
-    /*   eterm =  ATOM_QUIC_STATUS_CONTINUE; */
-    /*   break; */
-    case QUIC_STATUS_OUT_OF_MEMORY:
-      eterm = ATOM_QUIC_STATUS_OUT_OF_MEMORY;
-      break;
-    case QUIC_STATUS_INVALID_PARAMETER:
-      eterm = ATOM_QUIC_STATUS_INVALID_PARAMETER;
-      break;
-    /* case QUIC_STATUS_INVALID_STATE : */
-    /*   eterm =  ATOM_QUIC_STATUS_INVALID_STATE; */
-    /*   break; */
-    case QUIC_STATUS_NOT_SUPPORTED:
-      eterm = ATOM_QUIC_STATUS_NOT_SUPPORTED;
-      break;
-    case QUIC_STATUS_NOT_FOUND:
-      eterm = ATOM_QUIC_STATUS_NOT_FOUND;
-      break;
-    case QUIC_STATUS_BUFFER_TOO_SMALL:
-      eterm = ATOM_QUIC_STATUS_BUFFER_TOO_SMALL;
-      break;
-    /* case QUIC_STATUS_HANDSHAKE_FAILURE : */
-    /*   eterm =  ATOM_QUIC_STATUS_HANDSHAKE_FAILURE; */
-    /*   break; */
-    /* case QUIC_STATUS_ABORTED : */
-    /*   eterm =  ATOM_QUIC_STATUS_ABORTED; */
-    /*   break; */
-    case QUIC_STATUS_ADDRESS_IN_USE:
-      eterm = ATOM_QUIC_STATUS_ADDRESS_IN_USE;
-      break;
-    case QUIC_STATUS_CONNECTION_TIMEOUT:
-      eterm = ATOM_QUIC_STATUS_CONNECTION_TIMEOUT;
-      break;
-    /* case QUIC_STATUS_CONNECTION_IDLE : */
-    /*   eterm =  ATOM_QUIC_STATUS_CONNECTION_IDLE; */
-    /*   break; */
-    /* case QUIC_STATUS_INTERNAL_ERROR : */
-    /*   eterm =  ATOM_QUIC_STATUS_INTERNAL_ERROR; */
-    /*   break; */
-    /* case QUIC_STATUS_CONNECTION_REFUSED : */
-    /*   eterm =  ATOM_QUIC_STATUS_CONNECTION_REFUSED; */
-    /*   break; */
-    /* case QUIC_STATUS_PROTOCOL_ERROR : */
-    /*   eterm =  ATOM_QUIC_STATUS_PROTOCOL_ERROR; */
-    /*   break; */
-    /* case QUIC_STATUS_VER_NEG_ERROR : */
-    /*   eterm =  ATOM_QUIC_STATUS_VER_NEG_ERROR; */
-    /*   break; */
-    case QUIC_STATUS_UNREACHABLE:
-      eterm = ATOM_QUIC_STATUS_UNREACHABLE;
-      break;
-    case QUIC_STATUS_PERMISSION_DENIED:
-      eterm = ATOM_QUIC_STATUS_PERMISSION_DENIED;
-      break;
-      /* case QUIC_STATUS_EPOLL_ERROR : */
-      /*   eterm =  ATOM_QUIC_STATUS_EPOLL_ERROR; */
-      /*   break; */
-      /* case QUIC_STATUS_DNS_RESOLUTION_ERROR : */
-      /*   eterm =  ATOM_QUIC_STATUS_DNS_RESOLUTION_ERROR; */
-      /*   break; */
-      /* case QUIC_STATUS_SOCKET_ERROR : */
-      /*   eterm =  ATOM_QUIC_STATUS_SOCKET_ERROR; */
-      /*   break; */
-      /* case QUIC_STATUS_TLS_ERROR : */
-      /*   eterm =  ATOM_QUIC_STATUS_TLS_ERROR; */
-      /*   break; */
-      /* case QUIC_STATUS_USER_CANCELED : */
-      /*   eterm =  ATOM_QUIC_STATUS_USER_CANCELED; */
-      /*   break; */
-      /* case QUIC_STATUS_ALPN_NEG_FAILURE : */
-      /*   eterm =  ATOM_QUIC_STATUS_ALPN_NEG_FAILURE; */
-      /*   break; */
     }
   return eterm;
 }
