@@ -139,16 +139,10 @@ do_recv(Stream, Count, {Buff, BuffLen}) ->
 close_stream(Stream) ->
   quicer_nif:close_stream(Stream).
 
+-spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
+        {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 sockname(Conn) ->
-  {ok, Str} =quicer_nif:sockname(Conn),
-  [AddrStr, PortStr] = string:split(Str, ":", trailing),
-  Addr = case AddrStr of
-    [$[ | Ipv6] ->
-      inet:parse_address(string:trim(Ipv6, trailing, "]"));
-    Ipv4 ->
-      inet:parse_address(Ipv4)
-  end,
-  {ok, {Addr, list_to_integer(PortStr)}}.
+  quicer_nif:sockname(Conn).
 
 -spec getopt(Handle::connection_handler() | stream_handler() | listener_handler(),
              Optname::atom()) -> {ok, OptVal::any()} | {error, any()}.

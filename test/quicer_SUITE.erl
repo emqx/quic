@@ -140,6 +140,7 @@ tc_lib_re_registration(_Config) ->
 tc_open_listener(Config) ->
   Port = 4567,
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  {ok, {_, _}} = quicer:sockname(L),
   {error,eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
   {ok, P} = gen_udp:open(Port),
@@ -187,6 +188,7 @@ tc_stream_client_init(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_stream(Stm),
       SPid ! done
   after 1000 ->
