@@ -29,6 +29,7 @@ ERL_NIF_TERM ATOM_OPEN_FAILED;
 ERL_NIF_TERM ATOM_CTX_INIT_FAILED;
 ERL_NIF_TERM ATOM_BAD_PID;
 ERL_NIF_TERM ATOM_CONFIG_ERROR;
+ERL_NIF_TERM ATOM_PARM_ERROR;
 ERL_NIF_TERM ATOM_CERT_ERROR;
 ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
@@ -67,9 +68,103 @@ ERL_NIF_TERM ATOM_ERROR_SSL_ERROR;
 ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
+ERL_NIF_TERM ATOM_QUIC_STATUS_SUCCESS;
+ERL_NIF_TERM ATOM_QUIC_STATUS_PENDING;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CONTINUE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_OUT_OF_MEMORY;
+ERL_NIF_TERM ATOM_QUIC_STATUS_INVALID_PARAMETER;
+ERL_NIF_TERM ATOM_QUIC_STATUS_INVALID_STATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_NOT_SUPPORTED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_NOT_FOUND;
+ERL_NIF_TERM ATOM_QUIC_STATUS_BUFFER_TOO_SMALL;
+ERL_NIF_TERM ATOM_QUIC_STATUS_HANDSHAKE_FAILURE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_ABORTED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_ADDRESS_IN_USE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CONNECTION_TIMEOUT;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CONNECTION_IDLE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_INTERNAL_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CONNECTION_REFUSED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_PROTOCOL_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_VER_NEG_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_UNREACHABLE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_PERMISSION_DENIED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_EPOLL_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_DNS_RESOLUTION_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_SOCKET_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_TLS_ERROR;
+ERL_NIF_TERM ATOM_QUIC_STATUS_USER_CANCELED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
+
 // option keys
 ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
+
+/*-----------------------------------------*/
+/*         msquic parms starts             */
+/*-----------------------------------------*/
+
+// Parameters for QUIC_PARAM_LEVEL_GLOBAL.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SETTINGS;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_CONFIGURATION.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_LISTENER.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_STATS;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_CONNECTION.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_QUIC_VERSION;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_SETTINGS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
+
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
+
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_TLS.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
+
+//
+// Parameters for QUIC_PARAM_LEVEL_STREAM.
+//
+ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_ID;
+ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH;
+ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
+
+/*-----------------------*/
+/* msquic parms ends     */
+/*-----------------------*/
 
 // Mirror 'status' in msquic_linux.h
 
@@ -84,6 +179,7 @@ ERL_NIF_TERM ATOM_KEY;
   ATOM(ATOM_CTX_INIT_FAILED, ctx_init_failed);                                \
   ATOM(ATOM_BAD_PID, bad_pid);                                                \
   ATOM(ATOM_CONFIG_ERROR, config_error);                                      \
+  ATOM(ATOM_PARM_ERROR, parm_error);                                          \
   ATOM(ATOM_CERT_ERROR, cert_error);                                          \
   ATOM(ATOM_BAD_MON, bad_mon);                                                \
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
@@ -119,6 +215,106 @@ ERL_NIF_TERM ATOM_KEY;
   ATOM(ATOM_ERROR_SSL_ERROR, ssl_error);                                      \
   ATOM(ATOM_ERROR_USER_CANCELED, user_canceled);                              \
   ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);                        \
+                                                                              \
+  ATOM(ATOM_QUIC_STATUS_SUCCESS, success);                                    \
+  ATOM(ATOM_QUIC_STATUS_PENDING, pending);                                    \
+  ATOM(ATOM_QUIC_STATUS_CONTINUE, continue);                                  \
+  ATOM(ATOM_QUIC_STATUS_OUT_OF_MEMORY, out_of_memory);                        \
+  ATOM(ATOM_QUIC_STATUS_INVALID_PARAMETER, invalid_parameter);                \
+  ATOM(ATOM_QUIC_STATUS_INVALID_STATE, invalid_state);                        \
+  ATOM(ATOM_QUIC_STATUS_NOT_SUPPORTED, not_supported);                        \
+  ATOM(ATOM_QUIC_STATUS_NOT_FOUND, not_found);                                \
+  ATOM(ATOM_QUIC_STATUS_BUFFER_TOO_SMALL, buffer_too_small);                  \
+  ATOM(ATOM_QUIC_STATUS_HANDSHAKE_FAILURE, handshake_failure);                \
+  ATOM(ATOM_QUIC_STATUS_ABORTED, aborted);                                    \
+  ATOM(ATOM_QUIC_STATUS_ADDRESS_IN_USE, address_in_use);                      \
+  ATOM(ATOM_QUIC_STATUS_CONNECTION_TIMEOUT, connection_timeout);              \
+  ATOM(ATOM_QUIC_STATUS_CONNECTION_IDLE, connection_idle);                    \
+  ATOM(ATOM_QUIC_STATUS_INTERNAL_ERROR, internal_error);                      \
+  ATOM(ATOM_QUIC_STATUS_CONNECTION_REFUSED, connection_refused);              \
+  ATOM(ATOM_QUIC_STATUS_PROTOCOL_ERROR, protocol_error);                      \
+  ATOM(ATOM_QUIC_STATUS_VER_NEG_ERROR, ver_neg_error);                        \
+  ATOM(ATOM_QUIC_STATUS_UNREACHABLE, unreachable);                            \
+  ATOM(ATOM_QUIC_STATUS_PERMISSION_DENIED, permission_denied);                \
+  ATOM(ATOM_QUIC_STATUS_EPOLL_ERROR, epoll_error);                            \
+  ATOM(ATOM_QUIC_STATUS_DNS_RESOLUTION_ERROR, dns_resolution_error);          \
+  ATOM(ATOM_QUIC_STATUS_SOCKET_ERROR, socket_error);                          \
+  ATOM(ATOM_QUIC_STATUS_TLS_ERROR, tls_error);                                \
+  ATOM(ATOM_QUIC_STATUS_USER_CANCELED, user_canceled);                        \
+  ATOM(ATOM_QUIC_STATUS_ALPN_NEG_FAILURE, alpn_neg_failure);                  \
+  /*-----------------------------------------*/                               \
+  /*         msquic parms starts             */                               \
+  /*-----------------------------------------*/                               \
+                                                                              \
+  /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT,                           \
+       param_global_retry_memory_percent);                                    \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS,                             \
+       param_global_supported_versions);                                      \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE,                             \
+       param_global_load_balacing_mode);                                      \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, param_global_perf_counters);     \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, param_global_settings);               \
+                                                                              \
+  /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
+  ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \
+       param_registration_cid_prefix);                                        \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_CONFIGURATION. */                        \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS, param_configuration_settings); \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_LISTENER. */                             \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS, param_listener_local_address); \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_STATS, param_listener_stats);                 \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */                           \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_QUIC_VERSION, param_conn_quic_version);           \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, param_conn_local_address);         \
+  ATOM(ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS, param_conn_remote_address);       \
+  ATOM(ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR, param_conn_ideal_processor);     \
+  ATOM(ATOM_QUIC_PARAM_CONN_SETTINGS, param_conn_settings);                   \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS, param_conn_statistics);               \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT, param_conn_statistics_plat);     \
+  ATOM(ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING, param_conn_share_udp_binding); \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT,                          \
+       param_conn_local_bidi_stream_count);                                   \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT,                         \
+       param_conn_local_unidi_stream_count);                                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS, param_conn_max_stream_ids);       \
+  ATOM(ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE,                              \
+       param_conn_close_reason_phrase);                                       \
+  ATOM(ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME,                         \
+       param_conn_stream_scheduling_scheme);                                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED,                         \
+       param_conn_datagram_receive_enabled);                                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED,                            \
+       param_conn_datagram_send_enabled);                                     \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,                          \
+       param_conn_disable_1rtt_encryption);                                   \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, param_conn_resumption_ticket); \
+                                                                              \
+  /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
+       param_tls_schannel_context_attribute_w);                               \
+                                                                              \
+  /*  Parameters for QUIC_PARAM_LEVEL_STREAM.  */                             \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_STREAM_ID, param_stream_id);                           \
+  ATOM(ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH, param_stream_0rtt_length);         \
+  ATOM(ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE,                         \
+       param_stream_ideal_send_buffer_size);                                  \
+                                                                              \
+  /*-----------------------*/                                                 \
+  /* msquic parms ends     */                                                 \
+  /*-----------------------*/                                                 \
+                                                                              \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key)
 
@@ -287,6 +483,163 @@ deregistration(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
   return ATOM_OK;
 }
 
+ERL_NIF_TERM
+atom_status(QUIC_STATUS status)
+{
+  ERL_NIF_TERM eterm = ATOM_OK;
+  switch (status)
+    {
+    case NO_ERROR:
+      eterm = ATOM_ERROR_NO_ERROR;
+      break;
+    case ERROR_CONTINUE:
+      eterm = ATOM_ERROR_CONTINUE;
+      break;
+    case ERROR_NOT_READY:
+      eterm = ATOM_ERROR_NOT_READY;
+      break;
+    case ERROR_NOT_ENOUGH_MEMORY:
+      eterm = ATOM_ERROR_NOT_ENOUGH_MEMORY;
+      break;
+    case ERROR_INVALID_STATE:
+      eterm = ATOM_ERROR_INVALID_STATE;
+      break;
+    case ERROR_INVALID_PARAMETER:
+      eterm = ATOM_ERROR_INVALID_PARAMETER;
+      break;
+    case ERROR_NOT_SUPPORTED:
+      eterm = ATOM_ERROR_NOT_SUPPORTED;
+      break;
+    case ERROR_NOT_FOUND:
+      eterm = ATOM_ERROR_NOT_FOUND;
+      break;
+    case ERROR_BUFFER_OVERFLOW:
+      eterm = ATOM_ERROR_BUFFER_OVERFLOW;
+      break;
+    case ERROR_CONNECTION_REFUSED:
+      eterm = ATOM_ERROR_CONNECTION_REFUSED;
+      break;
+    case ERROR_OPERATION_ABORTED:
+      eterm = ATOM_ERROR_OPERATION_ABORTED;
+      break;
+    case ERROR_HANDSHAKE_FAILURE:
+      eterm = ATOM_ERROR_HANDSHAKE_FAILURE;
+      break;
+    case ERROR_NETWORK_UNREACHABLE:
+      eterm = ATOM_ERROR_NETWORK_UNREACHABLE;
+      break;
+    case ERROR_CONNECTION_IDLE:
+      eterm = ATOM_ERROR_CONNECTION_IDLE;
+      break;
+    case ERROR_INTERNAL_ERROR:
+      eterm = ATOM_ERROR_INTERNAL_ERROR;
+      break;
+    case ERROR_PROTOCOL_ERROR:
+      eterm = ATOM_ERROR_PROTOCOL_ERROR;
+      break;
+    case ERROR_VER_NEG_ERROR:
+      eterm = ATOM_ERROR_VER_NEG_ERROR;
+      break;
+    case ERROR_EPOLL_ERROR:
+      eterm = ATOM_ERROR_EPOLL_ERROR;
+      break;
+    case ERROR_DNS_RESOLUTION_ERROR:
+      eterm = ATOM_ERROR_DNS_RESOLUTION_ERROR;
+      break;
+    case ERROR_SOCKET_ERROR:
+      eterm = ATOM_ERROR_SOCKET_ERROR;
+      break;
+    case ERROR_SSL_ERROR:
+      eterm = ATOM_ERROR_SSL_ERROR;
+      break;
+    case ERROR_USER_CANCELED:
+      eterm = ATOM_ERROR_USER_CANCELED;
+      break;
+    case ERROR_ALPN_NEG_FAILURE:
+      eterm = ATOM_ERROR_ALPN_NEG_FAILURE;
+      break;
+    /* case QUIC_STATUS_SUCCESS : */
+    /*   eterm =  ATOM_QUIC_STATUS_SUCCESS; */
+    /*   break; */
+    /* case QUIC_STATUS_PENDING : */
+    /*   eterm =  ATOM_QUIC_STATUS_PENDING; */
+    /*   break; */
+    /* case QUIC_STATUS_CONTINUE : */
+    /*   eterm =  ATOM_QUIC_STATUS_CONTINUE; */
+    /*   break; */
+    case QUIC_STATUS_OUT_OF_MEMORY:
+      eterm = ATOM_QUIC_STATUS_OUT_OF_MEMORY;
+      break;
+    case QUIC_STATUS_INVALID_PARAMETER:
+      eterm = ATOM_QUIC_STATUS_INVALID_PARAMETER;
+      break;
+    /* case QUIC_STATUS_INVALID_STATE : */
+    /*   eterm =  ATOM_QUIC_STATUS_INVALID_STATE; */
+    /*   break; */
+    case QUIC_STATUS_NOT_SUPPORTED:
+      eterm = ATOM_QUIC_STATUS_NOT_SUPPORTED;
+      break;
+    case QUIC_STATUS_NOT_FOUND:
+      eterm = ATOM_QUIC_STATUS_NOT_FOUND;
+      break;
+    case QUIC_STATUS_BUFFER_TOO_SMALL:
+      eterm = ATOM_QUIC_STATUS_BUFFER_TOO_SMALL;
+      break;
+    /* case QUIC_STATUS_HANDSHAKE_FAILURE : */
+    /*   eterm =  ATOM_QUIC_STATUS_HANDSHAKE_FAILURE; */
+    /*   break; */
+    /* case QUIC_STATUS_ABORTED : */
+    /*   eterm =  ATOM_QUIC_STATUS_ABORTED; */
+    /*   break; */
+    case QUIC_STATUS_ADDRESS_IN_USE:
+      eterm = ATOM_QUIC_STATUS_ADDRESS_IN_USE;
+      break;
+    case QUIC_STATUS_CONNECTION_TIMEOUT:
+      eterm = ATOM_QUIC_STATUS_CONNECTION_TIMEOUT;
+      break;
+    /* case QUIC_STATUS_CONNECTION_IDLE : */
+    /*   eterm =  ATOM_QUIC_STATUS_CONNECTION_IDLE; */
+    /*   break; */
+    /* case QUIC_STATUS_INTERNAL_ERROR : */
+    /*   eterm =  ATOM_QUIC_STATUS_INTERNAL_ERROR; */
+    /*   break; */
+    /* case QUIC_STATUS_CONNECTION_REFUSED : */
+    /*   eterm =  ATOM_QUIC_STATUS_CONNECTION_REFUSED; */
+    /*   break; */
+    /* case QUIC_STATUS_PROTOCOL_ERROR : */
+    /*   eterm =  ATOM_QUIC_STATUS_PROTOCOL_ERROR; */
+    /*   break; */
+    /* case QUIC_STATUS_VER_NEG_ERROR : */
+    /*   eterm =  ATOM_QUIC_STATUS_VER_NEG_ERROR; */
+    /*   break; */
+    case QUIC_STATUS_UNREACHABLE:
+      eterm = ATOM_QUIC_STATUS_UNREACHABLE;
+      break;
+    case QUIC_STATUS_PERMISSION_DENIED:
+      eterm = ATOM_QUIC_STATUS_PERMISSION_DENIED;
+      break;
+      /* case QUIC_STATUS_EPOLL_ERROR : */
+      /*   eterm =  ATOM_QUIC_STATUS_EPOLL_ERROR; */
+      /*   break; */
+      /* case QUIC_STATUS_DNS_RESOLUTION_ERROR : */
+      /*   eterm =  ATOM_QUIC_STATUS_DNS_RESOLUTION_ERROR; */
+      /*   break; */
+      /* case QUIC_STATUS_SOCKET_ERROR : */
+      /*   eterm =  ATOM_QUIC_STATUS_SOCKET_ERROR; */
+      /*   break; */
+      /* case QUIC_STATUS_TLS_ERROR : */
+      /*   eterm =  ATOM_QUIC_STATUS_TLS_ERROR; */
+      /*   break; */
+      /* case QUIC_STATUS_USER_CANCELED : */
+      /*   eterm =  ATOM_QUIC_STATUS_USER_CANCELED; */
+      /*   break; */
+      /* case QUIC_STATUS_ALPN_NEG_FAILURE : */
+      /*   eterm =  ATOM_QUIC_STATUS_ALPN_NEG_FAILURE; */
+      /*   break; */
+    }
+  return eterm;
+}
+
 static ErlNifFunc nif_funcs[] = {
   /* |  name  | arity| funptr | flags|
    *
@@ -305,7 +658,8 @@ static ErlNifFunc nif_funcs[] = {
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 2, send2, 0},
   { "close_stream", 1, close_stream1, 0},
-  { "sockname", 1, sockname1, 0}
+  { "sockname", 1, sockname1, 0},
+  { "getopt", 2, getopt2, 0}
   // clang-format on
 };
 

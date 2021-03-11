@@ -31,7 +31,8 @@ limitations under the License.
 #define QUICER_SND_BUFF '10rQ'  // Qr01 - QUICER SEND BUFFER
 #define QUICER_OWNER_MON '20rQ' // Qr02 - QUICER OWNER MON
 #define QUICER_CREDENTIAL_CONFIG_HELPER                                       \
-  '30rQ' // QUICER_CREDENTIAL_CONFIG_HELPER
+  '30rQ'                       // QUICER_CREDENTIAL_CONFIG_HELPER
+#define QUICER_OPT_BUFF '40rQ' // Qr02 - QUICER OPT
 
 typedef struct ACCEPTOR
 {

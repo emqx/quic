@@ -47,6 +47,8 @@
         , tc_stream_passive_receive_buffer/1
         , tc_stream_passive_receive_large_buffer_1/1
         , tc_stream_passive_receive_large_buffer_2/1
+
+        , tc_getopt/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -284,6 +286,24 @@ tc_stream_passive_receive_large_buffer_2(Config) ->
       SPid ! done
   after 6000 ->
       ct:fail("timeout")
+  end.
+
+tc_getopt(Config) ->
+  Parm = param_conn_quic_version,
+  Port = 4569,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, <<1,0,0,0>>} = quicer:getopt(Conn, Parm),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {error, buffer_too_small} = quicer:getopt(Stm, Parm),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 1000 ->
+      ct:fail("listener_timoeut")
   end.
 
 %% internal helpers

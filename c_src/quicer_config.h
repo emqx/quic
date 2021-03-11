@@ -19,6 +19,9 @@ limitations under the License.
 
 #include "quicer_nif.h"
 
+// @todo check if we can make use of it.
+//#include <msquichelper.h>
+
 typedef struct QUIC_CREDENTIAL_CONFIG_HELPER
 {
   QUIC_CREDENTIAL_CONFIG CredConfig;
@@ -38,5 +41,7 @@ void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *);
 bool ServerLoadConfiguration(HQUIC *Configuration,
                              QUIC_CREDENTIAL_CONFIG_HELPER *Config);
 bool ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure);
+
+ERL_NIF_TERM getopt2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 #endif // __QUICER_CONFIG_H_

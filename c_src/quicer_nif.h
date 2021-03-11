@@ -49,6 +49,8 @@ extern void MsQuicLibraryLoad(void);
 
 extern const uint64_t IdleTimeoutMs;
 
+ERL_NIF_TERM atom_status(QUIC_STATUS status);
+
 // Compiler attributes
 #define __unused_parm__ __attribute__((unused))
 

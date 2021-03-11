@@ -27,6 +27,7 @@
         , recv/2
         , close_stream/1
         , sockname/1
+        , getopt/2
         ]).
 
 -on_load(init/0).
@@ -118,7 +119,6 @@ recv(Stream, Count) ->
       do_recv(Stream, Count, Buff)
   end.
 
-
 do_recv(Stream, Count, {Buff, BuffLen}) ->
   %% @todo check if its stream owner?
   ct:pal("~p", [get({'__quic_recv_buff__', Stream})]),
@@ -149,6 +149,11 @@ sockname(Conn) ->
       inet:parse_address(Ipv4)
   end,
   {ok, {Addr, list_to_integer(PortStr)}}.
+
+-spec getopt(Handle::connection_handler() | stream_handler() | listener_handler(),
+             Optname::atom()) -> {ok, OptVal::any()} | {error, any()}.
+getopt(Handle, Opt) ->
+  quicer_nif:getopt(Handle, Opt).
 
 init() ->
   quicer_nif:open_lib(),

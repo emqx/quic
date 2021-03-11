@@ -33,7 +33,11 @@ note over conn_acceptor
 Nif call `accept_connection`
 self() is enqueued in conn acceptors queue
 end note
+
+erl ---[#blue]--> erl : nif monitor
+
 hnote over conn_acceptor: blocking
+
 == listener started ==
 ...  ....
 == Establish Quic Connection ==
@@ -44,6 +48,8 @@ In Listener Callback:
 dequeue one acceptor
 register connection callback of *quicer*
 end note
+
+msw o-[#blue]->o conn_acceptor: nif monitor
 
 msw --> conn_acceptor: erl msg:  '{new_conn, ... }'
 
@@ -68,11 +74,12 @@ client --> msw: start stream in the connection.
 note over msw
 Execute connection callback:
 Dequeue a stream acceptor and owner pid of stream is set
-
-msw --> stream_acceptor: {new_stream, StreamHandler}
-
 register stream callback of *quicer*
 end note
+
+msw o--[#blue]->o stream_acceptor: nif monitor
+
+msw --> stream_acceptor: {new_stream, StreamHandler}
 
 hnote over stream_acceptor: unblocked
 
