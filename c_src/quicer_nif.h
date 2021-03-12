@@ -44,7 +44,7 @@ extern ErlNifResourceType *ctx_connection_t;
 extern ErlNifResourceType *ctx_stream_t;
 
 // Externals from msquic obj.
-extern void QuicPlatformSystemLoad(void);
+extern void CxPlatSystemLoad(void);
 extern void MsQuicLibraryLoad(void);
 
 extern const uint64_t IdleTimeoutMs;

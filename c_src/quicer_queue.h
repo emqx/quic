@@ -18,8 +18,8 @@ limitations under the License.
 #define __QUICER_QUEUE_H_
 
 // @fixme
-#ifndef QUIC_PLATFORM_LINUX
-#define QUIC_PLATFORM_LINUX 1
+#ifndef CX_PLATFORM_LINUX
+#define CX_PLATFORM_LINUX 1
 #endif
 
 #include <erl_nif.h>
@@ -36,13 +36,13 @@ limitations under the License.
 
 typedef struct ACCEPTOR
 {
-  QUIC_LIST_ENTRY Link;
+  CXPLAT_LIST_ENTRY Link;
   ErlNifPid Pid;
 } ACCEPTOR;
 
 typedef struct AcceptorsQueue
 {
-  QUIC_LIST_ENTRY List; // list of acceptors
+  CXPLAT_LIST_ENTRY List; // list of acceptors
   ErlNifMutex *Lock;
 } QUICER_ACCEPTOR_QUEUE;
 
