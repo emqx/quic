@@ -18,6 +18,9 @@ limitations under the License.
 #define __QUICER_ETERMS_H_
 #include <erl_nif.h>
 
+extern ERL_NIF_TERM ATOM_TRUE;
+extern ERL_NIF_TERM ATOM_FALSE;
+
 // quicer internal 'errors'
 extern ERL_NIF_TERM ATOM_OK;
 extern ERL_NIF_TERM ATOM_ERROR;
@@ -173,6 +176,10 @@ extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 
 #define ETERM_UINT_64(i) enif_make_int(env, (uint64_t)i)
 
-#define IS_SAME_TERM(x, y) 0 == enif_compare(x, y)
+#define IS_SAME_TERM(x, y) enif_is_identical(x, y)
+
+#define PropTupleInt(S, I)                                                    \
+  enif_make_tuple2(env, enif_make_string(env, #S, ERL_NIF_LATIN1),            \
+                   enif_make_int64(env, ETERM_UINT_64(I)))
 
 #endif // __QUICER_ETERMS_H_

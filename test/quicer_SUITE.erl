@@ -48,7 +48,9 @@
         , tc_stream_passive_receive_large_buffer_1/1
         , tc_stream_passive_receive_large_buffer_2/1
 
+        , tc_getopt_raw/1
         , tc_getopt/1
+        , tc_get_stream_id/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -290,7 +292,7 @@ tc_stream_passive_receive_large_buffer_2(Config) ->
       ct:fail("timeout")
   end.
 
-tc_getopt(Config) ->
+tc_getopt_raw(Config) ->
   Parm = param_conn_quic_version,
   Port = 4569,
   Owner = self(),
@@ -301,14 +303,59 @@ tc_getopt(Config) ->
       {ok, <<1,0,0,0>>} = quicer:getopt(Conn, Parm),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      {error, buffer_too_small} = quicer:getopt(Stm, Parm),
+      {error, badarg} = quicer:getopt(Stm, Parm),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 1000 ->
-      ct:fail("listener_timoeut")
+      ct:fail("listener_timeout")
   end.
 
-%% internal helpers
+tc_getopt(Config) ->
+  Parm = param_conn_statistics,
+  Port = 4570,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Stats} = quicer:getopt(Conn, Parm, false),
+      [true = proplists:is_defined(SKey, Stats)
+       || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {error, badarg} = quicer:getopt(Stm, Parm, false),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_get_stream_id(Config) ->
+  Port = 4571,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, 0} = quicer:get_stream_id(Stm),
+      {ok, Stm2} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm2, <<"ping">>),
+      {ok, 4} = quicer:get_stream_id(Stm2),
+      {ok, Stm3} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm3, <<"ping">>),
+      {ok, 8} = quicer:get_stream_id(Stm3),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+
+%%% ====================
+%%% Internal helpers
+%%% ====================
 echo_server(Owner, Config, Port)->
   case quicer:listen(Port, default_listen_opts(Config)) of
     {ok, L} ->
