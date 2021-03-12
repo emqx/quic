@@ -30,6 +30,7 @@
         , getopt/2
         , getopt/3
         , get_stream_id/1
+        , getstats/2
         ]).
 
 -on_load(init/0).
@@ -160,9 +161,36 @@ getopt(Handle, Opt, IsRaw) ->
 get_stream_id(Stream) ->
   quicer_nif:getopt(Stream, param_stream_id, false).
 
+-spec getstats(connection_handler(), [inet:stat_option()]) -> list().
+getstats(Conn, Cnts) ->
+  case quicer_nif:getopt(Conn, param_conn_statistics, false) of
+    {error, _} = E ->
+      E;
+    {ok, Res} ->
+      lists:map(fun(Cnt) ->
+                    Key = stats_map(Cnt),
+                    V = proplists:get_value(Key, Res, {Key, -1}),
+                    {Cnt, V}
+                end, Cnts)
+  end.
+
 init() ->
   quicer_nif:open_lib(),
   quicer_nif:reg_open().
+
+
+%%% Internal helpers
+stats_map(recv_cnt) ->
+  "Recv.TotalPackets";
+stats_map(recv_oct) ->
+  "Recv.TotalBytes";
+stats_map(send_cnt) ->
+  "Send.TotalPackets";
+stats_map(send_oct) ->
+  "Send.TotalBytes";
+stats_map(_) ->
+  undefined.
+
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

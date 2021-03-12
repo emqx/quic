@@ -51,6 +51,7 @@
         , tc_getopt_raw/1
         , tc_getopt/1
         , tc_get_stream_id/1
+        , tc_getstat/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -352,6 +353,22 @@ tc_get_stream_id(Config) ->
       ct:fail("listener_timeout")
   end.
 
+
+tc_getstat(Config) ->
+  Port = 4572,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      [{send_cnt, 63}, {recv_oct, _}] = quicer:getstats(Conn, [send_cnt, recv_oct]),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
 
 %%% ====================
 %%% Internal helpers
