@@ -350,7 +350,8 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
 }
 
 void
-resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env, void *obj,
+resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env,
+                            void *obj,
                             __unused_parm__ ErlNifPid *pid,
                             __unused_parm__ ErlNifMonitor *mon)
 {
@@ -372,7 +373,8 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *caller_env,
 }
 
 static int
-on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
+on_load(ErlNifEnv *env,
+        __unused_parm__ void **priv_data,
         __unused_parm__ ERL_NIF_TERM loadinfo)
 {
   int ret_val = 0;
@@ -395,22 +397,28 @@ on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
   ErlNifResourceTypeInit listenerInit = {
     .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
   };
-  ctx_listener_t = enif_open_resource_type_x(env, "listener_context_resource",
+  ctx_listener_t = enif_open_resource_type_x(env,
+                                             "listener_context_resource",
                                              &listenerInit, // init callbacks
-                                             flags, NULL);
-  ctx_connection_t
-      = enif_open_resource_type_x(env, "connection_context_resource",
-                                  &connInit, // init callbacks
-                                  flags, NULL);
-  ctx_stream_t = enif_open_resource_type_x(env, "stream_context_resource",
+                                             flags,
+                                             NULL);
+  ctx_connection_t = enif_open_resource_type_x(env,
+                                               "connection_context_resource",
+                                               &connInit, // init callbacks
+                                               flags,
+                                               NULL);
+  ctx_stream_t = enif_open_resource_type_x(env,
+                                           "stream_context_resource",
                                            &streamInit, // init callbacks
-                                           flags, NULL);
+                                           flags,
+                                           NULL);
 
   return ret_val;
 }
 
 static int
-on_upgrade(__unused_parm__ ErlNifEnv *env, __unused_parm__ void **priv_data,
+on_upgrade(__unused_parm__ ErlNifEnv *env,
+           __unused_parm__ void **priv_data,
            __unused_parm__ void **old_priv_data,
            __unused_parm__ ERL_NIF_TERM load_info)
 {
@@ -452,7 +460,8 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 static ERL_NIF_TERM
-closeLib(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
+closeLib(__unused_parm__ ErlNifEnv *env,
+         __unused_parm__ int argc,
          __unused_parm__ const ERL_NIF_TERM argv[])
 {
   if (isLibOpened && MsQuic)
@@ -465,7 +474,8 @@ closeLib(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 static ERL_NIF_TERM
-registration(ErlNifEnv *env, __unused_parm__ int argc,
+registration(ErlNifEnv *env,
+             __unused_parm__ int argc,
              __unused_parm__ const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
@@ -479,7 +489,8 @@ registration(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 static ERL_NIF_TERM
-deregistration(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
+deregistration(__unused_parm__ ErlNifEnv *env,
+               __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   if (isRegistered && Registration)

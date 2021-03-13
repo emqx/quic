@@ -179,7 +179,8 @@ extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 #define IS_SAME_TERM(x, y) enif_is_identical(x, y)
 
 #define PropTupleInt(S, I)                                                    \
-  enif_make_tuple2(env, enif_make_string(env, #S, ERL_NIF_LATIN1),            \
+  enif_make_tuple2(env,                                                       \
+                   enif_make_string(env, #S, ERL_NIF_LATIN1),                 \
                    enif_make_int64(env, ETERM_UINT_64(I)))
 
 #endif // __QUICER_ETERMS_H_

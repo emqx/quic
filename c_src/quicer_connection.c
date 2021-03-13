@@ -23,7 +23,8 @@ limitations under the License.
 //
 _IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
-    ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
+    ClientConnectionCallback(_In_ HQUIC Connection,
+                             _In_opt_ void *Context,
                              _Inout_ QUIC_CONNECTION_EVENT *Event)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
@@ -38,8 +39,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
       enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, c_ctx->owner_mon);
-      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL,
-                     enif_make_tuple3(env, enif_make_atom(env, "quic"),
+      if (!enif_send(NULL,
+                     &(c_ctx->owner->Pid),
+                     NULL,
+                     enif_make_tuple3(env,
+                                      enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "connected"),
                                       enif_make_resource(env, c_ctx))))
         {
@@ -68,8 +72,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, s_ctx->owner_mon);
 
-      if (!enif_send(NULL, &(acc->Pid), NULL,
-                     enif_make_tuple3(env, enif_make_atom(env, "quic"),
+      if (!enif_send(NULL,
+                     &(acc->Pid),
+                     NULL,
+                     enif_make_tuple3(env,
+                                      enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "new_stream"),
                                       enif_make_resource(env, s_ctx))))
         {
@@ -80,7 +87,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
         }
 
       MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
-                                 (void *)ClientStreamCallback, s_ctx);
+                                 (void *)ClientStreamCallback,
+                                 s_ctx);
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
       //
@@ -111,7 +119,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // received from the server.
       //
       for (uint32_t i = 0;
-           i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++)
+           i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
+           i++)
         {
           printf(
               "%.2X",
@@ -126,7 +135,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 }
 
 QUIC_STATUS
-ServerConnectionCallback(HQUIC Connection, void *Context,
+ServerConnectionCallback(HQUIC Connection,
+                         void *Context,
                          QUIC_CONNECTION_EVENT *Event)
 {
   QuicerConnCTX *c_ctx;
@@ -164,8 +174,11 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor
       // should pick a 'acceptor' here?
-      if (!enif_send(NULL, acc_pid, NULL,
-                     enif_make_tuple(c_ctx->env, 2,
+      if (!enif_send(NULL,
+                     acc_pid,
+                     NULL,
+                     enif_make_tuple(c_ctx->env,
+                                     2,
                                      enif_make_atom(c_ctx->env, "new_conn"),
                                      ConnHandler)))
         {
@@ -182,7 +195,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // is the expected way for the connection to shut down with this
       // protocol, since we let idle timeout kill the connection.
       //
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+      printf("[conn][%p] Shut down by transport, 0x%x\n",
+             Connection,
              Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
@@ -228,8 +242,11 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       s_ctx->owner = acc;
 
       // @todo add monitor here.
-      if (!enif_send(NULL, acc_pid, NULL,
-                     enif_make_tuple3(env, enif_make_atom(env, "quic"),
+      if (!enif_send(NULL,
+                     acc_pid,
+                     NULL,
+                     enif_make_tuple3(env,
+                                      enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "new_stream"),
                                       enif_make_resource(env, s_ctx))))
         {
@@ -242,7 +259,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       else
         {
           MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
-                                     (void *)ServerStreamCallback, s_ctx);
+                                     (void *)ServerStreamCallback,
+                                     s_ctx);
         }
       break;
     case QUIC_CONNECTION_EVENT_RESUMED:
@@ -258,7 +276,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
 }
 
 ERL_NIF_TERM
-async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
+async_connect3(ErlNifEnv *env,
+               __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
@@ -293,17 +312,20 @@ async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(
-                      Registration, ClientConnectionCallback, c_ctx,
-                      &(c_ctx->Connection))))
+  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration,
+                                                  ClientConnectionCallback,
+                                                  c_ctx,
+                                                  &(c_ctx->Connection))))
     {
       destroy_c_ctx(c_ctx);
       return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
-                      c_ctx->Connection, c_ctx->Configuration,
-                      QUIC_ADDRESS_FAMILY_UNSPEC, host, port)))
+  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
+                                                   c_ctx->Configuration,
+                                                   QUIC_ADDRESS_FAMILY_UNSPEC,
+                                                   host,
+                                                   port)))
     {
       MsQuic->ConnectionClose(c_ctx->Connection);
       destroy_c_ctx(c_ctx);
@@ -316,7 +338,8 @@ async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 ERL_NIF_TERM
-async_accept2(ErlNifEnv *env, __unused_parm__ int argc,
+async_accept2(ErlNifEnv *env,
+              __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
   QuicerListenerCTX *l_ctx;
@@ -346,7 +369,8 @@ async_accept2(ErlNifEnv *env, __unused_parm__ int argc,
 
 //@todo,  shutdown with error
 ERL_NIF_TERM
-close_connection1(ErlNifEnv *env, __unused_parm__ int argc,
+close_connection1(ErlNifEnv *env,
+                  __unused_parm__ int argc,
                   const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
@@ -356,74 +380,81 @@ close_connection1(ErlNifEnv *env, __unused_parm__ int argc,
     }
   MsQuic->ConnectionShutdown(c_ctx->Connection,
                              //@todo, check rfc for the error code
-                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
+                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                             NO_ERROR);
   return ATOM_OK;
 }
 
 ERL_NIF_TERM
-sockname1(ErlNifEnv *env, __unused_parm__ int args,
-          const ERL_NIF_TERM argv[])
+sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
 {
   void *q_ctx;
   HQUIC Handle = NULL;
   uint32_t Param = -1;
   QUIC_PARAM_LEVEL Level = -1;
 
-  if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx)) {
-    Handle = ((QuicerConnCTX *)q_ctx)->Connection;
-    Level = QUIC_PARAM_LEVEL_CONNECTION;
-    Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
-  } else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx)) {
-    Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
-    Level = QUIC_PARAM_LEVEL_LISTENER;
-    Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
-  } else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx)) {
-    Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
-    Level = QUIC_PARAM_LEVEL_CONNECTION;
-    Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
-  } else {
-    return ERROR_TUPLE_2(ATOM_BADARG);
-  }
+  if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
+    {
+      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
+    }
+  else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx))
+    {
+      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+      Level = QUIC_PARAM_LEVEL_LISTENER;
+      Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
+    }
+  else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
+    {
+      Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   QUIC_STATUS status;
   QUIC_ADDR addr;
   uint32_t addrSize = sizeof(addr);
 
-  if (QUIC_FAILED(status = MsQuic->GetParam(
-                                       Handle,
-                                       Level,
-                                       Param,
-                                       &addrSize,
-                                       &addr)))
-      {
-        return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
-      }
+  if (QUIC_FAILED(status
+                  = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
+    {
+      return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
+    }
 
   unsigned char *ip;
-  if (addr.Ip.sa_family == QUIC_ADDRESS_FAMILY_INET6) {
-    ip = (unsigned char *)&addr.Ipv6.sin6_addr;
-    return SUCCESS(enif_make_tuple2(env,
-                     enif_make_tuple8(env,
-                                      enif_make_int(env, ip[0]),
-                                      enif_make_int(env, ip[1]),
-                                      enif_make_int(env, ip[2]),
-                                      enif_make_int(env, ip[3]),
-                                      enif_make_int(env, ip[4]),
-                                      enif_make_int(env, ip[5]),
-                                      enif_make_int(env, ip[6]),
-                                      enif_make_int(env, ip[7])),
-                                    enif_make_int(env, addr.Ipv6.sin6_port)));
-  }
-  else {
-    ip = (unsigned char *)&addr.Ipv4.sin_addr;
-        return SUCCESS(enif_make_tuple2(env,
-                         enif_make_tuple4(env,
-                                          enif_make_int(env, ip[0]),
-                                          enif_make_int(env, ip[1]),
-                                          enif_make_int(env, ip[2]),
-                                          enif_make_int(env, ip[3])),
-                                        enif_make_int(env, addr.Ipv4.sin_port)));
-  }
+  if (addr.Ip.sa_family == QUIC_ADDRESS_FAMILY_INET6)
+    {
+      ip = (unsigned char *)&addr.Ipv6.sin6_addr;
+      return SUCCESS(
+          enif_make_tuple2(env,
+                           enif_make_tuple8(env,
+                                            enif_make_int(env, ip[0]),
+                                            enif_make_int(env, ip[1]),
+                                            enif_make_int(env, ip[2]),
+                                            enif_make_int(env, ip[3]),
+                                            enif_make_int(env, ip[4]),
+                                            enif_make_int(env, ip[5]),
+                                            enif_make_int(env, ip[6]),
+                                            enif_make_int(env, ip[7])),
+                           enif_make_int(env, addr.Ipv6.sin6_port)));
+    }
+  else
+    {
+      ip = (unsigned char *)&addr.Ipv4.sin_addr;
+      return SUCCESS(
+          enif_make_tuple2(env,
+                           enif_make_tuple4(env,
+                                            enif_make_int(env, ip[0]),
+                                            enif_make_int(env, ip[1]),
+                                            enif_make_int(env, ip[2]),
+                                            enif_make_int(env, ip[3])),
+                           enif_make_int(env, addr.Ipv4.sin_port)));
+    }
 }
 ///_* Emacs
 ///====================================================================

@@ -115,9 +115,13 @@ ServerLoadConfiguration(HQUIC *Configuration,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
-                      Registration, &Alpn, 1, &Settings, sizeof(Settings),
-                      NULL, Configuration)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+                                                     &Alpn,
+                                                     1,
+                                                     &Settings,
+                                                     sizeof(Settings),
+                                                     NULL,
+                                                     Configuration)))
     {
       return false;
     }
@@ -168,9 +172,13 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
-                      Registration, &Alpn, 1, &Settings, sizeof(Settings),
-                      NULL, Configuration)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+                                                     &Alpn,
+                                                     1,
+                                                     &Settings,
+                                                     sizeof(Settings),
+                                                     NULL,
+                                                     Configuration)))
     {
       return false;
     }
@@ -189,8 +197,11 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
 }
 
 ERL_NIF_TERM
-encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
-                     uint32_t BufferLength, void *Buffer)
+encode_parm_to_eterm(ErlNifEnv *env,
+                     QUIC_PARAM_LEVEL Level,
+                     uint32_t Param,
+                     uint32_t BufferLength,
+                     void *Buffer)
 {
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   if (QUIC_PARAM_CONN_STATISTICS == Param
@@ -198,72 +209,30 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
       && sizeof(QUIC_STATISTICS) == BufferLength)
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
-      res = SUCCESS(enif_make_list(
-          env, 20, PropTupleInt(Timing.Start, statics->Timing.Start),
-          PropTupleInt(
-              Timing.InitialFlightEnd,
-              statics->Timing
-                  .InitialFlightEnd), // Processed all peer's Initial packets
-          PropTupleInt(
-              Timing.HandshakeFlightEnd,
-              statics->Timing.HandshakeFlightEnd), // Processed all peer's
-                                                   // Handshake packets
-          PropTupleInt(Send.PathMtu,
-                       statics->Send.PathMtu), // Current path MTU.
-          PropTupleInt(
-              Send.TotalPackets,
-              statics->Send
-                  .TotalPackets), // QUIC packets, statics.Send.TotalPackets;
-                                  // // QUIC packets), could be coalesced into
-                                  // fewer UDP datagrams.
-          PropTupleInt(Send.RetransmittablePackets,
-                       statics->Send.RetransmittablePackets),
-          PropTupleInt(Send.SuspectedLostPackets,
-                       statics->Send.SuspectedLostPackets),
-          PropTupleInt(
-              Send.SpuriousLostPackets,
-              statics->Send.SpuriousLostPackets), // Actual lost is
-                                                  // (SuspectedLostPackets -
-                                                  // SpuriousLostPackets)
-          PropTupleInt(Send.TotalBytes,
-                       statics->Send.TotalBytes), // Sum of UDP payloads
-          PropTupleInt(
-              Send.TotalStreamBytes,
-              statics->Send.TotalStreamBytes), // Sum of stream payloads
-          PropTupleInt(
-              Send.CongestionCount,
-              statics->Send.CongestionCount), // Number of congestion events
-          PropTupleInt(
-              Send.PersistentCongestionCount,
-              statics->Send.PersistentCongestionCount), // Number of persistent
-                                                        // congestion events
-          PropTupleInt(
-              Recv.TotalPackets,
-              statics->Recv
-                  .TotalPackets), // QUIC packets, statics->Recv.TotalPackets;
-                                  // // QUIC packets), could be coalesced into
-                                  // fewer UDP datagrams.
-          PropTupleInt(
-              Recv.ReorderedPackets,
-              statics->Recv.ReorderedPackets), // Packets where packet number
-                                               // is less than highest seen.
-          PropTupleInt(
-              Recv.DroppedPackets,
-              statics->Recv.DroppedPackets), // Includes DuplicatePackets.
-          PropTupleInt(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
-          PropTupleInt(Recv.TotalBytes,
-                       statics->Recv.TotalBytes), // Sum of UDP payloads
-          PropTupleInt(
-              Recv.TotalStreamBytes,
-              statics->Recv.TotalStreamBytes), // Sum of stream payloads
-          PropTupleInt(
-              Recv.DecryptionFailures,
-              statics->Recv
-                  .DecryptionFailures), // Count of packet decryption failures.
-          PropTupleInt(
-              Recv.ValidAckFrames,
-              statics->Recv.ValidAckFrames) // Count of receive ACK frames.
-          ));
+      // clang-format off
+      res = SUCCESS(enif_make_list(env, 20,
+                                   PropTupleInt(Timing.Start, statics->Timing.Start),
+                                   PropTupleInt(Timing.InitialFlightEnd, statics->Timing.InitialFlightEnd),
+                                   PropTupleInt(Timing.HandshakeFlightEnd, statics->Timing.HandshakeFlightEnd),
+                                   PropTupleInt(Send.PathMtu, statics->Send.PathMtu),
+                                   PropTupleInt(Send.TotalPackets, statics->Send.TotalPackets),
+                                   PropTupleInt(Send.RetransmittablePackets, statics->Send.RetransmittablePackets),
+                                   PropTupleInt(Send.SuspectedLostPackets, statics->Send.SuspectedLostPackets),
+                                   PropTupleInt(Send.SpuriousLostPackets, statics->Send.SpuriousLostPackets),
+                                   PropTupleInt(Send.TotalBytes, statics->Send.TotalBytes),
+                                   PropTupleInt(Send.TotalStreamBytes, statics->Send.TotalStreamBytes),
+                                   PropTupleInt(Send.CongestionCount, statics->Send.CongestionCount),
+                                   PropTupleInt(Send.PersistentCongestionCount, statics->Send.PersistentCongestionCount),
+                                   PropTupleInt(Recv.TotalPackets, statics->Recv.TotalPackets),
+                                   PropTupleInt(Recv.ReorderedPackets, statics->Recv.ReorderedPackets),
+                                   PropTupleInt(Recv.DroppedPackets, statics->Recv.DroppedPackets),
+                                   PropTupleInt(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
+                                   PropTupleInt(Recv.TotalBytes, statics->Recv.TotalBytes),
+                                   PropTupleInt(Recv.TotalStreamBytes, statics->Recv.TotalStreamBytes),
+                                   PropTupleInt(Recv.DecryptionFailures, statics->Recv.DecryptionFailures),
+                                   PropTupleInt(Recv.ValidAckFrames, statics->Recv.ValidAckFrames))
+      );
+      // clang-format on
     }
   else if (QUIC_PARAM_STREAM_ID == Param && QUIC_PARAM_LEVEL_STREAM == Level)
     {
@@ -274,7 +243,8 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
 }
 
 ERL_NIF_TERM
-getopt3(ErlNifEnv *env, __unused_parm__ int argc,
+getopt3(ErlNifEnv *env,
+        __unused_parm__ int argc,
         __unused_parm__ const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM ctx = argv[0];

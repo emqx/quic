@@ -50,14 +50,16 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       uint32_t offset = 0;
       for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
         {
-          CxPlatCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
-                         Event->RECEIVE.Buffers[i].Length);
+          CxPlatCopyMemory(bin.data + offset,
+                           Event->RECEIVE.Buffers[i].Buffer,
+                           Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
       ERL_NIF_TERM report = enif_make_tuple6(
           env,
           // reserved for port
-          enif_make_atom(env, "quic"), enif_make_binary(env, &bin),
+          enif_make_atom(env, "quic"),
+          enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
           enif_make_int(
               env, Event->RECEIVE.AbsoluteOffset), // @todo check what is this?
@@ -102,7 +104,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 //
 _IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_STREAM_CALLBACK) QUIC_STATUS QUIC_API
-    ClientStreamCallback(_In_ HQUIC Stream, _In_opt_ void *Context,
+    ClientStreamCallback(_In_ HQUIC Stream,
+                         _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event)
 {
   ErlNifEnv *env;
@@ -134,15 +137,17 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       uint32_t offset = 0;
       for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
         {
-          CxPlatCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
-                         Event->RECEIVE.Buffers[i].Length);
+          CxPlatCopyMemory(bin.data + offset,
+                           Event->RECEIVE.Buffers[i].Buffer,
+                           Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
 
       ERL_NIF_TERM report = enif_make_tuple6(
           env,
           // reserved for port
-          enif_make_atom(env, "quic"), enif_make_binary(env, &bin),
+          enif_make_atom(env, "quic"),
+          enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
           enif_make_int(env, Event->RECEIVE.AbsoluteOffset),
           enif_make_int(env, Event->RECEIVE.TotalBufferLength),
@@ -189,7 +194,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 }
 
 ERL_NIF_TERM
-async_start_stream2(ErlNifEnv *env, __unused_parm__ int argc,
+async_start_stream2(ErlNifEnv *env,
+                    __unused_parm__ int argc,
                     const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
@@ -215,9 +221,11 @@ async_start_stream2(ErlNifEnv *env, __unused_parm__ int argc,
     }
 
   // @todo check if stream is null
-  if (QUIC_FAILED(Status = MsQuic->StreamOpen(
-                      c_ctx->Connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                      ClientStreamCallback, s_ctx, &(s_ctx->Stream))))
+  if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
+                                              QUIC_STREAM_OPEN_FLAG_NONE,
+                                              ClientStreamCallback,
+                                              s_ctx,
+                                              &(s_ctx->Stream))))
     {
       destroy_s_ctx(s_ctx);
       return ERROR_TUPLE_2(ATOM_STREAM_OPEN_ERROR);
@@ -240,7 +248,8 @@ async_start_stream2(ErlNifEnv *env, __unused_parm__ int argc,
 
 // accept streams on top of connection.
 ERL_NIF_TERM
-async_accept_stream2(ErlNifEnv *env, __unused_parm__ int argc,
+async_accept_stream2(ErlNifEnv *env,
+                     __unused_parm__ int argc,
                      const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
@@ -341,7 +350,8 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
-close_stream1(ErlNifEnv *env, __unused_parm__ int argc,
+close_stream1(ErlNifEnv *env,
+              __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
