@@ -50,7 +50,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       uint32_t offset = 0;
       for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
         {
-          QuicCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
+          CxPlatCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
                          Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
@@ -134,7 +134,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       uint32_t offset = 0;
       for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
         {
-          QuicCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
+          CxPlatCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
                          Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
@@ -299,7 +299,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   assert(sizeof(size_t) == sizeof(uint64_t));
   assert(bin.data != NULL);
   QUIC_BUFFER *SendBuffer
-      = QUIC_ALLOC_NONPAGED(sizeof(QUIC_BUFFER) + bin.size, QUICER_SND_BUFF);
+      = CXPLAT_ALLOC_NONPAGED(sizeof(QUIC_BUFFER) + bin.size, QUICER_SND_BUFF);
 
   if (SendBuffer == NULL)
     {
@@ -322,7 +322,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   **  Slow path, safe but requires memcpy copy
   */
   SendBuffer->Buffer = (uint8_t *)SendBuffer + sizeof(QUIC_BUFFER);
-  QuicCopyMemory(SendBuffer->Buffer, bin.data, bin.size);
+  CxPlatCopyMemory(SendBuffer->Buffer, bin.data, bin.size);
   SendBuffer->Length = (uint32_t)bin.size;
 
   QUIC_STATUS Status;

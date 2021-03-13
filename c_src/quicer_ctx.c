@@ -49,7 +49,7 @@ init_c_ctx()
   c_ctx->Connection = NULL;
   //@todo handle if NULL
   c_ctx->owner_mon
-      = QUIC_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
+      = CXPLAT_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
   return c_ctx;
 }

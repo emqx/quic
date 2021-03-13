@@ -431,7 +431,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   char lttngPath[PATH_MAX] = { 0 };
 
   // @todo external call for static link
-  QuicPlatformSystemLoad();
+  CxPlatSystemLoad();
   MsQuicLibraryLoad();
   if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
     {

@@ -364,42 +364,37 @@ ERL_NIF_TERM
 sockname1(ErlNifEnv *env, __unused_parm__ int args,
           const ERL_NIF_TERM argv[])
 {
-  QuicerConnCTX *c_ctx;
-  QuicerListenerCTX *l_ctx;
-  QuicerStreamCTX *s_ctx;
-  struct QUIC_HANDLE *handle;
+  void *q_ctx;
+  HQUIC Handle = NULL;
+  uint32_t Param = -1;
+  QUIC_PARAM_LEVEL Level = -1;
 
-  if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx)) {
-    handle = c_ctx->Connection;
-  } else if (enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx)) {
-    handle = l_ctx->Listener;
-  } else if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx)) {
-    handle = s_ctx->c_ctx->Connection;
+  if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx)) {
+    Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+    Level = QUIC_PARAM_LEVEL_CONNECTION;
+    Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
+  } else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx)) {
+    Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+    Level = QUIC_PARAM_LEVEL_LISTENER;
+    Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
+  } else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx)) {
+    Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+    Level = QUIC_PARAM_LEVEL_CONNECTION;
+    Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
   } else {
     return ERROR_TUPLE_2(ATOM_BADARG);
   }
 
-  QUIC_STATUS Status;
+  QUIC_STATUS status;
   QUIC_ADDR addr;
   uint32_t addrSize = sizeof(addr);
 
-  if (l_ctx) {
-    if (QUIC_FAILED(Status = MsQuic->GetParam(
-                                       handle,
-                                       QUIC_PARAM_LEVEL_LISTENER,
-                                       QUIC_PARAM_LISTENER_LOCAL_ADDRESS,
+  if (QUIC_FAILED(status = MsQuic->GetParam(
+                                       Handle,
+                                       Level,
+                                       Param,
                                        &addrSize,
                                        &addr)))
-      {
-        return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
-      }
-  }
-  else if (QUIC_FAILED(Status = MsQuic->GetParam(
-                           handle,
-                           QUIC_PARAM_LEVEL_CONNECTION,
-                           QUIC_PARAM_CONN_LOCAL_ADDRESS,
-                           &addrSize,
-                           &addr)))
       {
         return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
       }

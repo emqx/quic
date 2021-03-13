@@ -61,7 +61,7 @@ NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
       return NULL;
     }
 
-  Config = (QUIC_CREDENTIAL_CONFIG_HELPER *)QUIC_ALLOC_NONPAGED(
+  Config = (QUIC_CREDENTIAL_CONFIG_HELPER *)CXPLAT_ALLOC_NONPAGED(
       sizeof(QUIC_CREDENTIAL_CONFIG_HELPER), QUICER_CREDENTIAL_CONFIG_HELPER);
 
   memset(Config, 0, sizeof(QUIC_CREDENTIAL_CONFIG_HELPER));
@@ -378,7 +378,7 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
     }
   else if (!Buffer)
     { // when Buffer is not initialized.
-      Buffer = QUIC_ALLOC_NONPAGED(BufferLength, QUICER_OPT_BUFF);
+      Buffer = CXPLAT_ALLOC_NONPAGED(BufferLength, QUICER_OPT_BUFF);
       isMalloc = true;
     }
 
