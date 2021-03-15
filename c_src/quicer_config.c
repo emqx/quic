@@ -335,6 +335,13 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
     }
   else if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_STATISTICS))
     {
+      if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
+        {
+          // msquic has no stats on stream level, Lets fallback to connection
+          // for now
+          Level = QUIC_PARAM_LEVEL_CONNECTION;
+          Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+        }
       isLevelOK = Level == QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STATISTICS;
       BufferLength = sizeof(QUIC_STATISTICS);

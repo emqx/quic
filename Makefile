@@ -11,7 +11,9 @@ clean: distclean
 
 .PHONY: distclean
 distclean:
-	@rm -rf _build erl_crash.dump rebar3.crashdump rebar.lock
+	rebar3 unlock
+	rm -rf _build erl_crash.dump rebar3.crashdump
+	rm -rf c_build/*
 
 .PHONY: xref
 xref:
