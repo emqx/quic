@@ -170,6 +170,44 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 /* msquic parms ends     */
 /*-----------------------*/
 
+/*----------------------------------------------------------*/
+/* QUIC_SETTINGS starts      */
+/*----------------------------------------------------------*/
+
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBytesPerKey;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_IdleTimeoutMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_StreamRecvWindowDefault;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_StreamRecvBufferDefault;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_ConnFlowControlWindow;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxStatelessOperations;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_InitialWindowPackets;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_SendIdleTimeoutMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_InitialRttMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxAckDelayMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_DisconnectTimeoutMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_KeepAliveIntervalMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerBidiStreamCount;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerUnidiStreamCount;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_RetryMemoryLimit;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_LoadBalancingMode;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxOperationsPerDrain;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_SendBufferingEnabled;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_PacingEnabled;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MigrationEnabled;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_DatagramReceiveEnabled;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_ServerResumptionLevel;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
+
+/*----------------------------------------------------------*/
+/* QUIC_SETTINGS ends      */
+/*----------------------------------------------------------*/
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -322,6 +360,43 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
   /* msquic parms ends     */                                                 \
   /*-----------------------*/                                                 \
                                                                               \
+  /*                 QUIC_SETTINGS start                      */              \
+  ATOM(ATOM_QUIC_SETTINGS_MaxBytesPerKey, max_bytes_per_key);                 \
+  ATOM(ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs, handshake_idle_timeout_ms); \
+  ATOM(ATOM_QUIC_SETTINGS_IdleTimeoutMs, idle_timeout_ms);                    \
+  ATOM(ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer,                             \
+       tls_client_max_send_buffer);                                           \
+  ATOM(ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer,                             \
+       tls_server_max_send_buffer);                                           \
+  ATOM(ATOM_QUIC_SETTINGS_StreamRecvWindowDefault,                            \
+       stream_recv_window_default);                                           \
+  ATOM(ATOM_QUIC_SETTINGS_StreamRecvBufferDefault,                            \
+       stream_recv_buffer_default);                                           \
+  ATOM(ATOM_QUIC_SETTINGS_ConnFlowControlWindow, conn_flow_control_window);   \
+  ATOM(ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs, max_worker_queue_delay_us);  \
+  ATOM(ATOM_QUIC_SETTINGS_MaxStatelessOperations, max_stateless_operations);  \
+  ATOM(ATOM_QUIC_SETTINGS_InitialWindowPackets, initial_window_packets);      \
+  ATOM(ATOM_QUIC_SETTINGS_SendIdleTimeoutMs, send_idle_timeout_ms);           \
+  ATOM(ATOM_QUIC_SETTINGS_InitialRttMs, initial_rtt_ms);                      \
+  ATOM(ATOM_QUIC_SETTINGS_MaxAckDelayMs, max_ack_delay_ms);                   \
+  ATOM(ATOM_QUIC_SETTINGS_DisconnectTimeoutMs, disconnect_timeout_ms);        \
+  ATOM(ATOM_QUIC_SETTINGS_KeepAliveIntervalMs, keep_alive_interval_ms);       \
+  ATOM(ATOM_QUIC_SETTINGS_PeerBidiStreamCount, peer_bidi_stream_count);       \
+  ATOM(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, peer_unidi_stream_count);     \
+  ATOM(ATOM_QUIC_SETTINGS_RetryMemoryLimit, retry_memory_limit);              \
+  ATOM(ATOM_QUIC_SETTINGS_LoadBalancingMode, load_balancing_mode);            \
+  ATOM(ATOM_QUIC_SETTINGS_MaxOperationsPerDrain, max_operations_per_drain);   \
+  ATOM(ATOM_QUIC_SETTINGS_SendBufferingEnabled, send_buffering_enabled);      \
+  ATOM(ATOM_QUIC_SETTINGS_PacingEnabled, pacing_enabled);                     \
+  ATOM(ATOM_QUIC_SETTINGS_MigrationEnabled, migration_enabled);               \
+  ATOM(ATOM_QUIC_SETTINGS_DatagramReceiveEnabled, datagram_receive_enabled);  \
+  ATOM(ATOM_QUIC_SETTINGS_ServerResumptionLevel, server_resumption_level);    \
+  ATOM(ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled,                       \
+       version_negotiation_ext_enabled);                                      \
+  ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsList, desired_versions_list);        \
+  ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsListLength,                          \
+       desired_versions_list_length);                                         \
+  /*                  QUIC_SETTINGS end                        */             \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key)
 

@@ -166,6 +166,44 @@ extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 /* msquic parms ends     */
 /*-----------------------*/
 
+/*----------------------------------------------------------*/
+/* QUIC_SETTINGS starts      */
+/*----------------------------------------------------------*/
+
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBytesPerKey;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_IdleTimeoutMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_StreamRecvWindowDefault;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_StreamRecvBufferDefault;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_ConnFlowControlWindow;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxStatelessOperations;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_InitialWindowPackets;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_SendIdleTimeoutMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_InitialRttMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxAckDelayMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DisconnectTimeoutMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_KeepAliveIntervalMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerBidiStreamCount;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerUnidiStreamCount;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_RetryMemoryLimit;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_LoadBalancingMode;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxOperationsPerDrain;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_SendBufferingEnabled;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_PacingEnabled;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MigrationEnabled;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DatagramReceiveEnabled;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_ServerResumptionLevel;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
+
+/*----------------------------------------------------------*/
+/* QUIC_SETTINGS ends      */
+/*----------------------------------------------------------*/
+
 #define SUCCESS(Term) enif_make_tuple(env, 2, ATOM_OK, Term)
 #define ERROR_TUPLE_2(Err) enif_make_tuple2(env, ATOM_ERROR, Err)
 #define ERROR_TUPLE_3(Err1, Err2) enif_make_tuple3(env, ATOM_ERROR, Err1, Err2)
