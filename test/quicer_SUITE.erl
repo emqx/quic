@@ -324,7 +324,8 @@ tc_getopt(Config) ->
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      {error, badarg} = quicer:getopt(Stm, Parm, false),
+      %% test that op is fallbakced to connection
+      {ok, _} = quicer:getopt(Stm, Parm, false),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 5000 ->
@@ -347,6 +348,7 @@ tc_get_stream_id(Config) ->
       {ok, Stm3} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm3, <<"ping">>),
       {ok, 8} = quicer:get_stream_id(Stm3),
+      {error, badarg} = quicer:get_stream_id(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 5000 ->
