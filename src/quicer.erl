@@ -31,6 +31,7 @@
         , getopt/3
         , get_stream_id/1
         , getstats/2
+        , peername/1
         ]).
 
 -on_load(init/0).
@@ -173,6 +174,11 @@ getstats(Conn, Cnts) ->
                     {Cnt, V}
                 end, Cnts)
   end.
+
+-spec peername(connection_handler()  | stream_handler()) ->
+        {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
+peername(Handle)->
+  quicer_nif:getopt(Handle, param_conn_remote_address, false).
 
 init() ->
   quicer_nif:open_lib(),

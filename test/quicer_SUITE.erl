@@ -52,10 +52,13 @@
         , tc_getopt/1
         , tc_get_stream_id/1
         , tc_getstat/1
+        , tc_peername_v4/1
+        , tc_peername_v6/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
+-include_lib("kernel/include/inet.hrl").
 
 -define(PROPTEST(M,F), true = proper:quickcheck(M:F())).
 
@@ -366,6 +369,55 @@ tc_getstat(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       [{send_cnt, _}, {recv_oct, _}] = quicer:getstats(Conn, [send_cnt, recv_oct]),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+
+tc_peername_v6(Config) ->
+  Port = 4572,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("::1", Port, [], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      % @todo remove me.
+      timer:sleep(1000),
+      {error, badarg} = quicer:peername(0),
+      {ok, {Addr, RPort}} = quicer:peername(Conn),
+      {ok, {Addr, RPort}} = quicer:peername(Stm),
+      %% checks
+      true = is_integer(RPort),
+      ct:pal("addr is ~p", [Addr]),
+      "::1" = inet:ntoa(Addr),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_peername_v4(Config) ->
+  Port = 4572,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("127.0.0.1", Port, [], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      % @todo remove me.
+      timer:sleep(1000),
+      {error, badarg} = quicer:peername(0),
+      {ok, {Addr, RPort}} = quicer:peername(Conn),
+      {ok, {Addr, RPort}} = quicer:peername(Stm),
+      %% checks
+      true = is_integer(RPort),
+      ct:pal("addr is ~p", [Addr]),
+      "127.0.0.1" =  inet:ntoa(Addr),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 5000 ->
