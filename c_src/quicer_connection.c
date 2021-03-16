@@ -130,7 +130,7 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
                          QUIC_CONNECTION_EVENT *Event)
 {
   QuicerConnCTX *c_ctx;
-  ACCEPTOR *acc;
+  ACCEPTOR *acc = NULL;
   ErlNifPid *acc_pid = NULL;
 
   switch (Event->Type)

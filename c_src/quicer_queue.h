@@ -17,9 +17,10 @@ limitations under the License.
 #ifndef __QUICER_QUEUE_H_
 #define __QUICER_QUEUE_H_
 
-// @fixme
-#ifndef CX_PLATFORM_LINUX
+#if defined(__linux__)
 #define CX_PLATFORM_LINUX 1
+#elif defined(__APPLE__)
+#define CX_PLATFORM_DARWIN 1
 #endif
 
 #include <erl_nif.h>
