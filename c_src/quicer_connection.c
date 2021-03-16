@@ -399,31 +399,40 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args,
         return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
       }
 
-  unsigned char *ip;
-  if (addr.Ip.sa_family == QUIC_ADDRESS_FAMILY_INET6) {
-    ip = (unsigned char *)&addr.Ipv6.sin6_addr;
-    return SUCCESS(enif_make_tuple2(env,
-                     enif_make_tuple8(env,
-                                      enif_make_int(env, ip[0]),
-                                      enif_make_int(env, ip[1]),
-                                      enif_make_int(env, ip[2]),
-                                      enif_make_int(env, ip[3]),
-                                      enif_make_int(env, ip[4]),
-                                      enif_make_int(env, ip[5]),
-                                      enif_make_int(env, ip[6]),
-                                      enif_make_int(env, ip[7])),
-                                    enif_make_int(env, addr.Ipv6.sin6_port)));
-  }
-  else {
-    ip = (unsigned char *)&addr.Ipv4.sin_addr;
-        return SUCCESS(enif_make_tuple2(env,
-                         enif_make_tuple4(env,
-                                          enif_make_int(env, ip[0]),
-                                          enif_make_int(env, ip[1]),
-                                          enif_make_int(env, ip[2]),
-                                          enif_make_int(env, ip[3])),
-                                        enif_make_int(env, addr.Ipv4.sin_port)));
-  }
+  return SUCCESS(addr2eterm(env, &addr));
+}
+
+ERL_NIF_TERM
+addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
+{
+  if (addr->Ip.sa_family == QUIC_ADDRESS_FAMILY_INET6)
+    {
+      uint16_t *ip = (uint16_t *)&addr->Ipv6.sin6_addr;
+      return enif_make_tuple2(
+          env,
+          enif_make_tuple8(
+            env,
+            enif_make_int(env, ntohs(ip[0])),
+            enif_make_int(env, ntohs(ip[1])),
+            enif_make_int(env, ntohs(ip[2])),
+            enif_make_int(env, ntohs(ip[3])),
+            enif_make_int(env, ntohs(ip[4])),
+            enif_make_int(env, ntohs(ip[5])),
+            enif_make_int(env, ntohs(ip[6])),
+            enif_make_int(env, ntohs(ip[7]))),
+            enif_make_int(env, addr->Ipv6.sin6_port));
+    }
+  else
+    {
+      uint8_t *ip = (uint8_t *)&addr->Ipv4.sin_addr.s_addr;
+      return enif_make_tuple2(env,
+                              enif_make_tuple4(env,
+                                               enif_make_int(env, ip[0]),
+                                               enif_make_int(env, ip[1]),
+                                               enif_make_int(env, ip[2]),
+                                               enif_make_int(env, ip[3])),
+                              enif_make_int(env, addr->Ipv4.sin_port));
+    }
 }
 ///_* Emacs
 ///====================================================================

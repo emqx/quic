@@ -30,4 +30,5 @@ ERL_NIF_TERM sockname1(ErlNifEnv *env, int argc,
 QUIC_STATUS ServerConnectionCallback(HQUIC Connection, void *Context,
                                      QUIC_CONNECTION_EVENT *Event);
 
+ERL_NIF_TERM addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr);
 #endif // __QUICER_CONNECTION_H_

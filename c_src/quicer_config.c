@@ -269,6 +269,10 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
+  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param && QUIC_PARAM_LEVEL_CONNECTION == Level)
+    {
+      res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
+    }
 
   return res;
 }
@@ -326,6 +330,8 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+
+  // Matching PARMs in a hard way...
   if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
     {
       isLevelOK = Level == QUIC_PARAM_LEVEL_CONNECTION;
@@ -353,6 +359,20 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
       BufferLength = sizeof(uint64_t);
       uint64_t stream_id = 0;
       Buffer = &stream_id;
+    }
+  else if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
+    {
+      QUIC_ADDR addr;
+      if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
+        {
+          // Lets fallback to connection for now
+          Level = QUIC_PARAM_LEVEL_CONNECTION;
+          Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+        }
+      isLevelOK = Level == QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_REMOTE_ADDRESS;
+      BufferLength = sizeof(QUIC_ADDR);
+      Buffer = &addr;
     }
   else
     {
