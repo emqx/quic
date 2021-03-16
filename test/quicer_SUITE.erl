@@ -365,7 +365,7 @@ tc_getstat(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      [{send_cnt, 63}, {recv_oct, _}] = quicer:getstats(Conn, [send_cnt, recv_oct]),
+      [{send_cnt, _}, {recv_oct, _}] = quicer:getstats(Conn, [send_cnt, recv_oct]),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 5000 ->
