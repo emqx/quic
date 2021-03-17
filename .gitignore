@@ -4,6 +4,7 @@
 *.plt
 erl_crash.dump
 .concrete/DEV_MODE
+.DS_Store
 
 # rebar 2.x
 .rebar
@@ -18,6 +19,7 @@ _checkouts/
 
 # nif dynamic linked lib
 priv/*.so
+priv/*.dylib
 
 # language server caches
 .ccls-cache/

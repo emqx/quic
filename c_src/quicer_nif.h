@@ -29,7 +29,13 @@ limitations under the License.
 #include "quicer_queue.h"
 #include "quicer_stream.h"
 
+#if defined(__linux__)
 #include <linux/limits.h>
+#elif defined(__APPLE__)
+#include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif
 
 // Global registration
 // @todo avoid use globals
