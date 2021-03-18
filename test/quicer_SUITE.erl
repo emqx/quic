@@ -436,7 +436,7 @@ echo_server(Owner, Config, Port)->
       echo_server_stm_loop(L, Conn, Stm);
     {error, listener_start_error, 200000002} ->
       timer:sleep(100),
-      ping_pong_server(Owner, Config, Port)
+      echo_server(Owner, Config, Port)
   end.
 
 echo_server_stm_loop(L, Conn, Stm) ->
