@@ -102,6 +102,7 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
 // option keys
 ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
+ERL_NIF_TERM ATOM_ALPN;
 
 /*-----------------------------------------*/
 /*         msquic parms starts             */
@@ -398,7 +399,8 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
        desired_versions_list_length);                                         \
   /*                  QUIC_SETTINGS end                        */             \
   ATOM(ATOM_CERT, cert);                                                      \
-  ATOM(ATOM_KEY, key)
+  ATOM(ATOM_KEY, key)                                                         \
+  ATOM(ATOM_ALPN, alpn)
 
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
@@ -413,7 +415,8 @@ ErlNifResourceType *ctx_stream_t = NULL;
 
 const QUIC_REGISTRATION_CONFIG RegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
-const QUIC_BUFFER Alpn = { sizeof("sample") - 1, (uint8_t *)"sample" };
+// @todo is 16 enough?
+const uint16_t MAX_ALPN = 16;
 
 void
 resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,

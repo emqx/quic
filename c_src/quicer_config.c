@@ -87,7 +87,9 @@ DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 
 // @todo support per registration.
 bool
-ServerLoadConfiguration(HQUIC *Configuration,
+ServerLoadConfiguration(ErlNifEnv *env,
+                        const ERL_NIF_TERM *option,
+                        HQUIC *Configuration,
                         QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
   QUIC_SETTINGS Settings = { 0 };
@@ -110,13 +112,20 @@ ServerLoadConfiguration(HQUIC *Configuration,
   Settings.PeerBidiStreamCount = 10;
   Settings.IsSet.PeerBidiStreamCount = TRUE;
 
+  unsigned alpn_buffer_length = 0;
+  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+
+  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers)) {
+    return false;
+  }
+
   //
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
-                      Registration, &Alpn, 1, &Settings, sizeof(Settings),
+                      Registration, alpn_buffers, alpn_buffer_length, &Settings, sizeof(Settings),
                       NULL, Configuration)))
     {
       return false;
@@ -136,7 +145,10 @@ ServerLoadConfiguration(HQUIC *Configuration,
 
 // @todo return status instead
 bool
-ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
+ClientLoadConfiguration(ErlNifEnv *env,
+                        const ERL_NIF_TERM *option,
+                        HQUIC *Configuration,
+                        bool Unsecure)
 {
   QUIC_SETTINGS Settings = { 0 };
   //
@@ -163,13 +175,20 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
     }
 
+  unsigned alpn_buffer_length = 0;
+  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+
+  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers)) {
+    return false;
+  }
+
   //
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
-                      Registration, &Alpn, 1, &Settings, sizeof(Settings),
+                      Registration, alpn_buffers, alpn_buffer_length, &Settings, sizeof(Settings),
                       NULL, Configuration)))
     {
       return false;
@@ -184,6 +203,50 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
     {
       return false;
     }
+
+  return true;
+}
+
+bool load_alpn(ErlNifEnv *env,
+               const ERL_NIF_TERM *option,
+               unsigned *alpn_buffer_length,
+               QUIC_BUFFER alpn_buffers[]) {
+
+  ERL_NIF_TERM alpn_list;
+  if (!enif_get_map_value(env, *option, ATOM_ALPN, &alpn_list))
+    {
+      return false;
+    }
+
+  if (!enif_get_list_length(env, alpn_list, alpn_buffer_length))
+    {
+      return false;
+    }
+
+  ERL_NIF_TERM head, tail;
+
+  if (!enif_get_list_cell(env, alpn_list, &head, &tail))
+    {
+      return false;
+    }
+
+  for(int i = 0; i < (int)(*alpn_buffer_length); i++) {
+
+  // @todo check if PATH_MAX is the correct length
+  char str[PATH_MAX];
+  if(!enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1))
+    {
+      return false;
+    }
+
+    alpn_buffers[i].Buffer = (uint8_t*)str;
+    alpn_buffers[i].Length = strlen(str);
+
+    if(!enif_get_list_cell(env, tail, &head, &tail) && i + 1 < (int)(*alpn_buffer_length))
+      {
+        return false;
+      }
+  }
 
   return true;
 }

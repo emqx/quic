@@ -54,6 +54,8 @@
         , tc_getstat/1
         , tc_peername_v4/1
         , tc_peername_v6/1
+
+        , tc_alpn/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -165,7 +167,7 @@ tc_conn_basic(Config)->
                    end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done
@@ -179,7 +181,7 @@ tc_conn_other_port(Config)->
   {SPid, _Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 1000 ->
@@ -192,7 +194,7 @@ tc_stream_client_init(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> simple_stream_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_stream(Stm),
@@ -207,7 +209,7 @@ tc_stream_client_send(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive
@@ -228,7 +230,7 @@ tc_stream_passive_receive(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
@@ -245,7 +247,7 @@ tc_stream_passive_receive_buffer(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
@@ -265,7 +267,7 @@ tc_stream_passive_receive_large_buffer_1(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
@@ -282,7 +284,7 @@ tc_stream_passive_receive_large_buffer_2(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       timer:sleep(100),
@@ -303,7 +305,7 @@ tc_getopt_raw(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, <<1,0,0,0>>} = quicer:getopt(Conn, Parm),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
@@ -321,7 +323,7 @@ tc_getopt(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stats} = quicer:getopt(Conn, Parm, false),
       [true = proplists:is_defined(SKey, Stats)
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
@@ -341,7 +343,7 @@ tc_get_stream_id(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, 0} = quicer:get_stream_id(Stm),
@@ -365,7 +367,7 @@ tc_getstat(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       [{send_cnt, _}, {recv_oct, _}] = quicer:getstats(Conn, [send_cnt, recv_oct]),
@@ -382,7 +384,7 @@ tc_peername_v6(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("::1", Port, [], 5000),
+      {ok, Conn} = quicer:connect("::1", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {error, badarg} = quicer:peername(0),
@@ -404,7 +406,7 @@ tc_peername_v4(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("127.0.0.1", Port, [], 5000),
+      {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {error, badarg} = quicer:peername(0),
@@ -421,6 +423,21 @@ tc_peername_v4(Config) ->
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
+  end.
+
+tc_alpn(Config) ->
+  Port = 4573,
+  Owner = self(),
+  Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["sample2", "sample"]}),
+  {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 1000 ->
+    ct:fail("timeout")
   end.
 
 %%% ====================
@@ -480,6 +497,15 @@ simple_conn_server(Owner, Config, Port) ->
       ok
   end.
 
+conn_server_with(Owner, Port, Opts) ->
+  {ok, L} = quicer:listen(Port, Opts),
+  Owner ! listener_ready,
+  {ok, _Conn} = quicer:accept(L, [], 5000),
+  receive done ->
+    quicer:close_listener(L),
+    ok
+  end.
+
 simple_stream_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
@@ -490,10 +516,14 @@ simple_stream_server(Owner, Config, Port) ->
       ok
   end.
 
+default_conn_opts() ->
+  [{alpn, ["sample"]}].
+
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
   [ {cert, filename:join(DataDir, "cert.pem")}
-  , {key,  filename:join(DataDir, "key.pem")}].
+  , {key,  filename:join(DataDir, "key.pem")}
+  , {alpn, ["sample"]}].
 
 
 %%%_* Emacs ====================================================================

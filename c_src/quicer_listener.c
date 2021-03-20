@@ -99,7 +99,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   QUIC_CREDENTIAL_CONFIG_HELPER *Config = NewCredConfig(env, &options);
 
   // @todo check config
-  if (!ServerLoadConfiguration(&l_ctx->Configuration, Config))
+  if (!ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
@@ -128,8 +128,15 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ETERM_INT(Status));
     }
 
+    unsigned alpn_buffer_length = 0;
+    QUIC_BUFFER alpn_buffers[MAX_ALPN];
+
+    if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers)) {
+      return false;
+    }
+
   if (QUIC_FAILED(
-          Status = MsQuic->ListenerStart(l_ctx->Listener, &Alpn, 1, &Address)))
+          Status = MsQuic->ListenerStart(l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
       MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);

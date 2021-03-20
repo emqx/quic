@@ -38,9 +38,18 @@ bool ReloadCertConfig(HQUIC Configuration,
 QUIC_CREDENTIAL_CONFIG_HELPER *NewCredConfig(ErlNifEnv *env,
                                              const ERL_NIF_TERM *option);
 void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *);
-bool ServerLoadConfiguration(HQUIC *Configuration,
+bool ServerLoadConfiguration(ErlNifEnv *env,
+                             const ERL_NIF_TERM *option,
+                             HQUIC *Configuration,
                              QUIC_CREDENTIAL_CONFIG_HELPER *Config);
-bool ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure);
+bool ClientLoadConfiguration(ErlNifEnv *env,
+                             const ERL_NIF_TERM *option,
+                             HQUIC *Configuration,
+                             bool Unsecure);
+bool load_alpn(ErlNifEnv *env,
+               const ERL_NIF_TERM *option,
+               unsigned *alpn_buffer_length,
+               QUIC_BUFFER alpn_buffers[]);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
