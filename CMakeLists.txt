@@ -10,12 +10,16 @@ EXECUTE_PROCESS(
         OUTPUT_VARIABLE Erlang_OTP_ROOT_DIR
         )
 
-if (NOT DEFINED CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE DEBUG)
+if (DEFINED ENV{CMAKE_BUILD_TYPE})
+  set(CMAKE_BUILD_TYPE $ENV{CMAKE_BUILD_TYPE})
+else()
+  set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-if (NOT DEFINED QUIC_ENABLE_LOGGING)
-  set(QUIC_ENABLE_LOGGING ON)
+if (DEFINED ENV{QUIC_ENABLE_LOGGING})
+  set(QUIC_ENABLE_LOGGING $ENV{QUIC_ENABLE_LOGGING})
+else()
+  set(QUIC_ENABLE_LOGGING "ON")
 endif()
 
 # src files
@@ -47,7 +51,7 @@ elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
 endif()
 # @todo clean complier warnings in the code
-target_compile_options(quicer_static PUBLIC "-g" "-Wno-unused-variable")
+target_compile_options(quicer_static PUBLIC "-og" "-ggdb3" "-Wno-unused-variable")
 
 add_library(quicer_nif SHARED ${SOURCES})
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
