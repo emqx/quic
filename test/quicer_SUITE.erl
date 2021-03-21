@@ -377,7 +377,7 @@ tc_getstat(Config) ->
 
 
 tc_peername_v6(Config) ->
-  Port = 4572,
+  Port = 4573,
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -401,7 +401,7 @@ tc_peername_v6(Config) ->
   end.
 
 tc_peername_v4(Config) ->
-  Port = 4572,
+  Port = 4574,
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -419,6 +419,7 @@ tc_peername_v4(Config) ->
       ct:pal("addr is ~p", [Addr]),
       "127.0.0.1" =  inet:ntoa(Addr),
       ok = quicer:close_connection(Conn),
+      {ok, {Addr, RPort}} = quicer:peername(Conn),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")

@@ -106,8 +106,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                          _Inout_ QUIC_STREAM_EVENT *Event)
 {
   ErlNifEnv *env;
+  ErlNifBinary bin;
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
   env = s_ctx->env;
+
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -121,8 +123,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // Data was received from the peer on the stream.
       //
-      printf("[strm][%p] Data received\n", Stream);
-      ErlNifBinary bin;
+      //printf("[strm][%p] Data received\n", Stream);
 
       if (!enif_alloc_binary(Event->RECEIVE.TotalBufferLength, &bin))
         {
@@ -269,8 +270,8 @@ async_accept_stream2(ErlNifEnv *env, __unused_parm__ int argc,
     }
 
   AcceptorEnqueue(c_ctx->acceptor_queue, acceptor);
-  ERL_NIF_TERM listenHandler = enif_make_resource(env, c_ctx);
-  return SUCCESS(listenHandler);
+  ERL_NIF_TERM connectionHandler = enif_make_resource(env, c_ctx);
+  return SUCCESS(connectionHandler);
 }
 
 ERL_NIF_TERM
