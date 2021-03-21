@@ -125,7 +125,6 @@ recv(Stream, Count) ->
 
 do_recv(Stream, Count, {Buff, BuffLen}) ->
   %% @todo check if its stream owner?
-  ct:pal("~p", [get({'__quic_recv_buff__', Stream})]),
   receive
     {quic, Bin, Stream, _AbsOffset, _BinLen, _Flags} when 0 == Count ->
       {ok, Bin};

@@ -195,7 +195,11 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      MsQuic->ConnectionClose(Connection);
+      //
+      if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+        {
+          MsQuic->ConnectionClose(Connection);
+        }
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
       //
@@ -236,7 +240,9 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
           // @todo log and step counter
           // @todo, maybe we should just return error code and let msquic
           // shutdown the connection gracefully.
-          MsQuic->ConnectionClose(Connection);
+          // @todo, check rfc for the error code
+          MsQuic->ConnectionShutdown(
+            Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
           return QUIC_STATUS_UNREACHABLE;
         }
       else
