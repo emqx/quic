@@ -68,9 +68,9 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
-          // App down, close it.
-          // @todo free context as well
-          return QUIC_STATUS_UNREACHABLE;
+          // App down, close stream
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT,
+                                 QUIC_STATUS_UNREACHABLE);
         }
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
