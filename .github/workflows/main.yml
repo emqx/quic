@@ -41,4 +41,4 @@ jobs:
         with:
           otp-version: ${{ matrix.otp }}
       - name: release build with debug log off
-        run: cmake -B c_build -DCMAKE_BUILD_TYPE=Release -DQUIC_ENABLE_LOGGING=OFF && make test
+        run: CMAKE_BUILD_TYPE=Release QUIC_ENABLE_LOGGING=OFF make test

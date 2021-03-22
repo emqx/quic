@@ -377,7 +377,7 @@ tc_getstat(Config) ->
 
 
 tc_peername_v6(Config) ->
-  Port = 4572,
+  Port = 4573,
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -385,8 +385,6 @@ tc_peername_v6(Config) ->
       {ok, Conn} = quicer:connect("::1", Port, [], 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      % @todo remove me.
-      timer:sleep(1000),
       {error, badarg} = quicer:peername(0),
       {ok, {Addr, RPort}} = quicer:peername(Conn),
       {ok, {Addr, RPort}} = quicer:peername(Stm),
@@ -401,7 +399,7 @@ tc_peername_v6(Config) ->
   end.
 
 tc_peername_v4(Config) ->
-  Port = 4572,
+  Port = 4574,
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -409,8 +407,6 @@ tc_peername_v4(Config) ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, [], 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      % @todo remove me.
-      timer:sleep(1000),
       {error, badarg} = quicer:peername(0),
       {ok, {Addr, RPort}} = quicer:peername(Conn),
       {ok, {Addr, RPort}} = quicer:peername(Stm),
@@ -419,6 +415,9 @@ tc_peername_v4(Config) ->
       ct:pal("addr is ~p", [Addr]),
       "127.0.0.1" =  inet:ntoa(Addr),
       ok = quicer:close_connection(Conn),
+      %% @todo coredump, msquic isn't robust enough to handle the following call after
+      %% connection get closed. We need a follow-up later.
+      %{ok, {Addr, RPort}} = quicer:peername(Conn),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")

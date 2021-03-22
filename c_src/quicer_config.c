@@ -107,7 +107,7 @@ ServerLoadConfiguration(HQUIC *Configuration,
   // bidirectional stream. By default connections are not configured to allow
   // any streams from the peer.
   //
-  Settings.PeerBidiStreamCount = 1;
+  Settings.PeerBidiStreamCount = 10;
   Settings.IsSet.PeerBidiStreamCount = TRUE;
 
   //
@@ -149,7 +149,7 @@ ClientLoadConfiguration(HQUIC *Configuration, bool Unsecure)
   Settings.IsSet.PeerUnidiStreamCount = TRUE;
   Settings.PeerUnidiStreamCount = 1;
   Settings.IsSet.PeerBidiStreamCount = TRUE;
-  Settings.PeerBidiStreamCount = 1;
+  Settings.PeerBidiStreamCount = 10;
   //
   // Configures a default client configuration, optionally disabling
   // server certificate validation.
