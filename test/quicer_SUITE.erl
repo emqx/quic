@@ -56,6 +56,7 @@
         , tc_peername_v6/1
 
         , tc_alpn/1
+        , tc_alpn_mismatch/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -436,6 +437,25 @@ tc_alpn(Config) ->
       {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done
+  after 1000 ->
+    ct:fail("timeout")
+  end.
+
+tc_alpn_mismatch(Config) ->
+  Port = 4574,
+  Owner = self(),
+  Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["no"]}),
+  {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
+  receive
+    listener_ready ->
+      spawn_monitor(fun() -> quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                             Owner ! connected end),
+      receive
+        connected ->
+          ct:fail("illegal connection")
+      after 1000 ->
+        SPid ! done
+      end
   after 1000 ->
     ct:fail("timeout")
   end.
