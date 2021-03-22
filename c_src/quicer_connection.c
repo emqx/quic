@@ -431,7 +431,7 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
                                                enif_make_int(env, ip[1]),
                                                enif_make_int(env, ip[2]),
                                                enif_make_int(env, ip[3])),
-                              enif_make_int(env, addr->Ipv4.sin_port));
+                              enif_make_int(env, ntohs(addr->Ipv4.sin_port)));
     }
 }
 ///_* Emacs
