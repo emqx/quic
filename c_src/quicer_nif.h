@@ -42,7 +42,7 @@ limitations under the License.
 extern HQUIC Registration;
 extern const QUIC_API_TABLE *MsQuic;
 extern const QUIC_REGISTRATION_CONFIG RegConfig;
-extern const QUIC_BUFFER Alpn;
+extern const uint16_t MAX_ALPN;
 
 // Context Types
 extern ErlNifResourceType *ctx_listener_t;

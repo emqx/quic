@@ -271,7 +271,7 @@ async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
 
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
-  // ERL_NIF_TERM eoptions = argv[2];
+  ERL_NIF_TERM eoptions = argv[2];
 
   int port = 0;
   char host[256] = { 0 };
@@ -294,7 +294,7 @@ async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  if (!ClientLoadConfiguration(&(c_ctx->Configuration), true))
+  if (!ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true))
     {
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }

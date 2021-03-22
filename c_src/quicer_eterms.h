@@ -98,6 +98,7 @@ extern ERL_NIF_TERM ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
 // option keys
 extern ERL_NIF_TERM ATOM_CERT;
 extern ERL_NIF_TERM ATOM_KEY;
+extern ERL_NIF_TERM ATOM_ALPN;
 
 /*-----------------------------------------*/
 /*         msquic parms starts             */
