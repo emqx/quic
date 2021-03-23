@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2020-2021 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -59,6 +59,8 @@
         , tc_alpn_mismatch/1
         , tc_idle_timeout/1
         ]).
+
+-export([tc_app_echo_server/1]).
 
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
@@ -473,6 +475,23 @@ tc_idle_timeout(Config) ->
       {error, stm_open_error} = quicer:start_stream(Conn, []),
       SPid ! done
   end.
+
+tc_app_echo_server(Config) ->
+  Port = 8888,
+  application:ensure_all_started(quicer),
+  Options = [ {conn_acceptors, 32},
+              {conn_callback, quicer_server_conn_callback},
+              {stream_acceptors, 32},
+              {stream_callback, quicer_echo_server_stream_callback}
+            | default_listen_opts(Config)],
+  {ok, _QuicApp} = quicer_appl:start_app(mqtt, Port, maps:from_list(Options)),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, []),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
+  ok.
 
 %%% ====================
 %%% Internal helpers

@@ -6,8 +6,10 @@
    [kernel,
     stdlib
    ]},
+  {mod, {quicer_app, []}},
   {env,[]},
-  {modules, [quicer_nif]},
+  {modules, [ quicer
+            , quicer_nif]},
 
   {licenses, ["Apache 2.0"]},
   {links, []}

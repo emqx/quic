@@ -34,11 +34,17 @@
         , peername/1
         ]).
 
+-export([start_appl/2]). %% start application over quic
+
 -on_load(init/0).
 
 -type listener_handler() :: reference().
 -type connection_handler() :: reference().
 -type stream_handler() :: reference().
+
+
+start_appl(AppName, Options) ->
+  supervisor:start_child(quicer_appl_sup, [AppName, Options]).
 
 -spec listen(inet:port_number(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
