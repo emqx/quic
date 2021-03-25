@@ -50,10 +50,14 @@ bool load_alpn(ErlNifEnv *env,
                const ERL_NIF_TERM *option,
                unsigned *alpn_buffer_length,
                QUIC_BUFFER alpn_buffers[]);
-bool get_int_from_map(ErlNifEnv *env,
-                      const ERL_NIF_TERM map,
-                      ERL_NIF_TERM key,
-                      int* value);
+bool get_uint16_from_map(ErlNifEnv *env,
+                         const ERL_NIF_TERM map,
+                         ERL_NIF_TERM key,
+                         uint16_t* value);
+bool get_uint64_from_map(ErlNifEnv *env,
+                         const ERL_NIF_TERM map,
+                         ERL_NIF_TERM key,
+                         uint64_t* value);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 

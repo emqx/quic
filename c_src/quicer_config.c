@@ -155,12 +155,12 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // Configures the client's idle timeout.
   //
 
-  int IdleTimeoutMs = 0;
-  int PeerUnidiStreamCount = 0;
-  int PeerBidiStreamCount = 0;
-  if (!get_int_from_map(env, *option, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &IdleTimeoutMs) ||
-      !get_int_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, &PeerUnidiStreamCount) ||
-      !get_int_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerBidiStreamCount, &PeerBidiStreamCount))
+  uint64_t IdleTimeoutMs = 0;
+  uint16_t PeerUnidiStreamCount = 0;
+  uint16_t PeerBidiStreamCount = 0;
+  if (!get_uint64_from_map(env, *option, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &IdleTimeoutMs) ||
+      !get_uint16_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, &PeerUnidiStreamCount) ||
+      !get_uint16_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerBidiStreamCount, &PeerBidiStreamCount))
     {
       return false;
     }
@@ -260,14 +260,29 @@ bool load_alpn(ErlNifEnv *env,
   return true;
 }
 
-bool get_int_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, int* value) {
+bool get_uint16_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint16_t* value) {
   ERL_NIF_TERM evalue;
   if (!enif_get_map_value(env, map, key, &evalue)) {
     return false;
   }
-  if (!enif_get_int(env, evalue, value)) {
+  unsigned int value0 = 0;
+  if (!enif_get_uint(env, evalue, &value0)) {
     return false;
   }
+  *value = (uint16_t)value0;
+  return true;
+}
+
+bool get_uint64_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint64_t* value) {
+  ERL_NIF_TERM evalue;
+  if (!enif_get_map_value(env, map, key, &evalue)) {
+    return false;
+  }
+  unsigned long value0 = 0;
+  if (!enif_get_uint64(env, evalue, &value0)) {
+    return false;
+  }
+  *value = (uint64_t)value0;
   return true;
 }
 
