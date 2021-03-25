@@ -537,7 +537,10 @@ simple_stream_server(Owner, Config, Port) ->
   end.
 
 default_conn_opts() ->
-  [{alpn, ["sample"]}].
+  [{alpn, ["sample"]},
+   {idle_timeout_ms, 5000},
+   {peer_unidi_stream_count, 1},
+   {peer_bidi_stream_count, 10}].
 
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),

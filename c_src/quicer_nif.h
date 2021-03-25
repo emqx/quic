@@ -53,8 +53,6 @@ extern ErlNifResourceType *ctx_stream_t;
 extern void CxPlatSystemLoad(void);
 extern void MsQuicLibraryLoad(void);
 
-extern const uint64_t IdleTimeoutMs;
-
 ERL_NIF_TERM atom_status(QUIC_STATUS status);
 
 ERL_NIF_TERM atom_errno(int errno);
