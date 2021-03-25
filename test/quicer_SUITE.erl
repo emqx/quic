@@ -427,7 +427,7 @@ tc_peername_v4(Config) ->
   end.
 
 tc_alpn(Config) ->
-  Port = 4573,
+  Port = 4575,
   Owner = self(),
   Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["sample2", "sample"]}),
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
@@ -442,7 +442,7 @@ tc_alpn(Config) ->
   end.
 
 tc_alpn_mismatch(Config) ->
-  Port = 4574,
+  Port = 4576,
   Owner = self(),
   Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["no"]}),
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
