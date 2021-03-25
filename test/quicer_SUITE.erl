@@ -427,7 +427,7 @@ tc_peername_v4(Config) ->
   end.
 
 tc_alpn(Config) ->
-  Port = 4573,
+  Port = 4575,
   Owner = self(),
   Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["sample2", "sample"]}),
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
@@ -442,7 +442,7 @@ tc_alpn(Config) ->
   end.
 
 tc_alpn_mismatch(Config) ->
-  Port = 4574,
+  Port = 4576,
   Owner = self(),
   Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["no"]}),
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
@@ -537,7 +537,10 @@ simple_stream_server(Owner, Config, Port) ->
   end.
 
 default_conn_opts() ->
-  [{alpn, ["sample"]}].
+  [{alpn, ["sample"]},
+   {idle_timeout_ms, 5000},
+   {peer_unidi_stream_count, 1},
+   {peer_bidi_stream_count, 10}].
 
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),

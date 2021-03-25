@@ -154,14 +154,23 @@ ClientLoadConfiguration(ErlNifEnv *env,
   //
   // Configures the client's idle timeout.
   //
+
+  uint64_t IdleTimeoutMs = 0;
+  uint16_t PeerUnidiStreamCount = 0;
+  uint16_t PeerBidiStreamCount = 0;
+  if (!get_uint64_from_map(env, *option, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &IdleTimeoutMs) ||
+      !get_uint16_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, &PeerUnidiStreamCount) ||
+      !get_uint16_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerBidiStreamCount, &PeerBidiStreamCount))
+    {
+      return false;
+    }
+
   Settings.IdleTimeoutMs = IdleTimeoutMs;
   Settings.IsSet.IdleTimeoutMs = TRUE;
-
-  // This is to enable the ability of server initialized stream
+  Settings.PeerUnidiStreamCount = PeerUnidiStreamCount;
   Settings.IsSet.PeerUnidiStreamCount = TRUE;
-  Settings.PeerUnidiStreamCount = 1;
+  Settings.PeerBidiStreamCount = PeerBidiStreamCount;
   Settings.IsSet.PeerBidiStreamCount = TRUE;
-  Settings.PeerBidiStreamCount = 10;
   //
   // Configures a default client configuration, optionally disabling
   // server certificate validation.
@@ -248,6 +257,32 @@ bool load_alpn(ErlNifEnv *env,
       }
   }
 
+  return true;
+}
+
+bool get_uint16_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint16_t* value) {
+  ERL_NIF_TERM evalue;
+  if (!enif_get_map_value(env, map, key, &evalue)) {
+    return false;
+  }
+  unsigned int value0 = 0;
+  if (!enif_get_uint(env, evalue, &value0)) {
+    return false;
+  }
+  *value = (uint16_t)value0;
+  return true;
+}
+
+bool get_uint64_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint64_t* value) {
+  ERL_NIF_TERM evalue;
+  if (!enif_get_map_value(env, map, key, &evalue)) {
+    return false;
+  }
+  unsigned long value0 = 0;
+  if (!enif_get_uint64(env, evalue, &value0)) {
+    return false;
+  }
+  *value = (uint64_t)value0;
   return true;
 }
 
