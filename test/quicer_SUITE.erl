@@ -57,6 +57,7 @@
 
         , tc_alpn/1
         , tc_alpn_mismatch/1
+        , tc_idle_timeout/1
         ]).
 
 %% -include_lib("proper/include/proper.hrl").
@@ -458,6 +459,19 @@ tc_alpn_mismatch(Config) ->
       end
   after 1000 ->
     ct:fail("timeout")
+  end.
+
+tc_idle_timeout(Config) ->
+  Port = 4577,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      Opts = lists:keyreplace(idle_timeout_ms, 1, default_conn_opts(), {idle_timeout_ms, 1}),
+      {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+      timer:sleep(500),
+      {error, stm_open_error} = quicer:start_stream(Conn, []),
+      SPid ! done
   end.
 
 %%% ====================
