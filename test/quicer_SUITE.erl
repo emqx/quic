@@ -327,6 +327,7 @@ tc_getopt(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stats} = quicer:getopt(Conn, Parm, false),
+      1 = proplists:get_value("Recv.ValidAckFrames", Stats),
       [true = proplists:is_defined(SKey, Stats)
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
       {ok, Stm} = quicer:start_stream(Conn, []),
