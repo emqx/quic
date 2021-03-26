@@ -262,68 +262,68 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
       res = SUCCESS(enif_make_list(
-          env, 20, PropTupleInt(Timing.Start, statics->Timing.Start),
-          PropTupleInt(
+          env, 20, PropTupleUint64(Timing.Start, statics->Timing.Start),
+          PropTupleUint64(
               Timing.InitialFlightEnd,
               statics->Timing
                   .InitialFlightEnd), // Processed all peer's Initial packets
-          PropTupleInt(
+          PropTupleUint64(
               Timing.HandshakeFlightEnd,
               statics->Timing.HandshakeFlightEnd), // Processed all peer's
                                                    // Handshake packets
-          PropTupleInt(Send.PathMtu,
+          PropTupleUint64(Send.PathMtu,
                        statics->Send.PathMtu), // Current path MTU.
-          PropTupleInt(
+          PropTupleUint64(
               Send.TotalPackets,
               statics->Send
                   .TotalPackets), // QUIC packets, statics.Send.TotalPackets;
                                   // // QUIC packets), could be coalesced into
                                   // fewer UDP datagrams.
-          PropTupleInt(Send.RetransmittablePackets,
+          PropTupleUint64(Send.RetransmittablePackets,
                        statics->Send.RetransmittablePackets),
-          PropTupleInt(Send.SuspectedLostPackets,
+          PropTupleUint64(Send.SuspectedLostPackets,
                        statics->Send.SuspectedLostPackets),
-          PropTupleInt(
+          PropTupleUint64(
               Send.SpuriousLostPackets,
               statics->Send.SpuriousLostPackets), // Actual lost is
                                                   // (SuspectedLostPackets -
                                                   // SpuriousLostPackets)
-          PropTupleInt(Send.TotalBytes,
+          PropTupleUint64(Send.TotalBytes,
                        statics->Send.TotalBytes), // Sum of UDP payloads
-          PropTupleInt(
+          PropTupleUint64(
               Send.TotalStreamBytes,
               statics->Send.TotalStreamBytes), // Sum of stream payloads
-          PropTupleInt(
+          PropTupleUint64(
               Send.CongestionCount,
               statics->Send.CongestionCount), // Number of congestion events
-          PropTupleInt(
+          PropTupleUint64(
               Send.PersistentCongestionCount,
               statics->Send.PersistentCongestionCount), // Number of persistent
                                                         // congestion events
-          PropTupleInt(
+          PropTupleUint64(
               Recv.TotalPackets,
               statics->Recv
                   .TotalPackets), // QUIC packets, statics->Recv.TotalPackets;
                                   // // QUIC packets), could be coalesced into
                                   // fewer UDP datagrams.
-          PropTupleInt(
+          PropTupleUint64(
               Recv.ReorderedPackets,
               statics->Recv.ReorderedPackets), // Packets where packet number
                                                // is less than highest seen.
-          PropTupleInt(
+          PropTupleUint64(
               Recv.DroppedPackets,
               statics->Recv.DroppedPackets), // Includes DuplicatePackets.
-          PropTupleInt(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
-          PropTupleInt(Recv.TotalBytes,
+          PropTupleUint64(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
+          PropTupleUint64(Recv.TotalBytes,
                        statics->Recv.TotalBytes), // Sum of UDP payloads
-          PropTupleInt(
+          PropTupleUint64(
               Recv.TotalStreamBytes,
               statics->Recv.TotalStreamBytes), // Sum of stream payloads
-          PropTupleInt(
+          PropTupleUint64(
               Recv.DecryptionFailures,
               statics->Recv
                   .DecryptionFailures), // Count of packet decryption failures.
-          PropTupleInt(
+          PropTupleUint64(
               Recv.ValidAckFrames,
               statics->Recv.ValidAckFrames) // Count of receive ACK frames.
           ));
