@@ -484,7 +484,7 @@ tc_app_echo_server(Config) ->
               {stream_acceptors, 32},
               {stream_callback, quicer_echo_server_stream_callback}
             | default_listen_opts(Config)],
-  {ok, _QuicApp} = quicer_appl:start_app(mqtt, Port, maps:from_list(Options)),
+  {ok, _QuicApp} = quicer:start_app(mqtt, Port, maps:from_list(Options)),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, []),
   {ok, 4} = quicer:send(Stm, <<"ping">>),
