@@ -363,6 +363,37 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
               statics->Recv.ValidAckFrames) // Count of receive ACK frames.
           ));
     }
+  else if (QUIC_PARAM_CONN_SETTINGS == Param && QUIC_PARAM_LEVEL_CONNECTION == Level) {
+    QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
+    res = SUCCESS(enif_make_list(
+        env, 26,
+        PropTupleInt(MaxBytesPerKey, Settings->MaxBytesPerKey),
+        PropTupleInt(HandshakeIdleTimeoutMs, Settings->HandshakeIdleTimeoutMs),
+        PropTupleInt(IdleTimeoutMs, Settings->IdleTimeoutMs),
+        PropTupleInt(TlsClientMaxSendBuffer, Settings->TlsClientMaxSendBuffer),
+        PropTupleInt(TlsServerMaxSendBuffer, Settings->TlsServerMaxSendBuffer),
+        PropTupleInt(StreamRecvWindowDefault, Settings->StreamRecvWindowDefault),
+        PropTupleInt(StreamRecvBufferDefault, Settings->StreamRecvBufferDefault),
+        PropTupleInt(ConnFlowControlWindow, Settings->ConnFlowControlWindow),
+        PropTupleInt(MaxWorkerQueueDelayUs, Settings->MaxWorkerQueueDelayUs),
+        PropTupleInt(MaxStatelessOperations, Settings->MaxStatelessOperations),
+        PropTupleInt(InitialWindowPackets, Settings->InitialWindowPackets),
+        PropTupleInt(SendIdleTimeoutMs, Settings->SendIdleTimeoutMs),
+        PropTupleInt(InitialRttMs, Settings->InitialRttMs),
+        PropTupleInt(MaxAckDelayMs, Settings->MaxAckDelayMs),
+        PropTupleInt(DisconnectTimeoutMs, Settings->DisconnectTimeoutMs),
+        PropTupleInt(KeepAliveIntervalMs, Settings->KeepAliveIntervalMs),
+        PropTupleInt(PeerBidiStreamCount, Settings->PeerBidiStreamCount),
+        PropTupleInt(PeerUnidiStreamCount, Settings->PeerBidiStreamCount),
+        PropTupleInt(RetryMemoryLimit, Settings->RetryMemoryLimit),
+        PropTupleInt(LoadBalancingMode, Settings->LoadBalancingMode),
+        PropTupleInt(MaxOperationsPerDrain, Settings->MaxOperationsPerDrain),
+        PropTupleBool(SendBufferingEnabled, Settings->SendBufferingEnabled),
+        PropTupleBool(PacingEnabled, Settings->PacingEnabled),
+        PropTupleBool(MigrationEnabled, Settings->MigrationEnabled),
+        PropTupleBool(DatagramReceiveEnabled, Settings->DatagramReceiveEnabled),
+        PropTupleInt(ServerResumptionLevel, Settings->ServerResumptionLevel)));
+  }
   else if (QUIC_PARAM_STREAM_ID == Param && QUIC_PARAM_LEVEL_STREAM == Level)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
@@ -449,6 +480,18 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
       isLevelOK = Level == QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STATISTICS;
       BufferLength = sizeof(QUIC_STATISTICS);
+    }
+  else if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_SETTINGS))
+    {
+      if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
+        {
+        // fallback to connection for now
+          Level = QUIC_PARAM_LEVEL_CONNECTION;
+          Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+        }
+      isLevelOK = Level == QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_SETTINGS;
+      BufferLength = sizeof(QUIC_SETTINGS);
     }
   else if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_STREAM_ID))
     {
