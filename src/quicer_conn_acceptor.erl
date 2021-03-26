@@ -65,13 +65,15 @@ start_link(Listener, ConnOpts, Sup) ->
           {ok, State :: term(), hibernate} |
           {stop, Reason :: term()} |
           ignore.
-init([Listener, #{conn_callback := CallbackModule} = ConnOpts, Sup]) ->
+init([Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
+    init([Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
+init([Listener, {_, #{conn_callback := CallbackModule} = COpts, _} = Opts, Sup]) ->
     process_flag(trap_exit, true),
     %% Async Acceptor
-    {ok, Listener} = quicer_nif:async_accept(Listener, ConnOpts),
+    {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
     {ok, #state{ listener = Listener
                , callback = CallbackModule
-               , opts = ConnOpts
+               , opts = Opts
                , sup = Sup}}.
 
 %%--------------------------------------------------------------------

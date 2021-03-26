@@ -479,12 +479,14 @@ tc_idle_timeout(Config) ->
 tc_app_echo_server(Config) ->
   Port = 8888,
   application:ensure_all_started(quicer),
-  Options = [ {conn_acceptors, 32},
-              {conn_callback, quicer_server_conn_callback},
-              {stream_acceptors, 32},
-              {stream_callback, quicer_echo_server_stream_callback}
-            | default_listen_opts(Config)],
-  {ok, _QuicApp} = quicer:start_app(mqtt, Port, maps:from_list(Options)),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, []),
   {ok, 4} = quicer:send(Stm, <<"ping">>),
@@ -568,6 +570,9 @@ simple_stream_server(Owner, Config, Port) ->
       quicer:close_listener(L),
       ok
   end.
+
+default_stream_opts() ->
+  [].
 
 default_conn_opts() ->
   [{alpn, ["sample"]},

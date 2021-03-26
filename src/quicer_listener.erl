@@ -13,14 +13,14 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
--module(quicer_appl).
+-module(quicer_listener).
 
 -behaviour(gen_server).
 
 %% API
 -export([start_link/3,
-         start_app/3,
-         stop_app/1
+         start_listener/3,
+         stop_listener/1
         ]).
 
 %% gen_server callbacks
@@ -29,9 +29,10 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, { alpn :: string()
+-record(state, { name :: atom()
                , listener :: quicer:listener_handler()
                , conn_sup :: pid()
+               , alpn :: [string()]
                }).
 
 
@@ -63,11 +64,11 @@
 start_link(Name, Port, Opts) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name, Port, Opts], []).
 
-start_app(AppName, Port, Options) ->
-    supervisor:start_child(quicer_appl_sup, [AppName, Port, Options]).
+start_listener(AppName, Port, Options) ->
+    supervisor:start_child(quicer_listener_sup, [AppName, Port, Options]).
 
-stop_app(AppName) ->
-    supervisor:delete_child(quicer_appl_sup, AppName).
+stop_listener(AppName) ->
+    supervisor:delete_child(quicer_listener_sup, AppName).
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -83,14 +84,15 @@ stop_app(AppName) ->
           {ok, State :: term(), hibernate} |
           {stop, Reason :: term()} |
           ignore.
-init([Name, Port, Opts]) when is_atom(Name) ->
-    init([atom_to_list(Name), Port, Opts]);
-init([Name, Port, #{conn_acceptors := N} = Opts]) when is_list(Name) ->
+
+init([Name, Port, {LOpts, COpts, SOpts} = Opts]) when is_list(LOpts) ->
+    init([Name, Port, {maps:from_list(LOpts), COpts, SOpts}]);
+init([Name, Port, {#{conn_acceptors :=  N} = LOpts, _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
-    {ok, L} = quicer:listen(Port, Opts),
+    {ok, L} = quicer:listen(Port, LOpts),
     {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
     [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
-    {ok, #state{ alpn = Name
+    {ok, #state{ name = Name
                , listener = L
                , conn_sup = ConnSup
                }}.
@@ -185,3 +187,9 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+-spec listener_opts(map()) -> map().
+listener_opts(Opts) ->
+    CertFile = maps:get(listener_ssl_cert_file, Opts),
+    KeyFile = maps:get(listener_ssl_key_file, Opts),
+    Alpn = maps:get(listener_alpn, Opts),
+    #{cert => CertFile, key => KeyFile, alpn => Alpn}.

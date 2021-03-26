@@ -64,8 +64,8 @@ init([]) ->
                  intensity => 1,
                  period => 5},
 
-    Child = #{id => quicer_appl_sup,
-              start => {quicer_appl_sup, start_link, []},
+    Child = #{id => quicer_listener_sup,
+              start => {quicer_listener_sup, start_link, []},
               restart => transient,
               shutdown => infinity,
               type => supervisor

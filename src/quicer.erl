@@ -34,7 +34,7 @@
         , peername/1
         ]).
 
--export([start_app/3]). %% start application over quic
+-export([start_listener/3]). %% start application over quic
 
 -on_load(init/0).
 
@@ -42,9 +42,16 @@
 -type connection_handler() :: reference().
 -type stream_handler() :: reference().
 
+%% would be better to use map
+-type stream_opts() :: proplists:proplists().
+-type connection_opts() :: proplists:proplists().
+-type listener_opts() :: proplists:proplists().
 
-start_app(AppName, Port, Options) ->
-  quicer_appl:start_app(AppName, Port, Options).
+-spec start_listener(atom(), inet:port_number(),
+                     {listener_opts(), connection_opts(), stream_opts()}) ->
+        {ok, pid()} | {error, any()}.
+start_listener(AppName, Port, Options) ->
+  quicer_listener:start_listener(AppName, Port, Options).
 
 -spec listen(inet:port_number(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.

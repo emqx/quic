@@ -12,7 +12,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %
--module(quicer_appl_sup).
+-module(quicer_listener_sup).
 
 -behaviour(supervisor).
 
@@ -63,8 +63,8 @@ init([]) ->
                  intensity => 60,
                  period => 30},
 
-    Child = #{id => quicer_appl,
-              start => {quicer_appl, start_link, []},
+    Child = #{id => quicer_listener,
+              start => {quicer_listener, start_link, []},
               restart => transient,
               shutdown => infinity,
               type => supervisor

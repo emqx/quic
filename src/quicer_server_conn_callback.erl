@@ -17,5 +17,5 @@
 
 -export([new_conn/2]).
 
-new_conn(Conn, Opts) ->
-    quicer_stream:start_link(Conn, Opts).
+new_conn(Conn, {_, _, SOpts}) ->
+    quicer_stream:start_link(Conn, SOpts).
