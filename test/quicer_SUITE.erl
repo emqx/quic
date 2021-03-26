@@ -332,6 +332,7 @@ tc_getopt(Config) ->
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
       {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
       5000 = proplists:get_value("IdleTimeoutMs", Settings),
+      true = proplists:get_value("SendBufferingEnabled", Settings),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       %% test that op is fallbakced to connection

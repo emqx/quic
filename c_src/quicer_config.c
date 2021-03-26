@@ -388,10 +388,10 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
         PropTupleInt(RetryMemoryLimit, Settings->RetryMemoryLimit),
         PropTupleInt(LoadBalancingMode, Settings->LoadBalancingMode),
         PropTupleInt(MaxOperationsPerDrain, Settings->MaxOperationsPerDrain),
-        PropTupleInt(SendBufferingEnabled, Settings->SendBufferingEnabled),
-        PropTupleInt(PacingEnabled, Settings->PacingEnabled),
-        PropTupleInt(MigrationEnabled, Settings->MigrationEnabled),
-        PropTupleInt(DatagramReceiveEnabled, Settings->DatagramReceiveEnabled),
+        PropTupleBool(SendBufferingEnabled, Settings->SendBufferingEnabled),
+        PropTupleBool(PacingEnabled, Settings->PacingEnabled),
+        PropTupleBool(MigrationEnabled, Settings->MigrationEnabled),
+        PropTupleBool(DatagramReceiveEnabled, Settings->DatagramReceiveEnabled),
         PropTupleInt(ServerResumptionLevel, Settings->ServerResumptionLevel)));
   }
   else if (QUIC_PARAM_STREAM_ID == Param && QUIC_PARAM_LEVEL_STREAM == Level)
