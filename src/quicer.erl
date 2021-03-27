@@ -36,8 +36,6 @@
 
 -export([start_listener/3]). %% start application over quic
 
--on_load(init/0).
-
 -type listener_handler() :: reference().
 -type connection_handler() :: reference().
 -type stream_handler() :: reference().
@@ -193,11 +191,6 @@ getstats(Conn, Cnts) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 peername(Handle)->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
-
-init() ->
-  quicer_nif:open_lib(),
-  quicer_nif:reg_open().
-
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

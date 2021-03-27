@@ -94,6 +94,7 @@ groups() ->
 %%% Overall setup/teardown
 %%%===================================================================
 init_per_suite(Config) ->
+  application:ensure_all_started(quicer),
   Config.
 
 end_per_suite(_Config) ->
@@ -120,6 +121,10 @@ end_per_group(_Groupname, _Config) ->
 init_per_testcase(_TestCase, Config) ->
   Config.
 
+end_per_testcase(tc_lib_registration, _Config) ->
+  quicer_nif:reg_open();
+end_per_testcase(tc_lib_re_registration, _Config) ->
+  quicer_nif:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   ok.
 

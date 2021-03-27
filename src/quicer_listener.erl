@@ -35,16 +35,6 @@
                , alpn :: [string()]
                }).
 
-
-%% note, only put supported opts here.
--type appl_opts() :: #{ listener_ssl_cert_file := file:filename()
-                      , listener_ssl_key_file  := file:filename()
-                      , conn_acceptors     := non_neg_integer()
-                      , conn_callback      := module()
-                      , steam_acceptors    := non_neg_integer()
-                      , steam_callback     := module()
-                      }.
-
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -56,7 +46,7 @@
 %%--------------------------------------------------------------------
 -spec start_link(Name :: string() | atom(),
                  Port :: non_neg_integer(),
-                 Options :: appl_opts()
+                 Options :: {list(), list(), list()}
                 ) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
@@ -85,7 +75,7 @@ stop_listener(AppName) ->
           {stop, Reason :: term()} |
           ignore.
 
-init([Name, Port, {LOpts, COpts, SOpts} = Opts]) when is_list(LOpts) ->
+init([Name, Port, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
     init([Name, Port, {maps:from_list(LOpts), COpts, SOpts}]);
 init([Name, Port, {#{conn_acceptors :=  N} = LOpts, _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
@@ -187,9 +177,3 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec listener_opts(map()) -> map().
-listener_opts(Opts) ->
-    CertFile = maps:get(listener_ssl_cert_file, Opts),
-    KeyFile = maps:get(listener_ssl_key_file, Opts),
-    Alpn = maps:get(listener_alpn, Opts),
-    #{cert => CertFile, key => KeyFile, alpn => Alpn}.
