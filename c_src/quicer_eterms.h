@@ -168,7 +168,7 @@ extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 /*-----------------------*/
 
 /*----------------------------------------------------------*/
-/* QUIC_SETTINGS starts      */
+/* QUIC_SETTINGS starts                                     */
 /*----------------------------------------------------------*/
 
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBytesPerKey;
@@ -202,8 +202,14 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 
 /*----------------------------------------------------------*/
-/* QUIC_SETTINGS ends      */
+/* QUIC_SETTINGS ends                                       */
 /*----------------------------------------------------------*/
+
+extern ERL_NIF_TERM ATOM_QUIC;
+/*----------------------------------------------------------*/
+/* ATOMS ends here                                          */
+/*----------------------------------------------------------*/
+
 
 #define SUCCESS(Term) enif_make_tuple(env, 2, ATOM_OK, Term)
 #define ERROR_TUPLE_2(Err) enif_make_tuple2(env, ATOM_ERROR, Err)
