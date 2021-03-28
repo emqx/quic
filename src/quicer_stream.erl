@@ -28,6 +28,7 @@
 
 -record(state, { stream :: quicer:stream_handler()
                , opts :: map()
+               , cbstate :: any()
                }).
 
 %%%===================================================================
@@ -84,9 +85,19 @@ init([Conn, SOpts]) ->
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
           {stop, Reason :: term(), NewState :: term()}.
-handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+handle_call(_Request, _From,
+            #state{stream = Stream,
+                   opts = Options, cbstate = CBState} = State) ->
+    #{stream_callback := CallbackModule} = Options,
+    try CallbackModule:handle_call(Stream, Options, CBState) of
+        {ok, Reply, NewCBState} ->
+            {reply, Reply, #state{cbstate = NewCBState}};
+        Other -> % @todo
+            Other
+    catch _:Reason:ST ->
+            maybe_log_stracetrace(ST),
+            {reply, {callback_error, Reason}, State}
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -115,13 +126,31 @@ handle_cast(_Request, State) ->
           {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info({quic, new_stream, Stream}, #state{opts = Options} = State) ->
     #{stream_callback := CallbackModule} = Options,
-    CallbackModule:new_stream(Stream, Options),
-    {noreply, State#state{stream = Stream}};
-handle_info({quic, Bin, Stream, _, _, _}, #state{stream = Stream, opts = Options}= State) ->
+    try CallbackModule:new_stream(Stream, Options) of
+        {ok, CBState} ->
+            {noreply, State#state{stream = Stream, cbstate = CBState}};
+        {error, Reason} ->
+            {stop, Reason, State#state{stream = Stream}}
+    catch
+        _:Reason:ST ->
+            maybe_log_stracetrace(ST),
+            {stop, {new_stream_crash, Reason}, State#state{stream = Stream}}
+    end;
+handle_info({quic, Bin, Stream, _, _, _},
+            #state{stream = Stream, opts = Options, cbstate = CBState}= State) ->
     #{stream_callback := CallbackModule} = Options,
-    CallbackModule:handle_message(Stream, Bin, Options),
-    {noreply, State};
-handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB}= State)
+    try CallbackModule:handle_stream_data(Stream, Bin, Options, CBState) of
+        {ok, NewCBState} ->
+            {noreply, State#state{cbstate = NewCBState}};
+        {error, Reason, NewCBState} ->
+            {noreply, Reason, State#state{cbstate = NewCBState}}
+    catch
+        _:Reason:ST ->
+            maybe_log_stracetrace(ST),
+            {stop, {handle_stream_data_crash, Reason}, State}
+    end;
+
+handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
   when StreamB =/=StreamA->
     {stop, wrong_stream, State}.
 %%--------------------------------------------------------------------
@@ -135,7 +164,8 @@ handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB}= State)
 %%--------------------------------------------------------------------
 -spec terminate(Reason :: normal | shutdown | {shutdown, term()} | term(),
                 State :: term()) -> any().
-terminate(_Reason, _State) ->
+terminate(Reason, _State) ->
+    error_code(Reason),
     ok.
 
 %%--------------------------------------------------------------------
@@ -167,3 +197,15 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+error_code(normal)->
+    'QUIC_ERROR_NO_ERROR';
+error_code(shutdown)->
+    'QUIC_ERROR_NO_ERROR';
+error_code(_)->
+    %% @todo mapping errors to error code
+    %% for closing stream
+    'QUIC_ERROR_INTERNAL_ERROR'.
+
+maybe_log_stracetrace(ST)->
+    logger:error("~p~n", [ST]),
+    ok.

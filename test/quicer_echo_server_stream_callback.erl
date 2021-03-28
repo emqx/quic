@@ -16,12 +16,14 @@
 
 -module(quicer_echo_server_stream_callback).
 -export([ new_stream/2
-        , handle_message/3
+        , handle_stream_data/4
          ]
        ).
 
 new_stream(_,_) ->
-    ok.
+    InitState = #{sent_bytes => 0},
+    {ok, InitState}.
 
-handle_message(Stream, Bin, _Opts) ->
-    quicer:send(Stream, Bin).
+handle_stream_data(Stream, Bin, _Opts, #{sent_bytes := Cnt}= State) ->
+    {ok, Size} = quicer:send(Stream, Bin),
+    {ok, State#{ sent_bytes => Cnt + Size }}.
