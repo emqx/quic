@@ -121,6 +121,8 @@ end_per_group(_Groupname, _Config) ->
 init_per_testcase(_TestCase, Config) ->
   Config.
 
+end_per_testcase(tc_close_lib_test, _Config) ->
+  quicer_nif:open_lib();
 end_per_testcase(tc_lib_registration, _Config) ->
   quicer_nif:reg_open();
 end_per_testcase(tc_lib_re_registration, _Config) ->
