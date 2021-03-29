@@ -57,13 +57,12 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       ERL_NIF_TERM report = enif_make_tuple6(
           env,
           // reserved for port
-          enif_make_atom(env, "quic"), enif_make_binary(env, &bin),
+          ATOM_QUIC, enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
-          enif_make_int(
-              env, Event->RECEIVE.AbsoluteOffset), // @todo check what is this?
-          enif_make_int(env, Event->RECEIVE.TotalBufferLength),
-          enif_make_int(env, Event->RECEIVE.Flags)
-          // @todo reserved for
+          enif_make_uint64(
+              env, Event->RECEIVE.AbsoluteOffset),
+          enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
+          enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
       );
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
@@ -143,12 +142,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       ERL_NIF_TERM report = enif_make_tuple6(
           env,
           // reserved for port
-          enif_make_atom(env, "quic"), enif_make_binary(env, &bin),
+          ATOM_QUIC, enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
-          enif_make_int(env, Event->RECEIVE.AbsoluteOffset),
-          enif_make_int(env, Event->RECEIVE.TotalBufferLength),
+          enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
+          enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
           enif_make_int(env, Event->RECEIVE.Flags)
-          // @todo reserved for
       );
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))

@@ -34,11 +34,22 @@
         , peername/1
         ]).
 
--on_load(init/0).
+-export([start_listener/3]). %% start application over quic
 
 -type listener_handler() :: reference().
 -type connection_handler() :: reference().
 -type stream_handler() :: reference().
+
+%% would be better to use map
+-type stream_opts() :: proplists:proplists().
+-type connection_opts() :: proplists:proplists().
+-type listener_opts() :: proplists:proplists().
+
+-spec start_listener(atom(), inet:port_number(),
+                     {listener_opts(), connection_opts(), stream_opts()}) ->
+        {ok, pid()} | {error, any()}.
+start_listener(AppName, Port, Options) ->
+  quicer_listener:start_listener(AppName, Port, Options).
 
 -spec listen(inet:port_number(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
@@ -180,11 +191,6 @@ getstats(Conn, Cnts) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 peername(Handle)->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
-
-init() ->
-  quicer_nif:open_lib(),
-  quicer_nif:reg_open().
-
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

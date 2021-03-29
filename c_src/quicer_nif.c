@@ -209,6 +209,8 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 /* QUIC_SETTINGS ends      */
 /*----------------------------------------------------------*/
 
+ERL_NIF_TERM ATOM_QUIC;
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -399,8 +401,9 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
        desired_versions_list_length);                                         \
   /*                  QUIC_SETTINGS end                        */             \
   ATOM(ATOM_CERT, cert);                                                      \
-  ATOM(ATOM_KEY, key)                                                         \
-  ATOM(ATOM_ALPN, alpn)
+  ATOM(ATOM_KEY, key);                                                        \
+  ATOM(ATOM_ALPN, alpn);                                                      \
+  ATOM(ATOM_QUIC, quic);
 
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;

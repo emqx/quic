@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2020-2021 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -60,6 +60,8 @@
         , tc_idle_timeout/1
         ]).
 
+-export([tc_app_echo_server/1]).
+
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/inet.hrl").
@@ -92,6 +94,7 @@ groups() ->
 %%% Overall setup/teardown
 %%%===================================================================
 init_per_suite(Config) ->
+  application:ensure_all_started(quicer),
   Config.
 
 end_per_suite(_Config) ->
@@ -118,6 +121,12 @@ end_per_group(_Groupname, _Config) ->
 init_per_testcase(_TestCase, Config) ->
   Config.
 
+end_per_testcase(tc_close_lib_test, _Config) ->
+  quicer_nif:open_lib();
+end_per_testcase(tc_lib_registration, _Config) ->
+  quicer_nif:reg_open();
+end_per_testcase(tc_lib_re_registration, _Config) ->
+  quicer_nif:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   ok.
 
@@ -480,6 +489,25 @@ tc_idle_timeout(Config) ->
       SPid ! done
   end.
 
+tc_app_echo_server(Config) ->
+  Port = 8888,
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, []),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
+  ok.
+
 %%% ====================
 %%% Internal helpers
 %%% ====================
@@ -555,6 +583,9 @@ simple_stream_server(Owner, Config, Port) ->
       quicer:close_listener(L),
       ok
   end.
+
+default_stream_opts() ->
+  [].
 
 default_conn_opts() ->
   [{alpn, ["sample"]},
