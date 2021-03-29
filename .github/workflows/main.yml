@@ -11,20 +11,14 @@ jobs:
           submodules: recursive
       - name: prepare
         run: |
-          brew install kerl
-          echo "/usr/local/bin" >> $GITHUB_PATH
-      - name: build erlang
-        timeout-minutes: 60
-        run: |
-          kerl build 23.2.2
-          kerl install 23.2.2 $HOME/.kerl/23.2.2
+          brew update
+          brew install erlang@23
       - name: install rebar3
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
           cp ./rebar3 /usr/local/bin/rebar3
       - name: release build
         run: |
-          . $HOME/.kerl/23.2.2/activate
           make test
 
   linux:
