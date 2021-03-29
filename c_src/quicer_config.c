@@ -574,3 +574,91 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
       return res;
     }
 }
+
+ERL_NIF_TERM
+setopt3(ErlNifEnv *env, __unused_parm__ int argc,
+        __unused_parm__ const ERL_NIF_TERM argv[])
+{
+  ERL_NIF_TERM ctx = argv[0];
+  ERL_NIF_TERM eopt = argv[1];
+  ERL_NIF_TERM evalue = argv[2];
+
+  HQUIC Handle = NULL;
+  uint32_t Param = -1;
+  QUIC_PARAM_LEVEL Level = -1;
+  uint32_t BufferLength = 0;
+  bool isLevelOK = false;
+
+  void *q_ctx;
+  void *Buffer = NULL;
+
+  if (!enif_is_atom(env, eopt))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
+    {
+      Handle = ((QuicerStreamCTX *)q_ctx)->Stream;
+      Level = QUIC_PARAM_LEVEL_STREAM;
+    }
+  else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
+    {
+      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+    }
+  else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
+    {
+      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+      Level = QUIC_PARAM_LEVEL_LISTENER;
+    }
+  else
+    { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_SETTINGS))
+    {
+      if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
+        {
+        // Lets fallback to connection for now
+          Level = QUIC_PARAM_LEVEL_CONNECTION;
+          Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+        }
+      isLevelOK = Level == QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_SETTINGS;
+      QUIC_SETTINGS Settings = {0};
+      Buffer = &Settings;
+      BufferLength = sizeof(QUIC_SETTINGS);
+      if (!enif_is_map(env, evalue))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      uint64_t IdleTimeoutMs = 0;
+      if (get_uint64_from_map(env, evalue, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &IdleTimeoutMs))
+      {
+        Settings.IdleTimeoutMs = IdleTimeoutMs;
+        Settings.IsSet.IdleTimeoutMs = TRUE;
+      }
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+    }
+
+  if (!isLevelOK)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  // precheck before calling msquic api
+  if (BufferLength == 0 || Param < 0 || Level < 0)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+    }
+  if (QUIC_FAILED(MsQuic->SetParam(Handle, Level, Param, BufferLength, Buffer)))
+  {
+    return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+  }
+  return ATOM_OK;
+}

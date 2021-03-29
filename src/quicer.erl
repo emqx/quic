@@ -29,6 +29,7 @@
         , sockname/1
         , getopt/2
         , getopt/3
+        , setopt/3
         , get_stream_id/1
         , getstats/2
         , peername/1
@@ -169,6 +170,11 @@ getopt(Handle, Opt) ->
              Optname::atom(), IsRaw::boolean()) -> {ok, OptVal::any()} | {error, any()}.
 getopt(Handle, Opt, IsRaw) ->
   quicer_nif:getopt(Handle, Opt, IsRaw).
+
+setopt(Handle, Opt, Value) when is_list(Value) ->
+  setopt(Handle, Opt, maps:from_list(Value));
+setopt(Handle, Opt, Value) ->
+  quicer_nif:setopt(Handle, Opt, Value).
 
 -spec get_stream_id(Stream::stream_handler()) -> {ok, integer()} | {error, any()}.
 get_stream_id(Stream) ->
