@@ -297,68 +297,68 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
       res = SUCCESS(enif_make_list(
-          env, 20, PropTupleInt(Timing.Start, statics->Timing.Start),
-          PropTupleInt(
+          env, 20, PropTupleStrInt(Timing.Start, statics->Timing.Start),
+          PropTupleStrInt(
               Timing.InitialFlightEnd,
               statics->Timing
                   .InitialFlightEnd), // Processed all peer's Initial packets
-          PropTupleInt(
+          PropTupleStrInt(
               Timing.HandshakeFlightEnd,
               statics->Timing.HandshakeFlightEnd), // Processed all peer's
                                                    // Handshake packets
-          PropTupleInt(Send.PathMtu,
+          PropTupleStrInt(Send.PathMtu,
                        statics->Send.PathMtu), // Current path MTU.
-          PropTupleInt(
+          PropTupleStrInt(
               Send.TotalPackets,
               statics->Send
                   .TotalPackets), // QUIC packets, statics.Send.TotalPackets;
                                   // // QUIC packets), could be coalesced into
                                   // fewer UDP datagrams.
-          PropTupleInt(Send.RetransmittablePackets,
+          PropTupleStrInt(Send.RetransmittablePackets,
                        statics->Send.RetransmittablePackets),
-          PropTupleInt(Send.SuspectedLostPackets,
+          PropTupleStrInt(Send.SuspectedLostPackets,
                        statics->Send.SuspectedLostPackets),
-          PropTupleInt(
+          PropTupleStrInt(
               Send.SpuriousLostPackets,
               statics->Send.SpuriousLostPackets), // Actual lost is
                                                   // (SuspectedLostPackets -
                                                   // SpuriousLostPackets)
-          PropTupleInt(Send.TotalBytes,
+          PropTupleStrInt(Send.TotalBytes,
                        statics->Send.TotalBytes), // Sum of UDP payloads
-          PropTupleInt(
+          PropTupleStrInt(
               Send.TotalStreamBytes,
               statics->Send.TotalStreamBytes), // Sum of stream payloads
-          PropTupleInt(
+          PropTupleStrInt(
               Send.CongestionCount,
               statics->Send.CongestionCount), // Number of congestion events
-          PropTupleInt(
+          PropTupleStrInt(
               Send.PersistentCongestionCount,
               statics->Send.PersistentCongestionCount), // Number of persistent
                                                         // congestion events
-          PropTupleInt(
+          PropTupleStrInt(
               Recv.TotalPackets,
               statics->Recv
                   .TotalPackets), // QUIC packets, statics->Recv.TotalPackets;
                                   // // QUIC packets), could be coalesced into
                                   // fewer UDP datagrams.
-          PropTupleInt(
+          PropTupleStrInt(
               Recv.ReorderedPackets,
               statics->Recv.ReorderedPackets), // Packets where packet number
                                                // is less than highest seen.
-          PropTupleInt(
+          PropTupleStrInt(
               Recv.DroppedPackets,
               statics->Recv.DroppedPackets), // Includes DuplicatePackets.
-          PropTupleInt(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
-          PropTupleInt(Recv.TotalBytes,
+          PropTupleStrInt(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
+          PropTupleStrInt(Recv.TotalBytes,
                        statics->Recv.TotalBytes), // Sum of UDP payloads
-          PropTupleInt(
+          PropTupleStrInt(
               Recv.TotalStreamBytes,
               statics->Recv.TotalStreamBytes), // Sum of stream payloads
-          PropTupleInt(
+          PropTupleStrInt(
               Recv.DecryptionFailures,
               statics->Recv
                   .DecryptionFailures), // Count of packet decryption failures.
-          PropTupleInt(
+          PropTupleStrInt(
               Recv.ValidAckFrames,
               statics->Recv.ValidAckFrames) // Count of receive ACK frames.
           ));
@@ -367,32 +367,32 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
     QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
     res = SUCCESS(enif_make_list(
         env, 26,
-        PropTupleInt(MaxBytesPerKey, Settings->MaxBytesPerKey),
-        PropTupleInt(HandshakeIdleTimeoutMs, Settings->HandshakeIdleTimeoutMs),
-        PropTupleInt(IdleTimeoutMs, Settings->IdleTimeoutMs),
-        PropTupleInt(TlsClientMaxSendBuffer, Settings->TlsClientMaxSendBuffer),
-        PropTupleInt(TlsServerMaxSendBuffer, Settings->TlsServerMaxSendBuffer),
-        PropTupleInt(StreamRecvWindowDefault, Settings->StreamRecvWindowDefault),
-        PropTupleInt(StreamRecvBufferDefault, Settings->StreamRecvBufferDefault),
-        PropTupleInt(ConnFlowControlWindow, Settings->ConnFlowControlWindow),
-        PropTupleInt(MaxWorkerQueueDelayUs, Settings->MaxWorkerQueueDelayUs),
-        PropTupleInt(MaxStatelessOperations, Settings->MaxStatelessOperations),
-        PropTupleInt(InitialWindowPackets, Settings->InitialWindowPackets),
-        PropTupleInt(SendIdleTimeoutMs, Settings->SendIdleTimeoutMs),
-        PropTupleInt(InitialRttMs, Settings->InitialRttMs),
-        PropTupleInt(MaxAckDelayMs, Settings->MaxAckDelayMs),
-        PropTupleInt(DisconnectTimeoutMs, Settings->DisconnectTimeoutMs),
-        PropTupleInt(KeepAliveIntervalMs, Settings->KeepAliveIntervalMs),
-        PropTupleInt(PeerBidiStreamCount, Settings->PeerBidiStreamCount),
-        PropTupleInt(PeerUnidiStreamCount, Settings->PeerBidiStreamCount),
-        PropTupleInt(RetryMemoryLimit, Settings->RetryMemoryLimit),
-        PropTupleInt(LoadBalancingMode, Settings->LoadBalancingMode),
-        PropTupleInt(MaxOperationsPerDrain, Settings->MaxOperationsPerDrain),
-        PropTupleBool(SendBufferingEnabled, Settings->SendBufferingEnabled),
-        PropTupleBool(PacingEnabled, Settings->PacingEnabled),
-        PropTupleBool(MigrationEnabled, Settings->MigrationEnabled),
-        PropTupleBool(DatagramReceiveEnabled, Settings->DatagramReceiveEnabled),
-        PropTupleInt(ServerResumptionLevel, Settings->ServerResumptionLevel)));
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxBytesPerKey, Settings->MaxBytesPerKey),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs, Settings->HandshakeIdleTimeoutMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_IdleTimeoutMs, Settings->IdleTimeoutMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer, Settings->TlsClientMaxSendBuffer),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer, Settings->TlsServerMaxSendBuffer),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_StreamRecvWindowDefault, Settings->StreamRecvWindowDefault),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_StreamRecvBufferDefault, Settings->StreamRecvBufferDefault),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_ConnFlowControlWindow, Settings->ConnFlowControlWindow),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs, Settings->MaxWorkerQueueDelayUs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxStatelessOperations, Settings->MaxStatelessOperations),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_InitialWindowPackets, Settings->InitialWindowPackets),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_SendIdleTimeoutMs, Settings->SendIdleTimeoutMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_InitialRttMs, Settings->InitialRttMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxAckDelayMs, Settings->MaxAckDelayMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_DisconnectTimeoutMs, Settings->DisconnectTimeoutMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_KeepAliveIntervalMs, Settings->KeepAliveIntervalMs),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerBidiStreamCount, Settings->PeerBidiStreamCount),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, Settings->PeerBidiStreamCount),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_RetryMemoryLimit, Settings->RetryMemoryLimit),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_LoadBalancingMode, Settings->LoadBalancingMode),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxOperationsPerDrain, Settings->MaxOperationsPerDrain),
+        PropTupleAtomBool(ATOM_QUIC_SETTINGS_SendBufferingEnabled, Settings->SendBufferingEnabled),
+        PropTupleAtomBool(ATOM_QUIC_SETTINGS_PacingEnabled, Settings->PacingEnabled),
+        PropTupleAtomBool(ATOM_QUIC_SETTINGS_MigrationEnabled, Settings->MigrationEnabled),
+        PropTupleAtomBool(ATOM_QUIC_SETTINGS_DatagramReceiveEnabled, Settings->DatagramReceiveEnabled),
+        PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel, Settings->ServerResumptionLevel)));
   }
   else if (QUIC_PARAM_STREAM_ID == Param && QUIC_PARAM_LEVEL_STREAM == Level)
     {

@@ -225,13 +225,15 @@ extern ERL_NIF_TERM ATOM_QUIC;
 
 #define IS_SAME_TERM(x, y) enif_is_identical(x, y)
 
-#define PropTupleInt(S, I)                                                    \
+#define PropTupleStrInt(S, I)                                                 \
   enif_make_tuple2(env, enif_make_string(env, #S, ERL_NIF_LATIN1),            \
                    enif_make_uint64(env, (uint64_t)I))
 
-#define PropTupleBool(S, I)                                                   \
-  enif_make_tuple2(env, enif_make_string(env, #S, ERL_NIF_LATIN1),            \
-                   ETERM_BOOL(I))
+#define PropTupleAtomInt(A, I)                                                \
+  enif_make_tuple2(env, A, enif_make_uint64(env, (uint64_t)I))
+
+#define PropTupleAtomBool(A, I)                                               \
+  enif_make_tuple2(env, A, ETERM_BOOL(I))
 
 
 #endif // __QUICER_ETERMS_H_
