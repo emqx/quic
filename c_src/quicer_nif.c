@@ -209,6 +209,9 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 /* QUIC_SETTINGS ends      */
 /*----------------------------------------------------------*/
 
+ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
+ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 ERL_NIF_TERM ATOM_QUIC;
 
 // Mirror 'status' in msquic_linux.h
@@ -402,7 +405,10 @@ ERL_NIF_TERM ATOM_QUIC;
   /*                  QUIC_SETTINGS end                        */             \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key);                                                        \
-  ATOM(ATOM_ALPN, alpn);                                                      \
+  ATOM(ATOM_ALPN, alpn);                                                \
+  ATOM(ATOM_CLOSED, closed);                                            \
+  ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                            \
+  ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_QUIC, quic);
 
 HQUIC Registration;

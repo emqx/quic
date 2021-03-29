@@ -528,6 +528,14 @@ echo_server_stm_loop(L, Conn, Stm) ->
     {quic, Bin, Stm, _, _, _} ->
       quicer:send(Stm, Bin),
       echo_server_stm_loop(L, Conn, Stm);
+    {quic, peer_send_aborted, Stm, _Error} ->
+      quicer:close_stream(Stm),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, peer_send_shutdown, Stm, _Error} ->
+      quicer:close_stream(Stm),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, closed, Stm, _Flag} ->
+      echo_server_stm_loop(L, Conn, Stm);
     done ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
