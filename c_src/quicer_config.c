@@ -260,6 +260,19 @@ bool load_alpn(ErlNifEnv *env,
   return true;
 }
 
+bool get_uint8_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint8_t* value) {
+  ERL_NIF_TERM evalue;
+  if (!enif_get_map_value(env, map, key, &evalue)) {
+    return false;
+  }
+  unsigned int value0 = 0;
+  if (!enif_get_uint(env, evalue, &value0)) {
+    return false;
+  }
+  *value = (uint8_t)value0;
+  return true;
+}
+
 bool get_uint16_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint16_t* value) {
   ERL_NIF_TERM evalue;
   if (!enif_get_map_value(env, map, key, &evalue)) {
@@ -270,6 +283,19 @@ bool get_uint16_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM ke
     return false;
   }
   *value = (uint16_t)value0;
+  return true;
+}
+
+bool get_uint32_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint32_t* value) {
+  ERL_NIF_TERM evalue;
+  if (!enif_get_map_value(env, map, key, &evalue)) {
+    return false;
+  }
+  unsigned long value0 = 0;
+  if (!enif_get_uint64(env, evalue, &value0)) {
+    return false;
+  }
+  *value = (uint32_t)value0;
   return true;
 }
 
