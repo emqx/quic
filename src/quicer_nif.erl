@@ -29,6 +29,7 @@
         , close_stream/1
         , sockname/1
         , getopt/3
+        , setopt/3
         ]).
 
 -on_load(init/0).
@@ -83,4 +84,7 @@ sockname(_Conn) ->
   erlang:nif_error(nif_library_not_loaded).
 
 getopt(_Handle, _Optname, _IsRaw) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+setopt(_Handle, _Opt, _Value) ->
   erlang:nif_error(nif_library_not_loaded).

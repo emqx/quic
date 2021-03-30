@@ -16,8 +16,6 @@ limitations under the License.
 
 #include "quicer_config.h"
 
-const uint64_t IdleTimeoutMs = 5000;
-
 bool
 ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
@@ -96,7 +94,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   //
   // Configures the server's idle timeout.
   //
-  Settings.IdleTimeoutMs = IdleTimeoutMs;
+  Settings.IdleTimeoutMs = 5000;
   Settings.IsSet.IdleTimeoutMs = TRUE;
   //
   // Configures the server's resumption level to allow for resumption and
@@ -599,4 +597,207 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
         }
       return res;
     }
+}
+
+ERL_NIF_TERM
+setopt3(ErlNifEnv *env, __unused_parm__ int argc,
+        __unused_parm__ const ERL_NIF_TERM argv[])
+{
+  ERL_NIF_TERM ctx = argv[0];
+  ERL_NIF_TERM eopt = argv[1];
+  ERL_NIF_TERM evalue = argv[2];
+
+  HQUIC Handle = NULL;
+  QUIC_PARAM_LEVEL Level = -1;
+
+  void *q_ctx;
+
+  if (!enif_is_atom(env, eopt))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
+    {
+      Handle = ((QuicerStreamCTX *)q_ctx)->Stream;
+      Level = QUIC_PARAM_LEVEL_STREAM;
+    }
+  else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
+    {
+      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+    }
+  else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
+    {
+      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+      Level = QUIC_PARAM_LEVEL_LISTENER;
+    }
+  else
+    { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_SETTINGS))
+    {
+      if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
+        {
+        // Lets fallback to connection for now
+          Level = QUIC_PARAM_LEVEL_CONNECTION;
+          Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+        }
+
+      if (Level != QUIC_PARAM_LEVEL_CONNECTION) {
+        return ERROR_TUPLE_2(ATOM_BADARG);
+      }
+
+      return set_settings(env, &Handle, &evalue);
+    }
+  else
+    { //@todo support more param
+      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+    }
+}
+
+
+ERL_NIF_TERM set_settings(ErlNifEnv *env, HQUIC* Handle, ERL_NIF_TERM* emap)
+{
+  QUIC_SETTINGS Settings = {0};
+
+  if (!enif_is_map(env, *emap))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (get_uint64_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxBytesPerKey, &(Settings.MaxBytesPerKey)))
+    {
+      Settings.IsSet.MaxBytesPerKey = TRUE;
+    }
+  if (get_uint64_from_map(env, *emap, ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs, &Settings.HandshakeIdleTimeoutMs))
+    {
+      Settings.IsSet.HandshakeIdleTimeoutMs = TRUE;
+    }
+  if (get_uint64_from_map(env, *emap, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &Settings.IdleTimeoutMs))
+    {
+      Settings.IsSet.IdleTimeoutMs = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer, &Settings.TlsClientMaxSendBuffer))
+    {
+      Settings.IsSet.TlsClientMaxSendBuffer = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer, &Settings.TlsClientMaxSendBuffer))
+    {
+      Settings.IsSet.TlsClientMaxSendBuffer = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer, &Settings.TlsServerMaxSendBuffer))
+    {
+      Settings.IsSet.TlsServerMaxSendBuffer = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_StreamRecvWindowDefault, &Settings.StreamRecvWindowDefault))
+    {
+      Settings.IsSet.StreamRecvWindowDefault = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_StreamRecvBufferDefault, &Settings.StreamRecvBufferDefault))
+    {
+      Settings.IsSet.StreamRecvBufferDefault = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_ConnFlowControlWindow, &Settings.ConnFlowControlWindow))
+    {
+      Settings.IsSet.ConnFlowControlWindow = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs, &Settings.MaxWorkerQueueDelayUs))
+    {
+      Settings.IsSet.MaxWorkerQueueDelayUs = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxStatelessOperations, &Settings.MaxStatelessOperations))
+    {
+      Settings.IsSet.MaxStatelessOperations = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_InitialWindowPackets, &Settings.InitialWindowPackets))
+    {
+      Settings.IsSet.InitialWindowPackets = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_SendIdleTimeoutMs, &Settings.SendIdleTimeoutMs))
+    {
+      Settings.IsSet.SendIdleTimeoutMs = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_InitialRttMs, &Settings.InitialRttMs))
+    {
+      Settings.IsSet.InitialRttMs = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxAckDelayMs, &Settings.MaxAckDelayMs))
+    {
+      Settings.IsSet.MaxAckDelayMs = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_DisconnectTimeoutMs, &Settings.DisconnectTimeoutMs))
+    {
+      Settings.IsSet.DisconnectTimeoutMs = TRUE;
+    }
+  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_KeepAliveIntervalMs, &Settings.KeepAliveIntervalMs))
+    {
+      Settings.IsSet.KeepAliveIntervalMs = TRUE;
+    }
+  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_PeerBidiStreamCount, &Settings.PeerBidiStreamCount))
+    {
+      Settings.IsSet.PeerBidiStreamCount = TRUE;
+    }
+  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, &Settings.PeerUnidiStreamCount))
+    {
+      Settings.IsSet.PeerUnidiStreamCount = TRUE;
+    }
+  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_RetryMemoryLimit, &Settings.RetryMemoryLimit))
+    {
+      Settings.IsSet.RetryMemoryLimit = TRUE;
+    }
+  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_LoadBalancingMode, &Settings.LoadBalancingMode))
+    {
+      Settings.IsSet.LoadBalancingMode = TRUE;
+    }
+
+  // bit fields
+  uint8_t MaxOperationsPerDrain = 0;
+  uint8_t SendBufferingEnabled = 0;
+  uint8_t PacingEnabled = 0;
+  uint8_t MigrationEnabled = 0;
+  uint8_t DatagramReceiveEnabled = 0;
+  uint8_t ServerResumptionLevel = 0;
+  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxOperationsPerDrain, &MaxOperationsPerDrain))
+    {
+      Settings.MaxOperationsPerDrain = MaxOperationsPerDrain;
+      Settings.IsSet.MaxOperationsPerDrain = TRUE;
+    }
+  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_SendBufferingEnabled, &SendBufferingEnabled))
+    {
+      Settings.SendBufferingEnabled = SendBufferingEnabled;
+      Settings.IsSet.SendBufferingEnabled = TRUE;
+    }
+  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_PacingEnabled, &PacingEnabled))
+    {
+      Settings.PacingEnabled = PacingEnabled;
+      Settings.IsSet.PacingEnabled = TRUE;
+    }
+  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_MigrationEnabled, &MigrationEnabled))
+    {
+      Settings.MigrationEnabled = MigrationEnabled;
+      Settings.IsSet.MigrationEnabled = TRUE;
+    }
+  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_DatagramReceiveEnabled, &DatagramReceiveEnabled))
+    {
+      Settings.DatagramReceiveEnabled = DatagramReceiveEnabled;
+      Settings.IsSet.DatagramReceiveEnabled = TRUE;
+    }
+  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_ServerResumptionLevel, &ServerResumptionLevel))
+    {
+      Settings.ServerResumptionLevel = ServerResumptionLevel;
+      Settings.IsSet.ServerResumptionLevel = TRUE;
+    }
+
+  if (QUIC_FAILED(MsQuic->SetParam(*Handle,
+                                   QUIC_PARAM_LEVEL_CONNECTION,
+                                   QUIC_PARAM_CONN_SETTINGS,
+                                   sizeof(Settings),
+                                   &Settings)))
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+    }
+  return ATOM_OK;
 }

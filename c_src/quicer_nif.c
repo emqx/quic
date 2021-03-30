@@ -758,7 +758,8 @@ static ErlNifFunc nif_funcs[] = {
   { "send", 2, send2, 0},
   { "close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
-  { "getopt", 3, getopt3, 0}
+  { "getopt", 3, getopt3, 0},
+  { "setopt", 3, setopt3, 0}
   // clang-format on
 };
 
