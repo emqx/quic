@@ -110,14 +110,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A resumption ticket (also called New Session Ticket or NST) was
       // received from the server.
       //
-      for (uint32_t i = 0;
-           i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++)
-        {
-          printf(
-              "%.2X",
-              (uint8_t)Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket[i]);
-        }
-      printf("\n");
+      //
+      // @todo
       break;
     default:
       break;
@@ -367,43 +361,45 @@ close_connection1(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 ERL_NIF_TERM
-sockname1(ErlNifEnv *env, __unused_parm__ int args,
-          const ERL_NIF_TERM argv[])
+sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
 {
   void *q_ctx;
   HQUIC Handle = NULL;
   uint32_t Param = -1;
   QUIC_PARAM_LEVEL Level = -1;
 
-  if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx)) {
-    Handle = ((QuicerConnCTX *)q_ctx)->Connection;
-    Level = QUIC_PARAM_LEVEL_CONNECTION;
-    Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
-  } else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx)) {
-    Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
-    Level = QUIC_PARAM_LEVEL_LISTENER;
-    Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
-  } else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx)) {
-    Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
-    Level = QUIC_PARAM_LEVEL_CONNECTION;
-    Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
-  } else {
-    return ERROR_TUPLE_2(ATOM_BADARG);
-  }
+  if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
+    {
+      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
+    }
+  else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx))
+    {
+      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+      Level = QUIC_PARAM_LEVEL_LISTENER;
+      Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
+    }
+  else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
+    {
+      Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   QUIC_STATUS status;
   QUIC_ADDR addr;
   uint32_t addrSize = sizeof(addr);
 
-  if (QUIC_FAILED(status = MsQuic->GetParam(
-                                       Handle,
-                                       Level,
-                                       Param,
-                                       &addrSize,
-                                       &addr)))
-      {
-        return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
-      }
+  if (QUIC_FAILED(status
+                  = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
+    {
+      return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
+    }
 
   return SUCCESS(addr2eterm(env, &addr));
 }
