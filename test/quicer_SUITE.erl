@@ -50,6 +50,7 @@
 
         , tc_getopt_raw/1
         , tc_getopt/1
+        , tc_setopt/1
         , tc_get_stream_id/1
         , tc_getstat/1
         , tc_peername_v4/1
@@ -340,19 +341,20 @@ tc_getopt(Config) ->
       [true = proplists:is_defined(SKey, Stats)
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
       {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
-      5000 = proplists:get_value("IdleTimeoutMs", Settings),
-      true = proplists:get_value("SendBufferingEnabled", Settings),
+      5000 = proplists:get_value(idle_timeout_ms, Settings),
+      true = proplists:get_value(send_buffering_enabled, Settings),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       %% test that op is fallbakced to connection
       {ok, _} = quicer:getopt(Stm, Parm, false),
       {ok, Settings0} = quicer:getopt(Stm, param_conn_settings, false),
-      5000 = proplists:get_value("IdleTimeoutMs", Settings0),
+      5000 = proplists:get_value(idle_timeout_ms, Settings0),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
   end.
+
 
 tc_get_stream_id(Config) ->
   Port = 4571,
@@ -488,6 +490,36 @@ tc_idle_timeout(Config) ->
       {error, stm_open_error} = quicer:start_stream(Conn, []),
       SPid ! done
   end.
+
+
+tc_setopt(Config) ->
+  Port = 4578,
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      Opts = lists:keyreplace(peer_bidi_stream_count, 1, default_conn_opts(), {peer_bidi_stream_count, 1}),
+      {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+      {ok, Stm0} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm0, <<"ping">>),
+      {ok, Stm1} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm1, <<"ping">>),
+      {P, _} = spawn_monitor(fun () -> Owner ! quicer:recv(Stm1, 4) end),
+      receive
+        _ ->
+          ct:fail("unexpected recv")
+      after 1000 ->
+          ok
+      end,
+      exit(P, normal),
+      ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => 10}),
+      {ok, 4} = quicer:send(Stm0, <<"ping">>),
+      {ok, <<"ping">>} = quicer:recv(Stm0, 4),
+      SPid ! done
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end.
+
 
 tc_app_echo_server(Config) ->
   Port = 8888,
