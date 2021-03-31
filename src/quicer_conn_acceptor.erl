@@ -127,7 +127,15 @@ handle_info({new_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State)
     %% what to expect?
     M:new_conn(C, Opts),
 
-    {noreply, State#state{conn = C} }.
+    {noreply, State#state{conn = C} };
+
+handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
+   %% exit signal from signal
+    {noreply, State};
+
+handle_info({'EXIT', _Pid, {shutdown, _Other}}, State) ->
+   %% @todo
+    {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private

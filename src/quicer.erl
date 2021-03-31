@@ -32,6 +32,7 @@
         , setopt/3
         , get_stream_id/1
         , getstats/2
+        , getstat/2
         , peername/1
         ]).
 
@@ -179,6 +180,11 @@ setopt(Handle, Opt, Value) ->
 -spec get_stream_id(Stream::stream_handler()) -> {ok, integer()} | {error, any()}.
 get_stream_id(Stream) ->
   quicer_nif:getopt(Stream, param_stream_id, false).
+
+
+-spec getstat(connection_handler(), [inet:stat_option()]) -> list().
+getstat(Conn, Cnts) ->
+  getstats(Conn, Cnts).
 
 -spec getstats(connection_handler(), [inet:stat_option()]) -> list().
 getstats(Conn, Cnts) ->
