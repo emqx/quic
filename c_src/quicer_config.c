@@ -579,7 +579,10 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
 
   if (!QUIC_SUCCEEDED(status))
     {
-      enif_release_binary(&bin);
+      if (isReturnRaw)
+        {
+          enif_release_binary(&bin);
+        }
       return ERROR_TUPLE_2(atom_status(status));
     }
 
