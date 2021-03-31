@@ -21,6 +21,10 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
   ErlNifEnv *env;
   QuicerStreamCTX *s_ctx;
+  ErlNifBinary bin;
+  s_ctx = (QuicerStreamCTX *)Context;
+  env = s_ctx->env;
+
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -34,10 +38,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // Data was received from the peer on the stream.
       //
-      s_ctx = (QuicerStreamCTX *)Context;
-      env = s_ctx->env;
-
-      ErlNifBinary bin;
 
       // ownership is transfered to var: report
       if (!enif_alloc_binary(Event->RECEIVE.TotalBufferLength, &bin))
@@ -67,8 +67,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
-          // App down, close stream
-          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT,
+          // App down, shutdown stream
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
                                  QUIC_STATUS_UNREACHABLE);
         }
       break;
@@ -76,20 +76,46 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // The peer gracefully shut down its send direction of the stream.
       //
-      // ServerSend(Stream);
+      report = enif_make_tuple3(env,
+        ATOM_QUIC, ATOM_PEER_SEND_SHUTDOWN,
+        enif_make_resource(env, s_ctx));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // App down, close it.
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+        }
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
       //
       // The peer aborted its send direction of the stream.
       //
-      MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+      report = enif_make_tuple4(env,
+                                ATOM_QUIC, ATOM_PEER_SEND_ABORTED,
+                                enif_make_resource(env, s_ctx),
+                                enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown the stream as well.
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          // @todo return proper bad status
+        }
       break;
     case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
       //
       // Both directions of the stream have been shut down and MsQuic is done
       // with the stream. It can now be safely cleaned up.
       //
+      //
+      report = enif_make_tuple4(env,
+                                ATOM_QUIC, ATOM_CLOSED,
+                                enif_make_resource(env, s_ctx),
+                                enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+
+      enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
+      destroy_s_ctx(s_ctx);
       break;
     default:
       break;
@@ -107,6 +133,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   ErlNifEnv *env;
   ErlNifBinary bin;
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
+  ERL_NIF_TERM report;
   env = s_ctx->env;
 
   switch (Event->Type)
@@ -139,7 +166,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           offset += Event->RECEIVE.Buffers[i].Length;
         }
 
-      ERL_NIF_TERM report = enif_make_tuple6(
+      report = enif_make_tuple6(
           env,
           // reserved for port
           ATOM_QUIC, enif_make_binary(env, &bin),
@@ -162,23 +189,44 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // The peer gracefully shut down its send direction of the stream.
       //
-      printf("[strm][%p] Peer aborted\n", Stream);
-      //@todo notify owner about this
+      report = enif_make_tuple4(env,
+                                ATOM_QUIC, ATOM_PEER_SEND_ABORTED,
+                                enif_make_resource(env, s_ctx),
+                                enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown the stream as well.
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          // @todo return proper bad status
+        }
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
       //
       // The peer aborted its send direction of the stream.
       //
-      printf("[strm][%p] Peer shut down\n", Stream);
-      //@todo notify owner about this
+      report = enif_make_tuple3(env,
+        ATOM_QUIC, ATOM_PEER_SEND_SHUTDOWN,
+        enif_make_resource(env, s_ctx));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // App down, close it.
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+        }
       break;
     case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
       //
       // Both directions of the stream have been shut down and MsQuic is done
       // with the stream. It can now be safely cleaned up.
       //
+      report = enif_make_tuple4(env,
+        ATOM_QUIC, ATOM_CLOSED,
+        enif_make_resource(env, s_ctx),
+        enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+
+      enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
-      //@todo notify owner
       destroy_s_ctx(s_ctx);
       break;
     default:

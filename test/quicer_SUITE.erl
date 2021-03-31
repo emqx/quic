@@ -210,6 +210,7 @@ tc_stream_client_init(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_stream(Stm),
+      wait_for_close(Stm),
       SPid ! done
   after 1000 ->
       ct:fail("timeout")
@@ -231,6 +232,7 @@ tc_stream_client_send(Config) ->
         Other ->
           ct:fail("Unexpected Msg ~p", [Other])
       end,
+      wait_for_close(Stm),
       SPid ! done
   after 1000 ->
       ct:fail("timeout")
@@ -248,7 +250,8 @@ tc_stream_passive_receive(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
-      SPid ! done
+      SPid ! done,
+      wait_for_close(Stm)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -267,7 +270,8 @@ tc_stream_passive_receive_buffer(Config) ->
       {ok, <<"p">>} = quicer:recv(Stm, 1),
       {ok, <<"on">>} = quicer:recv(Stm, 2),
       {ok, <<"g">>} = quicer:recv(Stm, 0),
-      SPid ! done
+      SPid ! done,
+      wait_for_close(Stm)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -285,7 +289,8 @@ tc_stream_passive_receive_large_buffer_1(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
-      SPid ! done
+      SPid ! done,
+      wait_for_close(Stm)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -305,7 +310,8 @@ tc_stream_passive_receive_large_buffer_2(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       timer:sleep(100),
       {ok, <<"pongpongpong">>} = quicer:recv(Stm, 12),
-      SPid ! done
+      SPid ! done,
+      wait_for_close(Stm)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -323,6 +329,7 @@ tc_getopt_raw(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {error, badarg} = quicer:getopt(Stm, Parm),
       ok = quicer:close_connection(Conn),
+      wait_for_close(Stm),
       SPid ! done
   after 1000 ->
       ct:fail("listener_timeout")
@@ -350,6 +357,7 @@ tc_getopt(Config) ->
       {ok, Settings0} = quicer:getopt(Stm, param_conn_settings, false),
       5000 = proplists:get_value(idle_timeout_ms, Settings0),
       ok = quicer:close_connection(Conn),
+      wait_for_close(Stm),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
@@ -374,6 +382,7 @@ tc_get_stream_id(Config) ->
       {ok, 8} = quicer:get_stream_id(Stm3),
       {error, badarg} = quicer:get_stream_id(Conn),
       ok = quicer:close_connection(Conn),
+      wait_for_close(Stm),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
@@ -391,6 +400,7 @@ tc_getstat(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       [{send_cnt, _}, {recv_oct, _}] = quicer:getstats(Conn, [send_cnt, recv_oct]),
       ok = quicer:close_connection(Conn),
+      wait_for_close(Stm),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
@@ -414,6 +424,7 @@ tc_peername_v6(Config) ->
       ct:pal("addr is ~p", [Addr]),
       "::1" = inet:ntoa(Addr),
       ok = quicer:close_connection(Conn),
+      wait_for_close(Stm),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
@@ -422,7 +433,7 @@ tc_peername_v6(Config) ->
 tc_peername_v4(Config) ->
   Port = 4574,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
@@ -439,7 +450,7 @@ tc_peername_v4(Config) ->
       %% @todo coredump, msquic isn't robust enough to handle the following call after
       %% connection get closed. We need a follow-up later.
       %{ok, {Addr, RPort}} = quicer:peername(Conn),
-      SPid ! done
+      wait_for_close(Stm)
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -538,6 +549,8 @@ tc_app_echo_server(Config) ->
   {ok, 4} = quicer:send(Stm, <<"ping">>),
   {ok, 4} = quicer:send(Stm, <<"ping">>),
   {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
+  quicer:close_stream(Stm),
+  wait_for_close(Stm),
   ok.
 
 %%% ====================
@@ -559,6 +572,14 @@ echo_server_stm_loop(L, Conn, Stm) ->
   receive
     {quic, Bin, Stm, _, _, _} ->
       quicer:send(Stm, Bin),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, peer_send_aborted, Stm, _Error} ->
+      quicer:close_stream(Stm),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, peer_send_shutdown, Stm, _Error} ->
+      quicer:close_stream(Stm),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, closed, Stm, _Flag} ->
       echo_server_stm_loop(L, Conn, Stm);
     done ->
       quicer:close_connection(Conn),
@@ -631,6 +652,10 @@ default_listen_opts(Config) ->
   , {key,  filename:join(DataDir, "key.pem")}
   , {alpn, ["sample"]}].
 
+wait_for_close(Stm) ->
+  receive
+    {quic, closed, Stm, _} -> ok
+  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

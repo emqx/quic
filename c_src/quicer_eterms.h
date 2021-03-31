@@ -204,7 +204,9 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 /*----------------------------------------------------------*/
 /* QUIC_SETTINGS ends                                       */
 /*----------------------------------------------------------*/
-
+extern ERL_NIF_TERM ATOM_CLOSED;
+extern ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
+extern ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 extern ERL_NIF_TERM ATOM_QUIC;
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */
