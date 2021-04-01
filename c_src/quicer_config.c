@@ -91,24 +91,10 @@ ServerLoadConfiguration(ErlNifEnv *env,
                         QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
   QUIC_SETTINGS Settings = { 0 };
-  //
-  // Configures the server's idle timeout.
-  //
-  Settings.IdleTimeoutMs = 5000;
-  Settings.IsSet.IdleTimeoutMs = TRUE;
-  //
-  // Configures the server's resumption level to allow for resumption and
-  // 0-RTT.
-  //
-  Settings.ServerResumptionLevel = QUIC_SERVER_RESUME_AND_ZERORTT;
-  Settings.IsSet.ServerResumptionLevel = TRUE;
-  //
-  // Configures the server's settings to allow for the peer to open a single
-  // bidirectional stream. By default connections are not configured to allow
-  // any streams from the peer.
-  //
-  Settings.PeerBidiStreamCount = 10;
-  Settings.IsSet.PeerBidiStreamCount = TRUE;
+
+  if (!create_settings(env, option, &Settings)) {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+  }
 
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
@@ -153,22 +139,10 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // Configures the client's idle timeout.
   //
 
-  uint64_t IdleTimeoutMs = 0;
-  uint16_t PeerUnidiStreamCount = 0;
-  uint16_t PeerBidiStreamCount = 0;
-  if (!get_uint64_from_map(env, *option, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &IdleTimeoutMs) ||
-      !get_uint16_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, &PeerUnidiStreamCount) ||
-      !get_uint16_from_map(env, *option, ATOM_QUIC_SETTINGS_PeerBidiStreamCount, &PeerBidiStreamCount))
-    {
-      return false;
-    }
+  if (!create_settings(env, option, &Settings)) {
+    return ERROR_TUPLE_2(ATOM_BADARG);
+  }
 
-  Settings.IdleTimeoutMs = IdleTimeoutMs;
-  Settings.IsSet.IdleTimeoutMs = TRUE;
-  Settings.PeerUnidiStreamCount = PeerUnidiStreamCount;
-  Settings.IsSet.PeerUnidiStreamCount = TRUE;
-  Settings.PeerBidiStreamCount = PeerBidiStreamCount;
-  Settings.IsSet.PeerBidiStreamCount = TRUE;
   //
   // Configures a default client configuration, optionally disabling
   // server certificate validation.
@@ -676,7 +650,7 @@ setopt3(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 
-bool create_settings(ErlNifEnv *env, ERL_NIF_TERM* emap, QUIC_SETTINGS* Settings)
+bool create_settings(ErlNifEnv *env, const ERL_NIF_TERM* emap, QUIC_SETTINGS* Settings)
 {
   if (!enif_is_map(env, *emap))
     {
