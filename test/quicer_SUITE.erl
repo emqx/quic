@@ -650,7 +650,10 @@ default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
   [ {cert, filename:join(DataDir, "cert.pem")}
   , {key,  filename:join(DataDir, "key.pem")}
-  , {alpn, ["sample"]}].
+  , {alpn, ["sample"]}
+  , {idle_timeout_ms, 5000}
+  , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
+  , {peer_bidi_stream_count, 10}].
 
 wait_for_close(Stm) ->
   receive
