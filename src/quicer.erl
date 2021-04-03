@@ -213,6 +213,8 @@ stats_map(send_cnt) ->
   "Send.TotalPackets";
 stats_map(send_oct) ->
   "Send.TotalBytes";
+stats_map(send_pend) ->
+  "Send.CongestionCount";
 stats_map(_) ->
   undefined.
 
