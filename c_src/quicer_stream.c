@@ -118,8 +118,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       MsQuic->StreamClose(Stream);
       s_ctx->closed = true;
       enif_mutex_unlock(s_ctx->lock);
-      // @todo
-      //destroy_s_ctx(s_ctx);
+      destroy_s_ctx(s_ctx);
       break;
     default:
       break;
@@ -405,6 +404,7 @@ close_stream1(ErlNifEnv *env, __unused_parm__ int argc,
   //@todo support application specific error code.
   // we don't use trylock since we are in NIF call.
   enif_mutex_lock(s_ctx->lock);
+  enif_keep_resource(s_ctx);
   if (!s_ctx->closed)
   {
     if (QUIC_FAILED(
@@ -414,6 +414,7 @@ close_stream1(ErlNifEnv *env, __unused_parm__ int argc,
        ret =  ERROR_TUPLE_2(ETERM_INT(Status));
     }
   }
+  enif_release_resource(s_ctx);
   enif_mutex_unlock(s_ctx->lock);
   return ret;
 }

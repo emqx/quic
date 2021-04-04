@@ -450,6 +450,16 @@ resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env, void *obj,
 }
 
 void
+resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
+                                 void *obj
+                                 )
+{
+  QuicerStreamCTX *s_ctx = (QuicerStreamCTX *) obj;
+  enif_free_env(s_ctx->env);
+  enif_mutex_destroy(s_ctx->lock);
+}
+
+void
 resource_stream_down_callback(__unused_parm__ ErlNifEnv *caller_env,
                               __unused_parm__ void *obj,
                               __unused_parm__ ErlNifPid *pid,
@@ -476,7 +486,7 @@ on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
 
   ErlNifResourceTypeInit streamInit
-      = { .dtor = NULL, .down = resource_stream_down_callback, .stop = NULL };
+      = { .dtor = resource_stream_dealloc_callback, .down = resource_stream_down_callback, .stop = NULL };
   ErlNifResourceTypeInit connInit
       = { .dtor = NULL, .down = resource_conn_down_callback, .stop = NULL };
   ErlNifResourceTypeInit listenerInit = {

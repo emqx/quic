@@ -86,7 +86,6 @@ init_s_ctx()
 void
 destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
-  enif_free_env(s_ctx->env);
-  enif_mutex_destroy(s_ctx->lock);
+  // note, see resource_stream_dealloc_callback
   enif_release_resource(s_ctx);
 }
