@@ -197,8 +197,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // is the expected way for the connection to shut down with this
       // protocol, since we let idle timeout kill the connection.
       //
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
-             Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+      /* printf("[conn][%p] Shut down by transport, 0x%x\n", Connection, */
+      /*        Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status); */
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
       //

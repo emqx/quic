@@ -182,10 +182,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // App down, close it.
-          // @todo free context as well
-          printf("[strm][%p] failed to report data\n", Stream);
-          MsQuic->StreamClose(Stream);
-          // @todo return proper bad status
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, QUIC_STATUS_UNREACHABLE);
         }
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
