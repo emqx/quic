@@ -550,6 +550,7 @@ tc_app_echo_server(Config) ->
   {ok, 4} = quicer:send(Stm, <<"ping">>),
   {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
   quicer:close_stream(Stm),
+  quicer:close_connection(Conn),
   wait_for_close(Stm),
   ok.
 
@@ -657,7 +658,13 @@ default_listen_opts(Config) ->
 
 wait_for_close(Stm) ->
   receive
-    {quic, closed, Stm, _} -> ok
+    {quic, closed, Stm, _} ->
+      receive {quic, closed, _Conn} -> ok
+      after 2000 ->
+          receive Any ->
+              ct:fail({unexpected_recv, Any})
+          end
+      end
   end.
 
 %%%_* Emacs ====================================================================

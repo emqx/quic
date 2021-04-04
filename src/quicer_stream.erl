@@ -151,8 +151,18 @@ handle_info({quic, Bin, Stream, _, _, _},
     end;
 
 handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
-  when StreamB =/=StreamA->
-    {stop, wrong_stream, State}.
+  when StreamB =/=StreamA ->
+    {stop, wrong_stream, State};
+
+handle_info({quic, peer_send_shutdown, Stream}, #state{stream = Stream} = State) ->
+    %% todo add callback here
+    quicer:close_stream(Stream),
+    {noreply, State};
+
+handle_info({quic, closed, Stream, _Reason}, #state{stream = Stream} = State) ->
+    %% todo
+    {stop, normal, State}.
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc

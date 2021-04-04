@@ -210,6 +210,7 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 /*----------------------------------------------------------*/
 
 ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 ERL_NIF_TERM ATOM_QUIC;
@@ -407,6 +408,7 @@ ERL_NIF_TERM ATOM_QUIC;
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_ALPN, alpn);                                                \
   ATOM(ATOM_CLOSED, closed);                                            \
+  ATOM(ATOM_SHUTDOWN, shutdown);                                            \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                            \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_QUIC, quic);
@@ -437,16 +439,24 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
 }
 
 void
-resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env, void *obj,
+resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
+                                 void *obj
+                                 )
+{
+  QuicerConnCTX *c_ctx = (QuicerConnCTX *) obj;
+  AcceptorQueueDestroy(c_ctx->acceptor_queue);
+  enif_free_env(c_ctx->env);
+  enif_mutex_destroy(c_ctx->lock);
+}
+
+
+void
+resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env,
+                            __unused_parm__ void *obj,
                             __unused_parm__ ErlNifPid *pid,
                             __unused_parm__ ErlNifMonitor *mon)
 {
-  QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
-  assert(c_ctx->Connection != NULL);
-  MsQuic->ConnectionShutdown(c_ctx->Connection,
-                             //@todo, check rfc for the error code
-                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                             ERROR_OPERATION_ABORTED);
+  //todo
 }
 
 void

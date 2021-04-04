@@ -57,9 +57,6 @@ init_c_ctx()
 void
 destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
-  AcceptorQueueDestroy(c_ctx->acceptor_queue);
-  enif_free_env(c_ctx->env);
-  enif_mutex_destroy(c_ctx->lock);
   if (0 != enif_demonitor_process(c_ctx->env, c_ctx, c_ctx->owner_mon))
     {
       //@todo handle ret valus, for

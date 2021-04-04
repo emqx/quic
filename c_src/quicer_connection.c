@@ -29,6 +29,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
   QuicerStreamCTX *s_ctx = NULL;
   ErlNifEnv *env = c_ctx->env;
+  ERL_NIF_TERM report;
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -93,12 +94,30 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // The connection was explicitly shut down by the peer.
       //
+      report = enif_make_tuple3(env,
+                                ATOM_QUIC, ATOM_SHUTDOWN,
+                                enif_make_resource(env, c_ctx)
+                                );
+
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report)) {
+        // Owner is gone, we shutdown our side as well.
+        MsQuic->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                           QUIC_STATUS_UNREACHABLE);
+      }
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
       //
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
+      report = enif_make_tuple3(env,
+                                ATOM_QUIC, ATOM_CLOSED,
+                                enif_make_resource(env, c_ctx)
+      );
+
+      enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+
+
       if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
@@ -123,9 +142,11 @@ QUIC_STATUS
 ServerConnectionCallback(HQUIC Connection, void *Context,
                          QUIC_CONNECTION_EVENT *Event)
 {
-  QuicerConnCTX *c_ctx;
+  QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
   ACCEPTOR *acc = NULL;
   ErlNifPid *acc_pid = NULL;
+  ERL_NIF_TERM report;
+  ErlNifEnv *env = c_ctx->env;
 
   switch (Event->Type)
     {
@@ -133,7 +154,7 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       //
       // The handshake has completed for the connection.
       //
-      c_ctx = (QuicerConnCTX *)Context;
+
       assert(c_ctx->Connection == NULL);
       c_ctx->Connection = Connection;
       acc = c_ctx->owner;
@@ -183,13 +204,30 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       //
       // The connection was explicitly shut down by the peer.
       //
+      report = enif_make_tuple3(env,
+                                ATOM_QUIC, ATOM_SHUTDOWN,
+                                enif_make_resource(env, c_ctx)
+                                );
+
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report)) {
+        // Owner is gone, we shutdown our side as well.
+        MsQuic->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                           QUIC_STATUS_UNREACHABLE);
+      }
+
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
       //
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      //
+      report = enif_make_tuple3(env,
+                                ATOM_QUIC, ATOM_CLOSED,
+                                enif_make_resource(env, c_ctx)
+      );
+
+      enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+
       if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
