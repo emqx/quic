@@ -79,6 +79,7 @@ init_s_ctx()
   // @todo would be better to useacceptor's env.
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
+  s_ctx->closed = false;
   return s_ctx;
 }
 
