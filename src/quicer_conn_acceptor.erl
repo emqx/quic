@@ -127,7 +127,30 @@ handle_info({new_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State)
     %% what to expect?
     M:new_conn(C, Opts),
 
-    {noreply, State#state{conn = C} }.
+    {noreply, State#state{conn = C} };
+
+handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
+    %% exit signal from stream
+    {noreply, State};
+
+handle_info({'EXIT', _Pid, {shutdown, _Other}}, State) ->
+    %% @todo
+    {noreply, State};
+
+handle_info({'EXIT', _Pid, normal}, State) ->
+    %% @todo
+    {noreply, State};
+
+handle_info({quic, shutdown, C}, #state{conn = C} = State) ->
+    %% @todo, peer shutdown conn
+    %% add callback
+    {noreply, State};
+
+handle_info({quic, closed, C}, #state{conn = C} = State) ->
+    %% @todo, connection closed
+    {stop, normal, State}.
+
+
 
 %%--------------------------------------------------------------------
 %% @private

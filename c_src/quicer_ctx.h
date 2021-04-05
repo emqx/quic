@@ -52,6 +52,7 @@ typedef struct
   ErlNifMonitor *owner_mon;
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
+  BOOLEAN closed;
 } QuicerStreamCTX;
 
 QuicerListenerCTX *init_l_ctx();

@@ -57,9 +57,6 @@ init_c_ctx()
 void
 destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
-  AcceptorQueueDestroy(c_ctx->acceptor_queue);
-  enif_free_env(c_ctx->env);
-  enif_mutex_destroy(c_ctx->lock);
   if (0 != enif_demonitor_process(c_ctx->env, c_ctx, c_ctx->owner_mon))
     {
       //@todo handle ret valus, for
@@ -79,13 +76,13 @@ init_s_ctx()
   // @todo would be better to useacceptor's env.
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
+  s_ctx->closed = false;
   return s_ctx;
 }
 
 void
 destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
-  enif_free_env(s_ctx->env);
-  enif_mutex_destroy(s_ctx->lock);
+  // note, see resource_stream_dealloc_callback
   enif_release_resource(s_ctx);
 }

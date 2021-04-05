@@ -107,7 +107,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       // Both directions of the stream have been shut down and MsQuic is done
       // with the stream. It can now be safely cleaned up.
       //
-      //
+      // we don't use trylock since we are in callback context
+      enif_mutex_lock(s_ctx->lock);
       report = enif_make_tuple4(env,
                                 ATOM_QUIC, ATOM_CLOSED,
                                 enif_make_resource(env, s_ctx),
@@ -115,6 +116,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
+      s_ctx->closed = true;
+      enif_mutex_unlock(s_ctx->lock);
       destroy_s_ctx(s_ctx);
       break;
     default:
@@ -179,10 +182,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // App down, close it.
-          // @todo free context as well
-          printf("[strm][%p] failed to report data\n", Stream);
-          MsQuic->StreamClose(Stream);
-          // @todo return proper bad status
+          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, QUIC_STATUS_UNREACHABLE);
         }
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
@@ -391,20 +391,29 @@ ERL_NIF_TERM
 close_stream1(ErlNifEnv *env, __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
-  QUIC_STATUS Status;
+  QUIC_STATUS Status = 0;
+  ERL_NIF_TERM ret = ATOM_OK;
   QuicerStreamCTX *s_ctx;
   if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
   //@todo support application specific error code.
-  if (QUIC_FAILED(
+  // we don't use trylock since we are in NIF call.
+  enif_mutex_lock(s_ctx->lock);
+  enif_keep_resource(s_ctx);
+  if (!s_ctx->closed)
+  {
+    if (QUIC_FAILED(
           Status = MsQuic->StreamShutdown(
               s_ctx->Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, NO_ERROR)))
     {
-      return ERROR_TUPLE_2(ETERM_INT(Status));
+       ret =  ERROR_TUPLE_2(ETERM_INT(Status));
     }
-  return ATOM_OK;
+  }
+  enif_release_resource(s_ctx);
+  enif_mutex_unlock(s_ctx->lock);
+  return ret;
 }
 
 ///_* Emacs
