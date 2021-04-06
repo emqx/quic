@@ -31,7 +31,6 @@
         , getopt/3
         , setopt/3
         , get_stream_id/1
-        , getstats/2
         , getstat/2
         , peername/1
         ]).
@@ -181,22 +180,18 @@ setopt(Handle, Opt, Value) ->
 get_stream_id(Stream) ->
   quicer_nif:getopt(Stream, param_stream_id, false).
 
-
--spec getstat(connection_handler(), [inet:stat_option()]) -> list().
+-spec getstat(connection_handler(), [inet:stat_option()]) ->
+        [{inet:stat_option(), integer()}] | {error, any()}.
 getstat(Conn, Cnts) ->
-  getstats(Conn, Cnts).
-
--spec getstats(connection_handler(), [inet:stat_option()]) -> list().
-getstats(Conn, Cnts) ->
   case quicer_nif:getopt(Conn, param_conn_statistics, false) of
     {error, _} = E ->
       E;
     {ok, Res} ->
-      lists:map(fun(Cnt) ->
+      {ok, lists:map(fun(Cnt) ->
                     Key = stats_map(Cnt),
                     V = proplists:get_value(Key, Res, {Key, -1}),
                     {Cnt, V}
-                end, Cnts)
+                end, Cnts)}
   end.
 
 -spec peername(connection_handler()  | stream_handler()) ->
