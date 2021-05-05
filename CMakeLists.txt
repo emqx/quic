@@ -19,7 +19,7 @@ endif()
 if (DEFINED ENV{QUIC_ENABLE_LOGGING})
   set(QUIC_ENABLE_LOGGING $ENV{QUIC_ENABLE_LOGGING})
 else()
-  set(QUIC_ENABLE_LOGGING "ON")
+  set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
 # src files
