@@ -553,7 +553,7 @@ tc_app_echo_server(Config) ->
   quicer:close_stream(Stm),
   quicer:close_connection(Conn),
   wait_for_close(Stm),
-  ok.
+  ok = quicer:stop_listener(mqtt).
 
 %%% ====================
 %%% Internal helpers

@@ -55,10 +55,11 @@ start_link(Name, Port, Opts) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name, Port, Opts], []).
 
 start_listener(AppName, Port, Options) ->
-    supervisor:start_child(quicer_listener_sup, [AppName, Port, Options]).
+    quicer_listener_sup:start_listener(AppName, Port, Options).
 
 stop_listener(AppName) ->
-    supervisor:delete_child(quicer_listener_sup, AppName).
+    quicer_listener_sup:stop_listener(AppName).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
