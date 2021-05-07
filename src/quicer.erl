@@ -35,7 +35,9 @@
         , peername/1
         ]).
 
--export([start_listener/3]). %% start application over quic
+-export([ start_listener/3 %% start application over quic
+        , stop_listener/1
+        ]).
 
 -type listener_handler() :: reference().
 -type connection_handler() :: reference().
@@ -51,6 +53,10 @@
         {ok, pid()} | {error, any()}.
 start_listener(AppName, Port, Options) ->
   quicer_listener:start_listener(AppName, Port, Options).
+
+-spec stop_listener(atom()) -> ok.
+stop_listener(AppName) ->
+  quicer_listener:stop_listener(AppName).
 
 -spec listen(inet:port_number(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
@@ -183,6 +189,11 @@ get_stream_id(Stream) ->
 -spec getstat(connection_handler(), [inet:stat_option()]) ->
         [{inet:stat_option(), integer()}] | {error, any()}.
 getstat(Conn, Cnts) ->
+  getstats(Conn, Cnts).
+
+-spec getstats(connection_handler(), [inet:stat_option()]) ->
+        {ok, list()} | {error, any()}.
+getstats(Conn, Cnts) ->
   case quicer_nif:getopt(Conn, param_conn_statistics, false) of
     {error, _} = E ->
       E;
