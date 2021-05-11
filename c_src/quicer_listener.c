@@ -17,7 +17,8 @@ limitations under the License.
 #include "quicer_listener.h"
 
 QUIC_STATUS
-ServerListenerCallback(__unused_parm__ HQUIC Listener, void *Context,
+ServerListenerCallback(__unused_parm__ HQUIC Listener,
+                       void *Context,
                        QUIC_LISTENER_EVENT *Event)
 {
   QUIC_STATUS Status = QUIC_STATUS_NOT_SUPPORTED;
@@ -56,7 +57,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener, void *Context,
       // app MUST set the callback handler before returning.
       //
       MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
-                                 (void *)ServerConnectionCallback, c_ctx);
+                                 (void *)ServerConnectionCallback,
+                                 c_ctx);
       // @todo error handling here.
       Status = MsQuic->ConnectionSetConfiguration(
           Event->NEW_CONNECTION.Connection, l_ctx->Configuration);
@@ -120,23 +122,25 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_MON);
     }
 
-  if (QUIC_FAILED(Status
-                  = MsQuic->ListenerOpen(Registration, ServerListenerCallback,
-                                         l_ctx, &l_ctx->Listener)))
+  if (QUIC_FAILED(
+          Status = MsQuic->ListenerOpen(
+              Registration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ETERM_INT(Status));
     }
 
-    unsigned alpn_buffer_length = 0;
-    QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  unsigned alpn_buffer_length = 0;
+  QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
-    if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers)) {
+  if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
+    {
       return false;
     }
 
   if (QUIC_FAILED(
-          Status = MsQuic->ListenerStart(l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
+          Status = MsQuic->ListenerStart(
+              l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
       MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);
@@ -150,7 +154,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
-close_listener1(ErlNifEnv *env, __unused_parm__ int argc,
+close_listener1(ErlNifEnv *env,
+                __unused_parm__ int argc,
                 const ERL_NIF_TERM argv[])
 {
   QuicerListenerCTX *l_ctx;

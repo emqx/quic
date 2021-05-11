@@ -213,7 +213,6 @@ extern ERL_NIF_TERM ATOM_QUIC;
 /* ATOMS ends here                                          */
 /*----------------------------------------------------------*/
 
-
 #define SUCCESS(Term) enif_make_tuple(env, 2, ATOM_OK, Term)
 #define ERROR_TUPLE_2(Err) enif_make_tuple2(env, ATOM_ERROR, Err)
 #define ERROR_TUPLE_3(Err1, Err2) enif_make_tuple3(env, ATOM_ERROR, Err1, Err2)
@@ -229,14 +228,13 @@ extern ERL_NIF_TERM ATOM_QUIC;
 #define IS_SAME_TERM(x, y) enif_is_identical(x, y)
 
 #define PropTupleStrInt(S, I)                                                 \
-  enif_make_tuple2(env, enif_make_string(env, #S, ERL_NIF_LATIN1),            \
+  enif_make_tuple2(env,                                                       \
+                   enif_make_string(env, #S, ERL_NIF_LATIN1),                 \
                    enif_make_uint64(env, (uint64_t)I))
 
 #define PropTupleAtomInt(A, I)                                                \
   enif_make_tuple2(env, A, enif_make_uint64(env, (uint64_t)I))
 
-#define PropTupleAtomBool(A, I)                                               \
-  enif_make_tuple2(env, A, ETERM_BOOL(I))
-
+#define PropTupleAtomBool(A, I) enif_make_tuple2(env, A, ETERM_BOOL(I))
 
 #endif // __QUICER_ETERMS_H_

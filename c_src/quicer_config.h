@@ -51,27 +51,27 @@ bool load_alpn(ErlNifEnv *env,
                unsigned *alpn_buffer_length,
                QUIC_BUFFER alpn_buffers[]);
 bool get_uint8_from_map(ErlNifEnv *env,
-                         const ERL_NIF_TERM map,
-                         ERL_NIF_TERM key,
-                         uint8_t* value);
+                        const ERL_NIF_TERM map,
+                        ERL_NIF_TERM key,
+                        uint8_t *value);
 bool get_uint16_from_map(ErlNifEnv *env,
                          const ERL_NIF_TERM map,
                          ERL_NIF_TERM key,
-                         uint16_t* value);
+                         uint16_t *value);
 bool get_uint32_from_map(ErlNifEnv *env,
                          const ERL_NIF_TERM map,
                          ERL_NIF_TERM key,
-                         uint32_t* value);
+                         uint32_t *value);
 bool get_uint64_from_map(ErlNifEnv *env,
                          const ERL_NIF_TERM map,
                          ERL_NIF_TERM key,
-                         uint64_t* value);
+                         uint64_t *value);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM setopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 bool create_settings(ErlNifEnv *env,
-                     const ERL_NIF_TERM* emap,
-                     QUIC_SETTINGS* Settings);
+                     const ERL_NIF_TERM *emap,
+                     QUIC_SETTINGS *Settings);
 
 #endif // __QUICER_CONFIG_H_

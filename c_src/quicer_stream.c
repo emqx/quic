@@ -50,17 +50,18 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       uint32_t offset = 0;
       for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
         {
-          CxPlatCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
-                         Event->RECEIVE.Buffers[i].Length);
+          CxPlatCopyMemory(bin.data + offset,
+                           Event->RECEIVE.Buffers[i].Buffer,
+                           Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
       ERL_NIF_TERM report = enif_make_tuple6(
           env,
           // reserved for port
-          ATOM_QUIC, enif_make_binary(env, &bin),
+          ATOM_QUIC,
+          enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
-          enif_make_uint64(
-              env, Event->RECEIVE.AbsoluteOffset),
+          enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
           enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
           enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
       );
@@ -68,7 +69,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // App down, shutdown stream
-          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+          MsQuic->StreamShutdown(Stream,
+                                 QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
                                  QUIC_STATUS_UNREACHABLE);
         }
       break;
@@ -77,8 +79,9 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       // The peer gracefully shut down its send direction of the stream.
       //
       report = enif_make_tuple3(env,
-        ATOM_QUIC, ATOM_PEER_SEND_SHUTDOWN,
-        enif_make_resource(env, s_ctx));
+                                ATOM_QUIC,
+                                ATOM_PEER_SEND_SHUTDOWN,
+                                enif_make_resource(env, s_ctx));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
@@ -90,15 +93,18 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // The peer aborted its send direction of the stream.
       //
-      report = enif_make_tuple4(env,
-                                ATOM_QUIC, ATOM_PEER_SEND_ABORTED,
-                                enif_make_resource(env, s_ctx),
-                                enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_PEER_SEND_ABORTED,
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // Owner is gone, we shutdown the stream as well.
-          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          MsQuic->StreamShutdown(
+              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
           // @todo return proper bad status
         }
       break;
@@ -109,10 +115,12 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // we don't use trylock since we are in callback context
       enif_mutex_lock(s_ctx->lock);
-      report = enif_make_tuple4(env,
-                                ATOM_QUIC, ATOM_CLOSED,
-                                enif_make_resource(env, s_ctx),
-                                enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_CLOSED,
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
@@ -130,7 +138,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 //
 _IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_STREAM_CALLBACK) QUIC_STATUS QUIC_API
-    ClientStreamCallback(_In_ HQUIC Stream, _In_opt_ void *Context,
+    ClientStreamCallback(_In_ HQUIC Stream,
+                         _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event)
 {
   ErlNifEnv *env;
@@ -152,7 +161,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // Data was received from the peer on the stream.
       //
-      //printf("[strm][%p] Data received\n", Stream);
+      // printf("[strm][%p] Data received\n", Stream);
 
       if (!enif_alloc_binary(Event->RECEIVE.TotalBufferLength, &bin))
         {
@@ -164,40 +173,46 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       uint32_t offset = 0;
       for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
         {
-          CxPlatCopyMemory(bin.data + offset, Event->RECEIVE.Buffers[i].Buffer,
-                         Event->RECEIVE.Buffers[i].Length);
+          CxPlatCopyMemory(bin.data + offset,
+                           Event->RECEIVE.Buffers[i].Buffer,
+                           Event->RECEIVE.Buffers[i].Length);
           offset += Event->RECEIVE.Buffers[i].Length;
         }
 
       report = enif_make_tuple6(
           env,
           // reserved for port
-          ATOM_QUIC, enif_make_binary(env, &bin),
+          ATOM_QUIC,
+          enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
           enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
           enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
-          enif_make_int(env, Event->RECEIVE.Flags)
-      );
+          enif_make_int(env, Event->RECEIVE.Flags));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // App down, close it.
-          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, QUIC_STATUS_UNREACHABLE);
+          MsQuic->StreamShutdown(Stream,
+                                 QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+                                 QUIC_STATUS_UNREACHABLE);
         }
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
       //
       // The peer gracefully shut down its send direction of the stream.
       //
-      report = enif_make_tuple4(env,
-                                ATOM_QUIC, ATOM_PEER_SEND_ABORTED,
-                                enif_make_resource(env, s_ctx),
-                                enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_PEER_SEND_ABORTED,
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // Owner is gone, we shutdown the stream as well.
-          MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          MsQuic->StreamShutdown(
+              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
           // @todo return proper bad status
         }
       break;
@@ -206,8 +221,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // The peer aborted its send direction of the stream.
       //
       report = enif_make_tuple3(env,
-        ATOM_QUIC, ATOM_PEER_SEND_SHUTDOWN,
-        enif_make_resource(env, s_ctx));
+                                ATOM_QUIC,
+                                ATOM_PEER_SEND_SHUTDOWN,
+                                enif_make_resource(env, s_ctx));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
@@ -220,10 +236,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // Both directions of the stream have been shut down and MsQuic is done
       // with the stream. It can now be safely cleaned up.
       //
-      report = enif_make_tuple4(env,
-        ATOM_QUIC, ATOM_CLOSED,
-        enif_make_resource(env, s_ctx),
-        enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_CLOSED,
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
@@ -236,7 +254,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 }
 
 ERL_NIF_TERM
-async_start_stream2(ErlNifEnv *env, __unused_parm__ int argc,
+async_start_stream2(ErlNifEnv *env,
+                    __unused_parm__ int argc,
                     const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
@@ -262,9 +281,11 @@ async_start_stream2(ErlNifEnv *env, __unused_parm__ int argc,
     }
 
   // @todo check if stream is null
-  if (QUIC_FAILED(Status = MsQuic->StreamOpen(
-                      c_ctx->Connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                      ClientStreamCallback, s_ctx, &(s_ctx->Stream))))
+  if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
+                                              QUIC_STREAM_OPEN_FLAG_NONE,
+                                              ClientStreamCallback,
+                                              s_ctx,
+                                              &(s_ctx->Stream))))
     {
       destroy_s_ctx(s_ctx);
       return ERROR_TUPLE_2(ATOM_STREAM_OPEN_ERROR);
@@ -287,7 +308,8 @@ async_start_stream2(ErlNifEnv *env, __unused_parm__ int argc,
 
 // accept streams on top of connection.
 ERL_NIF_TERM
-async_accept_stream2(ErlNifEnv *env, __unused_parm__ int argc,
+async_accept_stream2(ErlNifEnv *env,
+                     __unused_parm__ int argc,
                      const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
@@ -388,7 +410,8 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
-close_stream1(ErlNifEnv *env, __unused_parm__ int argc,
+close_stream1(ErlNifEnv *env,
+              __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = 0;
@@ -403,14 +426,15 @@ close_stream1(ErlNifEnv *env, __unused_parm__ int argc,
   enif_mutex_lock(s_ctx->lock);
   enif_keep_resource(s_ctx);
   if (!s_ctx->closed)
-  {
-    if (QUIC_FAILED(
-          Status = MsQuic->StreamShutdown(
-              s_ctx->Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, NO_ERROR)))
     {
-       ret =  ERROR_TUPLE_2(ETERM_INT(Status));
+      if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
+                          s_ctx->Stream,
+                          QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+                          NO_ERROR)))
+        {
+          ret = ERROR_TUPLE_2(ETERM_INT(Status));
+        }
     }
-  }
   enif_release_resource(s_ctx);
   enif_mutex_unlock(s_ctx->lock);
   return ret;

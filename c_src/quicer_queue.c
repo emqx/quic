@@ -71,8 +71,8 @@ AcceptorDequeue(QUICER_ACCEPTOR_QUEUE *q)
   enif_mutex_lock(q->Lock);
   if (!CxPlatListIsEmpty(&q->List))
     {
-      acceptor = CXPLAT_CONTAINING_RECORD(CxPlatListRemoveHead(&q->List), ACCEPTOR,
-                                        Link);
+      acceptor = CXPLAT_CONTAINING_RECORD(
+          CxPlatListRemoveHead(&q->List), ACCEPTOR, Link);
     }
   else
     {

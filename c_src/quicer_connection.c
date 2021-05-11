@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_connection.h"
+
 #include <assert.h>
 #include <unistd.h>
 
@@ -23,7 +24,8 @@ limitations under the License.
 //
 _IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
-    ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
+    ClientConnectionCallback(_In_ HQUIC Connection,
+                             _In_opt_ void *Context,
                              _Inout_ QUIC_CONNECTION_EVENT *Event)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
@@ -39,8 +41,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
       enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, c_ctx->owner_mon);
-      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL,
-                     enif_make_tuple3(env, enif_make_atom(env, "quic"),
+      if (!enif_send(NULL,
+                     &(c_ctx->owner->Pid),
+                     NULL,
+                     enif_make_tuple3(env,
+                                      enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "connected"),
                                       enif_make_resource(env, c_ctx))))
         {
@@ -69,8 +74,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, s_ctx->owner_mon);
 
-      if (!enif_send(NULL, &(acc->Pid), NULL,
-                     enif_make_tuple3(env, enif_make_atom(env, "quic"),
+      if (!enif_send(NULL,
+                     &(acc->Pid),
+                     NULL,
+                     enif_make_tuple3(env,
+                                      enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "new_stream"),
                                       enif_make_resource(env, s_ctx))))
         {
@@ -81,7 +89,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
         }
 
       MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
-                                 (void *)ClientStreamCallback, s_ctx);
+                                 (void *)ClientStreamCallback,
+                                 s_ctx);
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
       //
@@ -94,29 +103,26 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // The connection was explicitly shut down by the peer.
       //
-      report = enif_make_tuple3(env,
-                                ATOM_QUIC, ATOM_SHUTDOWN,
-                                enif_make_resource(env, c_ctx)
-                                );
+      report = enif_make_tuple3(
+          env, ATOM_QUIC, ATOM_SHUTDOWN, enif_make_resource(env, c_ctx));
 
-      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report)) {
-        // Owner is gone, we shutdown our side as well.
-        MsQuic->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                           QUIC_STATUS_UNREACHABLE);
-      }
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
       //
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      report = enif_make_tuple3(env,
-                                ATOM_QUIC, ATOM_CLOSED,
-                                enif_make_resource(env, c_ctx)
-      );
+      report = enif_make_tuple3(
+          env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-
 
       if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
@@ -139,7 +145,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 }
 
 QUIC_STATUS
-ServerConnectionCallback(HQUIC Connection, void *Context,
+ServerConnectionCallback(HQUIC Connection,
+                         void *Context,
                          QUIC_CONNECTION_EVENT *Event)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
@@ -179,8 +186,11 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor
       // should pick a 'acceptor' here?
-      if (!enif_send(NULL, acc_pid, NULL,
-                     enif_make_tuple(c_ctx->env, 2,
+      if (!enif_send(NULL,
+                     acc_pid,
+                     NULL,
+                     enif_make_tuple(c_ctx->env,
+                                     2,
                                      enif_make_atom(c_ctx->env, "new_conn"),
                                      ConnHandler)))
         {
@@ -204,16 +214,16 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       //
       // The connection was explicitly shut down by the peer.
       //
-      report = enif_make_tuple3(env,
-                                ATOM_QUIC, ATOM_SHUTDOWN,
-                                enif_make_resource(env, c_ctx)
-                                );
+      report = enif_make_tuple3(
+          env, ATOM_QUIC, ATOM_SHUTDOWN, enif_make_resource(env, c_ctx));
 
-      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report)) {
-        // Owner is gone, we shutdown our side as well.
-        MsQuic->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                           QUIC_STATUS_UNREACHABLE);
-      }
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
 
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
@@ -221,10 +231,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      report = enif_make_tuple3(env,
-                                ATOM_QUIC, ATOM_CLOSED,
-                                enif_make_resource(env, c_ctx)
-      );
+      report = enif_make_tuple3(
+          env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
@@ -264,8 +272,11 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
       s_ctx->owner = acc;
 
       // @todo add monitor here.
-      if (!enif_send(NULL, acc_pid, NULL,
-                     enif_make_tuple3(env, enif_make_atom(env, "quic"),
+      if (!enif_send(NULL,
+                     acc_pid,
+                     NULL,
+                     enif_make_tuple3(env,
+                                      enif_make_atom(env, "quic"),
                                       enif_make_atom(env, "new_stream"),
                                       enif_make_resource(env, s_ctx))))
         {
@@ -274,13 +285,14 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
           // shutdown the connection gracefully.
           // @todo, check rfc for the error code
           MsQuic->ConnectionShutdown(
-            Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
+              Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
           return QUIC_STATUS_UNREACHABLE;
         }
       else
         {
           MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
-                                     (void *)ServerStreamCallback, s_ctx);
+                                     (void *)ServerStreamCallback,
+                                     s_ctx);
         }
       break;
     case QUIC_CONNECTION_EVENT_RESUMED:
@@ -296,7 +308,8 @@ ServerConnectionCallback(HQUIC Connection, void *Context,
 }
 
 ERL_NIF_TERM
-async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
+async_connect3(ErlNifEnv *env,
+               __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
@@ -331,17 +344,20 @@ async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(
-                      Registration, ClientConnectionCallback, c_ctx,
-                      &(c_ctx->Connection))))
+  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration,
+                                                  ClientConnectionCallback,
+                                                  c_ctx,
+                                                  &(c_ctx->Connection))))
     {
       destroy_c_ctx(c_ctx);
       return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
-                      c_ctx->Connection, c_ctx->Configuration,
-                      QUIC_ADDRESS_FAMILY_UNSPEC, host, port)))
+  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
+                                                   c_ctx->Configuration,
+                                                   QUIC_ADDRESS_FAMILY_UNSPEC,
+                                                   host,
+                                                   port)))
     {
       MsQuic->ConnectionClose(c_ctx->Connection);
       destroy_c_ctx(c_ctx);
@@ -354,7 +370,8 @@ async_connect3(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 ERL_NIF_TERM
-async_accept2(ErlNifEnv *env, __unused_parm__ int argc,
+async_accept2(ErlNifEnv *env,
+              __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
   QuicerListenerCTX *l_ctx;
@@ -384,7 +401,8 @@ async_accept2(ErlNifEnv *env, __unused_parm__ int argc,
 
 //@todo,  shutdown with error
 ERL_NIF_TERM
-close_connection1(ErlNifEnv *env, __unused_parm__ int argc,
+close_connection1(ErlNifEnv *env,
+                  __unused_parm__ int argc,
                   const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
@@ -394,7 +412,8 @@ close_connection1(ErlNifEnv *env, __unused_parm__ int argc,
     }
   MsQuic->ConnectionShutdown(c_ctx->Connection,
                              //@todo, check rfc for the error code
-                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
+                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                             NO_ERROR);
   return ATOM_OK;
 }
 
@@ -450,17 +469,16 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
       uint16_t *ip = (uint16_t *)&addr->Ipv6.sin6_addr;
       return enif_make_tuple2(
           env,
-          enif_make_tuple8(
-            env,
-            enif_make_int(env, ntohs(ip[0])),
-            enif_make_int(env, ntohs(ip[1])),
-            enif_make_int(env, ntohs(ip[2])),
-            enif_make_int(env, ntohs(ip[3])),
-            enif_make_int(env, ntohs(ip[4])),
-            enif_make_int(env, ntohs(ip[5])),
-            enif_make_int(env, ntohs(ip[6])),
-            enif_make_int(env, ntohs(ip[7]))),
-            enif_make_int(env, addr->Ipv6.sin6_port));
+          enif_make_tuple8(env,
+                           enif_make_int(env, ntohs(ip[0])),
+                           enif_make_int(env, ntohs(ip[1])),
+                           enif_make_int(env, ntohs(ip[2])),
+                           enif_make_int(env, ntohs(ip[3])),
+                           enif_make_int(env, ntohs(ip[4])),
+                           enif_make_int(env, ntohs(ip[5])),
+                           enif_make_int(env, ntohs(ip[6])),
+                           enif_make_int(env, ntohs(ip[7]))),
+          enif_make_int(env, addr->Ipv6.sin6_port));
     }
   else
     {

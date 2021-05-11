@@ -92,25 +92,31 @@ ServerLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
 
-  if (!create_settings(env, option, &Settings)) {
+  if (!create_settings(env, option, &Settings))
+    {
       return ERROR_TUPLE_2(ATOM_BADARG);
-  }
+    }
 
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
-  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers)) {
-    return false;
-  }
+  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
+    {
+      return false;
+    }
 
   //
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
-                      Registration, alpn_buffers, alpn_buffer_length, &Settings, sizeof(Settings),
-                      NULL, Configuration)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+                                                     alpn_buffers,
+                                                     alpn_buffer_length,
+                                                     &Settings,
+                                                     sizeof(Settings),
+                                                     NULL,
+                                                     Configuration)))
     {
       return false;
     }
@@ -139,9 +145,10 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // Configures the client's idle timeout.
   //
 
-  if (!create_settings(env, option, &Settings)) {
-    return ERROR_TUPLE_2(ATOM_BADARG);
-  }
+  if (!create_settings(env, option, &Settings))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   //
   // Configures a default client configuration, optionally disabling
@@ -159,18 +166,23 @@ ClientLoadConfiguration(ErlNifEnv *env,
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
-  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers)) {
-    return false;
-  }
+  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
+    {
+      return false;
+    }
 
   //
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
-                      Registration, alpn_buffers, alpn_buffer_length, &Settings, sizeof(Settings),
-                      NULL, Configuration)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+                                                     alpn_buffers,
+                                                     alpn_buffer_length,
+                                                     &Settings,
+                                                     sizeof(Settings),
+                                                     NULL,
+                                                     Configuration)))
     {
       return false;
     }
@@ -188,11 +200,12 @@ ClientLoadConfiguration(ErlNifEnv *env,
   return true;
 }
 
-bool load_alpn(ErlNifEnv *env,
-               const ERL_NIF_TERM *option,
-               unsigned *alpn_buffer_length,
-               QUIC_BUFFER alpn_buffers[]) {
-
+bool
+load_alpn(ErlNifEnv *env,
+          const ERL_NIF_TERM *option,
+          unsigned *alpn_buffer_length,
+          QUIC_BUFFER alpn_buffers[])
+{
   ERL_NIF_TERM alpn_list;
   if (!enif_get_map_value(env, *option, ATOM_ALPN, &alpn_list))
     {
@@ -211,82 +224,114 @@ bool load_alpn(ErlNifEnv *env,
       return false;
     }
 
-  for(int i = 0; i < (int)(*alpn_buffer_length); i++) {
-
-  // @todo check if PATH_MAX is the correct length
-  char str[PATH_MAX];
-  if(!enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1))
+  for (int i = 0; i < (int)(*alpn_buffer_length); i++)
     {
-      return false;
+      // @todo check if PATH_MAX is the correct length
+      char str[PATH_MAX];
+      if (!enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1))
+        {
+          return false;
+        }
+
+      alpn_buffers[i].Buffer = (uint8_t *)str;
+      alpn_buffers[i].Length = strlen(str);
+
+      if (!enif_get_list_cell(env, tail, &head, &tail)
+          && i + 1 < (int)(*alpn_buffer_length))
+        {
+          return false;
+        }
     }
-
-    alpn_buffers[i].Buffer = (uint8_t*)str;
-    alpn_buffers[i].Length = strlen(str);
-
-    if(!enif_get_list_cell(env, tail, &head, &tail) && i + 1 < (int)(*alpn_buffer_length))
-      {
-        return false;
-      }
-  }
 
   return true;
 }
 
-bool get_uint8_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint8_t* value) {
+bool
+get_uint8_from_map(ErlNifEnv *env,
+                   const ERL_NIF_TERM map,
+                   ERL_NIF_TERM key,
+                   uint8_t *value)
+{
   ERL_NIF_TERM evalue;
-  if (!enif_get_map_value(env, map, key, &evalue)) {
-    return false;
-  }
+  if (!enif_get_map_value(env, map, key, &evalue))
+    {
+      return false;
+    }
   unsigned int value0 = 0;
-  if (!enif_get_uint(env, evalue, &value0)) {
-    return false;
-  }
+  if (!enif_get_uint(env, evalue, &value0))
+    {
+      return false;
+    }
   *value = (uint8_t)value0;
   return true;
 }
 
-bool get_uint16_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint16_t* value) {
+bool
+get_uint16_from_map(ErlNifEnv *env,
+                    const ERL_NIF_TERM map,
+                    ERL_NIF_TERM key,
+                    uint16_t *value)
+{
   ERL_NIF_TERM evalue;
-  if (!enif_get_map_value(env, map, key, &evalue)) {
-    return false;
-  }
+  if (!enif_get_map_value(env, map, key, &evalue))
+    {
+      return false;
+    }
   unsigned int value0 = 0;
-  if (!enif_get_uint(env, evalue, &value0)) {
-    return false;
-  }
+  if (!enif_get_uint(env, evalue, &value0))
+    {
+      return false;
+    }
   *value = (uint16_t)value0;
   return true;
 }
 
-bool get_uint32_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint32_t* value) {
+bool
+get_uint32_from_map(ErlNifEnv *env,
+                    const ERL_NIF_TERM map,
+                    ERL_NIF_TERM key,
+                    uint32_t *value)
+{
   ERL_NIF_TERM evalue;
-  if (!enif_get_map_value(env, map, key, &evalue)) {
-    return false;
-  }
+  if (!enif_get_map_value(env, map, key, &evalue))
+    {
+      return false;
+    }
   unsigned long value0 = 0;
-  if (!enif_get_uint64(env, evalue, &value0)) {
-    return false;
-  }
+  if (!enif_get_uint64(env, evalue, &value0))
+    {
+      return false;
+    }
   *value = (uint32_t)value0;
   return true;
 }
 
-bool get_uint64_from_map(ErlNifEnv *env, const ERL_NIF_TERM map, ERL_NIF_TERM key, uint64_t* value) {
+bool
+get_uint64_from_map(ErlNifEnv *env,
+                    const ERL_NIF_TERM map,
+                    ERL_NIF_TERM key,
+                    uint64_t *value)
+{
   ERL_NIF_TERM evalue;
-  if (!enif_get_map_value(env, map, key, &evalue)) {
-    return false;
-  }
+  if (!enif_get_map_value(env, map, key, &evalue))
+    {
+      return false;
+    }
   unsigned long value0 = 0;
-  if (!enif_get_uint64(env, evalue, &value0)) {
-    return false;
-  }
+  if (!enif_get_uint64(env, evalue, &value0))
+    {
+      return false;
+    }
   *value = (uint64_t)value0;
   return true;
 }
 
 ERL_NIF_TERM
-encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
-                     uint32_t BufferLength, void *Buffer)
+encode_parm_to_eterm(ErlNifEnv *env,
+                     QUIC_PARAM_LEVEL Level,
+                     uint32_t Param,
+                     uint32_t BufferLength,
+                     void *Buffer)
 {
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   if (QUIC_PARAM_CONN_STATISTICS == Param
@@ -295,7 +340,9 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
       res = SUCCESS(enif_make_list(
-          env, 20, PropTupleStrInt(Timing.Start, statics->Timing.Start),
+          env,
+          20,
+          PropTupleStrInt(Timing.Start, statics->Timing.Start),
           PropTupleStrInt(
               Timing.InitialFlightEnd,
               statics->Timing
@@ -305,7 +352,7 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
               statics->Timing.HandshakeFlightEnd), // Processed all peer's
                                                    // Handshake packets
           PropTupleStrInt(Send.PathMtu,
-                       statics->Send.PathMtu), // Current path MTU.
+                          statics->Send.PathMtu), // Current path MTU.
           PropTupleStrInt(
               Send.TotalPackets,
               statics->Send
@@ -313,16 +360,16 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
                                   // // QUIC packets), could be coalesced into
                                   // fewer UDP datagrams.
           PropTupleStrInt(Send.RetransmittablePackets,
-                       statics->Send.RetransmittablePackets),
+                          statics->Send.RetransmittablePackets),
           PropTupleStrInt(Send.SuspectedLostPackets,
-                       statics->Send.SuspectedLostPackets),
+                          statics->Send.SuspectedLostPackets),
           PropTupleStrInt(
               Send.SpuriousLostPackets,
               statics->Send.SpuriousLostPackets), // Actual lost is
                                                   // (SuspectedLostPackets -
                                                   // SpuriousLostPackets)
           PropTupleStrInt(Send.TotalBytes,
-                       statics->Send.TotalBytes), // Sum of UDP payloads
+                          statics->Send.TotalBytes), // Sum of UDP payloads
           PropTupleStrInt(
               Send.TotalStreamBytes,
               statics->Send.TotalStreamBytes), // Sum of stream payloads
@@ -346,9 +393,10 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
           PropTupleStrInt(
               Recv.DroppedPackets,
               statics->Recv.DroppedPackets), // Includes DuplicatePackets.
-          PropTupleStrInt(Recv.DuplicatePackets, statics->Recv.DuplicatePackets),
+          PropTupleStrInt(Recv.DuplicatePackets,
+                          statics->Recv.DuplicatePackets),
           PropTupleStrInt(Recv.TotalBytes,
-                       statics->Recv.TotalBytes), // Sum of UDP payloads
+                          statics->Recv.TotalBytes), // Sum of UDP payloads
           PropTupleStrInt(
               Recv.TotalStreamBytes,
               statics->Recv.TotalStreamBytes), // Sum of stream payloads
@@ -361,42 +409,72 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
               statics->Recv.ValidAckFrames) // Count of receive ACK frames.
           ));
     }
-  else if (QUIC_PARAM_CONN_SETTINGS == Param && QUIC_PARAM_LEVEL_CONNECTION == Level) {
-    QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
-    res = SUCCESS(enif_make_list(
-        env, 26,
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxBytesPerKey, Settings->MaxBytesPerKey),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs, Settings->HandshakeIdleTimeoutMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_IdleTimeoutMs, Settings->IdleTimeoutMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer, Settings->TlsClientMaxSendBuffer),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer, Settings->TlsServerMaxSendBuffer),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_StreamRecvWindowDefault, Settings->StreamRecvWindowDefault),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_StreamRecvBufferDefault, Settings->StreamRecvBufferDefault),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_ConnFlowControlWindow, Settings->ConnFlowControlWindow),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs, Settings->MaxWorkerQueueDelayUs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxStatelessOperations, Settings->MaxStatelessOperations),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_InitialWindowPackets, Settings->InitialWindowPackets),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_SendIdleTimeoutMs, Settings->SendIdleTimeoutMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_InitialRttMs, Settings->InitialRttMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxAckDelayMs, Settings->MaxAckDelayMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_DisconnectTimeoutMs, Settings->DisconnectTimeoutMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_KeepAliveIntervalMs, Settings->KeepAliveIntervalMs),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerBidiStreamCount, Settings->PeerBidiStreamCount),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, Settings->PeerBidiStreamCount),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_RetryMemoryLimit, Settings->RetryMemoryLimit),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_LoadBalancingMode, Settings->LoadBalancingMode),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxOperationsPerDrain, Settings->MaxOperationsPerDrain),
-        PropTupleAtomBool(ATOM_QUIC_SETTINGS_SendBufferingEnabled, Settings->SendBufferingEnabled),
-        PropTupleAtomBool(ATOM_QUIC_SETTINGS_PacingEnabled, Settings->PacingEnabled),
-        PropTupleAtomBool(ATOM_QUIC_SETTINGS_MigrationEnabled, Settings->MigrationEnabled),
-        PropTupleAtomBool(ATOM_QUIC_SETTINGS_DatagramReceiveEnabled, Settings->DatagramReceiveEnabled),
-        PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel, Settings->ServerResumptionLevel)));
-  }
+  else if (QUIC_PARAM_CONN_SETTINGS == Param
+           && QUIC_PARAM_LEVEL_CONNECTION == Level)
+    {
+      QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
+      res = SUCCESS(enif_make_list(
+          env,
+          26,
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxBytesPerKey,
+                           Settings->MaxBytesPerKey),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs,
+                           Settings->HandshakeIdleTimeoutMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_IdleTimeoutMs,
+                           Settings->IdleTimeoutMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer,
+                           Settings->TlsClientMaxSendBuffer),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer,
+                           Settings->TlsServerMaxSendBuffer),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_StreamRecvWindowDefault,
+                           Settings->StreamRecvWindowDefault),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_StreamRecvBufferDefault,
+                           Settings->StreamRecvBufferDefault),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_ConnFlowControlWindow,
+                           Settings->ConnFlowControlWindow),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs,
+                           Settings->MaxWorkerQueueDelayUs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxStatelessOperations,
+                           Settings->MaxStatelessOperations),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_InitialWindowPackets,
+                           Settings->InitialWindowPackets),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_SendIdleTimeoutMs,
+                           Settings->SendIdleTimeoutMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_InitialRttMs,
+                           Settings->InitialRttMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxAckDelayMs,
+                           Settings->MaxAckDelayMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_DisconnectTimeoutMs,
+                           Settings->DisconnectTimeoutMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_KeepAliveIntervalMs,
+                           Settings->KeepAliveIntervalMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerBidiStreamCount,
+                           Settings->PeerBidiStreamCount),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount,
+                           Settings->PeerBidiStreamCount),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_RetryMemoryLimit,
+                           Settings->RetryMemoryLimit),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_LoadBalancingMode,
+                           Settings->LoadBalancingMode),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxOperationsPerDrain,
+                           Settings->MaxOperationsPerDrain),
+          PropTupleAtomBool(ATOM_QUIC_SETTINGS_SendBufferingEnabled,
+                            Settings->SendBufferingEnabled),
+          PropTupleAtomBool(ATOM_QUIC_SETTINGS_PacingEnabled,
+                            Settings->PacingEnabled),
+          PropTupleAtomBool(ATOM_QUIC_SETTINGS_MigrationEnabled,
+                            Settings->MigrationEnabled),
+          PropTupleAtomBool(ATOM_QUIC_SETTINGS_DatagramReceiveEnabled,
+                            Settings->DatagramReceiveEnabled),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel,
+                           Settings->ServerResumptionLevel)));
+    }
   else if (QUIC_PARAM_STREAM_ID == Param && QUIC_PARAM_LEVEL_STREAM == Level)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param && QUIC_PARAM_LEVEL_CONNECTION == Level)
+  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
+           && QUIC_PARAM_LEVEL_CONNECTION == Level)
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
     }
@@ -405,7 +483,8 @@ encode_parm_to_eterm(ErlNifEnv *env, QUIC_PARAM_LEVEL Level, uint32_t Param,
 }
 
 ERL_NIF_TERM
-getopt3(ErlNifEnv *env, __unused_parm__ int argc,
+getopt3(ErlNifEnv *env,
+        __unused_parm__ int argc,
         __unused_parm__ const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM ctx = argv[0];
@@ -457,7 +536,6 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-
   // Matching PARMs in a hard way...
   if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
     {
@@ -483,7 +561,7 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
     {
       if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
         {
-        // fallback to connection for now
+          // fallback to connection for now
           Level = QUIC_PARAM_LEVEL_CONNECTION;
           Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
         }
@@ -577,7 +655,8 @@ getopt3(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 ERL_NIF_TERM
-setopt3(ErlNifEnv *env, __unused_parm__ int argc,
+setopt3(ErlNifEnv *env,
+        __unused_parm__ int argc,
         __unused_parm__ const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM ctx = argv[0];
@@ -618,20 +697,21 @@ setopt3(ErlNifEnv *env, __unused_parm__ int argc,
     {
       if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
         {
-        // Lets fallback to connection for now
+          // Lets fallback to connection for now
           Level = QUIC_PARAM_LEVEL_CONNECTION;
           Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
         }
 
-      if (Level != QUIC_PARAM_LEVEL_CONNECTION) {
-        return ERROR_TUPLE_2(ATOM_BADARG);
-      }
+      if (Level != QUIC_PARAM_LEVEL_CONNECTION)
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
 
-      QUIC_SETTINGS Settings = {0};
+      QUIC_SETTINGS Settings = { 0 };
       if (!create_settings(env, &evalue, &Settings))
-      {
-        return ERROR_TUPLE_2(ATOM_BADARG);
-      }
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
 
       if (QUIC_FAILED(MsQuic->SetParam(Handle,
                                        QUIC_PARAM_LEVEL_CONNECTION,
@@ -649,95 +729,160 @@ setopt3(ErlNifEnv *env, __unused_parm__ int argc,
     }
 }
 
-
-bool create_settings(ErlNifEnv *env, const ERL_NIF_TERM* emap, QUIC_SETTINGS* Settings)
+bool
+create_settings(ErlNifEnv *env,
+                const ERL_NIF_TERM *emap,
+                QUIC_SETTINGS *Settings)
 {
   if (!enif_is_map(env, *emap))
     {
       return false;
     }
 
-  if (get_uint64_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxBytesPerKey, &Settings->MaxBytesPerKey))
+  if (get_uint64_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_MaxBytesPerKey,
+                          &Settings->MaxBytesPerKey))
     {
       Settings->IsSet.MaxBytesPerKey = TRUE;
     }
-  if (get_uint64_from_map(env, *emap, ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs, &Settings->HandshakeIdleTimeoutMs))
+  if (get_uint64_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs,
+                          &Settings->HandshakeIdleTimeoutMs))
     {
       Settings->IsSet.HandshakeIdleTimeoutMs = TRUE;
     }
-  if (get_uint64_from_map(env, *emap, ATOM_QUIC_SETTINGS_IdleTimeoutMs, &Settings->IdleTimeoutMs))
+  if (get_uint64_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_IdleTimeoutMs,
+                          &Settings->IdleTimeoutMs))
     {
       Settings->IsSet.IdleTimeoutMs = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer, &Settings->TlsClientMaxSendBuffer))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer,
+                          &Settings->TlsClientMaxSendBuffer))
     {
       Settings->IsSet.TlsClientMaxSendBuffer = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer, &Settings->TlsClientMaxSendBuffer))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer,
+                          &Settings->TlsClientMaxSendBuffer))
     {
       Settings->IsSet.TlsClientMaxSendBuffer = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer, &Settings->TlsServerMaxSendBuffer))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_TlsServerMaxSendBuffer,
+                          &Settings->TlsServerMaxSendBuffer))
     {
       Settings->IsSet.TlsServerMaxSendBuffer = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_StreamRecvWindowDefault, &Settings->StreamRecvWindowDefault))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_StreamRecvWindowDefault,
+                          &Settings->StreamRecvWindowDefault))
     {
       Settings->IsSet.StreamRecvWindowDefault = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_StreamRecvBufferDefault, &Settings->StreamRecvBufferDefault))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_StreamRecvBufferDefault,
+                          &Settings->StreamRecvBufferDefault))
     {
       Settings->IsSet.StreamRecvBufferDefault = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_ConnFlowControlWindow, &Settings->ConnFlowControlWindow))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_ConnFlowControlWindow,
+                          &Settings->ConnFlowControlWindow))
     {
       Settings->IsSet.ConnFlowControlWindow = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs, &Settings->MaxWorkerQueueDelayUs))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_MaxWorkerQueueDelayUs,
+                          &Settings->MaxWorkerQueueDelayUs))
     {
       Settings->IsSet.MaxWorkerQueueDelayUs = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxStatelessOperations, &Settings->MaxStatelessOperations))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_MaxStatelessOperations,
+                          &Settings->MaxStatelessOperations))
     {
       Settings->IsSet.MaxStatelessOperations = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_InitialWindowPackets, &Settings->InitialWindowPackets))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_InitialWindowPackets,
+                          &Settings->InitialWindowPackets))
     {
       Settings->IsSet.InitialWindowPackets = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_SendIdleTimeoutMs, &Settings->SendIdleTimeoutMs))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_SendIdleTimeoutMs,
+                          &Settings->SendIdleTimeoutMs))
     {
       Settings->IsSet.SendIdleTimeoutMs = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_InitialRttMs, &Settings->InitialRttMs))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_InitialRttMs,
+                          &Settings->InitialRttMs))
     {
       Settings->IsSet.InitialRttMs = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxAckDelayMs, &Settings->MaxAckDelayMs))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_MaxAckDelayMs,
+                          &Settings->MaxAckDelayMs))
     {
       Settings->IsSet.MaxAckDelayMs = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_DisconnectTimeoutMs, &Settings->DisconnectTimeoutMs))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_DisconnectTimeoutMs,
+                          &Settings->DisconnectTimeoutMs))
     {
       Settings->IsSet.DisconnectTimeoutMs = TRUE;
     }
-  if (get_uint32_from_map(env, *emap, ATOM_QUIC_SETTINGS_KeepAliveIntervalMs, &Settings->KeepAliveIntervalMs))
+  if (get_uint32_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_KeepAliveIntervalMs,
+                          &Settings->KeepAliveIntervalMs))
     {
       Settings->IsSet.KeepAliveIntervalMs = TRUE;
     }
-  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_PeerBidiStreamCount, &Settings->PeerBidiStreamCount))
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_PeerBidiStreamCount,
+                          &Settings->PeerBidiStreamCount))
     {
       Settings->IsSet.PeerBidiStreamCount = TRUE;
     }
-  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, &Settings->PeerUnidiStreamCount))
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_PeerUnidiStreamCount,
+                          &Settings->PeerUnidiStreamCount))
     {
       Settings->IsSet.PeerUnidiStreamCount = TRUE;
     }
-  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_RetryMemoryLimit, &Settings->RetryMemoryLimit))
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_RetryMemoryLimit,
+                          &Settings->RetryMemoryLimit))
     {
       Settings->IsSet.RetryMemoryLimit = TRUE;
     }
-  if (get_uint16_from_map(env, *emap, ATOM_QUIC_SETTINGS_LoadBalancingMode, &Settings->LoadBalancingMode))
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_LoadBalancingMode,
+                          &Settings->LoadBalancingMode))
     {
       Settings->IsSet.LoadBalancingMode = TRUE;
     }
@@ -749,37 +894,50 @@ bool create_settings(ErlNifEnv *env, const ERL_NIF_TERM* emap, QUIC_SETTINGS* Se
   uint8_t MigrationEnabled = 0;
   uint8_t DatagramReceiveEnabled = 0;
   uint8_t ServerResumptionLevel = 0;
-  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_MaxOperationsPerDrain, &MaxOperationsPerDrain))
+  if (get_uint8_from_map(env,
+                         *emap,
+                         ATOM_QUIC_SETTINGS_MaxOperationsPerDrain,
+                         &MaxOperationsPerDrain))
     {
       Settings->MaxOperationsPerDrain = MaxOperationsPerDrain;
       Settings->IsSet.MaxOperationsPerDrain = TRUE;
     }
-  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_SendBufferingEnabled, &SendBufferingEnabled))
+  if (get_uint8_from_map(env,
+                         *emap,
+                         ATOM_QUIC_SETTINGS_SendBufferingEnabled,
+                         &SendBufferingEnabled))
     {
       Settings->SendBufferingEnabled = SendBufferingEnabled;
       Settings->IsSet.SendBufferingEnabled = TRUE;
     }
-  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_PacingEnabled, &PacingEnabled))
+  if (get_uint8_from_map(
+          env, *emap, ATOM_QUIC_SETTINGS_PacingEnabled, &PacingEnabled))
     {
       Settings->PacingEnabled = PacingEnabled;
       Settings->IsSet.PacingEnabled = TRUE;
     }
-  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_MigrationEnabled, &MigrationEnabled))
+  if (get_uint8_from_map(
+          env, *emap, ATOM_QUIC_SETTINGS_MigrationEnabled, &MigrationEnabled))
     {
       Settings->MigrationEnabled = MigrationEnabled;
       Settings->IsSet.MigrationEnabled = TRUE;
     }
-  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_DatagramReceiveEnabled, &DatagramReceiveEnabled))
+  if (get_uint8_from_map(env,
+                         *emap,
+                         ATOM_QUIC_SETTINGS_DatagramReceiveEnabled,
+                         &DatagramReceiveEnabled))
     {
       Settings->DatagramReceiveEnabled = DatagramReceiveEnabled;
       Settings->IsSet.DatagramReceiveEnabled = TRUE;
     }
-  if (get_uint8_from_map(env, *emap, ATOM_QUIC_SETTINGS_ServerResumptionLevel, &ServerResumptionLevel))
+  if (get_uint8_from_map(env,
+                         *emap,
+                         ATOM_QUIC_SETTINGS_ServerResumptionLevel,
+                         &ServerResumptionLevel))
     {
       Settings->ServerResumptionLevel = ServerResumptionLevel;
       Settings->IsSet.ServerResumptionLevel = TRUE;
     }
 
   return true;
-
 }
