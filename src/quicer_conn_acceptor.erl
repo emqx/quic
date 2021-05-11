@@ -29,9 +29,11 @@
 -record(state, { listener :: quicer:listener_handler()
                , sup :: pid()
                , conn = undefined
-               , opts :: map()
+               , opts :: {quicer_listener:listener_opts(), conn_opts(), quicer_steam:stream_opts()}
                , callback :: module()
                }).
+
+-type conn_opts() :: map().
 
 %%%===================================================================
 %%% API

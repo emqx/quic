@@ -22,6 +22,8 @@ else()
   set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
+set(QUIC_BUILD_TEST "OFF")
+
 # src files
 set(SOURCES
   c_src/quicer_nif.c
