@@ -34,8 +34,24 @@
 
 -on_load(init/0).
 
+-include_lib("kernel/include/file.hrl").
+
 init() ->
-  Niflib = filename:join([code:priv_dir(quicer), "libquicer_nif"]),
+  NifName = "libquicer_nif",
+  Dir = code:priv_dir(quicer),
+  Niflib = case file:read_file_info(Dir) of
+             {ok, #file_info{type=directory}} ->
+               filename:join(Dir, NifName);
+             {error, enotdir} -> %% maybe escript,
+               Escript = filename:dirname(filename:dirname(Dir)),
+               case file:read_file_info(Escript) of
+                 {ok, #file_info{type=regular}} ->
+                   %% try locate the file in same dir of escript
+                   filename:join(filename:dirname(Escript), NifName);
+                 _ ->
+                   error(nif_not_found)
+               end
+           end,
   ok = erlang:load_nif(Niflib, 0).
 
 open_lib() ->
