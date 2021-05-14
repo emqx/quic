@@ -24,7 +24,7 @@ API: is not stable, might be changed in the future.
 1. OTP22+
 1. rebar3
 1. cmake3.16+
-1. [CLOG](https://github.com/microsoft/CLOG) (required for debug build only)
+1. [CLOG](https://github.com/microsoft/CLOG) (required for debug logging only)
 1. LTTNG2.12 (required for debug build only)
 
 ## With DEBUG
@@ -35,6 +35,16 @@ Debug build depedency: [CLOG](https://github.com/microsoft/CLOG)
 $ rebar3 compile 
 # OR
 $ make
+```
+
+note, 
+
+To enable logging and release build:
+
+``` sh
+export CMAKE_BUILD_TYPE=RelWithDebInfo
+export QUIC_ENABLE_LOGGING=ON
+make
 ```
 
 ## Without DEBUG
