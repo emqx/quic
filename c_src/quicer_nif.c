@@ -15,8 +15,10 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_nif.h"
-#include "quicer_listener.h"
+
 #include <dlfcn.h>
+
+#include "quicer_listener.h"
 
 /*
 ** atoms in use, initialized while load nif
@@ -406,10 +408,10 @@ ERL_NIF_TERM ATOM_QUIC;
   /*                  QUIC_SETTINGS end                        */             \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key);                                                        \
-  ATOM(ATOM_ALPN, alpn);                                                \
-  ATOM(ATOM_CLOSED, closed);                                            \
-  ATOM(ATOM_SHUTDOWN, shutdown);                                            \
-  ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                            \
+  ATOM(ATOM_ALPN, alpn);                                                      \
+  ATOM(ATOM_CLOSED, closed);                                                  \
+  ATOM(ATOM_SHUTDOWN, shutdown);                                              \
+  ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_QUIC, quic);
 
@@ -440,15 +442,13 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
 
 void
 resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
-                                 void *obj
-                                 )
+                               void *obj)
 {
-  QuicerConnCTX *c_ctx = (QuicerConnCTX *) obj;
+  QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
 }
-
 
 void
 resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env,
@@ -456,15 +456,14 @@ resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env,
                             __unused_parm__ ErlNifPid *pid,
                             __unused_parm__ ErlNifMonitor *mon)
 {
-  //todo
+  // todo
 }
 
 void
 resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
-                                 void *obj
-                                 )
+                                 void *obj)
 {
-  QuicerStreamCTX *s_ctx = (QuicerStreamCTX *) obj;
+  QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
   enif_free_env(s_ctx->env);
   enif_mutex_destroy(s_ctx->lock);
 }
@@ -479,7 +478,8 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *caller_env,
 }
 
 static int
-on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
+on_load(ErlNifEnv *env,
+        __unused_parm__ void **priv_data,
         __unused_parm__ ERL_NIF_TERM loadinfo)
 {
   int ret_val = 0;
@@ -496,28 +496,36 @@ on_load(ErlNifEnv *env, __unused_parm__ void **priv_data,
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
 
   ErlNifResourceTypeInit streamInit
-      = { .dtor = resource_stream_dealloc_callback, .down = resource_stream_down_callback, .stop = NULL };
+      = { .dtor = resource_stream_dealloc_callback,
+          .down = resource_stream_down_callback,
+          .stop = NULL };
   ErlNifResourceTypeInit connInit
       = { .dtor = NULL, .down = resource_conn_down_callback, .stop = NULL };
   ErlNifResourceTypeInit listenerInit = {
     .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
   };
-  ctx_listener_t = enif_open_resource_type_x(env, "listener_context_resource",
+  ctx_listener_t = enif_open_resource_type_x(env,
+                                             "listener_context_resource",
                                              &listenerInit, // init callbacks
-                                             flags, NULL);
-  ctx_connection_t
-      = enif_open_resource_type_x(env, "connection_context_resource",
-                                  &connInit, // init callbacks
-                                  flags, NULL);
-  ctx_stream_t = enif_open_resource_type_x(env, "stream_context_resource",
+                                             flags,
+                                             NULL);
+  ctx_connection_t = enif_open_resource_type_x(env,
+                                               "connection_context_resource",
+                                               &connInit, // init callbacks
+                                               flags,
+                                               NULL);
+  ctx_stream_t = enif_open_resource_type_x(env,
+                                           "stream_context_resource",
                                            &streamInit, // init callbacks
-                                           flags, NULL);
+                                           flags,
+                                           NULL);
 
   return ret_val;
 }
 
 static int
-on_upgrade(__unused_parm__ ErlNifEnv *env, __unused_parm__ void **priv_data,
+on_upgrade(__unused_parm__ ErlNifEnv *env,
+           __unused_parm__ void **priv_data,
            __unused_parm__ void **old_priv_data,
            __unused_parm__ ERL_NIF_TERM load_info)
 {
@@ -559,7 +567,8 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 static ERL_NIF_TERM
-closeLib(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
+closeLib(__unused_parm__ ErlNifEnv *env,
+         __unused_parm__ int argc,
          __unused_parm__ const ERL_NIF_TERM argv[])
 {
   if (isLibOpened && MsQuic)
@@ -572,7 +581,8 @@ closeLib(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 static ERL_NIF_TERM
-registration(ErlNifEnv *env, __unused_parm__ int argc,
+registration(ErlNifEnv *env,
+             __unused_parm__ int argc,
              __unused_parm__ const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
@@ -586,7 +596,8 @@ registration(ErlNifEnv *env, __unused_parm__ int argc,
 }
 
 static ERL_NIF_TERM
-deregistration(__unused_parm__ ErlNifEnv *env, __unused_parm__ int argc,
+deregistration(__unused_parm__ ErlNifEnv *env,
+               __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   if (isRegistered && Registration)

@@ -17,10 +17,9 @@ limitations under the License.
 #ifndef __QUICER_NIF_H_
 #define __QUICER_NIF_H_
 #include <assert.h>
-#include <stdbool.h>
-
 #include <erl_nif.h>
 #include <msquic.h>
+#include <stdbool.h>
 
 #include "quicer_config.h"
 #include "quicer_connection.h"

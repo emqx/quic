@@ -27,9 +27,11 @@
 -define(SERVER, ?MODULE).
 
 -record(state, { stream :: quicer:stream_handler()
-               , opts :: map()
+               , opts :: stream_opts()
                , cbstate :: any()
                }).
+
+-type stream_opts() :: map().
 
 %%%===================================================================
 %%% API
@@ -91,7 +93,9 @@ handle_call(_Request, _From,
     #{stream_callback := CallbackModule} = Options,
     try CallbackModule:handle_call(Stream, Options, CBState) of
         {ok, Reply, NewCBState} ->
-            {reply, Reply, #state{cbstate = NewCBState}};
+            {reply, Reply, #state{ cbstate = NewCBState
+                                 , opts = Options
+                                 }};
         Other -> % @todo
             Other
     catch _:Reason:ST ->

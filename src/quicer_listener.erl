@@ -35,6 +35,8 @@
                , alpn :: [string()]
                }).
 
+-type listener_opts() :: map().
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -46,7 +48,7 @@
 %%--------------------------------------------------------------------
 -spec start_link(Name :: string() | atom(),
                  Port :: non_neg_integer(),
-                 Options :: {list(), list(), list()}
+                 Options :: {listener_opts(), quicer_conn_acceptor:opts(), quicer_stream:stream_opts()}
                 ) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
@@ -78,7 +80,7 @@ stop_listener(AppName) ->
 
 init([Name, Port, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
     init([Name, Port, {maps:from_list(LOpts), COpts, SOpts}]);
-init([Name, Port, {#{conn_acceptors :=  N} = LOpts, _COpts, _SOpts} = Opts]) ->
+init([Name, Port, {#{conn_acceptors :=  N, alpn := Alpn} = LOpts, _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
     {ok, L} = quicer:listen(Port, LOpts),
     {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
@@ -86,6 +88,7 @@ init([Name, Port, {#{conn_acceptors :=  N} = LOpts, _COpts, _SOpts} = Opts]) ->
     {ok, #state{ name = Name
                , listener = L
                , conn_sup = ConnSup
+               , alpn = Alpn
                }}.
 
 %%--------------------------------------------------------------------

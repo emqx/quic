@@ -43,3 +43,6 @@ check: clang-format
 .PHONY: clang-format
 clang-format:
 	clang-format-10 --Werror --dry-run c_src/*
+
+.PHONY: ci
+ci: test dialyzer

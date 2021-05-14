@@ -18,16 +18,16 @@ limitations under the License.
 #define __QUICER_CONNECTION_H_
 #include "quicer_nif.h"
 
-ERL_NIF_TERM async_connect3(ErlNifEnv *env, int argc,
-                            const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM async_accept2(ErlNifEnv *env, int argc,
-                           const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM close_connection1(ErlNifEnv *env, int argc,
-                               const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM sockname1(ErlNifEnv *env, int argc,
-                       const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM
+async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM
+async_accept2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM
+close_connection1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM sockname1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
-QUIC_STATUS ServerConnectionCallback(HQUIC Connection, void *Context,
+QUIC_STATUS ServerConnectionCallback(HQUIC Connection,
+                                     void *Context,
                                      QUIC_CONNECTION_EVENT *Event);
 
 ERL_NIF_TERM addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr);

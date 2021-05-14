@@ -19,7 +19,7 @@ jobs:
           cp ./rebar3 /usr/local/bin/rebar3
       - name: release build
         run: |
-          make test
+          make ci
 
   linux:
     runs-on: ubuntu-latest
@@ -39,4 +39,4 @@ jobs:
         with:
           cmake-version: '3.16.9'
       - name: release build with debug log off
-        run: CMAKE_BUILD_TYPE=Release QUIC_ENABLE_LOGGING=OFF make test
+        run: CMAKE_BUILD_TYPE=Release QUIC_ENABLE_LOGGING=OFF make ci
