@@ -23,6 +23,7 @@ else()
 endif()
 
 set(QUIC_BUILD_TEST "OFF")
+set(QUIC_BUILD_TOOLS "OFF")
 
 # src files
 set(SOURCES
