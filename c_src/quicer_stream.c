@@ -296,6 +296,7 @@ async_start_stream2(ErlNifEnv *env,
   // the stream being started until data is sent on the stream.
   //
   if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream,
+                                               // @todo flag in options
                                                QUIC_STREAM_START_FLAG_NONE)))
     {
       // note, stream call back would close the stream.
