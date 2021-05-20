@@ -77,6 +77,8 @@ init_s_ctx()
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->closed = false;
+  s_ctx->passive_recv_bytes = 0;
+  s_ctx->Buffer = NULL;
   return s_ctx;
 }
 

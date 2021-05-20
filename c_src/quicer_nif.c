@@ -211,10 +211,19 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 /* QUIC_SETTINGS ends      */
 /*----------------------------------------------------------*/
 
+/*----------------------------------------------------------*/
+/* QUIC_STREAM_OPTS starts */
+/*----------------------------------------------------------*/
+ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
+/*----------------------------------------------------------*/
+/* QUIC_STREAM_OPTS ends  */
+/*----------------------------------------------------------*/
+
 ERL_NIF_TERM ATOM_CLOSED;
 ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
+ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
 
 // Mirror 'status' in msquic_linux.h
@@ -406,6 +415,9 @@ ERL_NIF_TERM ATOM_QUIC;
   ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsListLength,                          \
        desired_versions_list_length);                                         \
   /*                  QUIC_SETTINGS end                        */             \
+  /*                  QUIC_STREAM_OPTS start                        */        \
+  ATOM(ATOM_QUIC_STREAM_OPTS_ACTIVE, active)                                  \
+  /*                  QUIC_STREAM_OPTS end                        */          \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_ALPN, alpn);                                                      \
@@ -413,6 +425,7 @@ ERL_NIF_TERM ATOM_QUIC;
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
+  ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);
 
 HQUIC Registration;
@@ -793,6 +806,7 @@ static ErlNifFunc nif_funcs[] = {
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 2, send2, 0},
+  { "recv", 2, recv2, 0},
   { "close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},

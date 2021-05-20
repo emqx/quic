@@ -204,10 +204,20 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
 /*----------------------------------------------------------*/
 /* QUIC_SETTINGS ends                                       */
 /*----------------------------------------------------------*/
+
+/*----------------------------------------------------------*/
+/* QUIC_STREAM_OPTS starts                                  */
+/*----------------------------------------------------------*/
+extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
+/*----------------------------------------------------------*/
+/* QUIC_STREAM_OPTS ends                                    */
+/*----------------------------------------------------------*/
+
 extern ERL_NIF_TERM ATOM_CLOSED;
 extern ERL_NIF_TERM ATOM_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
+extern ERL_NIF_TERM ATOM_EINVAL;
 extern ERL_NIF_TERM ATOM_QUIC;
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */

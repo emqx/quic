@@ -39,4 +39,4 @@ jobs:
         with:
           cmake-version: '3.16.9'
       - name: release build with debug log off
-        run: CMAKE_BUILD_TYPE=Release QUIC_ENABLE_LOGGING=OFF make ci
+        run: make ci

@@ -19,9 +19,12 @@
 -export([ listen/2
         , close_listener/1
         , connect/4
+        , accept/2
         , accept/3
         , close_connection/1
         , accept_stream/2
+        , accept_stream/3
+        , async_accept_stream/2
         , start_stream/2
         , send/2
         , recv/2
@@ -84,6 +87,11 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
       Err
   end.
 
+-spec accept(listener_handler(), proplists:proplists()) ->
+        {ok, connection_handler()} | {error, any()}.
+accept(LSock, Opts) ->
+  accept(LSock, Opts, infinity).
+
 -spec accept(listener_handler(), proplists:proplists(), timeout()) ->
         {ok, connection_handler()} | {error, any()}.
 accept(LSock, Opts, Timeout) ->
@@ -103,22 +111,37 @@ close_connection(Conn) ->
 -spec accept_stream(connection_handler(), proplists:proplist()) ->
         {ok, stream_handler()} | {error, any()}.
 accept_stream(Conn, Opts) ->
+  accept_stream(Conn, Opts, infinity).
+accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
+  accept_stream(Conn, maps:from_list(Opts), Timeout);
+accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
   % @todo msg ref hack
   % @todo error handling
-  case quicer_nif:async_accept_stream(Conn, Opts) of
+  case quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)) of
     {ok, Conn} ->
       receive
         {quic, new_stream, Stream} ->
           {ok, Stream}
+      after Timeout ->
+          {error, timeout}
       end;
     {error, _} = E->
       E
   end.
 
--spec start_stream(connection_handler(), proplists:proplists()) ->
+-spec async_accept_stream(connection_handler(), proplists:proplist() | map) ->
+        {ok, connection_handler()} | {error, any()}.
+async_accept_stream(Conn, Opts) when is_list(Opts)->
+  accept_stream(Conn, maps:from_list(Opts));
+async_accept_stream(Conn, Opts) when is_map(Opts) ->
+  quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)).
+
+-spec start_stream(connection_handler(), proplists:proplists() | map) ->
         {ok, stream_handler()} | {error, any()}.
-start_stream(Conn, Opts) ->
-  quicer_nif:start_stream(Conn, Opts).
+start_stream(Conn, Opts) when is_list(Opts)->
+  start_stream(Conn, maps:from_list(Opts));
+start_stream(Conn, Opts) when is_map(Opts)->
+  quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 -spec send(stream_handler(), Data :: binary()) ->
         {ok, Len :: integer()} | {error, any()}.
@@ -128,35 +151,17 @@ send(Stream, Data) ->
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
 recv(Stream, Count) ->
-  case get({'__quic_recv_buff__', Stream}) of
-    undefined ->
-      InitBuff = {[], 0},
-      do_recv(Stream, Count, InitBuff);
-    {Buff, BuffLen} when Count == 0 andalso BuffLen =/= 0 ->
-      put({'__quic_recv_buff__', Stream}, {[], 0}),
-      {ok, iolist_to_binary(lists:reverse(Buff))};
-    {Buff, BuffLen} when Count =/= 0 andalso BuffLen >= Count  ->
-      << Out:Count/binary, Left/binary >> = iolist_to_binary(lists:reverse(Buff)),
-      put({'__quic_recv_buff__', Stream}, {[Left], BuffLen- Count}),
-      {ok, Out};
-    {_, _} = Buff ->
-      do_recv(Stream, Count, Buff)
-  end.
-
-do_recv(Stream, Count, {Buff, BuffLen}) ->
-  %% @todo check if its stream owner?
-  receive
-    {quic, Bin, Stream, _AbsOffset, _BinLen, _Flags} when 0 == Count ->
-      {ok, Bin};
-    {quic, Bin, Stream, _AbsOffset, BinLen, _Flags}
-      when Count =< BuffLen + BinLen ->
-      << Out:Count/binary, Left/binary >> = iolist_to_binary(lists:reverse([Bin | Buff])),
-      put({'__quic_recv_buff__', Stream},  {[Left], BuffLen + BinLen - Count}),
-      {ok, Out};
-    {quic, Bin, Stream, _AbsOffset, BinLen, _Flags}
-      when Count > BuffLen + BinLen ->
-      do_recv(Stream, Count, {[Bin | Buff], BuffLen + BinLen})
-  end.
+  case quicer_nif:recv(Stream, Count) of
+    {ok, not_ready} ->
+      %% Data is not ready yet but last call has been reg.
+      receive
+        %% @todo recv_mark
+        {quic, Stream, continue} ->
+          recv(Stream, Count)
+      end;
+    {ok, Bin} ->
+      {ok, Bin}
+   end.
 
 -spec close_stream(stream_handler()) -> ok.
 close_stream(Stream) ->
@@ -221,7 +226,8 @@ stats_map(send_pend) ->
 stats_map(_) ->
   undefined.
 
-
+default_stream_opts()->
+  #{active => true}.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t

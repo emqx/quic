@@ -177,7 +177,6 @@ accept_stream(Connection, Opts, Timeout) ->
   {ok, Stream} | {error, any()} | {error, any(), ErrorCode::integer()}.
 ```
 
-
 Accept stream on a existing connection. 
 
 This is a blocking call.
@@ -271,5 +270,4 @@ Returns connection local IP and Port.
 
 # License
 Apache License Version 2.0
-
 

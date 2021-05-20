@@ -69,7 +69,7 @@ init([Conn, SOpts]) when is_list(SOpts) ->
     init([Conn, maps:from_list(SOpts)]);
 init([Conn, SOpts]) ->
     process_flag(trap_exit, true),
-    {ok, Conn} = quicer_nif:async_accept_stream(Conn, SOpts),
+    {ok, Conn} = quicer:async_accept_stream(Conn, SOpts),
     {ok, #state{opts = SOpts}}.
 
 %%--------------------------------------------------------------------

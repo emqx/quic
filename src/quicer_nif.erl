@@ -26,6 +26,7 @@
         , async_accept_stream/2
         , start_stream/2
         , send/2
+        , recv/2
         , close_stream/1
         , sockname/1
         , getopt/3
@@ -91,6 +92,9 @@ start_stream(_Conn, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
 send(_Stream, _Data) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 
 close_stream(_Stream) ->

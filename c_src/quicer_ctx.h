@@ -53,6 +53,10 @@ typedef struct
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
   BOOLEAN closed;
+  uint8_t *Buffer;
+  size_t BufferLen;
+  BOOLEAN is_wait_for_data;
+  uint64_t passive_recv_bytes;
 } QuicerStreamCTX;
 
 QuicerListenerCTX *init_l_ctx();
