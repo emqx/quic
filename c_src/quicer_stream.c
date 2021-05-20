@@ -16,9 +16,9 @@ limitations under the License.
 
 #include "quicer_stream.h"
 
-static void recvbuffer_from_event(QuicerStreamCTX *stream_ctx,
-                                  ErlNifBinary *bin,
-                                  uint64_t req_len);
+static size_t recvbuffer_from_event(QuicerStreamCTX *stream_ctx,
+                                    ErlNifBinary *bin,
+                                    uint64_t req_len);
 static QUIC_STATUS handle_stream_recv_event(HQUIC Stream,
                                             QuicerStreamCTX *s_ctx,
                                             QUIC_STREAM_EVENT *Event);
@@ -417,23 +417,41 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   if (s_ctx->Buffer && s_ctx->BufferLen > 0
-      && (0 == size_req || size_req <= s_ctx->BufferLen))
+      && (0 == size_req || size_req <= s_ctx->BufferLen - s_ctx->BufferOffset))
     {
       printf("buffer ready %p\n", s_ctx->Buffer);
 
-      // assert(QUIC_STREAM_EVENT_RECEIVE == s_ctx->buffered_event->Type);
-
       printf("copy from %p, req_len %lu\n", s_ctx->Buffer, size_req);
 
-      recvbuffer_from_event(s_ctx, &bin, size_req);
+      s_ctx->passive_recv_bytes
+          -= recvbuffer_from_event(s_ctx, &bin, size_req);
+
+      if (s_ctx->passive_recv_bytes > 0)
+        {
+          s_ctx->is_wait_for_data = true;
+        }
+
+      else
+        {
+          s_ctx->is_wait_for_data = false;
+        }
 
       MsQuic->StreamReceiveComplete(s_ctx->Stream, bin.size);
 
       // if we have some remaining bytes
       // @todo disable receving when it is over some threshold.
       MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
-      s_ctx->is_wait_for_data = false;
+
       s_ctx->passive_recv_bytes = 0;
+      if (0 == s_ctx->BufferLen - s_ctx->BufferOffset - bin.size)
+        {
+          s_ctx->BufferOffset = 0;
+        }
+      else
+        {
+          s_ctx->BufferOffset += bin.size;
+        }
+
       res = SUCCESS(enif_make_binary(env, &bin));
     }
   else
@@ -443,6 +461,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       s_ctx->passive_recv_bytes = size_req;
 
       // reenable receving so new data can flow in.
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
       MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
       res = SUCCESS(ATOM_ERROR_NOT_READY);
     }
@@ -482,17 +501,18 @@ close_stream1(ErlNifEnv *env,
   return ret;
 }
 
-void
+size_t
 recvbuffer_from_event(QuicerStreamCTX *s_ctx,
                       ErlNifBinary *bin,
                       uint64_t req_len)
 {
   // ownership is transfered to var: report
   uint64_t bin_size = 0;
+  size_t offset = s_ctx->BufferOffset;
   // Decide binary size
-  if (req_len == 0 || req_len >= s_ctx->BufferLen)
+  if (req_len == 0 || req_len >= s_ctx->BufferLen - s_ctx->BufferOffset)
     {
-      bin_size = s_ctx->BufferLen;
+      bin_size = s_ctx->BufferLen - s_ctx->BufferOffset;
       req_len = bin_size; // cover the case of req_len = 0
     }
   else if (req_len < s_ctx->BufferLen)
@@ -504,29 +524,27 @@ recvbuffer_from_event(QuicerStreamCTX *s_ctx,
   enif_alloc_binary(bin_size, bin);
 
   //
-  for (uint32_t i = 0, offset = 0, len = 0;
-       i < s_ctx->BufferLen && req_len > 0;
-       i++)
+  for (uint32_t i = 0, len = 0; i < 1 && req_len > 0; i++)
     {
-      if (req_len >= s_ctx->BufferLen)
+      if (req_len >= s_ctx->BufferLen - s_ctx->BufferOffset)
         {
-          len = s_ctx->BufferLen;
+          len = s_ctx->BufferLen - s_ctx->BufferOffset;
         }
       else
         {
           len = req_len;
         }
-      printf("copy from %p offset: %u len%u req_len%lu\n",
+      printf("copy from %p offset: %lu len%u req_len%lu\n",
              s_ctx->Buffer,
              offset,
              len,
              req_len);
 
-      CxPlatCopyMemory(bin->data + offset, s_ctx->Buffer, len);
+      CxPlatCopyMemory(bin->data, s_ctx->Buffer + offset, len);
       offset += len;
       req_len -= len;
     }
-  assert(req_len == 0);
+  return req_len;
 }
 
 QUIC_STATUS
@@ -590,7 +608,6 @@ handle_stream_recv_event(HQUIC Stream,
         { // Owner is waiting but need more date to poll
           // Mark we handled 0 bytes and let it contitune.
           Event->RECEIVE.TotalBufferLength = 0;
-          status = QUIC_STATUS_PENDING;
         }
     }
 
