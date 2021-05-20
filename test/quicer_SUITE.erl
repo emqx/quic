@@ -517,7 +517,7 @@ tc_setopt(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
       {ok, Stm0} = quicer:start_stream(Conn, [{active, false}]),
       {ok, 4} = quicer:send(Stm0, <<"ping">>),
-      {ok, Stm1} = quicer:start_stream(Conn, []),
+      {ok, Stm1} = quicer:start_stream(Conn, [{active, false}]),
       {ok, 4} = quicer:send(Stm1, <<"ping">>),
       {P, _} = spawn_monitor(fun () -> Owner ! quicer:recv(Stm1, 4) end),
       receive
@@ -548,7 +548,7 @@ tc_app_echo_server(Config) ->
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
-  {ok, Stm} = quicer:start_stream(Conn, []),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
   {ok, 4} = quicer:send(Stm, <<"ping">>),
   {ok, 4} = quicer:send(Stm, <<"ping">>),
   {ok, 4} = quicer:send(Stm, <<"ping">>),
