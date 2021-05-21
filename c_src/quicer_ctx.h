@@ -57,7 +57,7 @@ typedef struct
   size_t BufferLen;
   size_t BufferOffset;
   BOOLEAN is_wait_for_data;
-  uint64_t passive_recv_bytes;
+  uint64_t passive_recv_bytes; // 0 means size unspecified
 } QuicerStreamCTX;
 
 QuicerListenerCTX *init_l_ctx();
