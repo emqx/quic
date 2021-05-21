@@ -54,8 +54,8 @@ typedef struct
   ErlNifMutex *lock;
   BOOLEAN closed;
   uint8_t *Buffer;
-  size_t BufferLen;
-  size_t BufferOffset;
+  uint64_t BufferLen;
+  uint64_t BufferOffset;
   BOOLEAN is_wait_for_data;
   uint64_t passive_recv_bytes; // 0 means size unspecified
 } QuicerStreamCTX;

@@ -16,7 +16,7 @@ limitations under the License.
 
 #include "quicer_stream.h"
 
-static size_t recvbuffer_flush(QuicerStreamCTX *stream_ctx,
+static uint64_t recvbuffer_flush(QuicerStreamCTX *stream_ctx,
                                ErlNifBinary *bin,
                                uint64_t req_len);
 static QUIC_STATUS handle_stream_recv_event(HQUIC Stream,
@@ -380,7 +380,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   QuicerStreamCTX *s_ctx;
   ErlNifBinary bin;
   ERL_NIF_TERM estream = argv[0];
-  uint64_t size_req = 0;
+  ErlNifUInt64 size_req = 0;
   ERL_NIF_TERM res;
 
   if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
@@ -405,7 +405,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (s_ctx->Buffer && s_ctx->BufferLen > 0
       && (0 == size_req || size_req <= s_ctx->BufferLen - s_ctx->BufferOffset))
     {
-      size_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
+      uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
       s_ctx->passive_recv_bytes -= size_consumed;
       s_ctx->is_wait_for_data = s_ctx->passive_recv_bytes > 0 ? true : false;
 
@@ -477,12 +477,12 @@ close_stream1(ErlNifEnv *env,
   return ret;
 }
 
-size_t
+uint64_t
 recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 {
   // note, make sure ownership of bin should be transfered, after call
   uint64_t bin_size = 0;
-  size_t offset = s_ctx->BufferOffset;
+  uint64_t offset = s_ctx->BufferOffset;
   // Decide binary size
   if (req_len == 0 || req_len >= s_ctx->BufferLen - s_ctx->BufferOffset)
     { // we need more data than buffer can provide
@@ -510,10 +510,9 @@ handle_stream_recv_event(HQUIC Stream,
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ErlNifEnv *env = s_ctx->env;
   ErlNifBinary bin;
-  ERL_NIF_TERM report;
 
   s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
-  s_ctx->BufferLen = Event->RECEIVE.Buffers->Length;
+  s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
 
   if (false == s_ctx->owner->active)
     { // passive receive
@@ -530,7 +529,7 @@ handle_stream_recv_event(HQUIC Stream,
         { // owner is waiting for data and we have enough data to report
           // msquic actually use only one buffer for API calls
           s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
-          s_ctx->BufferLen = Event->RECEIVE.Buffers->Length;
+          s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
           // notify owner to pull
           enif_send(NULL,
                     &(s_ctx->owner->Pid),
@@ -553,7 +552,7 @@ handle_stream_recv_event(HQUIC Stream,
   else
     { // active receive
 
-      recvbuffer_flush(s_ctx, &bin, 0);
+      recvbuffer_flush(s_ctx, &bin, (uint64_t) 0);
 
       ERL_NIF_TERM report = enif_make_tuple6(
           env,

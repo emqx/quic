@@ -108,7 +108,7 @@ accept(LSock, Opts, Timeout) ->
 close_connection(Conn) ->
   quicer_nif:close_connection(Conn).
 
--spec accept_stream(connection_handler(), proplists:proplist()) ->
+-spec accept_stream(connection_handler(), proplists:proplist() | map()) ->
         {ok, stream_handler()} | {error, any()}.
 accept_stream(Conn, Opts) ->
   accept_stream(Conn, Opts, infinity).
@@ -129,14 +129,14 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
       E
   end.
 
--spec async_accept_stream(connection_handler(), proplists:proplist() | map) ->
+-spec async_accept_stream(connection_handler(), proplists:proplist() | map()) ->
         {ok, connection_handler()} | {error, any()}.
 async_accept_stream(Conn, Opts) when is_list(Opts)->
-  accept_stream(Conn, maps:from_list(Opts));
+  async_accept_stream(Conn, maps:from_list(Opts));
 async_accept_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
--spec start_stream(connection_handler(), proplists:proplists() | map) ->
+-spec start_stream(connection_handler(), proplists:proplists() | map()) ->
         {ok, stream_handler()} | {error, any()}.
 start_stream(Conn, Opts) when is_list(Opts)->
   start_stream(Conn, maps:from_list(Opts));
