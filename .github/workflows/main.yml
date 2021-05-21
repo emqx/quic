@@ -19,6 +19,7 @@ jobs:
           cp ./rebar3 /usr/local/bin/rebar3
       - name: release build
         run: |
+          export PATH="/usr/local/opt/erlang@23/bin:$PATH"
           make ci
 
   linux:
