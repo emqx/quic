@@ -674,14 +674,16 @@ default_listen_opts(Config) ->
 
 wait_for_close(Stm) ->
   receive
-    {quic, closed, Stm, _} ->
-      receive {quic, closed, _Conn} -> ok
-      after 2000 ->
-          receive Any ->
-              ct:fail({unexpected_recv, Any})
-          after 0 ->
-              wait_for_close(Stm)
-          end
+    {quic, closed, Stm, _} -> ok;
+    {quic, peer_send_aborted, Stm, _ErrorNo} -> ok
+  end,
+  receive
+    {quic, closed, _Conn} -> ok
+  after 3000 ->
+      receive Any ->
+          ct:fail({unexpected_recv, Any})
+      after 0 ->
+          wait_for_close(Stm)
       end
   end.
 
