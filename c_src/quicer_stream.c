@@ -16,15 +16,25 @@ limitations under the License.
 
 #include "quicer_stream.h"
 
+static uint64_t recvbuffer_flush(QuicerStreamCTX *stream_ctx,
+                               ErlNifBinary *bin,
+                               uint64_t req_len);
+static QUIC_STATUS handle_stream_recv_event(HQUIC Stream,
+                                            QuicerStreamCTX *s_ctx,
+                                            QUIC_STREAM_EVENT *Event);
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
   ErlNifEnv *env;
   QuicerStreamCTX *s_ctx;
-  ErlNifBinary bin;
+  ERL_NIF_TERM report;
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   s_ctx = (QuicerStreamCTX *)Context;
-  env = s_ctx->env;
 
+  enif_mutex_lock(s_ctx->lock);
+
+  env = s_ctx->env;
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -38,41 +48,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // Data was received from the peer on the stream.
       //
-
-      // ownership is transfered to var: report
-      if (!enif_alloc_binary(Event->RECEIVE.TotalBufferLength, &bin))
-        {
-          //@todo error handling
-          return QUIC_STATUS_OUT_OF_MEMORY;
-        }
-      // @todo check can we skip copy?
-      // @todo handle multi buffer copy
-      uint32_t offset = 0;
-      for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
-        {
-          CxPlatCopyMemory(bin.data + offset,
-                           Event->RECEIVE.Buffers[i].Buffer,
-                           Event->RECEIVE.Buffers[i].Length);
-          offset += Event->RECEIVE.Buffers[i].Length;
-        }
-      ERL_NIF_TERM report = enif_make_tuple6(
-          env,
-          // reserved for port
-          ATOM_QUIC,
-          enif_make_binary(env, &bin),
-          enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
-          enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
-          enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
-      );
-
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
-        {
-          // App down, shutdown stream
-          MsQuic->StreamShutdown(Stream,
-                                 QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
-                                 QUIC_STATUS_UNREACHABLE);
-        }
+      status = handle_stream_recv_event(Stream, s_ctx, Event);
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
       //
@@ -114,7 +90,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       // with the stream. It can now be safely cleaned up.
       //
       // we don't use trylock since we are in callback context
-      enif_mutex_lock(s_ctx->lock);
       report = enif_make_tuple4(
           env,
           ATOM_QUIC,
@@ -125,13 +100,14 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
       s_ctx->closed = true;
-      enif_mutex_unlock(s_ctx->lock);
+
       destroy_s_ctx(s_ctx);
       break;
     default:
       break;
     }
-  return QUIC_STATUS_SUCCESS;
+  enif_mutex_unlock(s_ctx->lock);
+  return status;
 }
 
 // The clients's callback for stream events from MsQuic.
@@ -142,12 +118,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                          _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event)
 {
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ErlNifEnv *env;
-  ErlNifBinary bin;
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
   ERL_NIF_TERM report;
-  env = s_ctx->env;
 
+  enif_mutex_lock(s_ctx->lock);
+  env = s_ctx->env;
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -161,41 +138,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // Data was received from the peer on the stream.
       //
-      // printf("[strm][%p] Data received\n", Stream);
-
-      if (!enif_alloc_binary(Event->RECEIVE.TotalBufferLength, &bin))
-        {
-          printf("[strm][%p] Failed to build recv buffer\n", Stream);
-          return QUIC_STATUS_OUT_OF_MEMORY;
-        }
-      // @todo check can we skip copy?
-      // @todo handle multi buffer copy
-      uint32_t offset = 0;
-      for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
-        {
-          CxPlatCopyMemory(bin.data + offset,
-                           Event->RECEIVE.Buffers[i].Buffer,
-                           Event->RECEIVE.Buffers[i].Length);
-          offset += Event->RECEIVE.Buffers[i].Length;
-        }
-
-      report = enif_make_tuple6(
-          env,
-          // reserved for port
-          ATOM_QUIC,
-          enif_make_binary(env, &bin),
-          enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
-          enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
-          enif_make_int(env, Event->RECEIVE.Flags));
-
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
-        {
-          // App down, close it.
-          MsQuic->StreamShutdown(Stream,
-                                 QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
-                                 QUIC_STATUS_UNREACHABLE);
-        }
+      status = handle_stream_recv_event(Stream, s_ctx, Event);
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
       //
@@ -250,7 +193,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     default:
       break;
     }
-  return QUIC_STATUS_SUCCESS;
+  enif_mutex_unlock(s_ctx->lock);
+  return status;
 }
 
 ERL_NIF_TERM
@@ -260,14 +204,21 @@ async_start_stream2(ErlNifEnv *env,
 {
   QUIC_STATUS Status;
   QuicerConnCTX *c_ctx;
+  ERL_NIF_TERM active_val;
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  if (!enif_get_map_value(
+          env, argv[1], ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
   //
-  // note, ctx is not shared yet, thus no locking needed.
+  // note, ctx is not shared yet, thus no locking is needed.
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
   s_ctx->c_ctx = c_ctx;
@@ -279,6 +230,8 @@ async_start_stream2(ErlNifEnv *env,
       destroy_s_ctx(s_ctx);
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
+
+  s_ctx->owner->active = IS_SAME_TERM(active_val, ATOM_TRUE);
 
   // @todo check if stream is null
   if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
@@ -296,6 +249,7 @@ async_start_stream2(ErlNifEnv *env,
   // the stream being started until data is sent on the stream.
   //
   if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream,
+                                               // @todo flag in options
                                                QUIC_STREAM_START_FLAG_NONE)))
     {
       // note, stream call back would close the stream.
@@ -313,7 +267,15 @@ async_accept_stream2(ErlNifEnv *env,
                      const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
+  ERL_NIF_TERM active_val;
+
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_map_value(
+          env, argv[1], ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -336,6 +298,8 @@ async_accept_stream2(ErlNifEnv *env,
       free(acceptor);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
+
+  acceptor->active = IS_SAME_TERM(active_val, ATOM_TRUE);
 
   AcceptorEnqueue(c_ctx->acceptor_queue, acceptor);
   ERL_NIF_TERM connectionHandler = enif_make_resource(env, c_ctx);
@@ -410,6 +374,79 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
+recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+{
+
+  QuicerStreamCTX *s_ctx;
+  ErlNifBinary bin;
+  ERL_NIF_TERM estream = argv[0];
+  ErlNifUInt64 size_req = 0;
+  ERL_NIF_TERM res;
+
+  if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_uint64(env, argv[1], &size_req))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(s_ctx->lock);
+
+  if (s_ctx->owner->active)
+    {
+      // follow otp behavior
+      enif_mutex_unlock(s_ctx->lock);
+      return ERROR_TUPLE_2(ATOM_EINVAL);
+    }
+
+  if (s_ctx->Buffer && s_ctx->BufferLen > 0
+      && (0 == size_req || size_req <= s_ctx->BufferLen - s_ctx->BufferOffset))
+    {
+      uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
+      s_ctx->passive_recv_bytes -= size_consumed;
+      s_ctx->is_wait_for_data = s_ctx->passive_recv_bytes > 0 ? true : false;
+
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
+
+      // if we have some remaining bytes
+      // @todo disable receving when it is over some threshold.
+      MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+
+      if (0 == s_ctx->BufferLen - s_ctx->BufferOffset - size_consumed)
+        {
+          s_ctx->BufferOffset = 0;
+        }
+      else
+        {
+          s_ctx->BufferOffset += size_consumed;
+        }
+      res = SUCCESS(enif_make_binary(env, &bin));
+    }
+  else
+    { // we want more data
+      s_ctx->is_wait_for_data = true;
+      s_ctx->passive_recv_bytes = size_req;
+
+      // complete recv with 0 bytes
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+
+      // reenable receving so new data can flow in.
+      MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+
+      // nif caller will get {ok, not_ready}
+      // which means its call is acked and it should wait for
+      // recv the data in async.
+      res = SUCCESS(ATOM_ERROR_NOT_READY);
+    }
+  enif_mutex_unlock(s_ctx->lock);
+
+  return res;
+}
+
+ERL_NIF_TERM
 close_stream1(ErlNifEnv *env,
               __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
@@ -440,6 +477,104 @@ close_stream1(ErlNifEnv *env,
   return ret;
 }
 
+uint64_t
+recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
+{
+  // note, make sure ownership of bin should be transfered, after call
+  uint64_t bin_size = 0;
+  uint64_t offset = s_ctx->BufferOffset;
+  // Decide binary size
+  if (req_len == 0 || req_len >= s_ctx->BufferLen - s_ctx->BufferOffset)
+    { // we need more data than buffer can provide
+      bin_size = s_ctx->BufferLen - s_ctx->BufferOffset;
+      req_len = bin_size; // cover the case of req_len = 0
+    }
+  else if (req_len < s_ctx->BufferLen)
+    { // buffer size is larger than we want
+      bin_size = req_len;
+    }
+
+  enif_alloc_binary(bin_size, bin);
+
+  CxPlatCopyMemory(bin->data, s_ctx->Buffer + offset, bin_size);
+  req_len -= bin_size;
+  assert(req_len == 0);
+  return bin_size;
+}
+
+QUIC_STATUS
+handle_stream_recv_event(HQUIC Stream,
+                         QuicerStreamCTX *s_ctx,
+                         QUIC_STREAM_EVENT *Event)
+{
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
+  ErlNifEnv *env = s_ctx->env;
+  ErlNifBinary bin;
+
+  s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
+  s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
+
+  if (false == s_ctx->owner->active)
+    { // passive receive
+      if (!s_ctx->is_wait_for_data)
+        {
+          // msquic actually use only one buffer for API calls
+          assert(0 < Event->RECEIVE.BufferCount);
+          status = QUIC_STATUS_PENDING;
+        }
+      else if (s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0
+               && (0 == s_ctx->passive_recv_bytes // 0 means size unspecified
+                   || s_ctx->passive_recv_bytes
+                          <= Event->RECEIVE.TotalBufferLength))
+        { // owner is waiting for data and we have enough data to report
+          // msquic actually use only one buffer for API calls
+          s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
+          s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
+          // notify owner to pull
+          enif_send(NULL,
+                    &(s_ctx->owner->Pid),
+                    NULL,
+                    enif_make_tuple3(env,
+                                     ATOM_QUIC,
+                                     enif_make_resource(env, s_ctx),
+                                     ATOM_QUIC_STATUS_CONTINUE));
+          // so we hand over data to the owner, aka async handling,
+          // add we mark status pending to block the receiving.
+          s_ctx->is_wait_for_data = false;
+          status = QUIC_STATUS_PENDING;
+        }
+      else
+        { // Owner is waiting but need more date to poll
+          // Mark we handled 0 bytes and let it contitune to recv.
+          Event->RECEIVE.TotalBufferLength = 0;
+        }
+    }
+  else
+    { // active receive
+
+      recvbuffer_flush(s_ctx, &bin, (uint64_t) 0);
+
+      ERL_NIF_TERM report = enif_make_tuple6(
+          env,
+          // reserved for port
+          ATOM_QUIC,
+          enif_make_binary(env, &bin),
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
+          enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
+          enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
+      );
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // App down, shutdown stream
+          MsQuic->StreamShutdown(Stream,
+                                 QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+                                 QUIC_STATUS_UNREACHABLE);
+        }
+    }
+  return status;
+}
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

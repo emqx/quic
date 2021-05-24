@@ -61,7 +61,9 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  c_ctx);
       // @todo error handling here.
       Status = MsQuic->ConnectionSetConfiguration(
-          Event->NEW_CONNECTION.Connection, l_ctx->Configuration);
+          //@todo maybe use c_ctx->Configuration? or it should have a copy?
+          Event->NEW_CONNECTION.Connection,
+          l_ctx->Configuration);
       break;
     default:
       break;

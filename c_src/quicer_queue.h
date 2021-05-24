@@ -39,6 +39,7 @@ typedef struct ACCEPTOR
 {
   CXPLAT_LIST_ENTRY Link;
   ErlNifPid Pid;
+  BOOLEAN active; // is active receiver?
 } ACCEPTOR;
 
 typedef struct AcceptorsQueue
