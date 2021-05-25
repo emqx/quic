@@ -87,13 +87,15 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
       Err
   end.
 
--spec accept(listener_handler(), proplists:proplists()) ->
+-spec accept(listener_handler(), proplists:proplists() | map()) ->
         {ok, connection_handler()} | {error, any()}.
 accept(LSock, Opts) ->
   accept(LSock, Opts, infinity).
 
--spec accept(listener_handler(), proplists:proplists(), timeout()) ->
+-spec accept(listener_handler(), proplists:proplists() | map(), timeout()) ->
         {ok, connection_handler()} | {error, any()}.
+accept(LSock, Opts, Timeout) when is_list(Opts) ->
+  accept(LSock, maps:from_list(Opts), Timeout);
 accept(LSock, Opts, Timeout) ->
   % non-blocking
   {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
