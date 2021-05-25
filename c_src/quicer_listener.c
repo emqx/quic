@@ -46,8 +46,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!conn_owner)
         {
-          //@todo replace with tracepoint, listener should be default listener?
-          printf("S: info, no acceptor while connect \n");
+          return QUIC_STATUS_NOT_FOUND;
         }
       c_ctx->owner = conn_owner;
 

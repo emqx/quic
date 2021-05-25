@@ -57,14 +57,6 @@ init_c_ctx()
 void
 destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
-  if (0 != enif_demonitor_process(c_ctx->env, c_ctx, c_ctx->owner_mon))
-    {
-      //@todo handle ret valus, for
-      // - never created for this resource
-      // - already cancelled
-      // - already triggered
-      // - just about to be triggered by a concurrent thread
-    }
   enif_release_resource(c_ctx);
 }
 
