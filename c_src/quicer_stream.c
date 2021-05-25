@@ -17,8 +17,8 @@ limitations under the License.
 #include "quicer_stream.h"
 
 static uint64_t recvbuffer_flush(QuicerStreamCTX *stream_ctx,
-                               ErlNifBinary *bin,
-                               uint64_t req_len);
+                                 ErlNifBinary *bin,
+                                 uint64_t req_len);
 static QUIC_STATUS handle_stream_recv_event(HQUIC Stream,
                                             QuicerStreamCTX *s_ctx,
                                             QUIC_STREAM_EVENT *Event);
@@ -552,7 +552,7 @@ handle_stream_recv_event(HQUIC Stream,
   else
     { // active receive
 
-      recvbuffer_flush(s_ctx, &bin, (uint64_t) 0);
+      recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
 
       ERL_NIF_TERM report = enif_make_tuple6(
           env,

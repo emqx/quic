@@ -659,9 +659,8 @@ default_stream_opts() ->
 
 default_conn_opts() ->
   [{alpn, ["sample"]},
-   {idle_timeout_ms, 5000},
-   {peer_unidi_stream_count, 1},
-   {peer_bidi_stream_count, 10}].
+   {idle_timeout_ms, 5000}
+  ].
 
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
