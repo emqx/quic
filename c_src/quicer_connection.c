@@ -374,7 +374,7 @@ async_accept2(ErlNifEnv *env,
               __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
-  QuicerListenerCTX *l_ctx;
+  QuicerListenerCTX *l_ctx = NULL;
   if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);

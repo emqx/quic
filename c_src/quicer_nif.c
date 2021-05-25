@@ -458,9 +458,11 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
                                void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
+  enif_demonitor_process(c_ctx->env, c_ctx, c_ctx->owner_mon);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
+  CXPLAT_FREE(c_ctx->owner_mon, QUICER_OWNER_MON);
 }
 
 void
