@@ -77,7 +77,7 @@ close_listener(Listener) ->
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
   connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
-  case quicer_nif:async_connect(Host, Port, Opts) of
+  case quicer_nif:async_connect(Host, Port, maps:merge(default_conn_opts(), Opts)) of
     {ok, _H} ->
       receive
         {quic, connected, Ctx} ->
@@ -98,7 +98,7 @@ accept(LSock, Opts, Timeout) when is_list(Opts) ->
   accept(LSock, maps:from_list(Opts), Timeout);
 accept(LSock, Opts, Timeout) ->
   % non-blocking
-  {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
+  {ok, LSock} = quicer_nif:async_accept(LSock, maps:merge(default_conn_opts(), Opts)),
   receive
     {new_conn, C} ->
       {ok, C}
@@ -230,6 +230,11 @@ stats_map(_) ->
 
 default_stream_opts()->
   #{active => true}.
+
+default_conn_opts()->
+  #{ peer_bidi_stream_count => 1
+   , peer_unidi_stream_count => 1
+   }.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t

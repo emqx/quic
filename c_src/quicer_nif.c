@@ -463,6 +463,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
   CXPLAT_FREE(c_ctx->owner_mon, QUICER_OWNER_MON);
+  AcceptorDestroy(c_ctx->owner);
 }
 
 void

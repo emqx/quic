@@ -739,6 +739,8 @@ create_settings(ErlNifEnv *env,
       return false;
     }
 
+  CxPlatZeroMemory(Settings, sizeof(QUIC_SETTINGS));
+
   if (get_uint64_from_map(env,
                           *emap,
                           ATOM_QUIC_SETTINGS_MaxBytesPerKey,

@@ -21,7 +21,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                        void *Context,
                        QUIC_LISTENER_EVENT *Event)
 {
-  QUIC_STATUS Status = QUIC_STATUS_NOT_SUPPORTED;
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
   ErlNifEnv *env = l_ctx->env;
   QuicerConnCTX *c_ctx = NULL;
@@ -46,8 +46,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!conn_owner)
         {
-          // make msquic close the connection.
           destroy_c_ctx(c_ctx);
+          // make msquic close the connection.
           return QUIC_STATUS_NOT_FOUND;
         }
       c_ctx->owner = conn_owner;
@@ -60,11 +60,25 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
-      // @todo error handling here.
-      Status = MsQuic->ConnectionSetConfiguration(
-          //@todo maybe use c_ctx->Configuration? or it should have a copy?
-          Event->NEW_CONNECTION.Connection,
-          l_ctx->Configuration);
+
+      if (QUIC_FAILED(MsQuic->ConnectionSetConfiguration(
+              Event->NEW_CONNECTION.Connection, l_ctx->Configuration)))
+        {
+          destroy_c_ctx(c_ctx);
+          return QUIC_STATUS_INTERNAL_ERROR;
+        }
+
+      // Apply connection owners' option overrides
+      if (QUIC_FAILED(MsQuic->SetParam(Event->NEW_CONNECTION.Connection,
+                                       QUIC_PARAM_LEVEL_CONNECTION,
+                                       QUIC_PARAM_CONN_SETTINGS,
+                                       sizeof(QUIC_SETTINGS),
+                                       &c_ctx->owner->Settings)))
+        {
+          destroy_c_ctx(c_ctx);
+          return QUIC_STATUS_INTERNAL_ERROR;
+        }
+
       break;
     default:
       break;

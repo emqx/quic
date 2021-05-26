@@ -96,6 +96,12 @@ AcceptorAlloc()
   return CXPLAT_ALLOC_NONPAGED(sizeof(ACCEPTOR), QUICER_ACCEPTOR);
 }
 
+void
+AcceptorDestroy(ACCEPTOR *acc)
+{
+  return CXPLAT_FREE(acc, QUICER_ACCEPTOR);
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

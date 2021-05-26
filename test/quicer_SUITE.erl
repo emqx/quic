@@ -513,23 +513,30 @@ tc_setopt(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      Opts = lists:keyreplace(peer_bidi_stream_count, 1, default_conn_opts(), {peer_bidi_stream_count, 1}),
-      {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm0} = quicer:start_stream(Conn, [{active, false}]),
-      {ok, 4} = quicer:send(Stm0, <<"ping">>),
-      {ok, Stm1} = quicer:start_stream(Conn, [{active, false}]),
-      {ok, 4} = quicer:send(Stm1, <<"ping">>),
-      {P, _} = spawn_monitor(fun () -> Owner ! quicer:recv(Stm1, 4) end),
+      %% Stream 0
+      {ok, 5} = quicer:send(Stm0, <<"ping0">>),
+      {ok, <<"ping0">>} = quicer:recv(Stm0, 0),
+      %% Stream 1 but get blocked due to stream count
+      {ok, Stm1} = quicer:start_stream(Conn, [{active, true}]),
+      {ok, 5} = quicer:send(Stm1, <<"ping1">>),
       receive
-        Any ->
-          ct:fail("unexpected recv ~p", [Any])
+        {quic, _Data, Stm1, _, _, _} = Msg ->
+          ct:fail("unexpected_recv ~p ", [Msg])
       after 1000 ->
-          ok
+                ok
       end,
-      exit(P, normal),
-      ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => 10}),
-      {ok, 4} = quicer:send(Stm0, <<"ping">>),
-      {ok, <<"ping">>} = quicer:recv(Stm0, 4),
+
+      %% unblock Stream 1
+      SPid ! {set_stm_cnt, 3},
+
+      receive
+        {quic, <<"ping1">>, Stm1, _, _, _} ->
+          ok
+      after 1000 ->
+          ct:fail("sending is still bloked", [])
+      end,
       SPid ! done
   after 5000 ->
     ct:fail("listener_timeout")
@@ -586,6 +593,10 @@ echo_server_stm_loop(L, Conn, Stm) ->
       echo_server_stm_loop(L, Conn, Stm);
     {quic, closed, Stm, _Flag} ->
       echo_server_stm_loop(L, Conn, Stm);
+    {set_stm_cnt, N } ->
+      ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => N}),
+      {ok, NewStm} = quicer:accept_stream(Conn, []),
+      echo_server_stm_loop(L, Conn, NewStm);
     done ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
