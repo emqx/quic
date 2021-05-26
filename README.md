@@ -181,6 +181,8 @@ Accept stream on a existing connection.
 
 This is a blocking call.
 
+After this call is returned, the calling process becomes the owner of the stream.
+
 ### Send Data over stream
 
 ``` erlang
@@ -190,6 +192,20 @@ quicer:send(Stream, BinaryData) ->
 
 Aync send data over stream.
 
+
+### Active receive from stream
+
+If the stream option `active` is set to `true`, stream data will be delivered to the stream owner's process message queue as following format
+
+``` erlang
+{quic, Data, Stream, AbsOffset,  Length, Flag}
+when ->
+  Data::binary(),
+  Stream::stream_handler(),
+  AbsOffset::non_neg_integer(),
+  Length::non_neg_integer(),
+  Flag::integer()
+```
 
 ### Passive receive from stream
 
