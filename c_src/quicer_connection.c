@@ -374,8 +374,10 @@ async_accept2(ErlNifEnv *env,
               __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
+  ERL_NIF_TERM listener = argv[0];
+  ERL_NIF_TERM conn_opts = argv[1];
   QuicerListenerCTX *l_ctx = NULL;
-  if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
+  if (!enif_get_resource(env, listener, ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -389,6 +391,11 @@ async_accept2(ErlNifEnv *env,
   if (!enif_self(env, &(acceptor->Pid)))
     {
       return ERROR_TUPLE_2(ATOM_BAD_PID);
+    }
+
+  if (!create_settings(env, &conn_opts, &acceptor->Settings))
+    {
+      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
     }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);

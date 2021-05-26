@@ -42,7 +42,7 @@ typedef struct ACCEPTOR
   CXPLAT_LIST_ENTRY Link;
   ErlNifPid Pid;
   BOOLEAN active; // is active receiver?
-  QUIC_SETTINGS *Settings;
+  QUIC_SETTINGS Settings;
 } ACCEPTOR;
 
 typedef struct AcceptorsQueue
@@ -57,6 +57,7 @@ void AcceptorsQueueInit(QUICER_ACCEPTOR_QUEUE *q);
 void AcceptorEnqueue(QUICER_ACCEPTOR_QUEUE *q, ACCEPTOR *a);
 ACCEPTOR *AcceptorDequeue(QUICER_ACCEPTOR_QUEUE *q);
 ACCEPTOR *AcceptorAlloc();
+void AcceptorDestroy(ACCEPTOR *acc);
 
 //@todo add Acceptor cleanups.
 
