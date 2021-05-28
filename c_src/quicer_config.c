@@ -62,7 +62,7 @@ NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
   Config = (QUIC_CREDENTIAL_CONFIG_HELPER *)CXPLAT_ALLOC_NONPAGED(
       sizeof(QUIC_CREDENTIAL_CONFIG_HELPER), QUICER_CREDENTIAL_CONFIG_HELPER);
 
-  memset(Config, 0, sizeof(QUIC_CREDENTIAL_CONFIG_HELPER));
+  CxPlatZeroMemory(Config, sizeof(QUIC_CREDENTIAL_CONFIG_HELPER));
   Config->CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
   //
@@ -72,14 +72,17 @@ NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
   Config->CertFile.PrivateKeyFile = key_path;
   Config->CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
   Config->CredConfig.CertificateFile = &Config->CertFile;
+  // @todo set flag
+  // Config->CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS;
+  // Config->CredConfig.AsyncHandler = DestroyCredConfig;
   return Config;
 }
 
 void
 DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
-  // free((char *)Config->CertFile.CertificateFile);
-  // free((char *)Config->CertFile.PrivateKeyFile);
+  free((char *)Config->CertFile.CertificateFile);
+  free((char *)Config->CertFile.PrivateKeyFile);
   free(Config);
 }
 
@@ -98,7 +101,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
     }
 
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_BUFFER alpn_buffers[MAX_ALPN] = {0};
 
   if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
     {
@@ -155,7 +158,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // server certificate validation.
   //
   QUIC_CREDENTIAL_CONFIG CredConfig;
-  memset(&CredConfig, 0, sizeof(CredConfig));
+  CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
   if (Unsecure)
@@ -492,8 +495,8 @@ getopt3(ErlNifEnv *env,
   ERL_NIF_TERM eisRaw = argv[2];
 
   HQUIC Handle = NULL;
-  uint32_t Param = -1;
-  QUIC_PARAM_LEVEL Level = -1;
+  uint32_t Param;
+  QUIC_PARAM_LEVEL Level;
   uint32_t BufferLength = 0;
   ErlNifBinary bin;
   bool isReturnRaw = true;
@@ -602,7 +605,7 @@ getopt3(ErlNifEnv *env,
     }
 
   // precheck before calling msquic api
-  if (BufferLength == 0 || Param < 0 || Level < 0)
+  if (Level < 0)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
     }
@@ -664,7 +667,7 @@ setopt3(ErlNifEnv *env,
   ERL_NIF_TERM evalue = argv[2];
 
   HQUIC Handle = NULL;
-  QUIC_PARAM_LEVEL Level = -1;
+  QUIC_PARAM_LEVEL Level;
 
   void *q_ctx;
 

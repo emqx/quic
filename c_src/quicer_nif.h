@@ -28,6 +28,9 @@ limitations under the License.
 #include "quicer_queue.h"
 #include "quicer_stream.h"
 
+// @todo is 16 enough?
+#define MAX_ALPN 16
+
 #if defined(__linux__)
 #include <linux/limits.h>
 #elif defined(__APPLE__)
@@ -41,7 +44,6 @@ limitations under the License.
 extern HQUIC Registration;
 extern const QUIC_API_TABLE *MsQuic;
 extern const QUIC_REGISTRATION_CONFIG RegConfig;
-extern const uint16_t MAX_ALPN;
 
 // Context Types
 extern ErlNifResourceType *ctx_listener_t;

@@ -451,7 +451,7 @@ close_stream1(ErlNifEnv *env,
               __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
-  QUIC_STATUS Status = 0;
+  QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
   QuicerStreamCTX *s_ctx;
   if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))

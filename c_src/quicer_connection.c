@@ -430,8 +430,8 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
 {
   void *q_ctx;
   HQUIC Handle = NULL;
-  uint32_t Param = -1;
-  QUIC_PARAM_LEVEL Level = -1;
+  uint32_t Param;
+  QUIC_PARAM_LEVEL Level;
 
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
