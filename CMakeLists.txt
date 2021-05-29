@@ -49,6 +49,7 @@ add_subdirectory(submodules/msquic)
 add_library(quicer_static STATIC ${SOURCES})
 target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ submodules/msquic/src/inc/)
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
+  # @todo remove hardcoded SO_ATTACH_REUSEPORT_CBPF
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,--no-gc-sections -D SO_ATTACH_REUSEPORT_CBPF=51")
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
