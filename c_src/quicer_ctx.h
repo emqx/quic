@@ -29,6 +29,9 @@ typedef struct
   ErlNifPid listenerPid;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  void *reserved1;
+  void *reserved2;
+  void *reserved3;
 } QuicerListenerCTX;
 
 typedef struct
@@ -41,6 +44,9 @@ typedef struct
   ErlNifMonitor *owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  void *reserved1;
+  void *reserved2;
+  void *reserved3;
 } QuicerConnCTX;
 
 typedef struct
@@ -58,6 +64,9 @@ typedef struct
   uint64_t BufferOffset;
   BOOLEAN is_wait_for_data;
   uint64_t passive_recv_bytes; // 0 means size unspecified
+  void *reserved1;
+  void *reserved2;
+  void *reserved3;
 } QuicerStreamCTX;
 
 QuicerListenerCTX *init_l_ctx();

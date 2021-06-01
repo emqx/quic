@@ -43,6 +43,9 @@ typedef struct ACCEPTOR
   ErlNifPid Pid;
   BOOLEAN active; // is active receiver?
   QUIC_SETTINGS Settings;
+  void *reserved1;
+  void *reserved2;
+  void *reserved3;
 } ACCEPTOR;
 
 typedef struct AcceptorsQueue
