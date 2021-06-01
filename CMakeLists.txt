@@ -24,6 +24,7 @@ endif()
 
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
+set(QUIC_BUILD_PERF "OFF")
 
 # src files
 set(SOURCES
