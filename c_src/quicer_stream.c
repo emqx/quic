@@ -516,10 +516,10 @@ handle_stream_recv_event(HQUIC Stream,
 
   if (false == s_ctx->owner->active)
     { // passive receive
-      if (!s_ctx->is_wait_for_data)
+      if (!s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0)
         {
           // msquic actually use only one buffer for API calls
-          assert(0 < Event->RECEIVE.BufferCount);
+          assert(1 == Event->RECEIVE.BufferCount);
           status = QUIC_STATUS_PENDING;
         }
       else if (s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0

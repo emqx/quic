@@ -30,6 +30,7 @@
         , send/2
         , recv/2
         , close_stream/1
+        , async_close_stream/1
         , sockname/1
         , getopt/2
         , getopt/3
@@ -177,7 +178,15 @@ recv(Stream, Count) ->
 
 -spec close_stream(stream_handler()) -> ok.
 close_stream(Stream) ->
-  quicer_nif:close_stream(Stream).
+  ok = async_close_stream(Stream),
+  receive
+    {quic, closed, Stream, _IsGraceful} ->
+      ok
+  end.
+
+-spec async_close_stream(stream_handler()) -> ok.
+async_close_stream(Stream) ->
+  quicer_nif:async_close_stream(Stream).
 
 -spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
