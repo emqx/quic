@@ -101,7 +101,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
     }
 
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN] = {0};
+  QUIC_BUFFER alpn_buffers[MAX_ALPN] = { 0 };
 
   if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
     {

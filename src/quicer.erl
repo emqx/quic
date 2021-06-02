@@ -22,6 +22,7 @@
         , accept/2
         , accept/3
         , close_connection/1
+        , async_close_connection/1
         , accept_stream/2
         , accept_stream/3
         , async_accept_stream/2
@@ -108,7 +109,16 @@ accept(LSock, Opts, Timeout) ->
 
 -spec close_connection(connection_handler()) -> ok.
 close_connection(Conn) ->
-  quicer_nif:close_connection(Conn).
+  ok = async_close_connection(Conn),
+  %% @todo make_ref
+  receive
+    {quic, closed, Conn} ->
+      ok
+  end.
+
+-spec async_close_connection(connection_handler()) -> ok.
+async_close_connection(Conn) ->
+  quicer_nif:async_close_connection(Conn).
 
 -spec accept_stream(connection_handler(), proplists:proplist() | map()) ->
         {ok, stream_handler()} | {error, any()}.
@@ -117,7 +127,7 @@ accept_stream(Conn, Opts) ->
 accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
   accept_stream(Conn, maps:from_list(Opts), Timeout);
 accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
-  % @todo msg ref hack
+  % @todo make_ref
   % @todo error handling
   case quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)) of
     {ok, Conn} ->

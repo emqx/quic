@@ -428,8 +428,8 @@ tc_peername_v6(Config) ->
       ct:pal("addr is ~p", [Addr]),
       "::1" = inet:ntoa(Addr),
       %% @todo unsure this casue core dump
-      %% ok = quicer:close_connection(Conn),
-      %% wait_for_close(Stm),
+      ok = quicer:close_connection(Conn),
+      wait_for_close(Stm),
       SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
@@ -687,15 +687,6 @@ wait_for_close(Stm) ->
   receive
     {quic, closed, Stm, _} -> ok;
     {quic, peer_send_aborted, Stm, _ErrorNo} -> ok
-  end,
-  receive
-    {quic, closed, _Conn} -> ok
-  after 3000 ->
-      receive Any ->
-          ct:fail({unexpected_recv, Any})
-      after 0 ->
-          wait_for_close(Stm)
-      end
   end.
 
 %%%_* Emacs ====================================================================

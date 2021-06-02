@@ -803,7 +803,7 @@ static ErlNifFunc nif_funcs[] = {
   { "close_listener", 1, close_listener1, 0},
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
-  { "close_connection", 1, close_connection1, 0},
+  { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 2, send2, 0},
