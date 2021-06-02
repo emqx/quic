@@ -24,6 +24,7 @@ endif()
 
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
+set(QUIC_BUILD_PERF "OFF")
 
 # src files
 set(SOURCES
@@ -44,6 +45,9 @@ set(SOURCES
   c_src/quicer_stream.h
   )
 
+# @todo remove -DSO_ATTACH_REUSEPORT_CBPF=51
+add_compile_options(-DSO_ATTACH_REUSEPORT_CBPF=51)
+
 add_subdirectory(submodules/msquic)
 
 add_library(quicer_static STATIC ${SOURCES})
@@ -53,6 +57,7 @@ if (CMAKE_SYSTEM_NAME MATCHES Linux)
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
 endif()
+
 # @todo clean complier warnings in the code
 target_compile_options(quicer_static PUBLIC "-og" "-ggdb3" "-Wno-unused-variable")
 

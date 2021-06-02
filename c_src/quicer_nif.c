@@ -441,8 +441,6 @@ ErlNifResourceType *ctx_stream_t = NULL;
 
 const QUIC_REGISTRATION_CONFIG RegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
-// @todo is 16 enough?
-const uint16_t MAX_ALPN = 16;
 
 void
 resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,

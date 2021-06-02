@@ -117,7 +117,10 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   QUIC_CREDENTIAL_CONFIG_HELPER *Config = NewCredConfig(env, &options);
 
-  // @todo check config
+  if (!Config)
+    {
+      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+    }
   if (!ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config))
     {
       destroy_l_ctx(l_ctx);

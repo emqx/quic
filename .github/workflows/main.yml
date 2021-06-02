@@ -20,7 +20,16 @@ jobs:
       - name: release build
         run: |
           export PATH="/usr/local/opt/erlang@23/bin:$PATH"
+          ulimit -c unlimited
           make ci
+
+      - name: Archive CT Logs
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: mac-ct-logs
+          path: _build/test/logs
+          retention-days: 5
 
   linux:
     runs-on: ubuntu-latest
@@ -40,4 +49,14 @@ jobs:
         with:
           cmake-version: '3.16.9'
       - name: release build with debug log off
-        run: make ci
+        run: |
+          sudo sysctl -w kernel.core_pattern=core
+          ulimit -c unlimited
+          make ci
+      - name: Archive CT Logs
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: linux-ct-logs
+          path: _build/test/logs
+          retention-days: 5
