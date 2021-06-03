@@ -261,8 +261,8 @@ ServerConnectionCallback(HQUIC Connection,
       // The peer has started/created a new stream. The app MUST set the
       // callback handler before returning.
       //
-      c_ctx = (QuicerConnCTX *)Context;
       // maybe alloc later
+      ;
       QuicerStreamCTX *s_ctx = init_s_ctx();
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
@@ -276,9 +276,13 @@ ServerConnectionCallback(HQUIC Connection,
           acc = AcceptorDequeue(c_ctx->acceptor_queue);
           acc_pid = &(acc->Pid);
 
+          enif_mutex_unlock(c_ctx->lock);
           usleep(10000);
+          enif_mutex_lock(c_ctx->lock);
+
           if (retry < 0)
-            {
+          {
+              enif_mutex_unlock(c_ctx->lock);
               destroy_s_ctx(s_ctx);
               return QUIC_STATUS_UNREACHABLE;
             }
