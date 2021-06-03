@@ -529,11 +529,14 @@ tc_alpn_mismatch(Config) ->
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
   receive
     listener_ready ->
-      spawn_monitor(fun() -> quicer:connect("localhost", Port, default_conn_opts(), 5000),
-                             Owner ! connected end),
+      spawn_monitor(fun() ->
+                        Res = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                        Owner ! Res end),
       receive
-        connected ->
-          ct:fail("illegal connection")
+        ok ->
+          ct:fail("illegal connection");
+        {error, transport_down} ->
+          ok
       after 1000 ->
         SPid ! done
       end

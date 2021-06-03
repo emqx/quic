@@ -85,7 +85,9 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
     {ok, _H} ->
       receive
         {quic, connected, Ctx} ->
-          {ok, Ctx}
+          {ok, Ctx};
+        {quic, transport_shutdown, _} ->
+          {error, transport_down}
       end;
     {error, _} = Err ->
       Err

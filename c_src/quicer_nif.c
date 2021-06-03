@@ -220,6 +220,7 @@ ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
 /*----------------------------------------------------------*/
 
 ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
@@ -423,6 +424,7 @@ ERL_NIF_TERM ATOM_QUIC;
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_CLOSED, closed);                                                  \
+  ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \

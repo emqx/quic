@@ -101,6 +101,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // is the expected way for the connection to shut down with this
       // protocol, since we let idle timeout kill the connection.
       //
+      report = enif_make_tuple3(
+          env, ATOM_QUIC, ATOM_TRANS_SHUTDOWN, enif_make_resource(env, c_ctx));
+
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
       //
@@ -227,12 +230,12 @@ ServerConnectionCallback(HQUIC Connection,
         {
           // Owner is gone, we shutdown our side as well.
           // connection shutdown could result a connection close
-          if (!c_ctx->is_closed) 
-          {
-            MsQuic->ConnectionShutdown(Connection,
-                                       QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                       QUIC_STATUS_UNREACHABLE);
-          }
+          if (!c_ctx->is_closed)
+            {
+              MsQuic->ConnectionShutdown(Connection,
+                                         QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                         QUIC_STATUS_UNREACHABLE);
+            }
         }
 
       break;
