@@ -44,6 +44,7 @@ typedef struct
   ErlNifMonitor *owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  BOOLEAN is_closed;
   void *reserved1;
   void *reserved2;
   void *reserved3;

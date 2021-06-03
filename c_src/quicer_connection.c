@@ -32,6 +32,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   QuicerStreamCTX *s_ctx = NULL;
   ErlNifEnv *env = c_ctx->env;
   ERL_NIF_TERM report;
+
+  enif_mutex_lock(c_ctx->lock);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -45,11 +47,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                      &(c_ctx->owner->Pid),
                      NULL,
                      enif_make_tuple3(env,
-                                      enif_make_atom(env, "quic"),
+                                      ATOM_QUIC,
                                       enif_make_atom(env, "connected"),
                                       enif_make_resource(env, c_ctx))))
         {
-          // @todo find yet another acceptor?
+          enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_INTERNAL_ERROR;
         }
       break;
@@ -68,6 +70,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       if (!acc)
         {
           destroy_s_ctx(s_ctx);
+          enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
         }
       s_ctx->owner = acc;
@@ -78,7 +81,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                      &(acc->Pid),
                      NULL,
                      enif_make_tuple3(env,
-                                      enif_make_atom(env, "quic"),
+                                      ATOM_QUIC,
                                       enif_make_atom(env, "new_stream"),
                                       enif_make_resource(env, s_ctx))))
         {
@@ -124,9 +127,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
-      if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+      if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
+          c_ctx->is_closed = TRUE;
         }
       destroy_c_ctx(c_ctx);
       break;
@@ -141,6 +145,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     default:
       break;
     }
+  enif_mutex_unlock(c_ctx->lock);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -154,7 +159,7 @@ ServerConnectionCallback(HQUIC Connection,
   ErlNifPid *acc_pid = NULL;
   ERL_NIF_TERM report;
   ErlNifEnv *env = c_ctx->env;
-
+  enif_mutex_lock(c_ctx->lock);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -174,6 +179,7 @@ ServerConnectionCallback(HQUIC Connection,
           acc_pid = &(acc->Pid);
           if (!(acc && acc_pid && enif_is_process_alive(c_ctx->env, acc_pid)))
             {
+              enif_mutex_unlock(c_ctx->lock);
               return QUIC_STATUS_UNREACHABLE;
             }
         }
@@ -194,7 +200,7 @@ ServerConnectionCallback(HQUIC Connection,
                                      enif_make_atom(c_ctx->env, "new_conn"),
                                      ConnHandler)))
         {
-          //@todo close connection
+          enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
         }
 
@@ -220,9 +226,13 @@ ServerConnectionCallback(HQUIC Connection,
       if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
         {
           // Owner is gone, we shutdown our side as well.
-          MsQuic->ConnectionShutdown(Connection,
-                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                     QUIC_STATUS_UNREACHABLE);
+          // connection shutdown could result a connection close
+          if (!c_ctx->is_closed) 
+          {
+            MsQuic->ConnectionShutdown(Connection,
+                                       QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                       QUIC_STATUS_UNREACHABLE);
+          }
         }
 
       break;
@@ -236,10 +246,12 @@ ServerConnectionCallback(HQUIC Connection,
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
-      if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+      if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
+          c_ctx->is_closed = TRUE;
         }
+      destroy_c_ctx(c_ctx);
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
       //
@@ -276,7 +288,7 @@ ServerConnectionCallback(HQUIC Connection,
                      acc_pid,
                      NULL,
                      enif_make_tuple3(env,
-                                      enif_make_atom(env, "quic"),
+                                      ATOM_QUIC,
                                       enif_make_atom(env, "new_stream"),
                                       enif_make_resource(env, s_ctx))))
         {
@@ -286,6 +298,7 @@ ServerConnectionCallback(HQUIC Connection,
           // @todo, check rfc for the error code
           MsQuic->ConnectionShutdown(
               Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
+          enif_mutex_unlock(s_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
         }
       else
@@ -304,6 +317,8 @@ ServerConnectionCallback(HQUIC Connection,
     default:
       break;
     }
+
+  enif_mutex_unlock(c_ctx->lock);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -418,10 +433,16 @@ close_connection1(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  MsQuic->ConnectionShutdown(c_ctx->Connection,
-                             //@todo, check rfc for the error code
-                             QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                             NO_ERROR);
+  enif_mutex_lock(c_ctx->lock);
+
+  if (!c_ctx->is_closed)
+    {
+      MsQuic->ConnectionShutdown(c_ctx->Connection,
+                                 //@todo, check rfc for the error code
+                                 QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                 NO_ERROR);
+    }
+  enif_mutex_unlock(c_ctx->lock);
   return ATOM_OK;
 }
 

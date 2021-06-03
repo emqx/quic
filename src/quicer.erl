@@ -22,12 +22,14 @@
         , accept/2
         , accept/3
         , close_connection/1
+        , close_connection/2
         , async_close_connection/1
         , accept_stream/2
         , accept_stream/3
         , async_accept_stream/2
         , start_stream/2
         , send/2
+        , async_send/2
         , recv/2
         , close_stream/1
         , async_close_stream/1
@@ -110,11 +112,17 @@ accept(LSock, Opts, Timeout) ->
 
 -spec close_connection(connection_handler()) -> ok.
 close_connection(Conn) ->
+  close_connection(Conn, 5000).
+
+-spec close_connection(connection_handler(), timer:timeout()) -> ok.
+close_connection(Conn, Timeout) ->
   ok = async_close_connection(Conn),
   %% @todo make_ref
   receive
     {quic, closed, Conn} ->
       ok
+  after Timeout ->
+      {error, timeout}
   end.
 
 -spec async_close_connection(connection_handler()) -> ok.
@@ -156,10 +164,23 @@ start_stream(Conn, Opts) when is_list(Opts)->
 start_stream(Conn, Opts) when is_map(Opts)->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
+
 -spec send(stream_handler(), Data :: binary()) ->
-        {ok, Len :: integer()} | {error, any()}.
+        {ok, Len :: integer()} | {error, any(), integer()}.
 send(Stream, Data) ->
-  quicer_nif:send(Stream, Data).
+  case async_send(Stream, Data) of
+    {ok, _Len} = OK ->
+      receive
+        {quic, send_completed, Stream, _} -> OK
+      end;
+    E ->
+      E
+  end.
+
+-spec async_send(stream_handler(), Data :: binary()) ->
+        {ok, Len :: integer()} | {error, any()}.
+async_send(Stream, Data) ->
+  quicer_nif:async_send(Stream, Data).
 
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.

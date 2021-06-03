@@ -32,6 +32,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   s_ctx = (QuicerStreamCTX *)Context;
 
+  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
   env = s_ctx->env;
@@ -42,6 +43,21 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       // A previous StreamSend call has completed, and the context is being
       // returned back to the app.
       //
+      //
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_SEND_COMPLETE,
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown the stream as well.
+          MsQuic->StreamShutdown(
+              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          // @todo return proper bad status
+        }
       free(Event->SEND_COMPLETE.ClientContext);
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
@@ -107,6 +123,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       break;
     }
   enif_mutex_unlock(s_ctx->lock);
+  enif_mutex_unlock(s_ctx->c_ctx->lock);
   return status;
 }
 
@@ -122,7 +139,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   ErlNifEnv *env;
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
   ERL_NIF_TERM report;
-
+  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
   env = s_ctx->env;
   switch (Event->Type)
@@ -132,6 +149,20 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A previous StreamSend call has completed, and the context is being
       // returned back to the app.
       //
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_SEND_COMPLETE,
+          enif_make_resource(env, s_ctx),
+          enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown the stream as well.
+          MsQuic->StreamShutdown(
+              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          // @todo return proper bad status
+        }
       free(Event->SEND_COMPLETE.ClientContext);
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
@@ -194,6 +225,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       break;
     }
   enif_mutex_unlock(s_ctx->lock);
+  enif_mutex_unlock(s_ctx->c_ctx->lock);
   return status;
 }
 
@@ -317,11 +349,14 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
+  enif_mutex_lock(s_ctx->c_ctx->lock);
+  enif_mutex_lock(s_ctx->lock);
   HQUIC Stream = s_ctx->Stream;
 
   if (!enif_inspect_binary(env, ebin, &bin))
     {
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+      enif_mutex_unlock(s_ctx->lock);
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
   //
@@ -336,6 +371,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (SendBuffer == NULL)
     {
+      enif_mutex_unlock(s_ctx->lock);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -366,10 +402,13 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       free(SendBuffer);
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+      enif_mutex_unlock(s_ctx->lock);
       //@todo return error code
       return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ETERM_INT(Status));
     }
   uint64_t len = bin.size;
+  enif_mutex_unlock(s_ctx->c_ctx->lock);
+  enif_mutex_unlock(s_ctx->lock);
   return SUCCESS(ETERM_UINT_64(len));
 }
 

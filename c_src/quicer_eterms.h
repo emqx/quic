@@ -217,6 +217,7 @@ extern ERL_NIF_TERM ATOM_CLOSED;
 extern ERL_NIF_TERM ATOM_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
+extern ERL_NIF_TERM ATOM_SEND_COMPLETE;
 extern ERL_NIF_TERM ATOM_EINVAL;
 extern ERL_NIF_TERM ATOM_QUIC;
 /*----------------------------------------------------------*/
