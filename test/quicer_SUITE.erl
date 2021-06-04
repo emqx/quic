@@ -176,7 +176,7 @@ tc_close_listener(_Config) ->
 tc_conn_basic(Config)->
   Port = 4567,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(
+  {SPid, Ref} = spawn_monitor(
                    fun() ->
                        simple_conn_server(Owner, Config, Port)
                    end),
@@ -185,7 +185,8 @@ tc_conn_basic(Config)->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_connection(Conn),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 1000 ->
       ct:fail("timeout")
   end.
@@ -193,7 +194,7 @@ tc_conn_basic(Config)->
 tc_conn_double_close(Config)->
   Port = 4567,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(
+  {SPid, Ref} = spawn_monitor(
                    fun() ->
                        simple_conn_server(Owner, Config, Port)
                    end),
@@ -206,7 +207,8 @@ tc_conn_double_close(Config)->
       timer:sleep(1000),
       quicer:close_connection(Conn),
       %% Wait for it crash if it will
-      timer:sleep(1000)
+      timer:sleep(1000),
+      ensure_server_exit_normal(Ref)
   after 1000 ->
       ct:fail("timeout")
   end.
@@ -233,6 +235,7 @@ tc_stream_client_init(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_stream(Stm),
       SPid ! done,
@@ -266,7 +269,7 @@ tc_stream_client_send(Config) ->
 tc_stream_passive_receive(Config) ->
   Port = 4569,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -275,7 +278,8 @@ tc_stream_passive_receive(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -283,7 +287,7 @@ tc_stream_passive_receive(Config) ->
 tc_stream_passive_receive_buffer(Config) ->
   Port = 4569,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -294,7 +298,8 @@ tc_stream_passive_receive_buffer(Config) ->
       {ok, <<"p">>} = quicer:recv(Stm, 1),
       {ok, <<"on">>} = quicer:recv(Stm, 2),
       {ok, <<"g">>} = quicer:recv(Stm, 0),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -303,7 +308,7 @@ tc_stream_passive_receive_buffer(Config) ->
 tc_stream_passive_receive_large_buffer_1(Config) ->
   Port = 4569,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -312,7 +317,8 @@ tc_stream_passive_receive_large_buffer_1(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -320,7 +326,7 @@ tc_stream_passive_receive_large_buffer_1(Config) ->
 tc_stream_passive_receive_large_buffer_2(Config) ->
   Port = 4569,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -332,7 +338,8 @@ tc_stream_passive_receive_large_buffer_2(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       timer:sleep(100),
       {ok, <<"pongpongpong">>} = quicer:recv(Stm, 12),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 6000 ->
       ct:fail("timeout")
   end.
@@ -379,17 +386,20 @@ tc_getopt_raw(Config) ->
   Parm = param_conn_quic_version,
   Port = 4569,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 1000),
       {ok, <<1,0,0,0>>} = quicer:getopt(Conn, Parm),
       {ok, Stm} = quicer:start_stream(Conn, []),
+      timer:sleep(10),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
       {error, badarg} = quicer:getopt(Stm, Parm),
       ok = quicer:close_connection(Conn),
-      SPid ! done
-  after 1000 ->
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 3000 ->
       ct:fail("listener_timeout")
   end.
 
@@ -397,7 +407,7 @@ tc_getopt(Config) ->
   Parm = param_conn_statistics,
   Port = 4570,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -410,12 +420,14 @@ tc_getopt(Config) ->
       true = proplists:get_value(send_buffering_enabled, Settings),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
       %% test that op is fallbakced to connection
       {ok, _} = quicer:getopt(Stm, Parm, false),
       {ok, Settings0} = quicer:getopt(Stm, param_conn_settings, false),
       5000 = proplists:get_value(idle_timeout_ms, Settings0),
       ok = quicer:close_connection(Conn),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -424,7 +436,7 @@ tc_getopt(Config) ->
 tc_get_stream_id(Config) ->
   Port = 4571,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -439,7 +451,8 @@ tc_get_stream_id(Config) ->
       {ok, 8} = quicer:get_stream_id(Stm3),
       {error, badarg} = quicer:get_stream_id(Conn),
       ok = quicer:close_connection(Conn),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -547,21 +560,24 @@ tc_alpn_mismatch(Config) ->
 tc_idle_timeout(Config) ->
   Port = 4577,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       Opts = lists:keyreplace(idle_timeout_ms, 1, default_conn_opts(), {idle_timeout_ms, 100}),
       {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+      {ok, Stm0} = quicer:start_stream(Conn, []),
+      {ok, 5} = quicer:send(Stm0, <<"ping0">>),
       timer:sleep(5000),
       {error, stm_open_error} = quicer:start_stream(Conn, []),
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   end.
 
 
 tc_setopt(Config) ->
   Port = 4578,
   Owner = self(),
-  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -588,7 +604,8 @@ tc_setopt(Config) ->
       after 1000 ->
           ct:fail("sending is still bloked", [])
       end,
-      SPid ! done
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
   after 5000 ->
     ct:fail("listener_timeout")
   end.
@@ -623,9 +640,12 @@ echo_server(Owner, Config, Port)->
     {ok, L} ->
       Owner ! listener_ready,
       {ok, Conn} = quicer:accept(L, [], 5000),
+      ct:pal("echo server conn accepted", []),
       {ok, Stm} = quicer:accept_stream(Conn, []),
+      ct:pal("echo server stream accepted", []),
       echo_server_stm_loop(L, Conn, Stm);
     {error, listener_start_error, 200000002} ->
+      ct:pal("echo_server: listener_start_error", []),
       timer:sleep(100),
       echo_server(Owner, Config, Port)
   end.
@@ -643,14 +663,16 @@ echo_server_stm_loop(L, Conn, Stm) ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stm);
-    {quic, closed, Stm, _Flag} ->
-      ct:pal("echo server stream closed", []),
+    {quic, closed, Stm, Flag} ->
+      ct:pal("echo server stream closed ~p", [Flag]),
       echo_server_stm_loop(L, Conn, Stm);
     {set_stm_cnt, N } ->
+      ct:pal("echo_server: set max stream count: ~p", [N]),
       ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => N}),
       {ok, NewStm} = quicer:accept_stream(Conn, []),
       echo_server_stm_loop(L, Conn, NewStm);
     done ->
+      ct:pal("echo server shuting down", []),
       quicer:close_connection(Conn),
       quicer:close_listener(L)
   end.
@@ -710,7 +732,7 @@ simple_stream_server(Owner, Config, Port) ->
   end.
 
 ensure_server_exit_normal(MonRef) ->
-  ensure_server_exit_normal(MonRef, 3000).
+  ensure_server_exit_normal(MonRef, 5000).
 ensure_server_exit_normal(MonRef, Timeout) ->
   receive
     {'DOWN', MonRef, process, _, normal} ->
