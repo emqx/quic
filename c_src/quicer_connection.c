@@ -103,6 +103,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       report = enif_make_tuple3(
           env, ATOM_QUIC, ATOM_TRANS_SHUTDOWN, enif_make_resource(env, c_ctx));
+      enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
@@ -441,7 +442,6 @@ close_connection1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
   enif_mutex_lock(c_ctx->lock);
-
   if (!c_ctx->is_closed)
     {
       MsQuic->ConnectionShutdown(c_ctx->Connection,

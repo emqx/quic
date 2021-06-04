@@ -357,6 +357,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
       enif_mutex_unlock(s_ctx->lock);
+      enif_mutex_unlock(s_ctx->c_ctx->lock);
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
   //
@@ -372,6 +373,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (SendBuffer == NULL)
     {
       enif_mutex_unlock(s_ctx->lock);
+      enif_mutex_unlock(s_ctx->c_ctx->lock);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -403,12 +405,13 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       free(SendBuffer);
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
       enif_mutex_unlock(s_ctx->lock);
+      enif_mutex_unlock(s_ctx->c_ctx->lock);
       //@todo return error code
       return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ETERM_INT(Status));
     }
   uint64_t len = bin.size;
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
   enif_mutex_unlock(s_ctx->lock);
+  enif_mutex_unlock(s_ctx->c_ctx->lock);
   return SUCCESS(ETERM_UINT_64(len));
 }
 
@@ -511,8 +514,8 @@ close_stream1(ErlNifEnv *env,
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }
     }
-  enif_release_resource(s_ctx);
   enif_mutex_unlock(s_ctx->lock);
+  enif_release_resource(s_ctx);
   return ret;
 }
 
