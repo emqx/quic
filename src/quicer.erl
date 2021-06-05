@@ -190,9 +190,11 @@ recv(Stream, Count) ->
   case quicer_nif:recv(Stream, Count) of
     {ok, not_ready} ->
       %% Data is not ready yet but last call has been reg.
+      ct:pal("wait for conti...."),
       receive
         %% @todo recv_mark
         {quic, Stream, continue} ->
+          ct:pal("conti...."),
           recv(Stream, Count)
       end;
     {ok, Bin} ->

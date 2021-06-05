@@ -314,7 +314,11 @@ tc_stream_passive_receive_large_buffer_1(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
+      %% put some sleep to ensure server side won't send the data in batch
+      timer:sleep(100),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
+      %% put some sleep to ensure server side won't send the data in batch
+      timer:sleep(100),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
       SPid ! done,

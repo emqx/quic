@@ -444,39 +444,55 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_EINVAL);
     }
 
-  if (s_ctx->Buffer && s_ctx->BufferLen > 0
+  if (s_ctx->Buffer && s_ctx->BufferLen > 0 && s_ctx->is_buff_ready
       && (0 == size_req || size_req <= s_ctx->BufferLen - s_ctx->BufferOffset))
     {
       uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
       s_ctx->passive_recv_bytes -= size_consumed;
-      s_ctx->is_wait_for_data = s_ctx->passive_recv_bytes > 0 ? true : false;
-
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
+      s_ctx->is_wait_for_data = false;
 
       // if we have some remaining bytes
       // @todo disable receving when it is over some threshold.
-      MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+      //MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
 
-      if (0 == s_ctx->BufferLen - s_ctx->BufferOffset - size_consumed)
-        {
+      if (0 == s_ctx->BufferLen - s_ctx->BufferOffset - size_consumed || 0 == size_req)
+      { // perfect match
+         //MsQuic->StreamReceiveComplete(s_ctx->Stream, s_ctx->BufferLen);
+         printf("Buffer has perfect bytes consumed: %lu\n", size_consumed);
+         MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
+         MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
           s_ctx->BufferOffset = 0;
+          s_ctx->Buffer = NULL;
+          s_ctx->BufferLen = 0;
+          s_ctx->passive_recv_bytes = 0;
+          s_ctx->is_wait_for_data = FALSE;
+          s_ctx->is_buff_ready = FALSE;
         }
       else
-        {
-          s_ctx->BufferOffset += size_consumed;
-        }
+      {
+        printf("Buffer has more data than we need, consumed %lu\n", size_consumed);
+        MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
+        MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+        s_ctx->is_buff_ready = FALSE;
+        s_ctx->is_wait_for_data = FALSE;
+        //s_ctx->BufferOffset += size_consumed;
+        s_ctx->Buffer = NULL;
+      }
+
       res = SUCCESS(enif_make_binary(env, &bin));
     }
   else
     { // we want more data
-      s_ctx->is_wait_for_data = true;
+      printf("We want more data: %lu\n", size_req);
+      s_ctx->is_wait_for_data = TRUE;
       s_ctx->passive_recv_bytes = size_req;
 
-      // complete recv with 0 bytes
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+      // to complete a async handling, complete recv with 0 bytes
+      //MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
 
-      // reenable receving so new data can flow in.
-      MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+      // reenable receving so new data can flow in since we consumed 0
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+      MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
 
       // nif caller will get {ok, not_ready}
       // which means its call is acked and it should wait for
@@ -558,21 +574,25 @@ handle_stream_recv_event(HQUIC Stream,
 
   if (false == s_ctx->owner->active)
     { // passive receive
-      if (!s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0)
-        {
+      // important:
+      // for passive receive, it is not ok to call
+      // MsQuic->StreamReceiveSetEnabled to enable receiving
+      if (!s_ctx->is_wait_for_data)
+      { //no one is waiting
           // msquic actually use only one buffer for API calls
-          assert(1 == Event->RECEIVE.BufferCount);
-          status = QUIC_STATUS_PENDING;
+          //assert(1 == Event->RECEIVE.BufferCount);
+          s_ctx->is_buff_ready = TRUE;
+          Event->RECEIVE.TotalBufferLength = 0;
+          status = QUIC_STATUS_SUCCESS;
         }
-      else if (s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0
-               && (0 == s_ctx->passive_recv_bytes // 0 means size unspecified
-                   || s_ctx->passive_recv_bytes
-                          <= Event->RECEIVE.TotalBufferLength))
-        { // owner is waiting for data and we have enough data to report
-          // msquic actually use only one buffer for API calls
-          s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
-          s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
-          // notify owner to pull
+      else /* if (s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0 */
+           /*     && (0 == s_ctx->passive_recv_bytes // 0 means size unspecified */
+           /*         || s_ctx->passive_recv_bytes */
+           /*                <= Event->RECEIVE.TotalBufferLength)) */
+        { // Owner is waiting for data and we just report that
+          printf("We have new data: wanted %lu vs buffer %lu\n",
+                 s_ctx->passive_recv_bytes,
+                 Event->RECEIVE.TotalBufferLength);//
           enif_send(NULL,
                     &(s_ctx->owner->Pid),
                     NULL,
@@ -582,14 +602,20 @@ handle_stream_recv_event(HQUIC Stream,
                                      ATOM_QUIC_STATUS_CONTINUE));
           // so we hand over data to the owner, aka async handling,
           // add we mark status pending to block the receiving.
-          s_ctx->is_wait_for_data = false;
+          //s_ctx->is_wait_for_data = false;
+          s_ctx->is_buff_ready = TRUE;
+          //Event->RECEIVE.TotalBufferLength = 0;
+          //status = QUIC_STATUS_SUCCESS;
           status = QUIC_STATUS_PENDING;
         }
-      else
-        { // Owner is waiting but need more date to poll
-          // Mark we handled 0 bytes and let it contitune to recv.
-          Event->RECEIVE.TotalBufferLength = 0;
-        }
+      /* else */
+      /*   { // Owner is waiting but need more date to poll, */
+      /*     // mark we handled 0 bytes and let it contitune to recv. */
+      /*     printf("Owner is waiting more data: %lu\n", s_ctx->passive_recv_bytes); */
+      /*     Event->RECEIVE.TotalBufferLength = 0; */
+      /*     s_ctx->is_buff_ready = TRUE; */
+      /*     status = QUIC_STATUS_SUCCESS; */
+      /*   } */
     }
   else
     { // active receive

@@ -71,6 +71,7 @@ init_s_ctx()
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->closed = false;
   s_ctx->passive_recv_bytes = 0;
+  s_ctx->is_wait_for_data = false;
   s_ctx->Buffer = NULL;
   s_ctx->BufferLen = 0;
   s_ctx->BufferOffset = 0;
