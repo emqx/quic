@@ -77,7 +77,7 @@ close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
 -spec connect(inet:hostname(), inet:port_number(), proplists:proplists() | map(), timeout()) ->
-        {ok, connection_handler()} | {error, any()}.
+        {ok, connection_handler()} | {error, any(), integer()}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
   connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
@@ -86,8 +86,8 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
       receive
         {quic, connected, Ctx} ->
           {ok, Ctx};
-        {quic, transport_shutdown, _} ->
-          {error, transport_down}
+        {quic, transport_shutdown, _, Reason} ->
+          {error, transport_down, Reason}
       end;
     {error, _} = Err ->
       Err

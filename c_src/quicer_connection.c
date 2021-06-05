@@ -101,8 +101,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // is the expected way for the connection to shut down with this
       // protocol, since we let idle timeout kill the connection.
       //
-      report = enif_make_tuple3(
-          env, ATOM_QUIC, ATOM_TRANS_SHUTDOWN, enif_make_resource(env, c_ctx));
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_TRANS_SHUTDOWN,
+          enif_make_resource(env, c_ctx),
+          enif_make_uint(env, Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
       break;
@@ -258,12 +262,12 @@ ServerConnectionCallback(HQUIC Connection,
       destroy_c_ctx(c_ctx);
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-      //
-      // The peer has started/created a new stream. The app MUST set the
-      // callback handler before returning.
-      //
-      // maybe alloc later
-      ;
+        //
+        // The peer has started/created a new stream. The app MUST set the
+        // callback handler before returning.
+        //
+        // maybe alloc later
+        ;
       QuicerStreamCTX *s_ctx = init_s_ctx();
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
@@ -282,7 +286,7 @@ ServerConnectionCallback(HQUIC Connection,
           enif_mutex_lock(c_ctx->lock);
 
           if (retry < 0)
-          {
+            {
               enif_mutex_unlock(c_ctx->lock);
               destroy_s_ctx(s_ctx);
               return QUIC_STATUS_UNREACHABLE;
