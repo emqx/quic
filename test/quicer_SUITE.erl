@@ -572,7 +572,7 @@ tc_idle_timeout(Config) ->
       {ok, Stm0} = quicer:start_stream(Conn, []),
       {ok, 5} = quicer:send(Stm0, <<"ping0">>),
       timer:sleep(5000),
-      {error, stm_open_error} = quicer:start_stream(Conn, []),
+      {error, stm_open_error, 22} = quicer:start_stream(Conn, []),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   end.
@@ -625,6 +625,7 @@ tc_app_echo_server(Config) ->
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
@@ -762,7 +763,8 @@ default_listen_opts(Config) ->
   , {alpn, ["sample"]}
   , {idle_timeout_ms, 10000}
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
-  , {peer_bidi_stream_count, 10}].
+  , {peer_bidi_stream_count, 10}
+  ].
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
