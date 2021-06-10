@@ -451,14 +451,9 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       s_ctx->passive_recv_bytes -= size_consumed;
       s_ctx->is_wait_for_data = false;
 
-      // if we have some remaining bytes
-      // @todo disable receving when it is over some threshold.
-      //MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
-
       if (0 == s_ctx->BufferLen - s_ctx->BufferOffset - size_consumed || 0 == size_req)
-      { // perfect match
-         //MsQuic->StreamReceiveComplete(s_ctx->Stream, s_ctx->BufferLen);
-         printf("Buffer has perfect bytes consumed: %lu\n", size_consumed);
+      {
+         // Buffer has perfect bytes consumed
          MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
           s_ctx->BufferOffset = 0;
@@ -470,7 +465,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
       else
       {
-        printf("Buffer has more data than we need, consumed %lu\n", size_consumed);
+        // Buffer has more data than we need
         MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
         MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
         s_ctx->is_buff_ready = FALSE;
@@ -482,21 +477,16 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       res = SUCCESS(enif_make_binary(env, &bin));
     }
   else
-    { // we want more data
-      printf("We want more data: %lu\n", size_req);
+    { // want more data
       s_ctx->is_wait_for_data = TRUE;
       s_ctx->passive_recv_bytes = size_req;
-
-      // to complete a async handling, complete recv with 0 bytes
-      //MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
 
       // reenable receving so new data can flow in since we consumed 0
       MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
       MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
 
       // nif caller will get {ok, not_ready}
-      // which means its call is acked and it should wait for
-      // recv the data in async.
+      // this is a ack to its call
       res = SUCCESS(ATOM_ERROR_NOT_READY);
     }
   enif_mutex_unlock(s_ctx->lock);
@@ -585,14 +575,8 @@ handle_stream_recv_event(HQUIC Stream,
           Event->RECEIVE.TotalBufferLength = 0;
           status = QUIC_STATUS_SUCCESS;
         }
-      else /* if (s_ctx->is_wait_for_data && Event->RECEIVE.BufferCount > 0 */
-           /*     && (0 == s_ctx->passive_recv_bytes // 0 means size unspecified */
-           /*         || s_ctx->passive_recv_bytes */
-           /*                <= Event->RECEIVE.TotalBufferLength)) */
+      else
         { // Owner is waiting for data and we just report that
-          printf("We have new data: wanted %lu vs buffer %lu\n",
-                 s_ctx->passive_recv_bytes,
-                 Event->RECEIVE.TotalBufferLength);//
           enif_send(NULL,
                     &(s_ctx->owner->Pid),
                     NULL,
@@ -608,18 +592,9 @@ handle_stream_recv_event(HQUIC Stream,
           //status = QUIC_STATUS_SUCCESS;
           status = QUIC_STATUS_PENDING;
         }
-      /* else */
-      /*   { // Owner is waiting but need more date to poll, */
-      /*     // mark we handled 0 bytes and let it contitune to recv. */
-      /*     printf("Owner is waiting more data: %lu\n", s_ctx->passive_recv_bytes); */
-      /*     Event->RECEIVE.TotalBufferLength = 0; */
-      /*     s_ctx->is_buff_ready = TRUE; */
-      /*     status = QUIC_STATUS_SUCCESS; */
-      /*   } */
     }
   else
     { // active receive
-
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
 
       ERL_NIF_TERM report = enif_make_tuple6(
