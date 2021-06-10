@@ -171,6 +171,7 @@ start_stream(Conn, Opts) when is_map(Opts)->
         {ok, Len :: integer()} | {error, any(), integer()}.
 send(Stream, Data) ->
   case async_send(Stream, Data) of
+    %% @todo make ref
     {ok, _Len} = OK ->
       receive
         {quic, send_completed, Stream, _} -> OK
@@ -190,11 +191,9 @@ recv(Stream, Count) ->
   case quicer_nif:recv(Stream, Count) of
     {ok, not_ready} ->
       %% Data is not ready yet but last call has been reg.
-      ct:pal("wait for conti...."),
       receive
         %% @todo recv_mark
         {quic, Stream, continue} ->
-          ct:pal("conti...."),
           recv(Stream, Count)
       end;
     {ok, Bin} ->

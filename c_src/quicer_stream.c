@@ -444,44 +444,41 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_EINVAL);
     }
 
-  if (s_ctx->Buffer && s_ctx->BufferLen > 0 && s_ctx->is_buff_ready
-      && (0 == size_req || size_req <= s_ctx->BufferLen - s_ctx->BufferOffset))
-    {
+  if (s_ctx->is_buff_ready && s_ctx->Buffer && s_ctx->BufferLen > 0
+      && (0 == size_req || size_req <= s_ctx->BufferLen))
+    { // buffer is ready to consume
       uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
-      s_ctx->passive_recv_bytes -= size_consumed;
-      s_ctx->is_wait_for_data = false;
+      s_ctx->is_wait_for_data = FALSE;
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
 
-      if (0 == s_ctx->BufferLen - s_ctx->BufferOffset - size_consumed || 0 == size_req)
-      {
-         // Buffer has perfect bytes consumed
-         MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
-         MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
-          s_ctx->BufferOffset = 0;
+      if (size_consumed != s_ctx->BufferLen)
+        {
+          // explicit enable recv since we have some data left unconusmed
+          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+        }
+
+      if (0 == s_ctx->BufferLen - size_consumed || 0 == size_req)
+        {
+          // Buffer has perfect bytes consumed
           s_ctx->Buffer = NULL;
           s_ctx->BufferLen = 0;
-          s_ctx->passive_recv_bytes = 0;
-          s_ctx->is_wait_for_data = FALSE;
           s_ctx->is_buff_ready = FALSE;
         }
       else
-      {
-        // Buffer has more data than we need
-        MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
-        MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
-        s_ctx->is_buff_ready = FALSE;
-        s_ctx->is_wait_for_data = FALSE;
-        //s_ctx->BufferOffset += size_consumed;
-        s_ctx->Buffer = NULL;
-      }
+        {
+          // Buffer has more data than we need
+          s_ctx->is_buff_ready = FALSE;
+          s_ctx->Buffer = NULL;
+          s_ctx->BufferLen = 0;
+        }
 
       res = SUCCESS(enif_make_binary(env, &bin));
     }
   else
-    { // want more data
+    { // want more data in buffer
       s_ctx->is_wait_for_data = TRUE;
-      s_ctx->passive_recv_bytes = size_req;
 
-      // reenable receving so new data can flow in since we consumed 0
+      // let msquic buffer more and explicit enable recv
       MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
       MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
 
@@ -530,23 +527,20 @@ recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 {
   // note, make sure ownership of bin should be transfered, after call
   uint64_t bin_size = 0;
-  uint64_t offset = s_ctx->BufferOffset;
+  assert(req_len <= s_ctx->BufferLen);
   // Decide binary size
-  if (req_len == 0 || req_len >= s_ctx->BufferLen - s_ctx->BufferOffset)
-    { // we need more data than buffer can provide
-      bin_size = s_ctx->BufferLen - s_ctx->BufferOffset;
-      req_len = bin_size; // cover the case of req_len = 0
+  if (req_len == 0)
+    { // we need more data than buffer has
+      bin_size = s_ctx->BufferLen;
     }
-  else if (req_len < s_ctx->BufferLen)
+  else
     { // buffer size is larger than we want
       bin_size = req_len;
     }
 
   enif_alloc_binary(bin_size, bin);
 
-  CxPlatCopyMemory(bin->data, s_ctx->Buffer + offset, bin_size);
-  req_len -= bin_size;
-  assert(req_len == 0);
+  CxPlatCopyMemory(bin->data, s_ctx->Buffer, bin_size);
   return bin_size;
 }
 
@@ -564,33 +558,32 @@ handle_stream_recv_event(HQUIC Stream,
 
   if (false == s_ctx->owner->active)
     { // passive receive
-      // important:
-      // for passive receive, it is not ok to call
-      // MsQuic->StreamReceiveSetEnabled to enable receiving
-      if (!s_ctx->is_wait_for_data)
-      { //no one is waiting
-          // msquic actually use only one buffer for API calls
-          //assert(1 == Event->RECEIVE.BufferCount);
-          s_ctx->is_buff_ready = TRUE;
-          Event->RECEIVE.TotalBufferLength = 0;
-          status = QUIC_STATUS_SUCCESS;
-        }
-      else
-        { // Owner is waiting for data and we just report that
-          enif_send(NULL,
-                    &(s_ctx->owner->Pid),
-                    NULL,
-                    enif_make_tuple3(env,
-                                     ATOM_QUIC,
-                                     enif_make_resource(env, s_ctx),
-                                     ATOM_QUIC_STATUS_CONTINUE));
-          // so we hand over data to the owner, aka async handling,
-          // add we mark status pending to block the receiving.
-          //s_ctx->is_wait_for_data = false;
-          s_ctx->is_buff_ready = TRUE;
-          //Event->RECEIVE.TotalBufferLength = 0;
-          //status = QUIC_STATUS_SUCCESS;
-          status = QUIC_STATUS_PENDING;
+      /* important:
+         for passive receive, it is not ok to call
+         MsQuic->StreamReceiveSetEnabled to enable receiving
+         becasue it can casue busy spinning:
+         trigger event and handle event in a loop
+      */
+      s_ctx->is_buff_ready = TRUE;
+      status = QUIC_STATUS_PENDING;
+
+      if (s_ctx->is_wait_for_data)
+        { // Owner is waiting for data
+          // notify owner to trigger async recv
+          // @todo, can we expect some owner to take over?
+          if (!enif_send(NULL,
+                         &(s_ctx->owner->Pid),
+                         NULL,
+                         enif_make_tuple3(env,
+                                          ATOM_QUIC,
+                                          enif_make_resource(env, s_ctx),
+                                          ATOM_QUIC_STATUS_CONTINUE)))
+            {
+              // App down, shutdown stream
+              MsQuic->StreamShutdown(Stream,
+                                     QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+                                     QUIC_STATUS_UNREACHABLE);
+            }
         }
     }
   else
