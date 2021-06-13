@@ -22,13 +22,17 @@
         , accept/2
         , accept/3
         , close_connection/1
+        , close_connection/2
+        , async_close_connection/1
         , accept_stream/2
         , accept_stream/3
         , async_accept_stream/2
         , start_stream/2
         , send/2
+        , async_send/2
         , recv/2
         , close_stream/1
+        , async_close_stream/1
         , sockname/1
         , getopt/2
         , getopt/3
@@ -73,7 +77,7 @@ close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
 -spec connect(inet:hostname(), inet:port_number(), proplists:proplists() | map(), timeout()) ->
-        {ok, connection_handler()} | {error, any()}.
+        {ok, connection_handler()} | {error, any(), integer()}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
   connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
@@ -81,7 +85,9 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
     {ok, _H} ->
       receive
         {quic, connected, Ctx} ->
-          {ok, Ctx}
+          {ok, Ctx};
+        {quic, transport_shutdown, _, Reason} ->
+          {error, transport_down, Reason}
       end;
     {error, _} = Err ->
       Err
@@ -108,7 +114,22 @@ accept(LSock, Opts, Timeout) ->
 
 -spec close_connection(connection_handler()) -> ok.
 close_connection(Conn) ->
-  quicer_nif:close_connection(Conn).
+  close_connection(Conn, 5000).
+
+-spec close_connection(connection_handler(), timer:timeout()) -> ok.
+close_connection(Conn, Timeout) ->
+  ok = async_close_connection(Conn),
+  %% @todo make_ref
+  receive
+    {quic, closed, Conn} ->
+      ok
+  after Timeout ->
+      {error, timeout}
+  end.
+
+-spec async_close_connection(connection_handler()) -> ok.
+async_close_connection(Conn) ->
+  quicer_nif:async_close_connection(Conn).
 
 -spec accept_stream(connection_handler(), proplists:proplist() | map()) ->
         {ok, stream_handler()} | {error, any()}.
@@ -117,7 +138,7 @@ accept_stream(Conn, Opts) ->
 accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
   accept_stream(Conn, maps:from_list(Opts), Timeout);
 accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
-  % @todo msg ref hack
+  % @todo make_ref
   % @todo error handling
   case quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)) of
     {ok, Conn} ->
@@ -145,10 +166,24 @@ start_stream(Conn, Opts) when is_list(Opts)->
 start_stream(Conn, Opts) when is_map(Opts)->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
+
 -spec send(stream_handler(), Data :: binary()) ->
-        {ok, Len :: integer()} | {error, any()}.
+        {ok, Len :: integer()} | {error, any(), integer()}.
 send(Stream, Data) ->
-  quicer_nif:send(Stream, Data).
+  case async_send(Stream, Data) of
+    %% @todo make ref
+    {ok, _Len} = OK ->
+      receive
+        {quic, send_completed, Stream, _} -> OK
+      end;
+    E ->
+      E
+  end.
+
+-spec async_send(stream_handler(), Data :: binary()) ->
+        {ok, Len :: integer()} | {error, any()}.
+async_send(Stream, Data) ->
+  quicer_nif:async_send(Stream, Data).
 
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
@@ -167,7 +202,15 @@ recv(Stream, Count) ->
 
 -spec close_stream(stream_handler()) -> ok.
 close_stream(Stream) ->
-  quicer_nif:close_stream(Stream).
+  ok = async_close_stream(Stream),
+  receive
+    {quic, closed, Stream, _IsGraceful} ->
+      ok
+  end.
+
+-spec async_close_stream(stream_handler()) -> ok.
+async_close_stream(Stream) ->
+  quicer_nif:async_close_stream(Stream).
 
 -spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.

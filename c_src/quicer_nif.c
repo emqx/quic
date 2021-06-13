@@ -220,9 +220,11 @@ ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
 /*----------------------------------------------------------*/
 
 ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
+ERL_NIF_TERM ATOM_SEND_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
 
@@ -422,9 +424,11 @@ ERL_NIF_TERM ATOM_QUIC;
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_CLOSED, closed);                                                  \
+  ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
+  ATOM(ATOM_SEND_COMPLETE, send_completed);                                   \
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);
 
@@ -803,12 +807,12 @@ static ErlNifFunc nif_funcs[] = {
   { "close_listener", 1, close_listener1, 0},
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
-  { "close_connection", 1, close_connection1, 0},
+  { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
-  { "send", 2, send2, 0},
+  { "async_send", 2, send2, 0},
   { "recv", 2, recv2, 0},
-  { "close_stream", 1, close_stream1, 0},
+  { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
   { "setopt", 3, setopt3, 0}

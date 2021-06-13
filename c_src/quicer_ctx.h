@@ -20,6 +20,11 @@ limitations under the License.
 #include "quicer_nif.h"
 #include "quicer_queue.h"
 
+#define _CTX_CALLBACK_WRITE_
+#define _CTX_CALLBACK_READ_
+#define _CTX_NIF_WRITE_
+#define _CTX_NIF_READ_
+
 typedef struct
 {
   HQUIC Configuration;
@@ -44,6 +49,7 @@ typedef struct
   ErlNifMonitor *owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  BOOLEAN is_closed;
   void *reserved1;
   void *reserved2;
   void *reserved3;
@@ -59,11 +65,10 @@ typedef struct
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
   BOOLEAN closed;
-  uint8_t *Buffer;
-  uint64_t BufferLen;
-  uint64_t BufferOffset;
-  BOOLEAN is_wait_for_data;
-  uint64_t passive_recv_bytes; // 0 means size unspecified
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint8_t *Buffer;
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t BufferLen;
+  _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
+  _CTX_CALLBACK_WRITE_ BOOLEAN is_buff_ready;
   void *reserved1;
   void *reserved2;
   void *reserved3;

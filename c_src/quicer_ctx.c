@@ -51,6 +51,7 @@ init_c_ctx()
   c_ctx->owner_mon
       = CXPLAT_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
+  c_ctx->is_closed = FALSE;
   return c_ctx;
 }
 
@@ -69,10 +70,10 @@ init_s_ctx()
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->closed = false;
-  s_ctx->passive_recv_bytes = 0;
+  s_ctx->is_wait_for_data = false;
   s_ctx->Buffer = NULL;
   s_ctx->BufferLen = 0;
-  s_ctx->BufferOffset = 0;
+  s_ctx->is_buff_ready = false;
   return s_ctx;
 }
 
