@@ -516,6 +516,7 @@ close_stream1(ErlNifEnv *env,
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }
+      s_ctx->closed = TRUE;
     }
   enif_mutex_unlock(s_ctx->lock);
   enif_release_resource(s_ctx);
