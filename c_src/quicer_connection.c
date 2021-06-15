@@ -448,6 +448,7 @@ close_connection1(ErlNifEnv *env,
   enif_mutex_lock(c_ctx->lock);
   if (!c_ctx->is_closed)
     {
+      c_ctx->is_closed = TRUE;
       MsQuic->ConnectionShutdown(c_ctx->Connection,
                                  //@todo, check rfc for the error code
                                  QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
