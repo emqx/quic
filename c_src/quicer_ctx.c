@@ -69,11 +69,11 @@ init_s_ctx()
   // @todo would be better to useacceptor's env.
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
-  s_ctx->closed = false;
-  s_ctx->is_wait_for_data = false;
+  s_ctx->is_closed = FALSE;
+  s_ctx->is_wait_for_data = FALSE;
   s_ctx->Buffer = NULL;
   s_ctx->BufferLen = 0;
-  s_ctx->is_buff_ready = false;
+  s_ctx->is_buff_ready = FALSE;
   return s_ctx;
 }
 

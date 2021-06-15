@@ -64,7 +64,7 @@ typedef struct
   ErlNifMonitor *owner_mon;
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
-  BOOLEAN closed;
+  BOOLEAN is_closed;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint8_t *Buffer;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t BufferLen;
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;

@@ -115,7 +115,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
       MsQuic->StreamClose(Stream);
-      s_ctx->closed = true;
+      s_ctx->is_closed = true;
 
       destroy_s_ctx(s_ctx);
       break;
@@ -345,21 +345,28 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ErlNifBinary bin;
   ERL_NIF_TERM estream = argv[0];
   ERL_NIF_TERM ebin = argv[1];
+  if (!enif_inspect_binary(env, ebin, &bin))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
   if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
+
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
+
+  if (s_ctx->is_closed || s_ctx->c_ctx->is_closed)
+    {
+      enif_mutex_unlock(s_ctx->c_ctx->lock);
+      enif_mutex_unlock(s_ctx->lock);
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
   HQUIC Stream = s_ctx->Stream;
 
-  if (!enif_inspect_binary(env, ebin, &bin))
-    {
-      MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
-      enif_mutex_unlock(s_ctx->lock);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
   //
   // Allocates and builds the buffer to send over the stream.
   //
@@ -507,7 +514,7 @@ close_stream1(ErlNifEnv *env,
   // we don't use trylock since we are in NIF call.
   enif_mutex_lock(s_ctx->lock);
   enif_keep_resource(s_ctx);
-  if (!s_ctx->closed)
+  if (!s_ctx->is_closed)
     {
       if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
                           s_ctx->Stream,
@@ -516,7 +523,7 @@ close_stream1(ErlNifEnv *env,
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }
-      s_ctx->closed = TRUE;
+      s_ctx->is_closed = TRUE;
     }
   enif_mutex_unlock(s_ctx->lock);
   enif_release_resource(s_ctx);
