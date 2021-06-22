@@ -50,7 +50,8 @@
         , tc_stream_passive_receive_large_buffer_2/1
         , tc_stream_send_after_conn_close/1
         , tc_stream_send_after_async_conn_close/1
-
+        , tc_stream_passive_switch_to_active/1
+        , tc_stream_active_switch_to_passive/1
         , tc_getopt_raw/1
         , tc_getopt/1
         , tc_setopt/1
@@ -263,6 +264,62 @@ tc_stream_client_send(Config) ->
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_passive_switch_to_active(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+      {ok, <<"ping_passive">>} = quicer:recv(Stm, 0),
+      quicer:setopt(Stm, active, true),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {error, einval} = quicer:recv(Stm, 0),
+      receive
+        {quic, <<"ping_active">>, Stm, _, _, _} -> ok
+      end,
+      quicer:setopt(Stm, active, 100),
+      {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
+      receive
+        {quic, <<"ping_active_2">>, Stm, _, _, _} -> ok
+      end,
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_active_switch_to_passive(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {error, einval} = quicer:recv(Stm, 0),
+      receive
+        {quic, <<"ping_active">>, Stm, _, _, _} -> ok
+      end,
+      quicer:setopt(Stm, active, false),
+      {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+      {ok, <<"ping_passive">>} = quicer:recv(Stm, 0),
+      receive
+        Other -> ct:fail("Unexpected recv : ~p", [Other])
+      after 0 ->
+          ok
+      end,
+      {ok, 14} = quicer:send(Stm, <<"ping_passive_2">>),
+      {ok, <<"ping_passive_2">>} = quicer:recv(Stm, 0),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
       ct:fail("timeout")
   end.
 

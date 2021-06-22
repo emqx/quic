@@ -201,7 +201,9 @@ recv(Stream, Count) ->
           recv(Stream, Count)
       end;
     {ok, Bin} ->
-      {ok, Bin}
+      {ok, Bin};
+    {error, _} = E ->
+      E
    end.
 
 -spec close_stream(stream_handler()) -> ok | {error, any()}.
