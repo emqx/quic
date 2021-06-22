@@ -32,6 +32,7 @@
         , async_send/2
         , recv/2
         , close_stream/1
+        , close_stream/2
         , async_close_stream/1
         , sockname/1
         , getopt/2
@@ -200,15 +201,25 @@ recv(Stream, Count) ->
       {ok, Bin}
    end.
 
--spec close_stream(stream_handler()) -> ok.
+-spec close_stream(stream_handler()) -> ok | {error, any()}.
 close_stream(Stream) ->
-  ok = async_close_stream(Stream),
-  receive
-    {quic, closed, Stream, _IsGraceful} ->
-      ok
+  close_stream(Stream, infinity).
+
+-spec close_stream(stream_handler(), timer:timeout()) -> ok | {error, any()}.
+close_stream(Stream, Timeout) ->
+  case async_close_stream(Stream) of
+    ok ->
+      receive
+        {quic, closed, Stream, _IsGraceful} ->
+          ok
+      after Timeout ->
+          {error, timeout}
+      end;
+    Err ->
+      Err
   end.
 
--spec async_close_stream(stream_handler()) -> ok.
+-spec async_close_stream(stream_handler()) -> ok | {error, any()}.
 async_close_stream(Stream) ->
   quicer_nif:async_close_stream(Stream).
 
