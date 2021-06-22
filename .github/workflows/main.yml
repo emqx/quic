@@ -58,5 +58,5 @@ jobs:
         if: failure()
         with:
           name: linux-ct-logs
-          path: _build/test/logs
+          path: _build/test/
           retention-days: 5
