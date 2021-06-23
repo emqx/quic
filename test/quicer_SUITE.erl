@@ -54,6 +54,7 @@
         , tc_stream_active_switch_to_passive/1
         , tc_getopt_raw/1
         , tc_getopt/1
+        , tc_getopt_stream_active/1
         , tc_setopt/1
         , tc_get_stream_id/1
         , tc_getstat/1
@@ -486,6 +487,28 @@ tc_getopt(Config) ->
       {ok, _} = quicer:getopt(Stm, Parm, false),
       {ok, Settings0} = quicer:getopt(Stm, param_conn_settings, false),
       5000 = proplists:get_value(idle_timeout_ms, Settings0),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_getopt_stream_active(Config) ->
+  Parm = active,
+  Port = 4570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {error,parm_error} = quicer:getopt(Conn, Parm, false),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
+      {ok, true} = quicer:getopt(Stm, Parm, false),
+      ok = quicer:setopt(Stm, active, false),
+      {ok, false} = quicer:getopt(Stm, Parm, false),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
