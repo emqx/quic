@@ -71,6 +71,7 @@
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/inet.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(PROPTEST(M,F), true = proper:quickcheck(M:F())).
 
@@ -143,14 +144,16 @@ tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
 
 tc_open_lib_test(_Config) ->
-  ok = quicer_nif:open_lib(),
+  {ok, false} = quicer_nif:open_lib(),
   %% verify that reopen lib success.
-  ok = quicer_nif:open_lib().
+  {ok, false} = quicer_nif:open_lib().
 
 tc_close_lib_test(_Config) ->
-  ok = quicer_nif:open_lib(),
+  {ok, false} = quicer_nif:open_lib(),
   ok = quicer_nif:close_lib(),
-  ok = quicer_nif:close_lib().
+  ok = quicer_nif:close_lib(),
+  {ok, Res0} = quicer_nif:open_lib(),
+  ?assert(Res0 == true orelse Res0 == debug).
 
 tc_lib_registration(_Config) ->
   ok = quicer_nif:reg_open(),
