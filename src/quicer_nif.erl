@@ -39,26 +39,19 @@
 
 init() ->
   NifName = "libquicer_nif",
-  Dir = code:priv_dir(quicer),
-  Niflib = case file:read_file_info(Dir) of
-             {ok, #file_info{type=directory}} ->
-               filename:join(Dir, NifName);
-             {error, enotdir} -> %% maybe escript,
-               Escript = filename:dirname(filename:dirname(Dir)),
-               case file:read_file_info(Escript) of
-                 {ok, #file_info{type=regular}} ->
-                   %% try locate the file in same dir of escript
-                   filename:join(filename:dirname(Escript), NifName);
-                 _ ->
-                   error(nif_not_found)
-               end
-           end,
+  {ok, Niflib} = locate_lib(code:priv_dir(quicer), NifName),
   ok = erlang:load_nif(Niflib, 0).
 
 open_lib() ->
-  open_lib(code:priv_dir(quicer)).
+  LibFile = case locate_lib(code:priv_dir(quicer), "libmsquic.lttng.so") of
+              {ok, File} ->
+                File;
+              {error, _} ->
+                code:priv_dir(quicer)
+            end,
+  open_lib(LibFile).
 
-open_lib(_PrivDir) ->
+open_lib(_LttngLib) ->
   erlang:nif_error(nif_library_not_loaded).
 
 close_lib() ->
@@ -108,3 +101,22 @@ getopt(_Handle, _Optname, _IsRaw) ->
 
 setopt(_Handle, _Opt, _Value) ->
   erlang:nif_error(nif_library_not_loaded).
+
+
+%% Internals
+-spec locate_lib(file:name(), file:name()) ->
+        {ok, file:filename()} | {error, not_found}.
+locate_lib(PrivDir, LibName) ->
+  case file:read_file_info(PrivDir) of
+    {ok, #file_info{type = directory}} ->
+      {ok, filename:join(PrivDir, LibName)};
+    {error, enotdir} -> %% maybe escript,
+      Escript = filename:dirname(filename:dirname(PrivDir)),
+      case file:read_file_info(Escript) of
+        {ok, #file_info{type = regular}} ->
+          %% try locate the file in same dir of escript
+          {ok, filename:join(filename:dirname(Escript), LibName)};
+        _ ->
+          {error, not_found}
+      end
+  end.

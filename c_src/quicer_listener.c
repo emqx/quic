@@ -89,7 +89,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 ERL_NIF_TERM
 listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
-  QUIC_STATUS Status;
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
   ERL_NIF_TERM port = argv[0];
   ERL_NIF_TERM options = argv[1];
@@ -124,7 +124,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (!ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
+      return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, ETERM_INT(Status));
     }
 
   if (!ReloadCertConfig(l_ctx->Configuration, Config))

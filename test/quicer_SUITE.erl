@@ -50,9 +50,11 @@
         , tc_stream_passive_receive_large_buffer_2/1
         , tc_stream_send_after_conn_close/1
         , tc_stream_send_after_async_conn_close/1
-
+        , tc_stream_passive_switch_to_active/1
+        , tc_stream_active_switch_to_passive/1
         , tc_getopt_raw/1
         , tc_getopt/1
+        , tc_getopt_stream_active/1
         , tc_setopt/1
         , tc_get_stream_id/1
         , tc_getstat/1
@@ -69,6 +71,7 @@
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/inet.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(PROPTEST(M,F), true = proper:quickcheck(M:F())).
 
@@ -141,14 +144,18 @@ tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
 
 tc_open_lib_test(_Config) ->
-  ok = quicer_nif:open_lib(),
+  {ok, false} = quicer_nif:open_lib(),
   %% verify that reopen lib success.
-  ok = quicer_nif:open_lib().
+  {ok, false} = quicer_nif:open_lib().
 
 tc_close_lib_test(_Config) ->
-  ok = quicer_nif:open_lib(),
+  {ok, false} = quicer_nif:open_lib(),
+  %% @todo  close reg becore close lib
+  ok = quicer_nif:reg_close(),
   ok = quicer_nif:close_lib(),
-  ok = quicer_nif:close_lib().
+  ok = quicer_nif:close_lib(),
+  {ok, Res0} = quicer_nif:open_lib(),
+  ?assert(Res0 == true orelse Res0 == debug).
 
 tc_lib_registration(_Config) ->
   ok = quicer_nif:reg_open(),
@@ -263,6 +270,62 @@ tc_stream_client_send(Config) ->
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_passive_switch_to_active(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+      {ok, <<"ping_passive">>} = quicer:recv(Stm, 0),
+      quicer:setopt(Stm, active, true),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {error, einval} = quicer:recv(Stm, 0),
+      receive
+        {quic, <<"ping_active">>, Stm, _, _, _} -> ok
+      end,
+      quicer:setopt(Stm, active, 100),
+      {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
+      receive
+        {quic, <<"ping_active_2">>, Stm, _, _, _} -> ok
+      end,
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_active_switch_to_passive(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {error, einval} = quicer:recv(Stm, 0),
+      receive
+        {quic, <<"ping_active">>, Stm, _, _, _} -> ok
+      end,
+      quicer:setopt(Stm, active, false),
+      {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+      {ok, <<"ping_passive">>} = quicer:recv(Stm, 0),
+      receive
+        Other -> ct:fail("Unexpected recv : ~p", [Other])
+      after 0 ->
+          ok
+      end,
+      {ok, 14} = quicer:send(Stm, <<"ping_passive_2">>),
+      {ok, <<"ping_passive_2">>} = quicer:recv(Stm, 0),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
       ct:fail("timeout")
   end.
 
@@ -429,6 +492,28 @@ tc_getopt(Config) ->
       {ok, _} = quicer:getopt(Stm, Parm, false),
       {ok, Settings0} = quicer:getopt(Stm, param_conn_settings, false),
       5000 = proplists:get_value(idle_timeout_ms, Settings0),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_getopt_stream_active(Config) ->
+  Parm = active,
+  Port = 4570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {error,parm_error} = quicer:getopt(Conn, Parm, false),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
+      {ok, true} = quicer:getopt(Stm, Parm, false),
+      ok = quicer:setopt(Stm, active, false),
+      {ok, false} = quicer:getopt(Stm, Parm, false),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)

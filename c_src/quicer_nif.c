@@ -227,6 +227,7 @@ ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 ERL_NIF_TERM ATOM_SEND_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
+ERL_NIF_TERM ATOM_DEBUG;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -430,7 +431,8 @@ ERL_NIF_TERM ATOM_QUIC;
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_SEND_COMPLETE, send_completed);                                   \
   ATOM(ATOM_EINVAL, einval);                                                  \
-  ATOM(ATOM_QUIC, quic);
+  ATOM(ATOM_QUIC, quic);                                                \
+  ATOM(ATOM_DEBUG, debug);
 
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
@@ -560,17 +562,18 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   assert(1 == argc);
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM res = ATOM_FALSE;
   ERL_NIF_TERM lttngLib = argv[0];
   char lttngPath[PATH_MAX] = { 0 };
+
+  if (isLibOpened)
+  {
+    return SUCCESS(res);
+  }
 
   // @todo external call for static link
   CxPlatSystemLoad();
   MsQuicLibraryLoad();
-  if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
-    {
-      // loading lttng lib is optional, ok to fail
-      dlopen(lttngPath, (unsigned)RTLD_NOW | (unsigned)RTLD_GLOBAL);
-    }
 
   //
   // Open a handle to the library and get the API function table.
@@ -581,7 +584,18 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   isLibOpened = true;
-  return ATOM_OK;
+  res = ATOM_TRUE;
+
+  if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
+    {
+      // loading lttng lib is optional, ok to fail
+      if (dlopen(lttngPath, (unsigned)RTLD_NOW | (unsigned)RTLD_GLOBAL))
+      {
+        res = ATOM_DEBUG;
+      }
+    }
+
+  return SUCCESS(res);
 }
 
 static ERL_NIF_TERM
@@ -591,6 +605,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 {
   if (isLibOpened && MsQuic)
     {
+      // @todo ensure registration is closed first
       MsQuicClose(MsQuic);
       isLibOpened = false;
     }

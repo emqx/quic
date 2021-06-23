@@ -594,6 +594,19 @@ getopt3(ErlNifEnv *env,
       BufferLength = sizeof(QUIC_ADDR);
       Buffer = &addr;
     }
+  else if (Level == QUIC_PARAM_LEVEL_STREAM
+           && IS_SAME_TERM(eopt, ATOM_QUIC_STREAM_OPTS_ACTIVE))
+    {
+      QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)q_ctx;
+      ERL_NIF_TERM eterm = ATOM_FALSE;
+      enif_mutex_lock(s_ctx->lock);
+      if (s_ctx->owner->active)
+        {
+          eterm = ATOM_TRUE;
+        }
+      enif_mutex_unlock(s_ctx->lock);
+      return SUCCESS(eterm);
+    }
   else
     {
       return ERROR_TUPLE_2(ATOM_PARM_ERROR);
@@ -724,6 +737,23 @@ setopt3(ErlNifEnv *env,
         {
           return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
         }
+      return ATOM_OK;
+    }
+  else if (IS_SAME_TERM(eopt, ATOM_QUIC_STREAM_OPTS_ACTIVE)
+           && Level == QUIC_PARAM_LEVEL_STREAM)
+    {
+      QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)q_ctx;
+      enif_mutex_lock(s_ctx->lock);
+
+      if (!s_ctx->owner->active && s_ctx->is_buff_ready && s_ctx->Buffer
+          && s_ctx->BufferLen > 0)
+        {
+          // trigger callback of event recv.
+          MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
+        }
+      s_ctx->owner->active = !IS_SAME_TERM(evalue, ATOM_FALSE);
+      enif_mutex_unlock(s_ctx->lock);
       return ATOM_OK;
     }
   else
