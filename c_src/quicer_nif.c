@@ -605,6 +605,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 {
   if (isLibOpened && MsQuic)
     {
+      // @todo ensure registration is closed first
       MsQuicClose(MsQuic);
       isLibOpened = false;
     }

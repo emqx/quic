@@ -150,6 +150,8 @@ tc_open_lib_test(_Config) ->
 
 tc_close_lib_test(_Config) ->
   {ok, false} = quicer_nif:open_lib(),
+  %% @todo  close reg becore close lib
+  ok = quicer_nif:reg_close(),
   ok = quicer_nif:close_lib(),
   ok = quicer_nif:close_lib(),
   {ok, Res0} = quicer_nif:open_lib(),
