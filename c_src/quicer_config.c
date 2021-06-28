@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_config.h"
+#include "quicer_queue.h"
 
 bool
 ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
@@ -600,7 +601,7 @@ getopt3(ErlNifEnv *env,
       QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)q_ctx;
       ERL_NIF_TERM eterm = ATOM_FALSE;
       enif_mutex_lock(s_ctx->lock);
-      if (s_ctx->owner->active)
+      if (!(ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active))
         {
           eterm = ATOM_TRUE;
         }
@@ -745,14 +746,19 @@ setopt3(ErlNifEnv *env,
       QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)q_ctx;
       enif_mutex_lock(s_ctx->lock);
 
-      if (!s_ctx->owner->active && s_ctx->is_buff_ready && s_ctx->Buffer
-          && s_ctx->BufferLen > 0)
+      if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
+          && s_ctx->is_buff_ready && s_ctx->Buffer && s_ctx->BufferLen > 0)
         {
           // trigger callback of event recv.
           MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
           MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
         }
-      s_ctx->owner->active = !IS_SAME_TERM(evalue, ATOM_FALSE);
+      if (!set_owner_recv_mode(s_ctx->owner, env, evalue))
+        {
+          enif_mutex_unlock(s_ctx->lock);
+          return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+        }
+
       enif_mutex_unlock(s_ctx->lock);
       return ATOM_OK;
     }

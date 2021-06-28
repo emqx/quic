@@ -221,7 +221,9 @@ extern ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 extern ERL_NIF_TERM ATOM_SEND_COMPLETE;
 extern ERL_NIF_TERM ATOM_EINVAL;
 extern ERL_NIF_TERM ATOM_QUIC;
+extern ERL_NIF_TERM ATOM_QUIC_PASSIVE;
 extern ERL_NIF_TERM ATOM_DEBUG;
+extern ERL_NIF_TERM ATOM_ONCE;
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */
 /*----------------------------------------------------------*/

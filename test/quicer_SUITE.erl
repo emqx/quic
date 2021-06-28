@@ -56,6 +56,9 @@
         , tc_getopt/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
+        , tc_strm_opt_active_n/1
+        , tc_strm_opt_active_once/1
+        , tc_strm_opt_active_badarg/1
         , tc_get_stream_id/1
         , tc_getstat/1
         , tc_peername_v4/1
@@ -721,6 +724,78 @@ tc_app_echo_server(Config) ->
   quicer:close_stream(Stm),
   quicer:close_connection(Conn),
   ok = quicer:stop_listener(mqtt).
+
+tc_strm_opt_active_n(Config) ->
+  Port = 8889,
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, 3}]),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+  end,
+  {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
+  receive
+    {quic, <<"ping2">>, Stm,  _, _, _} -> ok
+  end,
+  {ok, 5} = quicer:async_send(Stm, <<"ping3">>),
+  receive
+    {quic_passive, <<"ping3">>, Stm,  _, _, _} -> ok
+  end,
+
+  {ok, 5} = quicer:async_send(Stm, <<"ping4">>),
+  {ok, <<"ping4">>} = quicer:recv(Stm, 5),
+  quicer:close_stream(Stm),
+  quicer:close_connection(Conn),
+  ok = quicer:stop_listener(mqtt).
+
+tc_strm_opt_active_once(Config) ->
+  Port = 8890,
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, once}]),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  receive
+    {quic_passive, <<"ping1">>, Stm,  _, _, _} -> ok
+  end,
+  {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
+  {ok, <<"ping2">>} = quicer:recv(Stm, 5),
+  quicer:close_stream(Stm),
+  quicer:close_connection(Conn),
+  ok = quicer:stop_listener(mqtt).
+
+tc_strm_opt_active_badarg(Config) ->
+  Port = 8891,
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {error, badarg} = quicer:start_stream(Conn, [{active, twice}]).
 
 %%% ====================
 %%% Internal helpers

@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_queue.h"
+#include "quicer_eterms.h"
 
 static QUICER_ACCEPTOR_QUEUE *AcceptorQueueAlloc();
 
@@ -100,6 +101,49 @@ void
 AcceptorDestroy(ACCEPTOR *acc)
 {
   return CXPLAT_FREE(acc, QUICER_ACCEPTOR);
+}
+
+bool
+set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM term)
+{
+  int i = 0;
+  if (IS_SAME_TERM(term, ATOM_FALSE))
+    {
+      owner->active_count = 0;
+      owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+    }
+  else if (IS_SAME_TERM(term, ATOM_TRUE))
+    {
+      owner->active_count = 0;
+      owner->active = ACCEPTOR_RECV_MODE_ACTIVE;
+    }
+  else if (IS_SAME_TERM(term, ATOM_ONCE))
+    {
+      owner->active_count = 1;
+      owner->active = ACCEPTOR_RECV_MODE_MULTI;
+    }
+  else if (enif_get_int(env, term, &i) && i <= INT16_MAX
+           && i >= INT16_MIN) // note, i<0 is possible
+    {
+      if ((i + owner->active_count) > INT16_MAX)
+        {
+          return FALSE; // follow otp behavior
+        }
+      else
+        {
+          owner->active = ACCEPTOR_RECV_MODE_MULTI;
+          owner->active_count += i;
+          if (owner->active_count < 0)
+            owner->active_count = 0;
+          if (owner->active_count == 0)
+            owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+        }
+    }
+  else // unsupported arg
+    {
+      return FALSE;
+    }
+  return TRUE;
 }
 
 ///_* Emacs

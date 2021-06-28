@@ -227,7 +227,9 @@ ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 ERL_NIF_TERM ATOM_SEND_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
+ERL_NIF_TERM ATOM_QUIC_PASSIVE;
 ERL_NIF_TERM ATOM_DEBUG;
+ERL_NIF_TERM ATOM_ONCE;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -431,8 +433,10 @@ ERL_NIF_TERM ATOM_DEBUG;
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_SEND_COMPLETE, send_completed);                                   \
   ATOM(ATOM_EINVAL, einval);                                                  \
-  ATOM(ATOM_QUIC, quic);                                                \
-  ATOM(ATOM_DEBUG, debug);
+  ATOM(ATOM_QUIC, quic);                                                      \
+  ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
+  ATOM(ATOM_DEBUG, debug);                                                    \
+  ATOM(ATOM_ONCE, once);
 
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
@@ -567,9 +571,9 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   char lttngPath[PATH_MAX] = { 0 };
 
   if (isLibOpened)
-  {
-    return SUCCESS(res);
-  }
+    {
+      return SUCCESS(res);
+    }
 
   // @todo external call for static link
   CxPlatSystemLoad();
@@ -590,9 +594,9 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       // loading lttng lib is optional, ok to fail
       if (dlopen(lttngPath, (unsigned)RTLD_NOW | (unsigned)RTLD_GLOBAL))
-      {
-        res = ATOM_DEBUG;
-      }
+        {
+          res = ATOM_DEBUG;
+        }
     }
 
   return SUCCESS(res);
