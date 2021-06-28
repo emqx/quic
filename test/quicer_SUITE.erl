@@ -749,7 +749,8 @@ tc_strm_opt_active_n(Config) ->
   end,
   {ok, 5} = quicer:async_send(Stm, <<"ping3">>),
   receive
-    {quic_passive, <<"ping3">>, Stm,  _, _, _} -> ok
+    {quic, <<"ping3">>, Stm,  _, _, _} ->
+      receive {quic_passive, Stm} -> ok end
   end,
 
   {ok, 5} = quicer:async_send(Stm, <<"ping4">>),
@@ -774,7 +775,12 @@ tc_strm_opt_active_once(Config) ->
   {ok, Stm} = quicer:start_stream(Conn, [{active, once}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic_passive, <<"ping1">>, Stm,  _, _, _} -> ok
+    {quic, <<"ping1">>, Stm,  _, _, _} ->
+      receive {quic_passive, Stm} = Event ->
+          ct:fail("unexpected recv ~p ", Event)
+      after 500 ->
+          ok
+      end
   end,
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
   {ok, <<"ping2">>} = quicer:recv(Stm, 5),

@@ -600,23 +600,11 @@ handle_stream_recv_event(HQUIC Stream,
     }
   else
     { // active receive
-      ERL_NIF_TERM report_hdr = ATOM_QUIC;
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
 
-      if (ACCEPTOR_RECV_MODE_MULTI == s_ctx->owner->active)
-        {
-          assert(s_ctx->owner->active_count > 0);
-          s_ctx->owner->active_count--;
-          if (s_ctx->owner->active_count == 0)
-            {
-              report_hdr = ATOM_QUIC_PASSIVE;
-              s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
-            }
-        }
-
-      ERL_NIF_TERM report = enif_make_tuple6(
+      ERL_NIF_TERM report_active = enif_make_tuple6(
           env,
-          report_hdr,
+          ATOM_QUIC,
           enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
           enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
@@ -624,14 +612,44 @@ handle_stream_recv_event(HQUIC Stream,
           enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
       );
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_active))
         {
           // App down, shutdown stream
           MsQuic->StreamShutdown(Stream,
                                  QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
                                  QUIC_STATUS_UNREACHABLE);
+          return status;
+        }
+
+      // report pasive
+      if (ACCEPTOR_RECV_MODE_ONCE == s_ctx->owner->active)
+        {
+          s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+        }
+      else if (ACCEPTOR_RECV_MODE_MULTI == s_ctx->owner->active)
+        {
+          assert(s_ctx->owner->active_count > 0);
+
+          s_ctx->owner->active_count--;
+
+          if (s_ctx->owner->active_count == 0)
+            {
+              s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+
+              ERL_NIF_TERM report_passive = enif_make_tuple2(
+                  env, ATOM_QUIC_PASSIVE, enif_make_resource(env, s_ctx));
+
+              if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_passive))
+                {
+                  MsQuic->StreamShutdown(Stream,
+                                         QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+                                         QUIC_STATUS_UNREACHABLE);
+                  return status;
+                }
+            }
         }
     }
+
   return status;
 }
 

@@ -119,8 +119,8 @@ set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM term)
     }
   else if (IS_SAME_TERM(term, ATOM_ONCE))
     {
-      owner->active_count = 1;
-      owner->active = ACCEPTOR_RECV_MODE_MULTI;
+      owner->active_count = 0;
+      owner->active = ACCEPTOR_RECV_MODE_ONCE;
     }
   else if (enif_get_int(env, term, &i) && i <= INT16_MAX
            && i >= INT16_MIN) // note, i<0 is possible
