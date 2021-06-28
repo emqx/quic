@@ -60,3 +60,36 @@ jobs:
           name: linux-ct-logs
           path: _build/test/
           retention-days: 5
+
+  multiarch:
+    ### note:
+    ### -  only verify compilation because qemu user env has no support for some socket opt
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        docker run --rm --privileged multiarch/qemu-user-static:register --reset
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: make ci arm32v7
+      uses: docker://emqx/build-env:erl24.0.1-emqx-1-alpine-arm32v7
+      with:
+        args: >
+          make
+
+    - name: make ci arm64v8
+      uses: docker://emqx/build-env:erl24.0.1-emqx-1-alpine-arm64v8
+      with:
+        args: >
+          make
+
+    - name: Archive CT Logs
+      uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        name: linux-ct-logs
+        path: _build/test/
+        retention-days: 5
