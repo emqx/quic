@@ -138,6 +138,7 @@ end_per_testcase(tc_lib_registration, _Config) ->
 end_per_testcase(tc_lib_re_registration, _Config) ->
   quicer_nif:reg_open();
 end_per_testcase(_TestCase, _Config) ->
+  quicer:stop_listener(mqtt),
   ok.
 
 %%%===================================================================
@@ -723,7 +724,10 @@ tc_app_echo_server(Config) ->
   {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
   quicer:close_stream(Stm),
   quicer:close_connection(Conn),
-  ok = quicer:stop_listener(mqtt).
+  ok = quicer:stop_listener(mqtt),
+  %% test that listener could be reopened
+  {ok, _} = quicer:start_listener(mqtt, Port, Options),
+  ok.
 
 tc_strm_opt_active_n(Config) ->
   Port = 8889,
@@ -756,8 +760,7 @@ tc_strm_opt_active_n(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping4">>),
   {ok, <<"ping4">>} = quicer:recv(Stm, 5),
   quicer:close_stream(Stm),
-  quicer:close_connection(Conn),
-  ok = quicer:stop_listener(mqtt).
+  quicer:close_connection(Conn).
 
 tc_strm_opt_active_once(Config) ->
   Port = 8890,
@@ -785,8 +788,7 @@ tc_strm_opt_active_once(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
   {ok, <<"ping2">>} = quicer:recv(Stm, 5),
   quicer:close_stream(Stm),
-  quicer:close_connection(Conn),
-  ok = quicer:stop_listener(mqtt).
+  quicer:close_connection(Conn).
 
 tc_strm_opt_active_badarg(Config) ->
   Port = 8891,

@@ -149,7 +149,9 @@ handle_info(_Info, State) ->
 %%--------------------------------------------------------------------
 -spec terminate(Reason :: normal | shutdown | {shutdown, term()} | term(),
                 State :: term()) -> any().
-terminate(_Reason, _State) ->
+terminate(_Reason, #state{listener = L}) ->
+    %% nif listener has no owner process so we need to close it explicitly.
+    quicer:close_listener(L),
     ok.
 
 %%--------------------------------------------------------------------
