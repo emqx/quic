@@ -94,7 +94,11 @@ AcceptorQueueAlloc()
 ACCEPTOR *
 AcceptorAlloc()
 {
-  return CXPLAT_ALLOC_NONPAGED(sizeof(ACCEPTOR), QUICER_ACCEPTOR);
+  ACCEPTOR *acc = CXPLAT_ALLOC_NONPAGED(sizeof(ACCEPTOR), QUICER_ACCEPTOR);
+  CxPlatZeroMemory(acc, sizeof(ACCEPTOR));
+  acc->active = ACCEPTOR_RECV_MODE_ACTIVE;
+  acc->active_count = 0;
+  return acc;
 }
 
 void
