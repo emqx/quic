@@ -37,11 +37,20 @@ limitations under the License.
 #define QUICER_OPT_BUFF '40rQ' // Qr04 - QUICER OPT
 #define QUICER_SETTINGS '50rQ' // Qr05 - QUICER CONNECTION SETTINGS
 
+typedef enum ACCEPTOR_RECV_MODE
+{
+  ACCEPTOR_RECV_MODE_PASSIVE,
+  ACCEPTOR_RECV_MODE_ACTIVE,
+  ACCEPTOR_RECV_MODE_ONCE,
+  ACCEPTOR_RECV_MODE_MULTI
+} ACCEPTOR_RECV_MODE;
+
 typedef struct ACCEPTOR
 {
   CXPLAT_LIST_ENTRY Link;
   ErlNifPid Pid;
-  BOOLEAN active; // is active receiver?
+  ACCEPTOR_RECV_MODE active;
+  uint16_t active_count; /* counter for active_n */
   QUIC_SETTINGS Settings;
   void *reserved1;
   void *reserved2;
@@ -62,6 +71,6 @@ ACCEPTOR *AcceptorDequeue(QUICER_ACCEPTOR_QUEUE *q);
 ACCEPTOR *AcceptorAlloc();
 void AcceptorDestroy(ACCEPTOR *acc);
 
-//@todo add Acceptor cleanups.
+bool set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM active);
 
 #endif // __QUICER_QUEUE_H_

@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_stream.h"
+#include "quicer_queue.h"
 
 static uint64_t recvbuffer_flush(QuicerStreamCTX *stream_ctx,
                                  ErlNifBinary *bin,
@@ -263,7 +264,10 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  s_ctx->owner->active = IS_SAME_TERM(active_val, ATOM_TRUE);
+  if (!set_owner_recv_mode(s_ctx->owner, env, active_val))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   // @todo check if stream is null
   if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
@@ -444,7 +448,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   enif_mutex_lock(s_ctx->lock);
 
-  if (s_ctx->owner->active)
+  if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
     {
       // follow otp behavior
       enif_mutex_unlock(s_ctx->lock);
@@ -564,7 +568,7 @@ handle_stream_recv_event(HQUIC Stream,
   s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
   s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
 
-  if (false == s_ctx->owner->active)
+  if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active)
     { // passive receive
       /* important:
          for passive receive, it is not ok to call
@@ -598,9 +602,8 @@ handle_stream_recv_event(HQUIC Stream,
     { // active receive
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
 
-      ERL_NIF_TERM report = enif_make_tuple6(
+      ERL_NIF_TERM report_active = enif_make_tuple6(
           env,
-          // reserved for port
           ATOM_QUIC,
           enif_make_binary(env, &bin),
           enif_make_resource(env, s_ctx),
@@ -609,16 +612,47 @@ handle_stream_recv_event(HQUIC Stream,
           enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
       );
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_active))
         {
           // App down, shutdown stream
           MsQuic->StreamShutdown(Stream,
                                  QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
                                  QUIC_STATUS_UNREACHABLE);
+          return status;
+        }
+
+      // report pasive
+      if (ACCEPTOR_RECV_MODE_ONCE == s_ctx->owner->active)
+        {
+          s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+        }
+      else if (ACCEPTOR_RECV_MODE_MULTI == s_ctx->owner->active)
+        {
+          assert(s_ctx->owner->active_count > 0);
+
+          s_ctx->owner->active_count--;
+
+          if (s_ctx->owner->active_count == 0)
+            {
+              s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+
+              ERL_NIF_TERM report_passive = enif_make_tuple2(
+                  env, ATOM_QUIC_PASSIVE, enif_make_resource(env, s_ctx));
+
+              if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_passive))
+                {
+                  MsQuic->StreamShutdown(Stream,
+                                         QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
+                                         QUIC_STATUS_UNREACHABLE);
+                  return status;
+                }
+            }
         }
     }
+
   return status;
 }
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:
