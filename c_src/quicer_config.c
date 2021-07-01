@@ -261,12 +261,21 @@ get_uint8_from_map(ErlNifEnv *env,
     {
       return false;
     }
+
   unsigned int value0 = 0;
+
   if (!enif_get_uint(env, evalue, &value0))
     {
       return false;
     }
+
+  if (value0 > UINT8_MAX)
+    {
+      return false;
+    }
+
   *value = (uint8_t)value0;
+
   return true;
 }
 
@@ -281,11 +290,18 @@ get_uint16_from_map(ErlNifEnv *env,
     {
       return false;
     }
+
   unsigned int value0 = 0;
   if (!enif_get_uint(env, evalue, &value0))
     {
       return false;
     }
+
+  if (value0 > UINT16_MAX)
+    {
+      return false;
+    }
+
   *value = (uint16_t)value0;
   return true;
 }
@@ -301,13 +317,8 @@ get_uint32_from_map(ErlNifEnv *env,
     {
       return false;
     }
-  unsigned long value0 = 0;
-  if (!enif_get_uint64(env, evalue, &value0))
-    {
-      return false;
-    }
-  *value = (uint32_t)value0;
-  return true;
+
+  return enif_get_uint(env, evalue, value);
 }
 
 bool
@@ -321,13 +332,12 @@ get_uint64_from_map(ErlNifEnv *env,
     {
       return false;
     }
-  unsigned long value0 = 0;
-  if (!enif_get_uint64(env, evalue, &value0))
-    {
-      return false;
-    }
-  *value = (uint64_t)value0;
-  return true;
+
+#ifdef __APPLE__
+  return enif_get_uint64(env, evalue, (unsigned long *)value);
+#else
+  return enif_get_uint64(env, evalue, value);
+#endif
 }
 
 ERL_NIF_TERM

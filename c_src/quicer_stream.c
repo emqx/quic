@@ -375,8 +375,6 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // Allocates and builds the buffer to send over the stream.
   //
 
-  // ensure type of ErlNifBinary.size
-  assert(sizeof(size_t) == sizeof(uint64_t));
   assert(bin.data != NULL);
   QUIC_BUFFER *SendBuffer
       = CXPLAT_ALLOC_NONPAGED(sizeof(QUIC_BUFFER) + bin.size, QUICER_SND_BUFF);
