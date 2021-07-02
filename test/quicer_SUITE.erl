@@ -68,6 +68,9 @@
         , tc_alpn/1
         , tc_alpn_mismatch/1
         , tc_idle_timeout/1
+
+        %% testcase to verify env works
+        %% , tc_network/1
         ]).
 
 -export([tc_app_echo_server/1]).
@@ -145,6 +148,10 @@ end_per_testcase(_TestCase, _Config) ->
 %%%===================================================================
 %%% Individual Test Cases (from groups() definition)
 %%%===================================================================
+%% tc_network(_Config) ->
+%%   {ok, _} = gen_tcp:listen(12456, []),
+%%   {ok, _} = gen_udp:open(12456, []).
+
 tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
 
