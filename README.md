@@ -44,6 +44,7 @@ To enable logging and release build:
 ``` sh
 export CMAKE_BUILD_TYPE=RelWithDebInfo
 export QUIC_ENABLE_LOGGING=ON
+export QUICER_USE_LTTNG=1
 make
 ```
 

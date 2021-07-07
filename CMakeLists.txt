@@ -22,6 +22,11 @@ else()
   set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
+
+if (DEFINED ENV{QUICER_USE_LTTNG})
+  add_compile_options(-DQUICER_USE_LTTNG)
+endif()
+
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
 set(QUIC_BUILD_PERF "OFF")
@@ -43,10 +48,15 @@ set(SOURCES
   c_src/quicer_connection.h
   c_src/quicer_stream.c
   c_src/quicer_stream.h
+  c_src/quicer_tp.c
+  c_src/quicer_tp.h
   )
 
 # @todo remove -DSO_ATTACH_REUSEPORT_CBPF=51
 add_compile_options(-DSO_ATTACH_REUSEPORT_CBPF=51)
+
+# for lttng, quicer_tp.h
+include_directories(c_src)
 
 add_subdirectory(submodules/msquic)
 

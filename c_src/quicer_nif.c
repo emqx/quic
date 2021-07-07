@@ -565,6 +565,7 @@ static ERL_NIF_TERM
 openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   assert(1 == argc);
+  TP_NIF_2(openLib, 1);
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_FALSE;
   ERL_NIF_TERM lttngLib = argv[0];
@@ -599,6 +600,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
     }
 
+  TP_NIF_2(openLib, 2);
   return SUCCESS(res);
 }
 
