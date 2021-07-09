@@ -34,7 +34,9 @@
         , tc_close_lib_test/1
         , tc_lib_registration/1
         , tc_lib_re_registration/1
+
         , tc_open_listener/1
+        , tc_open_listener_neg_1/1
         , tc_close_listener/1
 
         , tc_conn_basic/1
@@ -141,6 +143,9 @@ end_per_testcase(tc_lib_registration, _Config) ->
   quicer_nif:reg_open();
 end_per_testcase(tc_lib_re_registration, _Config) ->
   quicer_nif:reg_open();
+end_per_testcase(tc_open_listener_neg_1, _Config) ->
+  quicer_nif:open_lib(),
+  quicer_nif:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   quicer:stop_listener(mqtt),
   ok.
@@ -172,6 +177,13 @@ tc_close_lib_test(_Config) ->
 tc_lib_registration(_Config) ->
   ok = quicer_nif:reg_open(),
   ok = quicer_nif:reg_close().
+
+tc_open_listener_neg_1(Config) ->
+  Port = 4567,
+  ok = quicer_nif:reg_close(),
+  ok = quicer_nif:close_lib(),
+  {error, config_error, 0} = quicer:listen(Port, default_listen_opts(Config)),
+  ok.
 
 tc_lib_re_registration(_Config) ->
   ok = quicer_nif:reg_open(),
