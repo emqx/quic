@@ -14,11 +14,13 @@ TRACEPOINT_EVENT(
     quicer_tp,
     callback,
     TP_ARGS(
-        char*, name,
+        const char*, fun,
+        char*, tag,
         int, mark
     ),
     TP_FIELDS(
-        ctf_string(name, name)
+        ctf_string(fun, fun)
+        ctf_string(tag, tag)
         ctf_integer(int, mark, mark)
     )
 )
@@ -27,18 +29,20 @@ TRACEPOINT_EVENT(
     quicer_tp,
     nif,
     TP_ARGS(
-        char*, fun,
+        const char*, fun,
+        char*, tag,
         int, mark
     ),
     TP_FIELDS(
-        ctf_string(name, fun)
+        ctf_string(fun, fun)
+        ctf_string(tag, tag)
         ctf_integer(int, mark, mark)
     )
 )
 
 
-#define TP_NIF_2(NAME, ARG2) tracepoint(quicer_tp, nif, #NAME, ARG2)
-#define TP_CB_2(NAME, ARG2)  tracepoint(quicer_tp, callback, #NAME, ARG2)
+#define TP_NIF_2(TAG, ARG2) tracepoint(quicer_tp, nif, __func__, #TAG, ARG2)
+#define TP_CB_2(TAG, ARG2)  tracepoint(quicer_tp, callback, __func__, #TAG, ARG2)
 
 #else /* QUICER_USE_LTTNG */
 

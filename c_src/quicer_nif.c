@@ -565,7 +565,7 @@ static ERL_NIF_TERM
 openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   assert(1 == argc);
-  TP_NIF_2(openLib, 1);
+  TP_NIF_2(enter, 1);
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_FALSE;
   ERL_NIF_TERM lttngLib = argv[0];
@@ -573,6 +573,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (isLibOpened)
     {
+      TP_NIF_2(skip, 2);
       return SUCCESS(res);
     }
 
@@ -584,11 +585,14 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // Open a handle to the library and get the API function table.
   //
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
-    {
+  {
+      isLibOpened = false;
       return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ETERM_INT(status));
     }
 
   isLibOpened = true;
+  TP_NIF_2(success, 2);
+
   res = ATOM_TRUE;
 
   if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
@@ -600,7 +604,6 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-  TP_NIF_2(openLib, 2);
   return SUCCESS(res);
 }
 
@@ -612,6 +615,8 @@ closeLib(__unused_parm__ ErlNifEnv *env,
   if (isLibOpened && MsQuic)
     {
       // @todo ensure registration is closed first
+      //
+      TP_NIF_2(do_close, isLibOpened);
       MsQuicClose(MsQuic);
       isLibOpened = false;
     }
@@ -628,8 +633,11 @@ registration(ErlNifEnv *env,
   if (QUIC_FAILED(status
                   = MsQuic->RegistrationOpen(&RegConfig, &Registration)))
     {
+      isRegistered = false;
+      TP_NIF_2(fail, status);
       return ERROR_TUPLE_3(ATOM_REG_FAILED, ETERM_INT(status));
     }
+  TP_NIF_2(success, status);
   isRegistered = true;
   return ATOM_OK;
 }
