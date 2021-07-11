@@ -36,6 +36,7 @@ jobs:
     strategy:
       matrix:
         otp: [22.3.4.9, 23.2, 24.0.2]
+        build_type: [RelWithDebInfo, Debug]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -52,6 +53,7 @@ jobs:
         run: |
           sudo sysctl -w kernel.core_pattern=core
           ulimit -c unlimited
+          export CMAKE_BUILD_TYPE=${{ matrix.build_type }}
           make ci
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2

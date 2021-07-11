@@ -17,6 +17,8 @@ limitations under the License.
 #include "quicer_config.h"
 #include "quicer_queue.h"
 
+extern BOOLEAN isRegistered;
+
 bool
 ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
@@ -114,7 +116,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+  if ( !isRegistered || QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,
