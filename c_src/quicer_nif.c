@@ -231,6 +231,24 @@ ERL_NIF_TERM ATOM_QUIC_PASSIVE;
 ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
 
+/*----------------------------------------------------------*/
+/* for code insert with SNABBKAFFE   */
+/*----------------------------------------------------------*/
+ERL_NIF_TERM ATOM_SNABBKAFFE_COLLECTOR;
+ERL_NIF_TERM ATOM_TRACE;
+// Trace point Context, nif for callback
+ERL_NIF_TERM ATOM_CONTEXT;
+ERL_NIF_TERM ATOM_NIF;
+ERL_NIF_TERM ATOM_CALLBACK;
+ERL_NIF_TERM ATOM_TAG;
+ERL_NIF_TERM ATOM_RESOURCE_ID;
+ERL_NIF_TERM ATOM_MARK;
+ERL_NIF_TERM ATOM_KIND;
+ERL_NIF_TERM ATOM_SNK_KIND;
+ERL_NIF_TERM ATOM_SNK_META;
+ERL_NIF_TERM ATOM_GEN_CAST;
+ERL_NIF_TERM ATOM_FUNCTION;
+ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -436,7 +454,21 @@ ERL_NIF_TERM ATOM_ONCE;
   ATOM(ATOM_QUIC, quic);                                                      \
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
   ATOM(ATOM_DEBUG, debug);                                                    \
-  ATOM(ATOM_ONCE, once);
+  ATOM(ATOM_ONCE, once);                                                      \
+  ATOM(ATOM_SNABBKAFFE_COLLECTOR, snabbkaffe_collector);                      \
+  ATOM(ATOM_TRACE, trace);                                                    \
+  ATOM(ATOM_CONTEXT, context);                                                \
+  ATOM(ATOM_NIF, nif);                                                        \
+  ATOM(ATOM_CALLBACK, callback);                                              \
+  ATOM(ATOM_TAG, tag);                                                        \
+  ATOM(ATOM_RESOURCE_ID, resource_id);                                        \
+  ATOM(ATOM_MARK, mark);                                                      \
+  ATOM(ATOM_KIND, kind);                                                      \
+  ATOM(ATOM_SNK_KIND, $kind);                                                 \
+  ATOM(ATOM_SNK_META, ~meta);                                                 \
+  ATOM(ATOM_GEN_CAST, $gen_cast);                                             \
+  ATOM(ATOM_FUNCTION, function);                                              \
+  ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);
 
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
@@ -565,7 +597,7 @@ static ERL_NIF_TERM
 openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   assert(1 == argc);
-  TP_NIF_2(enter, 1);
+  TP_NIF_3(enter, 0, 1);
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_FALSE;
   ERL_NIF_TERM lttngLib = argv[0];
@@ -573,7 +605,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (isLibOpened)
     {
-      TP_NIF_2(skip, 2);
+      TP_NIF_3(skip, 0, 2);
       return SUCCESS(res);
     }
 
@@ -585,13 +617,13 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // Open a handle to the library and get the API function table.
   //
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
-  {
+    {
       isLibOpened = false;
       return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ETERM_INT(status));
     }
 
   isLibOpened = true;
-  TP_NIF_2(success, 2);
+  TP_NIF_3(success, 0, 2);
 
   res = ATOM_TRUE;
 
@@ -616,7 +648,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
     {
       // @todo ensure registration is closed first
       //
-      TP_NIF_2(do_close, isLibOpened);
+      TP_NIF_3(do_close, 0, isLibOpened);
       MsQuicClose(MsQuic);
       isLibOpened = false;
     }
@@ -634,10 +666,10 @@ registration(ErlNifEnv *env,
                   = MsQuic->RegistrationOpen(&RegConfig, &Registration)))
     {
       isRegistered = false;
-      TP_NIF_2(fail, status);
+      TP_NIF_3(fail, 0, status);
       return ERROR_TUPLE_3(ATOM_REG_FAILED, ETERM_INT(status));
     }
-  TP_NIF_2(success, status);
+  TP_NIF_3(success, 0, status);
   isRegistered = true;
   return ATOM_OK;
 }

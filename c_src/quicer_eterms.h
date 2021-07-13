@@ -224,6 +224,22 @@ extern ERL_NIF_TERM ATOM_QUIC;
 extern ERL_NIF_TERM ATOM_QUIC_PASSIVE;
 extern ERL_NIF_TERM ATOM_DEBUG;
 extern ERL_NIF_TERM ATOM_ONCE;
+
+extern ERL_NIF_TERM ATOM_SNABBKAFFE_COLLECTOR;
+extern ERL_NIF_TERM ATOM_TRACE;
+// Trace point Context, nif for callback
+extern ERL_NIF_TERM ATOM_CONTEXT;
+extern ERL_NIF_TERM ATOM_NIF;
+extern ERL_NIF_TERM ATOM_CALLBACK;
+extern ERL_NIF_TERM ATOM_TAG;
+extern ERL_NIF_TERM ATOM_RESOURCE_ID;
+extern ERL_NIF_TERM ATOM_MARK;
+extern ERL_NIF_TERM ATOM_KIND;
+extern ERL_NIF_TERM ATOM_GEN_CAST;
+extern ERL_NIF_TERM ATOM_SNK_KIND;
+extern ERL_NIF_TERM ATOM_SNK_META;
+extern ERL_NIF_TERM ATOM_FUNCTION;
+extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */
 /*----------------------------------------------------------*/

@@ -27,6 +27,10 @@ if (DEFINED ENV{QUICER_USE_LTTNG})
   add_compile_options(-DQUICER_USE_LTTNG)
 endif()
 
+if (DEFINED ENV{QUICER_USE_SNK})
+  add_compile_options(-DQUICER_USE_SNK)
+endif()
+
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
 set(QUIC_BUILD_PERF "OFF")

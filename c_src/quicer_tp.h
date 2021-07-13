@@ -7,19 +7,25 @@
 #if !defined(_QUICER_TP_H) || defined(TRACEPOINT_HEADER_MULTI_READ)
 #define _QUICER_TP_H
 
+#include "quicer_eterms.h"
+#include <stdint.h>
+
 #ifdef QUICER_USE_LTTNG
 #include <lttng/tracepoint.h>
 
+// clang-format off
 TRACEPOINT_EVENT(
     quicer_tp,
     callback,
     TP_ARGS(
-        const char*, fun,
-        char*, tag,
-        int, mark
-    ),
+        const char *, fun,
+        char *, tag,
+        uint64_t, rid,
+        int, mark),
+
     TP_FIELDS(
         ctf_string(fun, fun)
+        ctf_integer_hex(int, rid, rid)
         ctf_string(tag, tag)
         ctf_integer(int, mark, mark)
     )
@@ -28,26 +34,51 @@ TRACEPOINT_EVENT(
 TRACEPOINT_EVENT(
     quicer_tp,
     nif,
-    TP_ARGS(
-        const char*, fun,
-        char*, tag,
-        int, mark
-    ),
-    TP_FIELDS(
-        ctf_string(fun, fun)
-        ctf_string(tag, tag)
-        ctf_integer(int, mark, mark)
+    TP_ARGS(const char *, fun,
+            char *, tag,
+            uint64_t, rid,
+            int, mark),
+    TP_FIELDS(ctf_string(fun, fun)
+              ctf_string(tag, tag)
+              ctf_integer_hex(int, rid, rid)
+              ctf_integer(int, mark, mark)
     )
 )
+// clang-format on
 
+#define TP_NIF_3(TAG, RID, ARG)                                               \
+  tracepoint(quicer_tp, nif, __func__, #TAG, (uint64_t)RID, ARG)
+#define TP_CB_3(TAG, RID, ARG)                                                \
+  tracepoint(quicer_tp, callback, __func__, #TAG, (uint64_t)RID, ARG)
 
-#define TP_NIF_2(TAG, ARG2) tracepoint(quicer_tp, nif, __func__, #TAG, ARG2)
-#define TP_CB_2(TAG, ARG2)  tracepoint(quicer_tp, callback, __func__, #TAG, ARG2)
+/* END of ifdef QUICER_USE_LTTNG */
 
-#else /* QUICER_USE_LTTNG */
+#elif defined(QUICER_USE_SNK)
 
-#define TP_NIF_2(Arg1, Arg2) do {} while(0)
-#define TP_CB_2(Arg1, Arg2)  do {} while(0)
+#define TP_NIF_3(TAG, RID, ARG)                                               \
+  tp_snk(env, "nif", __func__, #TAG, (uint64_t)RID, ARG)
+#define TP_CB_3(TAG, RID, ARG)                                                \
+  tp_snk(env, "callback", __func__, #TAG, (uint64_t)RID, ARG)
+
+void tp_snk(ErlNifEnv *env,
+            const char *ctx,
+            const char *fun,
+            const char *tag,
+            uint64_t rid,
+            int mark);
+/* END of ifdef QUICER_USE_SNK */
+#else /* NO TP is defined */
+
+#define TP_NIF_3(Arg1, Arg2, Arg3)                                            \
+  do                                                                          \
+    {                                                                         \
+    }                                                                         \
+  while (0)
+#define TP_CB_3(Arg1, Arg2, Arg3)                                             \
+  do                                                                          \
+    {                                                                         \
+    }                                                                         \
+  while (0)
 
 #endif /* QUICER_USE_LTTNG */
 #endif /* _QUICER_TP_H */

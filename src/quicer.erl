@@ -16,6 +16,8 @@
 
 -module(quicer).
 
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
+
 -export([ listen/2
         , close_listener/1
         , connect/4
@@ -178,7 +180,8 @@ send(Stream, Data) ->
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
-        {quic, send_completed, Stream, _} -> OK
+        {quic, send_completed, Stream, _} ->
+          OK
       end;
     E ->
       E

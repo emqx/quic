@@ -17,6 +17,8 @@ limitations under the License.
 #include "quicer_stream.h"
 #include "quicer_queue.h"
 
+#include "quicer_tp.h"
+
 static uint64_t recvbuffer_flush(QuicerStreamCTX *stream_ctx,
                                  ErlNifBinary *bin,
                                  uint64_t req_len);
@@ -37,6 +39,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   enif_mutex_lock(s_ctx->lock);
 
   env = s_ctx->env;
+
+  TP_CB_3(event, Stream, Event->Type);
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -55,6 +59,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // Owner is gone, we shutdown the stream as well.
+          TP_CB_3(owner_die, Stream, Event->Type);
           MsQuic->StreamShutdown(
               Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
           // @todo return proper bad status
@@ -79,6 +84,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // App down, close it.
+          TP_CB_3(app_down, Stream, Event->Type);
           MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
         }
       break;
@@ -96,6 +102,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // Owner is gone, we shutdown the stream as well.
+          TP_CB_3(app_down, Stream, Event->Type);
           MsQuic->StreamShutdown(
               Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
           // @todo return proper bad status
@@ -143,6 +150,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
   env = s_ctx->env;
+  TP_CB_3(event, Stream, Event->Type);
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -159,6 +167,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
+          TP_CB_3(app_down, Stream, 0);
           // Owner is gone, we shutdown the stream as well.
           MsQuic->StreamShutdown(
               Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);

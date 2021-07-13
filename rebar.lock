@@ -1,1 +1,4 @@
-[].
+[{<<"snabbkaffe">>,
+  {git,"https://github.com/kafka4beam/snabbkaffe.git",
+       {ref,"2f2f6ad09b97e33ba66b195665cef17d04598abd"}},
+  0}].
