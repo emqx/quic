@@ -25,7 +25,7 @@ eunit: compile
 
 .PHONY: ct
 ct: compile
-	$(REBAR) as test ct -v
+	QUICER_USE_SNK=1 $(REBAR) as test ct -v
 
 cover:
 	$(REBAR) cover

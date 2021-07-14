@@ -13,13 +13,22 @@ EXECUTE_PROCESS(
 if (DEFINED ENV{CMAKE_BUILD_TYPE})
   set(CMAKE_BUILD_TYPE $ENV{CMAKE_BUILD_TYPE})
 else()
-  set(CMAKE_BUILD_TYPE "Debug")
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
 if (DEFINED ENV{QUIC_ENABLE_LOGGING})
   set(QUIC_ENABLE_LOGGING $ENV{QUIC_ENABLE_LOGGING})
 else()
   set(QUIC_ENABLE_LOGGING "OFF")
+endif()
+
+
+if (DEFINED ENV{QUICER_USE_LTTNG})
+  add_compile_options(-DQUICER_USE_LTTNG)
+endif()
+
+if (DEFINED ENV{QUICER_USE_SNK})
+  add_compile_options(-DQUICER_USE_SNK)
 endif()
 
 set(QUIC_BUILD_TEST "OFF")
@@ -43,10 +52,15 @@ set(SOURCES
   c_src/quicer_connection.h
   c_src/quicer_stream.c
   c_src/quicer_stream.h
+  c_src/quicer_tp.c
+  c_src/quicer_tp.h
   )
 
 # @todo remove -DSO_ATTACH_REUSEPORT_CBPF=51
 add_compile_options(-DSO_ATTACH_REUSEPORT_CBPF=51)
+
+# for lttng, quicer_tp.h
+include_directories(c_src)
 
 add_subdirectory(submodules/msquic)
 

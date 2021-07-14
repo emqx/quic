@@ -27,6 +27,7 @@ limitations under the License.
 #include "quicer_eterms.h"
 #include "quicer_queue.h"
 #include "quicer_stream.h"
+#include "quicer_tp.h"
 
 // @todo is 16 enough?
 #define MAX_ALPN 16
