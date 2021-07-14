@@ -71,6 +71,8 @@
         , tc_alpn_mismatch/1
         , tc_idle_timeout/1
 
+
+        , tc_get_conn_rid/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -850,6 +852,22 @@ tc_strm_opt_active_badarg(Config) ->
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {error, badarg} = quicer:start_stream(Conn, [{active, twice}]).
+
+tc_get_conn_rid(Config)->
+  Port = 8891,
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Rid} = quicer:get_conn_rid(Conn),
+  ?assert(is_integer(Rid)).
 
 %%% ====================
 %%% Internal helpers

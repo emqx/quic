@@ -533,6 +533,24 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
                               enif_make_int(env, ntohs(addr->Ipv4.sin_port)));
     }
 }
+
+ERL_NIF_TERM
+get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx;
+  if ( 1 != args)
+  {
+    return ERROR_TUPLE_2(ATOM_BADARG);
+  }
+
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  return SUCCESS(enif_make_ulong(env, (unsigned long) c_ctx->Connection));
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

@@ -45,6 +45,9 @@
         , peername/1
         ]).
 
+%% Exports for test
+-export([get_conn_rid/1]).
+
 -export([ start_listener/3 %% start application over quic
         , stop_listener/1
         ]).
@@ -273,8 +276,12 @@ getstat(Conn, Cnts) ->
 
 -spec peername(connection_handler()  | stream_handler()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
-peername(Handle)->
+peername(Handle) ->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
+
+-spec get_conn_rid(connection_handler()) -> {ok, non_neg_integer()} | {error, any()}.
+get_conn_rid(Conn) ->
+  quicer_nif:get_conn_rid(Conn).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

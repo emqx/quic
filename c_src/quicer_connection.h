@@ -31,4 +31,7 @@ QUIC_STATUS ServerConnectionCallback(HQUIC Connection,
                                      QUIC_CONNECTION_EVENT *Event);
 
 ERL_NIF_TERM addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr);
+
+ERL_NIF_TERM get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
+
 #endif // __QUICER_CONNECTION_H_
