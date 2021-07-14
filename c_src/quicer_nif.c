@@ -878,7 +878,8 @@ static ErlNifFunc nif_funcs[] = {
   { "getopt", 3, getopt3, 0},
   { "setopt", 3, setopt3, 0},
   /* for DEBUG */
-  { "get_conn_rid", 1, get_conn_rid1, 1}
+  { "get_conn_rid", 1, get_conn_rid1, 1},
+  { "get_stream_rid", 1, get_stream_rid1, 1}
   // clang-format on
 };
 

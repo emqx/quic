@@ -34,6 +34,7 @@
         ]).
 
 -export([ get_conn_rid/1
+        , get_stream_rid/1
         ]).
 
 -on_load(init/0).
@@ -106,6 +107,9 @@ setopt(_Handle, _Opt, _Value) ->
   erlang:nif_error(nif_library_not_loaded).
 
 get_conn_rid(_Handle)->
+  erlang:nif_error(nif_library_not_loaded).
+
+get_stream_rid(_Handle)->
   erlang:nif_error(nif_library_not_loaded).
 
 

@@ -46,7 +46,9 @@
         ]).
 
 %% Exports for test
--export([get_conn_rid/1]).
+-export([ get_conn_rid/1
+        , get_stream_rid/1
+        ]).
 
 -export([ start_listener/3 %% start application over quic
         , stop_listener/1
@@ -282,6 +284,10 @@ peername(Handle) ->
 -spec get_conn_rid(connection_handler()) -> {ok, non_neg_integer()} | {error, any()}.
 get_conn_rid(Conn) ->
   quicer_nif:get_conn_rid(Conn).
+
+-spec get_stream_rid(stream_handler()) -> {ok, non_neg_integer()} | {error, any()}.
+get_stream_rid(Stream) ->
+  quicer_nif:get_stream_rid(Stream).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->
