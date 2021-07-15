@@ -59,7 +59,7 @@ elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
 endif()
 
 # @todo clean complier warnings in the code
-target_compile_options(quicer_static PUBLIC "-og" "-ggdb3" "-Wno-unused-variable")
+target_compile_options(quicer_static PUBLIC "-ggdb3" "-Wno-unused-variable")
 
 add_library(quicer_nif SHARED ${SOURCES})
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
