@@ -17,21 +17,9 @@ limitations under the License.
 #ifndef __QUICER_CONFIG_H_
 #define __QUICER_CONFIG_H_
 
+#include "quicer_internal.h"
 #include "quicer_nif.h"
-
-// @todo check if we can make use of it.
-//#include <msquichelper.h>
-
-typedef struct QUIC_CREDENTIAL_CONFIG_HELPER
-{
-  QUIC_CREDENTIAL_CONFIG CredConfig;
-  union
-  {
-    QUIC_CERTIFICATE_HASH CertHash;
-    QUIC_CERTIFICATE_HASH_STORE CertHashStore;
-    QUIC_CERTIFICATE_FILE CertFile;
-  };
-} QUIC_CREDENTIAL_CONFIG_HELPER;
+#include <msquichelper.h>
 
 bool ReloadCertConfig(HQUIC Configuration,
                       QUIC_CREDENTIAL_CONFIG_HELPER *Config);
@@ -73,5 +61,4 @@ ERL_NIF_TERM setopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 bool create_settings(ErlNifEnv *env,
                      const ERL_NIF_TERM *emap,
                      QUIC_SETTINGS *Settings);
-
 #endif // __QUICER_CONFIG_H_

@@ -14,19 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -------------------------------------------------------------------*/
 
-#ifndef __QUICER_LISTENER_H_
-#define __QUICER_LISTENER_H_
+#ifndef QUICER_INTERNAL_H_
+#define QUICER_INTERNAL_H_
 
-#include "quicer_internal.h"
-#include "quicer_nif.h"
-//#include "quicer_config.h"
+#if defined(__linux__)
+#include <linux/limits.h>
+#elif defined(__APPLE__)
+#include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif
 
-QUIC_STATUS ServerListenerCallback(HQUIC Listener,
-                                   void *Context,
-                                   QUIC_LISTENER_EVENT *Event);
+#if defined(__linux__)
+#define CX_PLATFORM_LINUX 1
+#elif defined(__APPLE__)
+#define CX_PLATFORM_DARWIN 1
+#endif
 
-ERL_NIF_TERM listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM
-close_listener1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+#if defined(__linux__)
+#include <linux/limits.h>
+#elif defined(__APPLE__)
+#include <sys/syslimits.h>
+#else
+#include <limits.h>
+#endif
 
-#endif // __QUICER_LISTENER_H_
+#endif // QUICER_INTERNAL_H_

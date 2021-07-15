@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "quicer_nif.h"
 #include "quicer_queue.h"
+#include <msquichelper.h>
 
 #define _CTX_CALLBACK_WRITE_
 #define _CTX_CALLBACK_READ_
@@ -34,6 +35,7 @@ typedef struct
   ErlNifPid listenerPid;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  char *ssl_key_log_file;
   void *reserved1;
   void *reserved2;
   void *reserved3;
@@ -50,6 +52,7 @@ typedef struct
   ErlNifEnv *env;
   ErlNifMutex *lock;
   BOOLEAN is_closed;
+  CXPLAT_TLS_SECRETS *TlsSecrets;
   void *reserved1;
   void *reserved2;
   void *reserved3;

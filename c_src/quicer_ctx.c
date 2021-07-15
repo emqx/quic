@@ -26,6 +26,7 @@ init_l_ctx()
   l_ctx->env = enif_alloc_env();
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
+  l_ctx->ssl_key_log_file = NULL;
   return l_ctx;
 }
 
@@ -52,6 +53,7 @@ init_c_ctx()
       = CXPLAT_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
   c_ctx->is_closed = FALSE;
+  c_ctx->TlsSecrets = NULL;
   return c_ctx;
 }
 

@@ -17,12 +17,7 @@ limitations under the License.
 #ifndef __QUICER_QUEUE_H_
 #define __QUICER_QUEUE_H_
 
-#if defined(__linux__)
-#define CX_PLATFORM_LINUX 1
-#elif defined(__APPLE__)
-#define CX_PLATFORM_DARWIN 1
-#endif
-
+#include "quicer_internal.h"
 #include <erl_nif.h>
 #include <msquic.h>
 #include <quic_platform.h>
@@ -36,7 +31,8 @@ limitations under the License.
   '30rQ'                       // Qr03 QUICER_CREDENTIAL_CONFIG_HELPER
 #define QUICER_OPT_BUFF '40rQ' // Qr04 - QUICER OPT
 #define QUICER_SETTINGS '50rQ' // Qr05 - QUICER CONNECTION SETTINGS
-
+#define QUICER_TLS_SECRETS                                                    \
+  '60rQ' // Qr06 - QUICER TLS SECRETS for SSLKeyLogFile
 typedef enum ACCEPTOR_RECV_MODE
 {
   ACCEPTOR_RECV_MODE_PASSIVE,

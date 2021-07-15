@@ -18,6 +18,7 @@ limitations under the License.
 #define __QUICER_STREAM_H_
 
 #include "quicer_config.h"
+#include "quicer_internal.h"
 #include "quicer_nif.h"
 
 QUIC_STATUS

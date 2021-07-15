@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_listener.h"
+#include "quicer_config.h"
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -37,8 +38,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!c_ctx)
         {
-          return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
+          return QUIC_STATUS_OUT_OF_MEMORY;
         }
+
+      c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
       c_ctx->l_ctx = l_ctx;
 
@@ -77,6 +80,27 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         {
           destroy_c_ctx(c_ctx);
           return QUIC_STATUS_INTERNAL_ERROR;
+        }
+
+      // @todo: this is just a poc
+      l_ctx->ssl_key_log_file = "/tmp/SSLKEYLOGFILE";
+
+      if (NULL != l_ctx->ssl_key_log_file)
+        {
+          CXPLAT_TLS_SECRETS *TlsSecrets
+              = CXPLAT_ALLOC_NONPAGED(sizeof(CXPLAT_TLS_SECRETS), QUICER_TLS_SECRETS);
+
+          CxPlatZeroMemory(TlsSecrets, sizeof(CXPLAT_TLS_SECRETS));
+          Status = MsQuic->SetParam(c_ctx->Connection,
+                                    QUIC_PARAM_LEVEL_CONNECTION,
+                                    QUIC_PARAM_CONN_TLS_SECRETS,
+                                    sizeof(CXPLAT_TLS_SECRETS),
+                                    TlsSecrets);
+          if (QUIC_FAILED(Status))
+            {
+              break;
+            }
+          c_ctx->TlsSecrets = TlsSecrets;
         }
 
       break;

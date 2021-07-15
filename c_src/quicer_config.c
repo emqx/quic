@@ -15,7 +15,9 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_config.h"
+#include "quicer_internal.h"
 #include "quicer_queue.h"
+#include <msquichelper.h>
 
 extern BOOLEAN isRegistered;
 

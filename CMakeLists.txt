@@ -18,10 +18,15 @@ endif()
 
 if (DEFINED ENV{QUIC_ENABLE_LOGGING})
   set(QUIC_ENABLE_LOGGING $ENV{QUIC_ENABLE_LOGGING})
+  if (QUIC_ENABLE_LOGGING)
+    set(QUIC_TLS_SECRETS_SUPPORT "ON")
+  endif()
 else()
   set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
+# @todo for testing only
+set(QUIC_TLS_SECRETS_SUPPORT "ON")
 
 if (DEFINED ENV{QUICER_USE_LTTNG})
   add_compile_options(-DQUICER_USE_LTTNG)

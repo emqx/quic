@@ -16,7 +16,9 @@ limitations under the License.
 
 #ifndef __QUICER_CONNECTION_H_
 #define __QUICER_CONNECTION_H_
+#include "quicer_internal.h"
 #include "quicer_nif.h"
+#include <msquichelper.h>
 
 ERL_NIF_TERM
 async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
@@ -32,6 +34,7 @@ QUIC_STATUS ServerConnectionCallback(HQUIC Connection,
 
 ERL_NIF_TERM addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr);
 
-ERL_NIF_TERM get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM
+get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
 
 #endif // __QUICER_CONNECTION_H_
