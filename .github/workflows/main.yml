@@ -44,10 +44,6 @@ jobs:
       - uses: gleam-lang/setup-erlang@v1.1.2
         with:
           otp-version: ${{ matrix.otp }}
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v1.8
-        with:
-          cmake-version: '3.16.9'
       - name: release build with debug log off
         run: |
           sudo sysctl -w kernel.core_pattern=core
