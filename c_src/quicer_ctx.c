@@ -26,7 +26,6 @@ init_l_ctx()
   l_ctx->env = enif_alloc_env();
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
-  l_ctx->ssl_key_log_file = NULL;
   return l_ctx;
 }
 

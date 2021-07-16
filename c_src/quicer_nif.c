@@ -474,7 +474,7 @@ ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
   ATOM(ATOM_SNK_META, ~meta);                                                 \
   ATOM(ATOM_GEN_CAST, $gen_cast);                                             \
   ATOM(ATOM_FUNCTION, function);                                              \
-  ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                    \
+  ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;

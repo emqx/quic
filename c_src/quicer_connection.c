@@ -20,9 +20,11 @@ limitations under the License.
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
+extern inline const char* QuicStatusToString(QUIC_STATUS Status);
+
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
-                    _In_ CXPLAT_TLS_SECRETS TlsSecrets)
+                   _In_ CXPLAT_TLS_SECRETS TlsSecrets)
 {
   FILE *File = NULL;
 #ifdef _WIN32
@@ -238,8 +240,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
         {
-          dump_sslkeylogfile(c_ctx->ssl_keylogfile,
-                             *(c_ctx->TlsSecrets));
+          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
         }
 
       destroy_c_ctx(c_ctx);
@@ -512,10 +513,7 @@ async_connect3(ErlNifEnv *env,
 
       else
         {
-              fprintf(stderr,
-                      "failed to read string ssl_keylogfile");
-
-          // fail silently
+          fprintf(stderr, "failed to read string ssl_keylogfile");
         }
     }
 

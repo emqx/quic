@@ -24,7 +24,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
-  ErlNifEnv *env = l_ctx->env;
   QuicerConnCTX *c_ctx = NULL;
   switch (Event->Type)
     {
@@ -80,27 +79,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         {
           destroy_c_ctx(c_ctx);
           return QUIC_STATUS_INTERNAL_ERROR;
-        }
-
-      // @todo: this is just a poc
-      l_ctx->ssl_key_log_file = "/tmp/SSLKEYLOGFILE";
-
-      if (NULL != l_ctx->ssl_key_log_file)
-        {
-          CXPLAT_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
-              sizeof(CXPLAT_TLS_SECRETS), QUICER_TLS_SECRETS);
-
-          CxPlatZeroMemory(TlsSecrets, sizeof(CXPLAT_TLS_SECRETS));
-          Status = MsQuic->SetParam(c_ctx->Connection,
-                                    QUIC_PARAM_LEVEL_CONNECTION,
-                                    QUIC_PARAM_CONN_TLS_SECRETS,
-                                    sizeof(CXPLAT_TLS_SECRETS),
-                                    TlsSecrets);
-          if (QUIC_FAILED(Status))
-            {
-              break;
-            }
-          c_ctx->TlsSecrets = TlsSecrets;
         }
 
       break;

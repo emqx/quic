@@ -35,7 +35,6 @@ typedef struct
   ErlNifPid listenerPid;
   ErlNifEnv *env;
   ErlNifMutex *lock;
-  char *ssl_key_log_file;
   void *reserved1;
   void *reserved2;
   void *reserved3;
