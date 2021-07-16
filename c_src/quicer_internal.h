@@ -31,12 +31,4 @@ limitations under the License.
 #define CX_PLATFORM_DARWIN 1
 #endif
 
-#if defined(__linux__)
-#include <linux/limits.h>
-#elif defined(__APPLE__)
-#include <sys/syslimits.h>
-#else
-#include <limits.h>
-#endif
-
 #endif // QUICER_INTERNAL_H_

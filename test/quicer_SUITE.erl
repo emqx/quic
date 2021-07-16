@@ -15,6 +15,7 @@
 %%--------------------------------------------------------------------
 
 -module(quicer_SUITE).
+-include_lib("kernel/include/file.hrl").
 
 %% API
 -export([all/0,
@@ -62,6 +63,7 @@
         , tc_strm_opt_active_once/1
         , tc_strm_opt_active_1/1
         , tc_strm_opt_active_badarg/1
+        , tc_conn_opt_sslkeylogfile/1
         , tc_get_stream_id/1
         , tc_getstat/1
         , tc_peername_v4/1
@@ -854,7 +856,7 @@ tc_strm_opt_active_badarg(Config) ->
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {error, badarg} = quicer:start_stream(Conn, [{active, twice}]).
 
-tc_get_conn_rid(Config)->
+tc_get_conn_rid(Config) ->
   Port = 8891,
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
@@ -891,6 +893,28 @@ tc_get_stream_rid(Config) ->
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
+
+tc_conn_opt_sslkeylogfile(Config) ->
+  Port = 8892,
+  TargetFName = "SSLKEYLOGFILE",
+  file:delete(TargetFName),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              [ {sslkeylogfile, TargetFName} |
+                                default_conn_opts() ],
+                              5000),
+  quicer:close_connection(Conn),
+  timer:sleep(100),
+  {ok, #file_info{type=regular}} = file:read_file_info("SSLKEYLOGFILE").
 
 %%% ====================
 %%% Internal helpers

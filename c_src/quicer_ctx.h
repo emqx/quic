@@ -53,6 +53,7 @@ typedef struct
   ErlNifMutex *lock;
   BOOLEAN is_closed;
   CXPLAT_TLS_SECRETS *TlsSecrets;
+  char *ssl_keylogfile;
   void *reserved1;
   void *reserved2;
   void *reserved3;

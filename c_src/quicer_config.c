@@ -159,6 +159,13 @@ ClientLoadConfiguration(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  // Uncomment to make client prefer to use Draft-29
+  // This is for Draft-29 version in HOST byte order.
+  /* const uint32_t DesiredVersion = 0xff00001dU; */
+  /* Settings.DesiredVersionsList = &DesiredVersion; */
+  /* Settings.DesiredVersionsListLength = 1; */
+  /* Settings.IsSet.DesiredVersionsList = TRUE; */
+
   //
   // Configures a default client configuration, optionally disabling
   // server certificate validation.

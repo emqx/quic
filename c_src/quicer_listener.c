@@ -87,8 +87,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (NULL != l_ctx->ssl_key_log_file)
         {
-          CXPLAT_TLS_SECRETS *TlsSecrets
-              = CXPLAT_ALLOC_NONPAGED(sizeof(CXPLAT_TLS_SECRETS), QUICER_TLS_SECRETS);
+          CXPLAT_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
+              sizeof(CXPLAT_TLS_SECRETS), QUICER_TLS_SECRETS);
 
           CxPlatZeroMemory(TlsSecrets, sizeof(CXPLAT_TLS_SECRETS));
           Status = MsQuic->SetParam(c_ctx->Connection,
