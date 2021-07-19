@@ -38,9 +38,5 @@ tp_snk(ErlNifEnv *env,
           env, ATOM_GEN_CAST, enif_make_tuple2(env, ATOM_TRACE, snk_event));
       enif_send(NULL, &pid, NULL, report);
     }
-  else
-    {
-      fprintf(stderr, "Warning snabbcaffe_collector not found\n");
-    }
 }
 //#endif /* QUICER_USE_SNK */

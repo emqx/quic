@@ -660,6 +660,23 @@ handle_stream_recv_event(HQUIC Stream,
   return status;
 }
 
+ERL_NIF_TERM
+get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx;
+  if (1 != args)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  return SUCCESS(enif_make_ulong(env, (unsigned long)s_ctx->Stream));
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

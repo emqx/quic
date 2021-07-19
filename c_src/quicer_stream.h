@@ -18,6 +18,7 @@ limitations under the License.
 #define __QUICER_STREAM_H_
 
 #include "quicer_config.h"
+#include "quicer_internal.h"
 #include "quicer_nif.h"
 
 QUIC_STATUS
@@ -42,4 +43,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                          _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event);
 
+ERL_NIF_TERM
+get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
 #endif // __QUICER_STREAM_H_

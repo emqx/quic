@@ -22,7 +22,6 @@ else()
   set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
-
 if (DEFINED ENV{QUICER_USE_LTTNG})
   add_compile_options(-DQUICER_USE_LTTNG)
 endif()
@@ -34,6 +33,8 @@ endif()
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
 set(QUIC_BUILD_PERF "OFF")
+
+set(QUIC_TLS_SECRETS_SUPPORT "ON")
 
 # src files
 set(SOURCES

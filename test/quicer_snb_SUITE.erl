@@ -40,7 +40,6 @@ suite() ->
 init_per_suite(Config) ->
   application:ensure_all_started(quicer),
   application:ensure_all_started(snabbkaffe),
-  snabbkaffe:start_trace(),
   Config.
 
 %%--------------------------------------------------------------------
@@ -152,16 +151,28 @@ tc_app_echo_server(Config) ->
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-  ?check_trace(begin
+  ?check_trace(#{timetrap => 1000},
+               begin
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  quicer:recv(Stm, 4)
                end,
                fun(Result, Trace) ->
                    ?assertEqual({ok, <<"ping">>}, Result),
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assert(?strict_causality(#{?snk_kind := debug, function := "ClientStreamCallback", mark := ?QUIC_STREAM_EVENT_SEND_COMPLETE},
-                                             #{?snk_kind := debug, function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_RECEIVE},
-                                     Trace))
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "ClientStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_COMPLETE
+                                              , resource_id := _RidC
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_RECEIVE
+                                              , resource_id := _RidS
+                                              },
+                                             _RidC =/= _RidS,
+                                             Trace))
                end),
 
   quicer:close_stream(Stm),

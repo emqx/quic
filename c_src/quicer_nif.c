@@ -249,6 +249,12 @@ ERL_NIF_TERM ATOM_SNK_META;
 ERL_NIF_TERM ATOM_GEN_CAST;
 ERL_NIF_TERM ATOM_FUNCTION;
 ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
+
+/*----------------------------------------------------------*/
+/* Additional Connection Opt                                */
+/*----------------------------------------------------------*/
+ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -468,8 +474,8 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
   ATOM(ATOM_SNK_META, ~meta);                                                 \
   ATOM(ATOM_GEN_CAST, $gen_cast);                                             \
   ATOM(ATOM_FUNCTION, function);                                              \
-  ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);
-
+  ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
+  ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
 
@@ -503,6 +509,8 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
   CXPLAT_FREE(c_ctx->owner_mon, QUICER_OWNER_MON);
+  CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
+  CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
   AcceptorDestroy(c_ctx->owner);
 }
 
@@ -876,7 +884,10 @@ static ErlNifFunc nif_funcs[] = {
   { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
-  { "setopt", 3, setopt3, 0}
+  { "setopt", 3, setopt3, 0},
+  /* for DEBUG */
+  { "get_conn_rid", 1, get_conn_rid1, 1},
+  { "get_stream_rid", 1, get_stream_rid1, 1}
   // clang-format on
 };
 

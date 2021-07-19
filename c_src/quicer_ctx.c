@@ -52,6 +52,8 @@ init_c_ctx()
       = CXPLAT_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
   c_ctx->is_closed = FALSE;
+  c_ctx->TlsSecrets = NULL;
+  c_ctx->ssl_keylogfile = NULL;
   return c_ctx;
 }
 

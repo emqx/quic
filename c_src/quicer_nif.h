@@ -16,9 +16,11 @@ limitations under the License.
 
 #ifndef __QUICER_NIF_H_
 #define __QUICER_NIF_H_
+#include "quicer_internal.h"
 #include <assert.h>
 #include <erl_nif.h>
 #include <msquic.h>
+#include <msquichelper.h>
 #include <stdbool.h>
 
 #include "quicer_config.h"
@@ -31,14 +33,6 @@ limitations under the License.
 
 // @todo is 16 enough?
 #define MAX_ALPN 16
-
-#if defined(__linux__)
-#include <linux/limits.h>
-#elif defined(__APPLE__)
-#include <sys/syslimits.h>
-#else
-#include <limits.h>
-#endif
 
 // Global registration
 // @todo avoid use globals

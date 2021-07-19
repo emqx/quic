@@ -13,11 +13,108 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -------------------------------------------------------------------*/
-
 #include "quicer_connection.h"
-
 #include <assert.h>
 #include <unistd.h>
+
+extern inline void
+EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
+
+extern inline const char* QuicStatusToString(QUIC_STATUS Status);
+
+void
+dump_sslkeylogfile(_In_z_ const char *FileName,
+                   _In_ CXPLAT_TLS_SECRETS TlsSecrets)
+{
+  FILE *File = NULL;
+#ifdef _WIN32
+  if (fopen_s(&File, FileName, "ab"))
+    {
+      printf("Failed to open sslkeylogfile %s\n", FileName);
+      return;
+    }
+#else
+  File = fopen(FileName, "ab");
+#endif
+
+  if (File == NULL)
+    {
+      printf("Failed to open sslkeylogfile %s\n", FileName);
+      return;
+    }
+  if (fseek(File, 0, SEEK_END) == 0 && ftell(File) == 0)
+    {
+      fprintf(File, "# TLS 1.3 secrets log file\n");
+    }
+  char ClientRandomBuffer
+      [(2 * sizeof(((CXPLAT_TLS_SECRETS *)NULL)->ClientRandom)) + 1]
+      = { 0 };
+  char TempHexBuffer[(2 * CXPLAT_TLS_SECRETS_MAX_SECRET_LEN) + 1] = { 0 };
+  if (TlsSecrets.IsSet.ClientRandom)
+    {
+      EncodeHexBuffer(TlsSecrets.ClientRandom,
+                      (uint8_t)sizeof(TlsSecrets.ClientRandom),
+                      ClientRandomBuffer);
+    }
+
+  if (TlsSecrets.IsSet.ClientEarlyTrafficSecret)
+    {
+      EncodeHexBuffer(TlsSecrets.ClientEarlyTrafficSecret,
+                      TlsSecrets.SecretLength,
+                      TempHexBuffer);
+      fprintf(File,
+              "CLIENT_EARLY_TRAFFIC_SECRET %s %s\n",
+              ClientRandomBuffer,
+              TempHexBuffer);
+    }
+
+  if (TlsSecrets.IsSet.ClientHandshakeTrafficSecret)
+    {
+      EncodeHexBuffer(TlsSecrets.ClientHandshakeTrafficSecret,
+                      TlsSecrets.SecretLength,
+                      TempHexBuffer);
+      fprintf(File,
+              "CLIENT_HANDSHAKE_TRAFFIC_SECRET %s %s\n",
+              ClientRandomBuffer,
+              TempHexBuffer);
+    }
+
+  if (TlsSecrets.IsSet.ServerHandshakeTrafficSecret)
+    {
+      EncodeHexBuffer(TlsSecrets.ServerHandshakeTrafficSecret,
+                      TlsSecrets.SecretLength,
+                      TempHexBuffer);
+      fprintf(File,
+              "SERVER_HANDSHAKE_TRAFFIC_SECRET %s %s\n",
+              ClientRandomBuffer,
+              TempHexBuffer);
+    }
+
+  if (TlsSecrets.IsSet.ClientTrafficSecret0)
+    {
+      EncodeHexBuffer(TlsSecrets.ClientTrafficSecret0,
+                      TlsSecrets.SecretLength,
+                      TempHexBuffer);
+      fprintf(File,
+              "CLIENT_TRAFFIC_SECRET_0 %s %s\n",
+              ClientRandomBuffer,
+              TempHexBuffer);
+    }
+
+  if (TlsSecrets.IsSet.ServerTrafficSecret0)
+    {
+      EncodeHexBuffer(TlsSecrets.ServerTrafficSecret0,
+                      TlsSecrets.SecretLength,
+                      TempHexBuffer);
+      fprintf(File,
+              "SERVER_TRAFFIC_SECRET_0 %s %s\n",
+              ClientRandomBuffer,
+              TempHexBuffer);
+    }
+
+  fflush(File);
+  fclose(File);
+}
 
 //
 // The clients's callback for connection events from MsQuic.
@@ -140,6 +237,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           MsQuic->ConnectionClose(Connection);
           c_ctx->is_closed = TRUE;
         }
+
+      if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
+        {
+          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
+        }
+
       destroy_c_ctx(c_ctx);
       break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
@@ -175,7 +278,7 @@ ServerConnectionCallback(HQUIC Connection,
       // The handshake has completed for the connection.
       //
 
-      assert(c_ctx->Connection == NULL);
+      assert(c_ctx->Connection == Connection);
       c_ctx->Connection = Connection;
       acc = c_ctx->owner;
       acc_pid = &(acc->Pid);
@@ -214,6 +317,7 @@ ServerConnectionCallback(HQUIC Connection,
 
       MsQuic->ConnectionSendResumptionTicket(
           Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
+
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
       //
@@ -380,6 +484,39 @@ async_connect3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
     }
 
+  ERL_NIF_TERM essl_keylogfile;
+  if (enif_get_map_value(
+          env, eoptions, ATOM_SSL_KEYLOGFILE_NAME, &essl_keylogfile))
+    {
+      char *keylogfile = CXPLAT_ALLOC_NONPAGED(PATH_MAX, QUICER_TRACE);
+      if (enif_get_string(
+              env, essl_keylogfile, keylogfile, PATH_MAX, ERL_NIF_LATIN1))
+        {
+          CXPLAT_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
+              sizeof(CXPLAT_TLS_SECRETS), QUICER_TLS_SECRETS);
+
+          CxPlatZeroMemory(TlsSecrets, sizeof(CXPLAT_TLS_SECRETS));
+          Status = MsQuic->SetParam(c_ctx->Connection,
+                                    QUIC_PARAM_LEVEL_CONNECTION,
+                                    QUIC_PARAM_CONN_TLS_SECRETS,
+                                    sizeof(CXPLAT_TLS_SECRETS),
+                                    TlsSecrets);
+          if (QUIC_FAILED(Status))
+            {
+              fprintf(stderr,
+                      "failed to enable secret logging: %s",
+                      QuicStatusToString(Status));
+            }
+          c_ctx->TlsSecrets = TlsSecrets;
+          c_ctx->ssl_keylogfile = keylogfile;
+        }
+
+      else
+        {
+          fprintf(stderr, "failed to read string ssl_keylogfile");
+        }
+    }
+
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
                                                    c_ctx->Configuration,
                                                    QUIC_ADDRESS_FAMILY_UNSPEC,
@@ -533,6 +670,24 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
                               enif_make_int(env, ntohs(addr->Ipv4.sin_port)));
     }
 }
+
+ERL_NIF_TERM
+get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx;
+  if (1 != args)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  return SUCCESS(enif_make_ulong(env, (unsigned long)c_ctx->Connection));
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

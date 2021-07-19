@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 
 #include "quicer_listener.h"
+#include "quicer_config.h"
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -23,7 +24,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
-  ErlNifEnv *env = l_ctx->env;
   QuicerConnCTX *c_ctx = NULL;
   switch (Event->Type)
     {
@@ -37,8 +37,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!c_ctx)
         {
-          return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
+          return QUIC_STATUS_OUT_OF_MEMORY;
         }
+
+      c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
       c_ctx->l_ctx = l_ctx;
 
