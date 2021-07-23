@@ -20,7 +20,7 @@ limitations under the License.
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
-extern inline const char* QuicStatusToString(QUIC_STATUS Status);
+extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
@@ -562,6 +562,12 @@ async_accept2(ErlNifEnv *env,
       AcceptorDestroy(acceptor);
       return ERROR_TUPLE_2(ATOM_PARM_ERROR);
     }
+
+  ERL_NIF_TERM IsFastConn;
+  if (!enif_get_map_value(env, conn_opts, ATOM_FAST_CONN, &IsFastConn))
+  {
+    acceptor->fast_conn = IS_SAME_TERM(IsFastConn, ATOM_TRUE);
+  }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
 

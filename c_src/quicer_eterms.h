@@ -241,6 +241,7 @@ extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /* Additional Connection Opt                                */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
+extern ERL_NIF_TERM ATOM_FAST_CONN;
 
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */

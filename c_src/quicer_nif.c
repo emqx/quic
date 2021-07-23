@@ -250,6 +250,7 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /* Additional Connection Opt                                */
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
+ERL_NIF_TERM ATOM_FAST_CONN;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -467,7 +468,9 @@ ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
   ATOM(ATOM_GEN_CAST, $gen_cast);                                             \
   ATOM(ATOM_FUNCTION, function);                                              \
   ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
-  ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);
+  ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
+  ATOM(ATOM_FAST_CONN, fast_conn);
+
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
 
