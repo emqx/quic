@@ -40,7 +40,7 @@ typedef struct
   void *reserved3;
 } QuicerListenerCTX;
 
-typedef struct
+typedef struct QuicerConnCTX
 {
   HQUIC Configuration;
   HQUIC Connection;

@@ -21,6 +21,7 @@
 -export([ listen/2
         , close_listener/1
         , connect/4
+        , async_handshake/1
         , accept/2
         , accept/3
         , close_connection/1
@@ -104,6 +105,10 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
       Err
   end.
 
+-spec async_handshake(connection_handler()) -> ok | {error, any()}.
+async_handshake(Conn) ->
+  quicer_nif:async_handshake(Conn).
+
 -spec accept(listener_handler(), proplists:proplists() | map()) ->
         {ok, connection_handler()} | {error, any()}.
 accept(LSock, Opts) ->
@@ -116,8 +121,21 @@ accept(LSock, Opts, Timeout) when is_list(Opts) ->
 accept(LSock, Opts, Timeout) ->
   % non-blocking
   {ok, LSock} = quicer_nif:async_accept(LSock, maps:merge(default_conn_opts(), Opts)),
+  IsFastConn = maps:get(fast_conn, Opts, true),
   receive
+    {init_conn, C} when not IsFastConn ->
+      %% new incomming connection while `fast_conn' is off
+      case quicer_nif:async_handshake(C) of
+        ok ->
+          receive
+            %% @todo handle handshake fail
+            {new_conn, C} -> {ok, C}
+          end;
+        {error, _} = E ->
+          E
+      end;
     {new_conn, C} ->
+      %% newly established connection
       {ok, C}
   after Timeout ->
     {error, timeout}

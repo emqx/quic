@@ -31,6 +31,7 @@
                , conn = undefined
                , opts :: {quicer_listener:listener_opts(), conn_opts(), quicer_steam:stream_opts()}
                , callback :: module()
+               , slow_start :: boolean()
                }).
 
 -type conn_opts() :: map().
@@ -74,6 +75,7 @@ init([Listener, {_, #{conn_callback := CallbackModule} = COpts, _} = Opts, Sup])
     %% Async Acceptor
     {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
     {ok, #state{ listener = Listener
+               , slow_start = false
                , callback = CallbackModule
                , opts = Opts
                , sup = Sup}}.
@@ -122,15 +124,19 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info({new_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State) ->
+handle_info({quic, init_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State) ->
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
-
-    %% what to expect?
     M:new_conn(C, Opts),
-
+    ok = quicer:async_handshake(C),
+    {noreply, State#state{conn = C, slow_start = true} };
+handle_info({new_conn, C}, #state{callback = M, sup = Sup, opts = Opts, slow_start = false} = State) ->
+    %% I become the connection owner, I should start an new acceptor.
+    supervisor:start_child(Sup, [Sup]),
+    M:new_conn(C, Opts),
     {noreply, State#state{conn = C} };
-
+handle_info({new_conn, C}, #state{conn = C, slow_start = true} = State) ->
+    {noreply, State};
 handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
     %% exit signal from stream
     {noreply, State};

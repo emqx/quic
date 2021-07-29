@@ -16,6 +16,7 @@ limitations under the License.
 
 #include "quicer_listener.h"
 #include "quicer_config.h"
+#include "quicer_tp.h"
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -24,7 +25,9 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
+  ErlNifEnv *env = l_ctx->env;
   QuicerConnCTX *c_ctx = NULL;
+
   switch (Event->Type)
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
@@ -63,24 +66,31 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
 
-      if (QUIC_FAILED(MsQuic->ConnectionSetConfiguration(
-              Event->NEW_CONNECTION.Connection, l_ctx->Configuration)))
+      if (conn_owner->fast_conn)
         {
-          destroy_c_ctx(c_ctx);
-          return QUIC_STATUS_INTERNAL_ERROR;
+          TP_CB_3(fast_conn, c_ctx->Connection, 1);
+          if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
+            {
+              destroy_c_ctx(c_ctx);
+              return Status;
+            }
         }
-
-      // Apply connection owners' option overrides
-      if (QUIC_FAILED(MsQuic->SetParam(Event->NEW_CONNECTION.Connection,
-                                       QUIC_PARAM_LEVEL_CONNECTION,
-                                       QUIC_PARAM_CONN_SETTINGS,
-                                       sizeof(QUIC_SETTINGS),
-                                       &c_ctx->owner->Settings)))
+      else
         {
-          destroy_c_ctx(c_ctx);
-          return QUIC_STATUS_INTERNAL_ERROR;
+          TP_CB_3(fast_conn, c_ctx->Connection, 0);
+          if (!enif_send(
+                  NULL,
+                  &(c_ctx->owner->Pid),
+                  NULL,
+                  enif_make_tuple3(c_ctx->env,
+                                   ATOM_QUIC,
+                                   enif_make_atom(c_ctx->env, "init_conn"),
+                                   enif_make_resource(c_ctx->env, c_ctx))))
+            {
+              enif_mutex_unlock(c_ctx->lock);
+              return QUIC_STATUS_INTERNAL_ERROR;
+            }
         }
-
       break;
     default:
       break;
@@ -190,5 +200,5 @@ close_listener1(ErlNifEnv *env,
   MsQuic->ListenerStop(l_ctx->Listener);
   MsQuic->ListenerClose(l_ctx->Listener);
   enif_release_resource(l_ctx);
-  return enif_make_atom(env, "ok");
+  return ATOM_OK;
 }

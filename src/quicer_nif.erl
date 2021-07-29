@@ -22,6 +22,7 @@
         , close_listener/1
         , async_connect/3
         , async_accept/2
+        , async_handshake/1
         , async_close_connection/1
         , async_accept_stream/2
         , start_stream/2
@@ -77,6 +78,9 @@ async_connect(_Host, _Port, _Opts)->
   erlang:nif_error(nif_library_not_loaded).
 
 async_accept(_Listener, _Opts) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+async_handshake(_Connection)->
   erlang:nif_error(nif_library_not_loaded).
 
 async_close_connection(_Conn) ->

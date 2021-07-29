@@ -32,3 +32,5 @@ limitations under the License.
 #endif
 
 #endif // QUICER_INTERNAL_H_
+
+typedef struct QuicerConnCTX QuicerConnCTX;

@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -------------------------------------------------------------------*/
 #include "quicer_connection.h"
+#include "quicer_ctx.h"
 #include <assert.h>
 #include <unistd.h>
 
@@ -564,10 +565,10 @@ async_accept2(ErlNifEnv *env,
     }
 
   ERL_NIF_TERM IsFastConn;
-  if (!enif_get_map_value(env, conn_opts, ATOM_FAST_CONN, &IsFastConn))
-  {
-    acceptor->fast_conn = IS_SAME_TERM(IsFastConn, ATOM_TRUE);
-  }
+  if (enif_get_map_value(env, conn_opts, ATOM_FAST_CONN, &IsFastConn))
+    {
+      acceptor->fast_conn = IS_SAME_TERM(IsFastConn, ATOM_TRUE);
+    }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
 
@@ -678,10 +679,10 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
 }
 
 ERL_NIF_TERM
-get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
+get_conn_rid1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
-  if (1 != args)
+  if (1 != argc)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -692,6 +693,62 @@ get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
     }
 
   return SUCCESS(enif_make_ulong(env, (unsigned long)c_ctx->Connection));
+}
+
+QUIC_STATUS
+continue_connection_handshake(QuicerConnCTX *c_ctx)
+{
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+
+  if (!c_ctx || !(c_ctx->l_ctx))
+    {
+      return QUIC_STATUS_INTERNAL_ERROR;
+    }
+
+  if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
+                      c_ctx->Connection, c_ctx->l_ctx->Configuration)))
+    {
+      return Status;
+    }
+
+  // Apply connection owners' option overrides
+  if (QUIC_FAILED(Status = MsQuic->SetParam(c_ctx->Connection,
+                                            QUIC_PARAM_LEVEL_CONNECTION,
+                                            QUIC_PARAM_CONN_SETTINGS,
+                                            sizeof(QUIC_SETTINGS),
+                                            &c_ctx->owner->Settings)))
+    {
+      return Status;
+    }
+  return Status;
+}
+
+ERL_NIF_TERM
+async_handshake_1(ErlNifEnv *env,
+            __unused_parm__ int argc,
+            const ERL_NIF_TERM argv[])
+
+{
+  QuicerConnCTX *c_ctx;
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  if (1 != argc)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  TP_NIF_3(start, c_ctx->Connection, 0);
+
+  if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
+    {
+      return ERROR_TUPLE_2(atom_status(Status));
+    }
+
+  return ATOM_OK;
 }
 
 ///_* Emacs
