@@ -530,7 +530,7 @@ close_stream1(ErlNifEnv *env,
       if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
                           s_ctx->Stream,
                           QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
-                          NO_ERROR)))
+                          0)))
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }
