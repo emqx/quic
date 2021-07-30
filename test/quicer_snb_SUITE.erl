@@ -148,6 +148,7 @@ tc_app_echo_server(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
+                   , {fast_conn, false}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
@@ -202,8 +203,11 @@ tc_slow_conn(Config) ->
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  quicer:recv(Stm, 4),
-                 quicer:close_stream(Stm),
+                 ct:pal("closing stream"),
+                 ok = quicer:close_stream(Stm),
+                 ct:pal("closing conn"),
                  quicer:close_connection(Conn),
+                 ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
                fun(Result, Trace) ->
@@ -231,8 +235,9 @@ default_stream_opts() ->
   [].
 
 default_conn_opts() ->
-  [{alpn, ["sample"]},
-   {idle_timeout_ms, 5000}
+  [ {alpn, ["sample"]}
+  %% , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+  , {idle_timeout_ms, 5000}
   ].
 
 default_listen_opts(Config) ->

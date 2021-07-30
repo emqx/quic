@@ -179,6 +179,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // Data was received from the peer on the stream.
       //
+      if (0 == Event->RECEIVE.TotalBufferLength)
+      {
+        break;
+      }
       status = handle_stream_recv_event(Stream, s_ctx, Event);
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:

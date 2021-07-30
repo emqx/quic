@@ -126,17 +126,20 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info({quic, new_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State) ->
+    ?tp(quic_new_conn, #{module=>?MODULE, conn=>C}),
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
     M:new_conn(C, Opts),
     ok = quicer:async_handshake(C),
     {noreply, State#state{conn = C, slow_start = true} };
 handle_info({quic, connected, C}, #state{callback = M, sup = Sup, opts = Opts, slow_start = false} = State) ->
+    ?tp(quic_connected, #{module=>?MODULE, conn=>C}),
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
     M:new_conn(C, Opts),
     {noreply, State#state{conn = C} };
 handle_info({quic, connected, C}, #state{conn = C, slow_start = true} = State) ->
+    ?tp(quic_connected_slow, #{module=>?MODULE, conn=>C}),
     {noreply, State};
 handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
     %% exit signal from stream
@@ -158,8 +161,6 @@ handle_info({quic, shutdown, C}, #state{conn = C, callback = M} = State) ->
 handle_info({quic, closed, C}, #state{conn = C} = State) ->
     %% @todo, connection closed
     {stop, normal, State}.
-
-
 
 %%--------------------------------------------------------------------
 %% @private
