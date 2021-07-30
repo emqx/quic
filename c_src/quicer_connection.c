@@ -146,7 +146,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                      NULL,
                      enif_make_tuple3(env,
                                       ATOM_QUIC,
-                                      enif_make_atom(env, "connected"),
+                                      ATOM_CONNECTED,
                                       enif_make_resource(env, c_ctx))))
         {
           enif_mutex_unlock(c_ctx->lock);
@@ -180,7 +180,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                      NULL,
                      enif_make_tuple3(env,
                                       ATOM_QUIC,
-                                      enif_make_atom(env, "new_stream"),
+                                      ATOM_NEW_STREAM,
                                       enif_make_resource(env, s_ctx))))
         {
           // @todo log and step counter
@@ -304,13 +304,11 @@ ServerConnectionCallback(HQUIC Connection,
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor
       // should pick a 'acceptor' here?
-      if (!enif_send(NULL,
-                     acc_pid,
-                     NULL,
-                     enif_make_tuple(c_ctx->env,
-                                     2,
-                                     enif_make_atom(c_ctx->env, "new_conn"),
-                                     ConnHandler)))
+      if (!enif_send(
+              NULL,
+              acc_pid,
+              NULL,
+              enif_make_tuple(c_ctx->env, 2, ATOM_NEW_CONN, ConnHandler)))
         {
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
@@ -408,7 +406,7 @@ ServerConnectionCallback(HQUIC Connection,
                      NULL,
                      enif_make_tuple3(env,
                                       ATOM_QUIC,
-                                      enif_make_atom(env, "new_stream"),
+                                      ATOM_NEW_STREAM,
                                       enif_make_resource(env, s_ctx))))
         {
           // @todo log and step counter

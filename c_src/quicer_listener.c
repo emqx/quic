@@ -85,7 +85,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                   NULL,
                   enif_make_tuple3(c_ctx->env,
                                    ATOM_QUIC,
-                                   enif_make_atom(c_ctx->env, "init_conn"),
+                                   ATOM_INIT_CONN,
                                    enif_make_resource(c_ctx->env, c_ctx))))
             {
               enif_mutex_unlock(c_ctx->lock);
