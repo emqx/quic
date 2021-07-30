@@ -15,7 +15,12 @@
 %%--------------------------------------------------------------------
 -module(quicer_server_conn_callback).
 
--export([new_conn/2]).
+-export([ new_conn/2
+        , shutdown/1
+        ]).
 
 new_conn(Conn, {_, _, SOpts}) ->
     quicer_stream:start_link(Conn, SOpts).
+
+shutdown(Conn) ->
+    quicer:async_close_connection(Conn).

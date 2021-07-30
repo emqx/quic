@@ -260,7 +260,7 @@ tc_conn_double_close(Config)->
       ok = quicer:close_connection(Conn),
       SPid ! done,
       timer:sleep(1000),
-      quicer:close_connection(Conn),
+      quicer:async_close_connection(Conn),
       %% Wait for it crash if it will
       timer:sleep(1000),
       ensure_server_exit_normal(Ref)
@@ -293,6 +293,7 @@ tc_stream_client_init(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_stream(Stm),
+      ok = quicer:close_connection(Conn),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -389,6 +390,8 @@ tc_stream_passive_receive(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
+      quicer:close_stream(Stm),
+      quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 6000 ->
@@ -490,7 +493,6 @@ tc_stream_send_after_async_conn_close(Config) ->
       %% but it should not crash
       quicer:send(Stm, <<"ping">>),
       SPid ! done,
-      timer:sleep(3000),
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
       ct:fail("timeout")
@@ -767,11 +769,12 @@ tc_app_echo_server(Config) ->
   {ok, 4} = quicer:async_send(Stm, <<"ping">>),
   {ok, 4} = quicer:async_send(Stm, <<"ping">>),
   {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
-  quicer:close_stream(Stm),
-  quicer:close_connection(Conn),
+  ok = quicer:close_stream(Stm),
+  ok = quicer:close_connection(Conn),
   ok = quicer:stop_listener(mqtt),
   %% test that listener could be reopened
   {ok, _} = quicer:start_listener(mqtt, Port, Options),
+  ok = quicer:stop_listener(mqtt),
   ok.
 
 tc_strm_opt_active_1(Config) ->
@@ -967,6 +970,10 @@ echo_server_stm_loop(L, Conn, Stm) ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stm);
+    {quic, shutdown, Conn} ->
+      ct:pal("echo server conn shutdown ~p", [Conn]),
+      quicer:close_connection(Conn),
+      echo_server_stm_loop(L, Conn, Stm);
     {quic, closed, Stm, Flag} ->
       ct:pal("echo server stream closed ~p", [Flag]),
       echo_server_stm_loop(L, Conn, Stm);
@@ -977,7 +984,7 @@ echo_server_stm_loop(L, Conn, Stm) ->
       echo_server_stm_loop(L, Conn, NewStm);
     done ->
       ct:pal("echo server shuting down", []),
-      quicer:close_connection(Conn),
+      quicer:async_close_connection(Conn),
       quicer:close_listener(L)
   end.
 
@@ -988,7 +995,8 @@ ping_pong_server(Owner, Config, Port) ->
       {ok, Conn} = quicer:accept(L, [], 5000),
       {ok, Stm} = quicer:accept_stream(Conn, []),
       ping_pong_server_stm_loop(L, Conn, Stm);
-    {error, listener_start_error, 200000002} ->
+    {error, listener_start_error, R} ->
+      ct:pal("Failed to start listener:~p , retry ...", [R]),
       timer:sleep(100),
       ping_pong_server(Owner, Config, Port)
   end.
@@ -997,20 +1005,32 @@ ping_pong_server_stm_loop(L, Conn, Stm) ->
   true = is_reference(Stm),
   receive
     {quic, <<"ping">>, _, _, _, _} ->
+      ct:pal("send pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_stm_loop(L, Conn, Stm);
-    done ->
+    {quic, peer_send_shutdown, Stm} ->
+      ct:pal("closing stream"),
+      quicer:close_stream(Stm),
+      ping_pong_server_stm_loop(L, Conn, Stm);
+    {quic, shutdown, Conn} ->
+      ct:pal("closing conn"),
       quicer:close_connection(Conn),
+      ping_pong_server_stm_loop(L, Conn, Stm);
+    done ->
       quicer:close_listener(L)
   end.
 
 simple_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
-  {ok, _Conn} = quicer:accept(L, [], 5000),
-  receive done ->
+  {ok, Conn} = quicer:accept(L, [], 1000),
+  receive 
+    done ->
       quicer:close_listener(L),
-      ok
+      ok;
+    {quic, shutdown, Conn} ->
+      quicer:close_connection(Conn),
+      quicer:close_listener(L)
   end.
 
 simple_slow_conn_server(Owner, Config, Port) ->
@@ -1042,10 +1062,17 @@ simple_stream_server(Owner, Config, Port) ->
     {ok, _Stream} -> ok;
     {error, timeout} -> ok % for testing negtive testcases
   end,
-  receive done ->
-      quicer:close_listener(L),
+  receive
+    {quic, shutdown, Conn} ->
+      quicer:close_connection(Conn);
+    {quic, peer_send_shutdown, Stream} ->
+      quicer:close_stream(Stream),
+      quicer:close_connection(Conn);
+    done ->
       ok
-  end.
+  end,
+  quicer:close_listener(L).
+
 
 ensure_server_exit_normal(MonRef) ->
   ensure_server_exit_normal(MonRef, 5000).
@@ -1064,6 +1091,7 @@ default_stream_opts() ->
 
 default_conn_opts() ->
   [{alpn, ["sample"]},
+   {fast_conn, false},
    {idle_timeout_ms, 5000}
   ].
 

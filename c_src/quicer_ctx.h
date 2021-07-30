@@ -30,7 +30,6 @@ typedef struct
 {
   HQUIC Configuration;
   HQUIC Listener;
-  HQUIC Connection;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
   ErlNifEnv *env;

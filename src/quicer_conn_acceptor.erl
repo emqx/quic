@@ -14,6 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 -module(quicer_conn_acceptor).
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -behaviour(gen_server).
 
@@ -149,9 +150,9 @@ handle_info({'EXIT', _Pid, normal}, State) ->
     %% @todo
     {noreply, State};
 
-handle_info({quic, shutdown, C}, #state{conn = C} = State) ->
-    %% @todo, peer shutdown conn
-    %% add callback
+handle_info({quic, shutdown, C}, #state{conn = C, callback = M} = State) ->
+    ?tp(quic_shutdown, #{module=>?MODULE}),
+    M:shutdown(C),
     {noreply, State};
 
 handle_info({quic, closed, C}, #state{conn = C} = State) ->
