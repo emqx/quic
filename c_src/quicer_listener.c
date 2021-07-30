@@ -25,7 +25,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
-  ErlNifEnv *env = l_ctx->env;
   QuicerConnCTX *c_ctx = NULL;
 
   switch (Event->Type)
@@ -37,6 +36,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       // Note, c_ctx is newly init here, don't grab lock.
       //
       c_ctx = init_c_ctx();
+      ErlNifEnv *env = c_ctx->env;
 
       if (!c_ctx)
         {
@@ -83,10 +83,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                   NULL,
                   &(c_ctx->owner->Pid),
                   NULL,
-                  enif_make_tuple3(c_ctx->env,
+                  enif_make_tuple3(env,
                                    ATOM_QUIC,
                                    ATOM_INIT_CONN,
-                                   enif_make_resource(c_ctx->env, c_ctx))))
+                                   enif_make_resource(env, c_ctx))))
             {
               enif_mutex_unlock(c_ctx->lock);
               return QUIC_STATUS_INTERNAL_ERROR;
