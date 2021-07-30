@@ -79,14 +79,13 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       else
         {
           TP_CB_3(fast_conn, c_ctx->Connection, 0);
-          if (!enif_send(
-                  NULL,
-                  &(c_ctx->owner->Pid),
-                  NULL,
-                  enif_make_tuple3(env,
-                                   ATOM_QUIC,
-                                   ATOM_INIT_CONN,
-                                   enif_make_resource(env, c_ctx))))
+          if (!enif_send(NULL,
+                         &(c_ctx->owner->Pid),
+                         NULL,
+                         enif_make_tuple3(env,
+                                          ATOM_QUIC,
+                                          ATOM_NEW_CONN,
+                                          enif_make_resource(env, c_ctx))))
             {
               enif_mutex_unlock(c_ctx->lock);
               return QUIC_STATUS_INTERNAL_ERROR;

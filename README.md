@@ -135,7 +135,9 @@ quicer:close_listener(Listener) -> ok.
 
 Gracefully close listener.
 
-### Accept Connection (Server)
+### Accept Connection 
+
+Accept connection
 
 ``` erlang
 quicer:accept(Listener, Options, Timeout) -> 
@@ -146,6 +148,19 @@ Blocking call to accept new connection.
 
 Caller becomes the owner of new connection.
 
+If option `{fast_conn, false}` is set, TLS handshake will not be done automatically and
+
+application has the chance to reject/close connection early before TLS handshake.
+
+note: `fast_conn` is set default to `true` means TLS handshake will be done automatically. 
+
+### TLS Handshake
+
+When connection was accepted with option `{fast_conn, false}`, handshake must be called to finish the TLS handshake.
+
+``` erlang
+quicer:handeshake(Connection) -> ok | {error, any()}.
+```
 
 ### Start Connection  (Client)
 
@@ -256,8 +271,7 @@ Supported Opts:
   |---------|----------------|------|-------------|
   |         |                |      |             |
 | param_conn_settings | Set            | map() | map keys: <br>conn_flow_control_window<br>max_worker_queue_delay_us<br>max_stateless_operations<br>initial_window_packets<br>send_idle_timeout_ms<br>initial_rtt_ms<br>max_ack_delay_ms<br>disconnect_timeout_ms<br>keep_alive_interval_ms<br>peer_bidi_stream_count<br>peer_unidi_stream_count<br>retry_memory_limit<br>load_balancing_mode<br>max_operations_per_drain<br>send_buffering_enabled<br>pacing_enabled<br>migration_enabled<br>datagram_receive_enabled<br>server_resumption_level<br>version_negotiation_ext_enabled<br>desired_versions_list<br>desired_versions_list_length<br> |
-|
-  
+
 
 ### Connection stat
 

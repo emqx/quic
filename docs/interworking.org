@@ -51,7 +51,7 @@ end note
 
 msw o-[#blue]->o conn_acceptor: nif monitor
 
-msw --> conn_acceptor: erl msg:  '{new_conn, ... }'
+msw --> conn_acceptor: erl msg:  '{quic, connected, ... }'
 
 hnote over conn_acceptor: unblocked
 

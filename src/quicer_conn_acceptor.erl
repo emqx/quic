@@ -124,18 +124,18 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info({quic, init_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State) ->
+handle_info({quic, new_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State) ->
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
     M:new_conn(C, Opts),
     ok = quicer:async_handshake(C),
     {noreply, State#state{conn = C, slow_start = true} };
-handle_info({new_conn, C}, #state{callback = M, sup = Sup, opts = Opts, slow_start = false} = State) ->
+handle_info({quic, connected, C}, #state{callback = M, sup = Sup, opts = Opts, slow_start = false} = State) ->
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
     M:new_conn(C, Opts),
     {noreply, State#state{conn = C} };
-handle_info({new_conn, C}, #state{conn = C, slow_start = true} = State) ->
+handle_info({quic, connected, C}, #state{conn = C, slow_start = true} = State) ->
     {noreply, State};
 handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
     %% exit signal from stream

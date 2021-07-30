@@ -304,11 +304,11 @@ ServerConnectionCallback(HQUIC Connection,
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor
       // should pick a 'acceptor' here?
-      if (!enif_send(
-              NULL,
-              acc_pid,
-              NULL,
-              enif_make_tuple(c_ctx->env, 2, ATOM_NEW_CONN, ConnHandler)))
+      if (!enif_send(NULL,
+                     acc_pid,
+                     NULL,
+                     enif_make_tuple3(
+                         c_ctx->env, ATOM_QUIC, ATOM_CONNECTED, ConnHandler)))
         {
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;

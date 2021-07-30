@@ -41,6 +41,7 @@
         , tc_close_listener/1
 
         , tc_conn_basic/1
+        , tc_conn_basic_slow_start/1
         , tc_conn_double_close/1
         , tc_conn_other_port/1
 
@@ -215,6 +216,24 @@ tc_conn_basic(Config)->
   {SPid, Ref} = spawn_monitor(
                    fun() ->
                        simple_conn_server(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_basic_slow_start(Config)->
+  Port = 4567,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_slow_conn_server(Owner, Config, Port)
                    end),
   receive
     listener_ready ->
@@ -989,6 +1008,18 @@ simple_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
   {ok, _Conn} = quicer:accept(L, [], 5000),
+  receive done ->
+      quicer:close_listener(L),
+      ok
+  end.
+
+simple_slow_conn_server(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Owner ! listener_ready,
+  {ok, Conn} = quicer:accept(L, [{fast_conn, false}], 5000),
+  {ok, Conn} = quicer:handshake(Conn),
+  %% test what happens if handshake twice
+  {error, invalid_state} = quicer:handshake(Conn),
   receive done ->
       quicer:close_listener(L),
       ok

@@ -226,7 +226,6 @@ ERL_NIF_TERM ATOM_QUIC;
 ERL_NIF_TERM ATOM_QUIC_PASSIVE;
 ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
-ERL_NIF_TERM ATOM_INIT_CONN;
 ERL_NIF_TERM ATOM_NEW_CONN;
 ERL_NIF_TERM ATOM_CONNECTED;
 ERL_NIF_TERM ATOM_NEW_STREAM;
@@ -458,7 +457,6 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
-  ATOM(ATOM_INIT_CONN, init_conn);                                            \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \
   ATOM(ATOM_CONNECTED, connected);                                            \
   ATOM(ATOM_NEW_STREAM, new_stream);                                          \
