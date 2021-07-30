@@ -51,9 +51,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!conn_owner)
         {
+          TP_CB_3(missing_acceptor, c_ctx->Connection, 0);
           destroy_c_ctx(c_ctx);
           // make msquic close the connection.
-          return QUIC_STATUS_NOT_FOUND;
+          return QUIC_STATUS_UNREACHABLE;
         }
       c_ctx->owner = conn_owner;
 

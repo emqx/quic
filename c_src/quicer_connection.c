@@ -378,26 +378,28 @@ ServerConnectionCallback(HQUIC Connection,
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
       s_ctx->c_ctx = c_ctx;
       s_ctx->l_ctx = c_ctx->l_ctx;
-      int retry = 100;
-      // @todo, not nice to spin here, need new method to sync with connection
-      // owner1
-      while (!(acc && acc_pid && enif_is_process_alive(env, acc_pid)))
+
+      acc = AcceptorDequeue(c_ctx->acceptor_queue);
+
+      if (!acc)
         {
-          acc = AcceptorDequeue(c_ctx->acceptor_queue);
-          acc_pid = &(acc->Pid);
-
-          enif_mutex_unlock(c_ctx->lock);
-          usleep(10000);
-          enif_mutex_lock(c_ctx->lock);
-
-          if (retry < 0)
+          if (c_ctx->owner->fast_conn)
             {
-              enif_mutex_unlock(c_ctx->lock);
+              // if fast_conn is on and acceptor_queue is empty
+              //   set stream owner to conn owner
+              acc = c_ctx->owner;
+            }
+          else
+            {
               destroy_s_ctx(s_ctx);
+              enif_mutex_unlock(c_ctx->lock);
               return QUIC_STATUS_UNREACHABLE;
             }
-          retry--;
         }
+
+      assert(acc);
+      acc_pid = &(acc->Pid);
+
       s_ctx->owner = acc;
 
       // @todo add monitor here.
@@ -725,8 +727,8 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 
 ERL_NIF_TERM
 async_handshake_1(ErlNifEnv *env,
-            __unused_parm__ int argc,
-            const ERL_NIF_TERM argv[])
+                  __unused_parm__ int argc,
+                  const ERL_NIF_TERM argv[])
 
 {
   QuicerConnCTX *c_ctx;

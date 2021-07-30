@@ -122,7 +122,7 @@ groups() ->
 %%--------------------------------------------------------------------
 all() ->
   [ tc_app_echo_server
-  , tc_fast_conn
+  , tc_slow_conn
   ].
 
 %%--------------------------------------------------------------------
@@ -184,7 +184,7 @@ tc_app_echo_server(Config) ->
   quicer:close_connection(Conn),
   ok = quicer:stop_listener(mqtt).
 
-tc_fast_conn(Config) ->
+tc_slow_conn(Config) ->
   Port = 8888,
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
