@@ -185,7 +185,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           // @todo log and step counter
           MsQuic->ConnectionShutdown(Connection,
                                      QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                     ERROR_OPERATION_ABORTED);
+                                     QUIC_STATUS_ABORTED);
         }
 
       MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
@@ -413,7 +413,7 @@ ServerConnectionCallback(HQUIC Connection,
           // shutdown the connection gracefully.
           // @todo, check rfc for the error code
           MsQuic->ConnectionShutdown(
-              Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, NO_ERROR);
+              Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
           enif_mutex_unlock(s_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
         }
@@ -589,7 +589,7 @@ close_connection1(ErlNifEnv *env,
       MsQuic->ConnectionShutdown(c_ctx->Connection,
                                  //@todo, check rfc for the error code
                                  QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                 NO_ERROR);
+                                 0);
     }
   enif_mutex_unlock(c_ctx->lock);
   return ATOM_OK;

@@ -51,8 +51,6 @@ extern void MsQuicLibraryLoad(void);
 
 ERL_NIF_TERM atom_status(QUIC_STATUS status);
 
-ERL_NIF_TERM atom_errno(int errno);
-
 // Compiler attributes
 #define __unused_parm__ __attribute__((unused))
 
