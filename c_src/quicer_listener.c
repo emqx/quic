@@ -167,7 +167,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
     {
-      return false;
+      destroy_l_ctx(l_ctx);
+      return ERROR_TUPLE_2(ATOM_ALPN);
     }
 
   if (QUIC_FAILED(
@@ -195,9 +196,8 @@ close_listener1(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
-  // @todo error handling here
-  MsQuic->ListenerStop(l_ctx->Listener);
+  // calling ListenerStop is optional
+  //MsQuic->ListenerStop(l_ctx->Listener);
   MsQuic->ListenerClose(l_ctx->Listener);
   enif_release_resource(l_ctx);
   return ATOM_OK;
