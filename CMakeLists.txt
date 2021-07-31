@@ -63,10 +63,10 @@ add_compile_options(-DSO_ATTACH_REUSEPORT_CBPF=51)
 # for lttng, quicer_tp.h
 include_directories(c_src)
 
-add_subdirectory(submodules/msquic)
+add_subdirectory(msquic)
 
 add_library(quicer_static STATIC ${SOURCES})
-target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ submodules/msquic/src/inc/)
+target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ msquic/src/inc/)
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,--no-gc-sections")
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
@@ -82,7 +82,7 @@ if (CMAKE_SYSTEM_NAME MATCHES Linux)
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_nif PRIVATE quicer_static "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip") # link enif lib
 endif()
-target_include_directories(quicer_nif PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ submodules/msquic/src/inc/)
+target_include_directories(quicer_nif PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ msquic/src/inc/)
 
 add_dependencies(quicer_nif quicer_static)
 add_dependencies(quicer_static msquic)
