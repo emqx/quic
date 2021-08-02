@@ -62,11 +62,15 @@ $ cmake -B c_build -DCMAKE_BUILD_TYPE=Release -DQUIC_ENABLE_LOGGING=OFF && make
 ### Server
 
 ``` erlang
+application:ensure_all_started(quicer),
 Port = 4567,
 LOptions = [ {cert, "cert.pem"}
-           , {key,  "key.pem"}],
+           , {key,  "key.pem"}
+           , {alpn, ["sample"]}
+             ],
 {ok, L} = quicer:listen(Port, LOptions),
 {ok, Conn} = quicer:accept(L, [], 5000),
+{ok, Conn} = quicer:handshake(Conn),
 {ok, Stm} = quicer:accept_stream(Conn, []),
 receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
 {ok, 4} = quicer:send(Stm, <<"pong">>),
@@ -76,8 +80,9 @@ quicer:close_listener(L).
 ### Client
 
 ``` erlang
+application:ensure_all_started(quicer),
 Port = 4567,
-{ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+{ok, Conn} = quicer:connect("localhost", Port, [{alpn, ["sample"]}], 5000),
 {ok, Stm} = quicer:start_stream(Conn, []),
 {ok, 4} = quicer:send(Stm, <<"ping">>),
 receive {quic, <<"pong">>, Stm, _, _, _} -> ok end,
