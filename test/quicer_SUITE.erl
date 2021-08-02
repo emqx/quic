@@ -947,8 +947,13 @@ echo_server(Owner, Config, Port)->
     {ok, L} ->
       Owner ! listener_ready,
       {ok, Conn} = quicer:accept(L, [], 5000),
+      {ok, Conn} = quicer:async_accept_stream(Conn, []),
+      {ok, Conn} = quicer:handshake(Conn),
       ct:pal("echo server conn accepted", []),
-      {ok, Stm} = quicer:accept_stream(Conn, []),
+      receive
+        {quic, new_stream, Stm} ->
+          {ok, Conn} = quicer:async_accept_stream(Conn, [])
+      end,
       ct:pal("echo server stream accepted", []),
       echo_server_stm_loop(L, Conn, Stm);
     {error, listener_start_error, 200000002} ->
@@ -993,7 +998,12 @@ ping_pong_server(Owner, Config, Port) ->
     {ok, L} ->
       Owner ! listener_ready,
       {ok, Conn} = quicer:accept(L, [], 5000),
-      {ok, Stm} = quicer:accept_stream(Conn, []),
+      {ok, Conn} = quicer:async_accept_stream(Conn, []),
+      {ok, Conn} = quicer:handshake(Conn),
+      receive
+        {quic, new_stream, Stm} ->
+          {ok, Conn} = quicer:async_accept_stream(Conn, [])
+      end,
       ping_pong_server_stm_loop(L, Conn, Stm);
     {error, listener_start_error, R} ->
       ct:pal("Failed to start listener:~p , retry ...", [R]),
@@ -1024,6 +1034,7 @@ simple_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 1000),
+  {ok, Conn} = quicer:handshake(Conn),
   receive 
     done ->
       quicer:close_listener(L),
@@ -1048,7 +1059,8 @@ simple_slow_conn_server(Owner, Config, Port) ->
 conn_server_with(Owner, Port, Opts) ->
   {ok, L} = quicer:listen(Port, Opts),
   Owner ! listener_ready,
-  {ok, _Conn} = quicer:accept(L, [], 10000),
+  {ok, Conn} = quicer:accept(L, [], 10000),
+  {ok, Conn} = quicer:handshake(Conn),
   receive done ->
     quicer:close_listener(L),
     ok
@@ -1058,15 +1070,23 @@ simple_stream_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 5000),
-  case quicer:accept_stream(Conn, [], 500) of
-    {ok, _Stream} -> ok;
-    {error, timeout} -> ok % for testing negtive testcases
+  {ok, Conn} = quicer:async_accept_stream(Conn, []),
+  {ok, Conn} = quicer:handshake(Conn),
+  receive
+    {quic, new_stream, Stream} ->
+      {ok, StreamId} = quicer:get_stream_id(Stream),
+      ct:pal("New StreamID: ~p", [StreamId]),
+      receive
+        {quic, shutdown, Conn} ->
+          quicer:close_connection(Conn);
+        {quic, peer_send_shutdown, Stream} ->
+          quicer:close_stream(Stream)
+      end
+  after 1000 ->
+      {error, timeout}
   end,
   receive
     {quic, shutdown, Conn} ->
-      quicer:close_connection(Conn);
-    {quic, peer_send_shutdown, Stream} ->
-      quicer:close_stream(Stream),
       quicer:close_connection(Conn);
     done ->
       ok
@@ -1091,7 +1111,7 @@ default_stream_opts() ->
 
 default_conn_opts() ->
   [{alpn, ["sample"]},
-   {fast_conn, false},
+   %{sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
    {idle_timeout_ms, 5000}
   ].
 

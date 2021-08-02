@@ -135,7 +135,7 @@ quicer:close_listener(Listener) -> ok.
 
 Gracefully close listener.
 
-### Accept Connection 
+### Accept Connection (Server) 
 
 Accept connection
 
@@ -148,18 +148,10 @@ Blocking call to accept new connection.
 
 Caller becomes the owner of new connection.
 
-If option `{fast_conn, false}` is set, TLS handshake will not be done automatically and
-
-application has the chance to reject/close connection early before TLS handshake.
-
-note: `fast_conn` is set default to `true` means TLS handshake will be done automatically. 
-
-### TLS Handshake
-
-When connection was accepted with option `{fast_conn, false}`, handshake must be called to finish the TLS handshake.
+### TLS Handshake (Server)
 
 ``` erlang
-quicer:handeshake(Connection) -> ok | {error, any()}.
+quicer:handeshake(Connection) -> {ok, Connection} | {error, any()}.
 ```
 
 ### Start Connection  (Client)

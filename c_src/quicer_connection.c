@@ -381,18 +381,7 @@ ServerConnectionCallback(HQUIC Connection,
 
       if (!acc)
         {
-          if (c_ctx->owner->fast_conn)
-            {
-              // if fast_conn is on and acceptor_queue is empty
-              //   set stream owner to conn owner
-              acc = c_ctx->owner;
-            }
-          else
-            {
-              destroy_s_ctx(s_ctx);
-              enif_mutex_unlock(c_ctx->lock);
-              return QUIC_STATUS_UNREACHABLE;
-            }
+          acc = c_ctx->owner;
         }
 
       assert(acc);

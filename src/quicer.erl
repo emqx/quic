@@ -109,7 +109,7 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
 
 -spec handshake(connection_handler()) -> ok | {error, any()}.
 handshake(Conn) ->
-  handshake(Conn, infinity).
+  handshake(Conn, 1000).
 
 -spec handshake(connection_handler(), timer:timeout()) -> ok | {error, any()}.
 handshake(Conn, Timeout) ->
