@@ -188,7 +188,7 @@ tc_open_listener_neg_1(Config) ->
   Port = 4567,
   ok = quicer_nif:reg_close(),
   ok = quicer_nif:close_lib(),
-  {error, config_error, 0} = quicer:listen(Port, default_listen_opts(Config)),
+  {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
   ok.
 
 tc_lib_re_registration(_Config) ->

@@ -133,10 +133,14 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       return ERROR_TUPLE_2(ATOM_PARM_ERROR);
     }
-  if (!ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config))
+
+  ERL_NIF_TERM estatus
+      = ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config);
+
+  if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
     }
 
   if (!ReloadCertConfig(l_ctx->Configuration, Config))
@@ -197,7 +201,7 @@ close_listener1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
   // calling ListenerStop is optional
-  //MsQuic->ListenerStop(l_ctx->Listener);
+  // MsQuic->ListenerStop(l_ctx->Listener);
   MsQuic->ListenerClose(l_ctx->Listener);
   enif_release_resource(l_ctx);
   return ATOM_OK;

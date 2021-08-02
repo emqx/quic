@@ -92,7 +92,7 @@ DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 }
 
 // @todo support per registration.
-bool
+ERL_NIF_TERM
 ServerLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option,
                         HQUIC *Configuration,
@@ -100,9 +100,14 @@ ServerLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
 
+  if (!isRegistered)
+    {
+      return ATOM_REG_FAILED;
+    }
+
   if (!create_settings(env, option, &Settings))
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      return ATOM_BADARG;
     }
 
   unsigned alpn_buffer_length = 0;
@@ -110,7 +115,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
 
   if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
     {
-      return false;
+      return ATOM_ALPN;
     }
 
   //
@@ -118,16 +123,15 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (!isRegistered
-      || QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
-                                                        alpn_buffers,
-                                                        alpn_buffer_length,
-                                                        &Settings,
-                                                        sizeof(Settings),
-                                                        NULL,
-                                                        Configuration)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+                                                     alpn_buffers,
+                                                     alpn_buffer_length,
+                                                     &Settings,
+                                                     sizeof(Settings),
+                                                     NULL,
+                                                     Configuration)))
     {
-      return false;
+      return atom_status(Status);
     }
 
   //
@@ -136,14 +140,14 @@ ServerLoadConfiguration(ErlNifEnv *env,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
                       *Configuration, &Config->CredConfig)))
     {
-      return false;
+      return atom_status(Status);
     }
 
-  return true;
+  return ATOM_OK;
 }
 
 // @todo return status instead
-bool
+ERL_NIF_TERM
 ClientLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option,
                         HQUIC *Configuration,
@@ -156,7 +160,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
 
   if (!create_settings(env, option, &Settings))
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      return ATOM_BADARG;
     }
 
   // Uncomment to make client prefer to use Draft-29
@@ -184,7 +188,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
 
   if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
     {
-      return false;
+      return ATOM_ALPN;
     }
 
   //
@@ -200,7 +204,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
                                                      NULL,
                                                      Configuration)))
     {
-      return false;
+      return atom_status(Status);
     }
 
   //
@@ -210,10 +214,10 @@ ClientLoadConfiguration(ErlNifEnv *env,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
                                                                &CredConfig)))
     {
-      return false;
+      return atom_status(Status);
     }
 
-  return true;
+  return ATOM_OK;
 }
 
 bool

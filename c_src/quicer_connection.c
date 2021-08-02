@@ -460,7 +460,9 @@ async_connect3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  if (!ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true))
+  ERL_NIF_TERM estatus
+      = ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true);
+  if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }
