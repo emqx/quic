@@ -32,6 +32,7 @@
                , conn = undefined
                , opts :: {quicer_listener:listener_opts(), conn_opts(), quicer_steam:stream_opts()}
                , callback :: module()
+               , callback_state :: map()
                , slow_start :: boolean()
                }).
 
@@ -71,14 +72,15 @@ start_link(Listener, ConnOpts, Sup) ->
           ignore.
 init([Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
     init([Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
-init([Listener, {_, #{conn_callback := CallbackModule} = COpts, _} = Opts, Sup]) ->
+init([Listener, {_, #{conn_callback := CallbackModule} = COpts, SOpts} = Opts, Sup]) ->
     process_flag(trap_exit, true),
     %% Async Acceptor
     {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
     {ok, #state{ listener = Listener
-               , slow_start = true
                , callback = CallbackModule
+               , callback_state = CallbackModule:init(COpts#{stream_opts => SOpts} )
                , opts = Opts
+               , slow_start = not maps:get(fast_conn, COpts, false)
                , sup = Sup}}.
 
 %%--------------------------------------------------------------------
@@ -125,24 +127,31 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info({quic, new_conn, C}, #state{callback = M, sup = Sup, opts = Opts} = State) ->
+handle_info({quic, new_conn, C}, #state{callback = M, sup = Sup, callback_state = CBState} = State) ->
     ?tp(quic_new_conn, #{module=>?MODULE, conn=>C}),
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
-    M:new_conn(C, Opts),
-    ok = quicer:async_handshake(C),
-    {noreply, State#state{conn = C, slow_start = true} };
+    {ok, NewCBState} = M:new_conn(C, CBState),
+    {noreply, State#state{conn = C, slow_start = true, callback_state = NewCBState} };
 
-handle_info({quic, connected, C}, #state{callback = M, sup = Sup, opts = Opts, slow_start = false} = State) ->
+handle_info({quic, connected, C}, #state{ slow_start = false
+                                        , callback = M
+                                        , sup = Sup
+                                        , callback_state = CbState
+                                        } = State) ->
     ?tp(quic_connected, #{module=>?MODULE, conn=>C}),
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
-    M:new_conn(C, Opts),
-    {noreply, State#state{conn = C} };
+    NewCBState = M:connected(C, CbState#{slow_start => false}),
+    {noreply, State#state{conn = C, callback_state = NewCBState} };
 
-handle_info({quic, connected, C}, #state{conn = C, slow_start = true} = State) ->
+handle_info({quic, connected, C}, #state{ slow_start = true
+                                        , conn = C
+                                        , callback = M
+                                        , callback_state = CbState} = State) ->
     ?tp(quic_connected_slow, #{module=>?MODULE, conn=>C}),
-    {noreply, State};
+    {ok, NewCBState} = M:connected(C, CbState#{slow_start => true} ),
+    {noreply, State#state{ callback_state = NewCBState }};
 
 handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
     %% exit signal from stream
