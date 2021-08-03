@@ -17,6 +17,7 @@ limitations under the License.
 #include "quicer_listener.h"
 #include "quicer_config.h"
 #include "quicer_tp.h"
+#include <netinet/in.h>
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -103,21 +104,36 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
-  ERL_NIF_TERM port = argv[0];
+  ERL_NIF_TERM elisten_on = argv[0];
   ERL_NIF_TERM options = argv[1];
-
-  // @todo argc checks
-  // @todo read from argv
   QUIC_ADDR Address = {};
   int UdpPort = 0;
-  if (!enif_get_int(env, port, &UdpPort) && UdpPort >= 0)
+
+  if (!enif_is_map(env, options))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
-
-  QuicAddrSetPort(&Address, (uint16_t)UdpPort);
+  char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
+  if (enif_get_string(
+          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
+      > 0)
+    {
+      if (!(QuicAddr4FromString(listen_on, &Address)
+            || QuicAddr6FromString(listen_on, &Address)))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  else if (enif_get_int(env, elisten_on, &UdpPort) && UdpPort >= 0)
+    {
+      QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
+      QuicAddrSetPort(&Address, (uint16_t)UdpPort);
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   QuicerListenerCTX *l_ctx = init_l_ctx();
 
@@ -163,7 +179,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
               Registration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, atom_status(Status));
     }
 
   unsigned alpn_buffer_length = 0;
@@ -181,7 +197,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, atom_status(Status));
     }
 
   DestroyCredConfig(Config);

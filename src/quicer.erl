@@ -46,6 +46,8 @@
         , get_stream_id/1
         , getstat/2
         , peername/1
+        , listeners/0
+        , listener/1
         ]).
 
 %% Exports for test
@@ -313,6 +315,14 @@ get_conn_rid(Conn) ->
 -spec get_stream_rid(stream_handler()) -> {ok, non_neg_integer()} | {error, any()}.
 get_stream_rid(Stream) ->
   quicer_nif:get_stream_rid(Stream).
+
+-spec listeners() ->  [{{atom(), string() | integer()}, pid()}].
+listeners() ->
+  quicer_listener_sup:listeners().
+
+-spec listener(atom() | tuple()) -> pid().
+listener(Name) ->
+  quicer_listener_sup:listener(Name).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

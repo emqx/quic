@@ -125,11 +125,14 @@ All APIs are exported though API MODULE: quicer.erl
 Start listener on specific port.
 
 ``` erlang
-quicer:listen(Port, Options) ->
+quicer:listen(ListenOn, Options) ->
   {ok, Connection} | {error, any()} | {error, any(), ErrorCode::integer()}.
+  
 ```
 
-note: port binding is done in NIF context, thus you cannot see it from `inet:i()`.
+note: 
+1. port binding is done in NIF context, thus you cannot see it from `inet:i()`.
+1. ListenOn can either be integer() for Port or be String for HOST:PORT
 
 
 ### Close listener (Server)

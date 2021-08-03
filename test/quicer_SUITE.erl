@@ -37,8 +37,13 @@
         , tc_lib_re_registration/1
 
         , tc_open_listener/1
+        , tc_open_listener_bind/1
+        , tc_open_listener_bind_v6/1
         , tc_open_listener_neg_1/1
+        , tc_open_listener_neg_2/1
         , tc_close_listener/1
+        , tc_get_listeners/1
+        , tc_get_listener/1
 
         , tc_conn_basic/1
         , tc_conn_basic_slow_start/1
@@ -191,6 +196,12 @@ tc_open_listener_neg_1(Config) ->
   {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
   ok.
 
+tc_open_listener_neg_2(Config) ->
+  {error, badarg} = quicer_nif:listen("localhost:4567", default_listen_opts(Config)),
+  %% following test should fail, but msquic has some hack to let it pass, ref: MsQuicListenerStart in msquic listener.c
+  %% {error, badarg} = quicer_nif:listen("8.8.8.8:4567", default_listen_opts(Config)),
+  ok.
+
 tc_lib_re_registration(_Config) ->
   ok = quicer_nif:reg_open(),
   ok = quicer_nif:reg_open(),
@@ -207,8 +218,75 @@ tc_open_listener(Config) ->
   ok = gen_udp:close(P),
   ok.
 
+tc_open_listener_bind(Config) ->
+  ListenOn = "127.0.0.1:4567",
+  {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
+  {ok, {_, _}} = quicer:sockname(L),
+  {error,eaddrinuse} = gen_udp:open(4567),
+  ok = quicer:close_listener(L),
+  {ok, P} = gen_udp:open(4567),
+  ok = gen_udp:close(P),
+  ok.
+
+tc_open_listener_bind_v6(Config) ->
+  ListenOn = "[::1]:4567",
+  {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
+  {ok, {_, _}} = quicer:sockname(L),
+  {error,eaddrinuse} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  ok = quicer:close_listener(L),
+  {ok, P} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  ok = gen_udp:close(P),
+  ok.
+
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).
+
+tc_get_listeners(Config) ->
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Listeners = [ {alpn1, "127.0.0.1:24567"}
+              , {alpn2, "0.0.0.1:24568"}
+              , {alpn3, 24569}
+              , {alpn4, "[::1]:24570"}
+              ],
+  Res = lists:map(fun({Alpn, ListenOn}) ->
+                      {ok, L} = quicer:start_listener(Alpn, ListenOn,
+                                                     {ListenerOpts, ConnectionOpts, StreamOpts}),
+                      L
+                  end, Listeners),
+  ?assertEqual(lists:reverse(lists:zip(Listeners, Res)),
+               quicer:listeners()),
+  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
+
+tc_get_listener(Config) ->
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Listeners = [ {alpn1, "127.0.0.1:24567"}
+              , {alpn2, "0.0.0.1:24568"}
+              , {alpn3, 24569}
+              , {alpn4, "[::1]:24570"}
+              ],
+  lists:map(fun({Alpn, ListenOn}) ->
+                {ok, L} = quicer:start_listener(Alpn, ListenOn,
+                                                {ListenerOpts, ConnectionOpts, StreamOpts}),
+                L
+            end, Listeners),
+
+  lists:foreach(fun({Name, _} = NameListenON) ->
+                    LPid = quicer:listener(Name),
+                    LPid = quicer:listener(NameListenON),
+                    true = is_process_alive(LPid)
+                end, Listeners),
+
+  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
 
 tc_conn_basic(Config)->
   Port = 4567,
