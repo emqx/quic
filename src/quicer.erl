@@ -63,10 +63,9 @@
 -type connection_handler() :: reference().
 -type stream_handler() :: reference().
 
-%% would be better to use map
--type stream_opts() :: proplists:proplists().
--type connection_opts() :: proplists:proplists().
--type listener_opts() :: proplists:proplists().
+-type stream_opts() :: proplists:proplist() | quicer_stream:stream_opts().
+-type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().
+-type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
 
 -spec start_listener(atom(), inet:port_number(),
                      {listener_opts(), connection_opts(), stream_opts()}) ->
@@ -78,12 +77,12 @@ start_listener(AppName, Port, Options) ->
 stop_listener(AppName) ->
   quicer_listener:stop_listener(AppName).
 
--spec listen(inet:port_number(), proplists:proplists() | map()) ->
+-spec listen(quicer_listener:listen_on(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
-listen(Port, Opts) when is_list(Opts)->
-  listen(Port, maps:from_list(Opts));
-listen(Port, Opts) when is_map(Opts)->
-  quicer_nif:listen(Port, Opts).
+listen(ListenOn, Opts) when is_list(Opts)->
+  listen(ListenOn, maps:from_list(Opts));
+listen(ListenOn, Opts) when is_map(Opts)->
+  quicer_nif:listen(ListenOn, Opts).
 
 -spec close_listener(listener_handler()) -> ok.
 close_listener(Listener) ->
@@ -316,11 +315,12 @@ get_conn_rid(Conn) ->
 get_stream_rid(Stream) ->
   quicer_nif:get_stream_rid(Stream).
 
--spec listeners() ->  [{{atom(), string() | integer()}, pid()}].
+-spec listeners() ->  [{{quicer_listener:listener_name(), quicer_listener:listen_on()}, pid()}].
 listeners() ->
   quicer_listener_sup:listeners().
 
--spec listener(atom() | tuple()) -> pid().
+-spec listener(quicer_listener:listener_name()
+              | {quicer_listener:listener_name(), quicer_listener:listen_on()}) -> pid().
 listener(Name) ->
   quicer_listener_sup:listener(Name).
 

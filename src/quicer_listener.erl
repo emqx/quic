@@ -35,6 +35,8 @@
                , alpn :: [string()]
                }).
 
+-type listener_name() :: atom().
+-type listen_on() :: inet:port_number() | string(). %% "127.0.0.1:8080"
 -type listener_opts() :: map().
 
 %%%===================================================================
@@ -46,8 +48,8 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Name :: string() | atom(),
-                 Port :: non_neg_integer() | string(),
+-spec start_link(Name :: listener_name(),
+                 ListenOn :: listen_on(),
                  Options :: {listener_opts(), quicer_conn_acceptor:opts(), quicer_stream:stream_opts()}
                 ) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
@@ -56,11 +58,11 @@
 start_link(Name, ListenOn, Opts) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name, ListenOn, Opts], []).
 
-start_listener(AppName, Port, Options) ->
-    quicer_listener_sup:start_listener(AppName, Port, Options).
+start_listener(Name, ListenOn, Options) ->
+    quicer_listener_sup:start_listener(Name, ListenOn, Options).
 
-stop_listener(AppName) ->
-    quicer_listener_sup:stop_listener(AppName).
+stop_listener(Name) ->
+    quicer_listener_sup:stop_listener(Name).
 
 %%%===================================================================
 %%% gen_server callbacks
