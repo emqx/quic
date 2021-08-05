@@ -21,6 +21,9 @@
 -export([ listen/2
         , close_listener/1
         , connect/4
+        , handshake/1
+        , handshake/2
+        , async_handshake/1
         , accept/2
         , accept/3
         , close_connection/1
@@ -43,6 +46,8 @@
         , get_stream_id/1
         , getstat/2
         , peername/1
+        , listeners/0
+        , listener/1
         ]).
 
 %% Exports for test
@@ -58,10 +63,9 @@
 -type connection_handler() :: reference().
 -type stream_handler() :: reference().
 
-%% would be better to use map
--type stream_opts() :: proplists:proplists().
--type connection_opts() :: proplists:proplists().
--type listener_opts() :: proplists:proplists().
+-type stream_opts() :: proplists:proplist() | quicer_stream:stream_opts().
+-type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().
+-type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
 
 -spec start_listener(atom(), inet:port_number(),
                      {listener_opts(), connection_opts(), stream_opts()}) ->
@@ -73,12 +77,12 @@ start_listener(AppName, Port, Options) ->
 stop_listener(AppName) ->
   quicer_listener:stop_listener(AppName).
 
--spec listen(inet:port_number(), proplists:proplists() | map()) ->
+-spec listen(quicer_listener:listen_on(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
-listen(Port, Opts) when is_list(Opts)->
-  listen(Port, maps:from_list(Opts));
-listen(Port, Opts) when is_map(Opts)->
-  quicer_nif:listen(Port, Opts).
+listen(ListenOn, Opts) when is_list(Opts)->
+  listen(ListenOn, maps:from_list(Opts));
+listen(ListenOn, Opts) when is_map(Opts)->
+  quicer_nif:listen(ListenOn, Opts).
 
 -spec close_listener(listener_handler()) -> ok.
 close_listener(Listener) ->
@@ -104,6 +108,26 @@ connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
       Err
   end.
 
+-spec handshake(connection_handler()) -> ok | {error, any()}.
+handshake(Conn) ->
+  handshake(Conn, 1000).
+
+-spec handshake(connection_handler(), timer:timeout()) -> ok | {error, any()}.
+handshake(Conn, Timeout) ->
+  case async_handshake(Conn) of
+    {error, _} = E -> E;
+    ok ->
+      receive
+        {quic, connected, C} -> {ok, C}
+      after Timeout ->
+          {error, timeout}
+      end
+  end.
+
+-spec async_handshake(connection_handler()) -> ok | {error, any()}.
+async_handshake(Conn) ->
+  quicer_nif:async_handshake(Conn).
+
 -spec accept(listener_handler(), proplists:proplists() | map()) ->
         {ok, connection_handler()} | {error, any()}.
 accept(LSock, Opts) ->
@@ -117,7 +141,9 @@ accept(LSock, Opts, Timeout) ->
   % non-blocking
   {ok, LSock} = quicer_nif:async_accept(LSock, maps:merge(default_conn_opts(), Opts)),
   receive
-    {new_conn, C} ->
+    {quic, new_conn, C} ->
+      {ok, C};
+    {quic, connected, C} ->
       {ok, C}
   after Timeout ->
     {error, timeout}
@@ -288,6 +314,15 @@ get_conn_rid(Conn) ->
 -spec get_stream_rid(stream_handler()) -> {ok, non_neg_integer()} | {error, any()}.
 get_stream_rid(Stream) ->
   quicer_nif:get_stream_rid(Stream).
+
+-spec listeners() ->  [{{quicer_listener:listener_name(), quicer_listener:listen_on()}, pid()}].
+listeners() ->
+  quicer_listener_sup:listeners().
+
+-spec listener(quicer_listener:listener_name()
+              | {quicer_listener:listener_name(), quicer_listener:listen_on()}) -> pid().
+listener(Name) ->
+  quicer_listener_sup:listener(Name).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

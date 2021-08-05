@@ -1,6 +1,6 @@
 #+TITLE: Interworking
 * Basic flow [Happy path]
- note, 'C-c c' to produce.
+ note, 'C-c C-c' to produce.
 #+begin_src plantuml :file basic_flow_happy_path.png
 title
 Server Side: erlang, client init connection and stream
@@ -51,12 +51,7 @@ end note
 
 msw o-[#blue]->o conn_acceptor: nif monitor
 
-msw --> conn_acceptor: erl msg:  '{new_conn, ... }'
-
-hnote over conn_acceptor: unblocked
-
-msw ---> client: continue connection establishment
-== Quic Connection Established ==
+msw --> conn_acceptor: erl msg:  '{quic, new_conn, ... }'
 
 create stream_acceptor
 conn_acceptor --> stream_acceptor: spawn new stream acceptor
@@ -67,6 +62,20 @@ self() is enqueued to stream acceptors queue
 end note
 
 hnote over stream_acceptor: blocking
+
+note over conn_acceptor
+NIF call `handshake` to complete TLS handshake,
+otherwise drop the connection here
+end note
+
+msw ---> client: continue connection establishment
+
+msw --> conn_acceptor: erl msg:  '{quic, connected, ... }'
+
+hnote over conn_acceptor: unblocked
+
+
+== Quic Connection Established ==
 
 == Quic START Stream ==
 client --> msw: start stream in the connection.

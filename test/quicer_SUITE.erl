@@ -37,10 +37,16 @@
         , tc_lib_re_registration/1
 
         , tc_open_listener/1
+        , tc_open_listener_bind/1
+        , tc_open_listener_bind_v6/1
         , tc_open_listener_neg_1/1
+        , tc_open_listener_neg_2/1
         , tc_close_listener/1
+        , tc_get_listeners/1
+        , tc_get_listener/1
 
         , tc_conn_basic/1
+        , tc_conn_basic_slow_start/1
         , tc_conn_double_close/1
         , tc_conn_other_port/1
 
@@ -187,7 +193,13 @@ tc_open_listener_neg_1(Config) ->
   Port = 4567,
   ok = quicer_nif:reg_close(),
   ok = quicer_nif:close_lib(),
-  {error, config_error, 0} = quicer:listen(Port, default_listen_opts(Config)),
+  {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
+  ok.
+
+tc_open_listener_neg_2(Config) ->
+  {error, badarg} = quicer_nif:listen("localhost:4567", default_listen_opts(Config)),
+  %% following test should fail, but msquic has some hack to let it pass, ref: MsQuicListenerStart in msquic listener.c
+  %% {error, badarg} = quicer_nif:listen("8.8.8.8:4567", default_listen_opts(Config)),
   ok.
 
 tc_lib_re_registration(_Config) ->
@@ -206,8 +218,75 @@ tc_open_listener(Config) ->
   ok = gen_udp:close(P),
   ok.
 
+tc_open_listener_bind(Config) ->
+  ListenOn = "127.0.0.1:4567",
+  {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
+  {ok, {_, _}} = quicer:sockname(L),
+  {error,eaddrinuse} = gen_udp:open(4567),
+  ok = quicer:close_listener(L),
+  {ok, P} = gen_udp:open(4567),
+  ok = gen_udp:close(P),
+  ok.
+
+tc_open_listener_bind_v6(Config) ->
+  ListenOn = "[::1]:4567",
+  {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
+  {ok, {_, _}} = quicer:sockname(L),
+  {error,eaddrinuse} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  ok = quicer:close_listener(L),
+  {ok, P} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  ok = gen_udp:close(P),
+  ok.
+
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).
+
+tc_get_listeners(Config) ->
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Listeners = [ {alpn1, "127.0.0.1:24567"}
+              , {alpn2, "0.0.0.1:24568"}
+              , {alpn3, 24569}
+              , {alpn4, "[::1]:24570"}
+              ],
+  Res = lists:map(fun({Alpn, ListenOn}) ->
+                      {ok, L} = quicer:start_listener(Alpn, ListenOn,
+                                                     {ListenerOpts, ConnectionOpts, StreamOpts}),
+                      L
+                  end, Listeners),
+  ?assertEqual(lists:reverse(lists:zip(Listeners, Res)),
+               quicer:listeners()),
+  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
+
+tc_get_listener(Config) ->
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Listeners = [ {alpn1, "127.0.0.1:24567"}
+              , {alpn2, "0.0.0.1:24568"}
+              , {alpn3, 24569}
+              , {alpn4, "[::1]:24570"}
+              ],
+  lists:map(fun({Alpn, ListenOn}) ->
+                {ok, L} = quicer:start_listener(Alpn, ListenOn,
+                                                {ListenerOpts, ConnectionOpts, StreamOpts}),
+                L
+            end, Listeners),
+
+  lists:foreach(fun({Name, _} = NameListenON) ->
+                    LPid = quicer:listener(Name),
+                    LPid = quicer:listener(NameListenON),
+                    true = is_process_alive(LPid)
+                end, Listeners),
+
+  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
 
 tc_conn_basic(Config)->
   Port = 4567,
@@ -215,6 +294,24 @@ tc_conn_basic(Config)->
   {SPid, Ref} = spawn_monitor(
                    fun() ->
                        simple_conn_server(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_basic_slow_start(Config)->
+  Port = 4567,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_slow_conn_server(Owner, Config, Port)
                    end),
   receive
     listener_ready ->
@@ -241,7 +338,7 @@ tc_conn_double_close(Config)->
       ok = quicer:close_connection(Conn),
       SPid ! done,
       timer:sleep(1000),
-      quicer:close_connection(Conn),
+      quicer:async_close_connection(Conn),
       %% Wait for it crash if it will
       timer:sleep(1000),
       ensure_server_exit_normal(Ref)
@@ -274,6 +371,7 @@ tc_stream_client_init(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_stream(Stm),
+      ok = quicer:close_connection(Conn),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -370,6 +468,8 @@ tc_stream_passive_receive(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
+      quicer:close_stream(Stm),
+      quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 6000 ->
@@ -471,7 +571,6 @@ tc_stream_send_after_async_conn_close(Config) ->
       %% but it should not crash
       quicer:send(Stm, <<"ping">>),
       SPid ! done,
-      timer:sleep(3000),
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
       ct:fail("timeout")
@@ -734,6 +833,7 @@ tc_app_echo_server(Config) ->
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
                    , {stream_acceptors, 32}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
@@ -747,11 +847,12 @@ tc_app_echo_server(Config) ->
   {ok, 4} = quicer:async_send(Stm, <<"ping">>),
   {ok, 4} = quicer:async_send(Stm, <<"ping">>),
   {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
-  quicer:close_stream(Stm),
-  quicer:close_connection(Conn),
+  ok = quicer:close_stream(Stm),
+  ok = quicer:close_connection(Conn),
   ok = quicer:stop_listener(mqtt),
   %% test that listener could be reopened
   {ok, _} = quicer:start_listener(mqtt, Port, Options),
+  ok = quicer:stop_listener(mqtt),
   ok.
 
 tc_strm_opt_active_1(Config) ->
@@ -924,8 +1025,13 @@ echo_server(Owner, Config, Port)->
     {ok, L} ->
       Owner ! listener_ready,
       {ok, Conn} = quicer:accept(L, [], 5000),
+      {ok, Conn} = quicer:async_accept_stream(Conn, []),
+      {ok, Conn} = quicer:handshake(Conn),
       ct:pal("echo server conn accepted", []),
-      {ok, Stm} = quicer:accept_stream(Conn, []),
+      receive
+        {quic, new_stream, Stm} ->
+          {ok, Conn} = quicer:async_accept_stream(Conn, [])
+      end,
       ct:pal("echo server stream accepted", []),
       echo_server_stm_loop(L, Conn, Stm);
     {error, listener_start_error, 200000002} ->
@@ -947,6 +1053,10 @@ echo_server_stm_loop(L, Conn, Stm) ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stm);
+    {quic, shutdown, Conn} ->
+      ct:pal("echo server conn shutdown ~p", [Conn]),
+      quicer:close_connection(Conn),
+      echo_server_stm_loop(L, Conn, Stm);
     {quic, closed, Stm, Flag} ->
       ct:pal("echo server stream closed ~p", [Flag]),
       echo_server_stm_loop(L, Conn, Stm);
@@ -957,7 +1067,7 @@ echo_server_stm_loop(L, Conn, Stm) ->
       echo_server_stm_loop(L, Conn, NewStm);
     done ->
       ct:pal("echo server shuting down", []),
-      quicer:close_connection(Conn),
+      quicer:async_close_connection(Conn),
       quicer:close_listener(L)
   end.
 
@@ -966,9 +1076,15 @@ ping_pong_server(Owner, Config, Port) ->
     {ok, L} ->
       Owner ! listener_ready,
       {ok, Conn} = quicer:accept(L, [], 5000),
-      {ok, Stm} = quicer:accept_stream(Conn, []),
+      {ok, Conn} = quicer:async_accept_stream(Conn, []),
+      {ok, Conn} = quicer:handshake(Conn),
+      receive
+        {quic, new_stream, Stm} ->
+          {ok, Conn} = quicer:async_accept_stream(Conn, [])
+      end,
       ping_pong_server_stm_loop(L, Conn, Stm);
-    {error, listener_start_error, 200000002} ->
+    {error, listener_start_error, R} ->
+      ct:pal("Failed to start listener:~p , retry ...", [R]),
       timer:sleep(100),
       ping_pong_server(Owner, Config, Port)
   end.
@@ -977,17 +1093,42 @@ ping_pong_server_stm_loop(L, Conn, Stm) ->
   true = is_reference(Stm),
   receive
     {quic, <<"ping">>, _, _, _, _} ->
+      ct:pal("send pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_stm_loop(L, Conn, Stm);
-    done ->
+    {quic, peer_send_shutdown, Stm} ->
+      ct:pal("closing stream"),
+      quicer:close_stream(Stm),
+      ping_pong_server_stm_loop(L, Conn, Stm);
+    {quic, shutdown, Conn} ->
+      ct:pal("closing conn"),
       quicer:close_connection(Conn),
+      ping_pong_server_stm_loop(L, Conn, Stm);
+    done ->
       quicer:close_listener(L)
   end.
 
 simple_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
-  {ok, _Conn} = quicer:accept(L, [], 5000),
+  {ok, Conn} = quicer:accept(L, [], 1000),
+  {ok, Conn} = quicer:handshake(Conn),
+  receive 
+    done ->
+      quicer:close_listener(L),
+      ok;
+    {quic, shutdown, Conn} ->
+      quicer:close_connection(Conn),
+      quicer:close_listener(L)
+  end.
+
+simple_slow_conn_server(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Owner ! listener_ready,
+  {ok, Conn} = quicer:accept(L, [{fast_conn, false}], 5000),
+  {ok, Conn} = quicer:handshake(Conn),
+  %% test what happens if handshake twice
+  {error, invalid_state} = quicer:handshake(Conn),
   receive done ->
       quicer:close_listener(L),
       ok
@@ -996,7 +1137,8 @@ simple_conn_server(Owner, Config, Port) ->
 conn_server_with(Owner, Port, Opts) ->
   {ok, L} = quicer:listen(Port, Opts),
   Owner ! listener_ready,
-  {ok, _Conn} = quicer:accept(L, [], 10000),
+  {ok, Conn} = quicer:accept(L, [], 10000),
+  {ok, Conn} = quicer:handshake(Conn),
   receive done ->
     quicer:close_listener(L),
     ok
@@ -1006,14 +1148,29 @@ simple_stream_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 5000),
-  case quicer:accept_stream(Conn, [], 500) of
-    {ok, _Stream} -> ok;
-    {error, timeout} -> ok % for testing negtive testcases
+  {ok, Conn} = quicer:async_accept_stream(Conn, []),
+  {ok, Conn} = quicer:handshake(Conn),
+  receive
+    {quic, new_stream, Stream} ->
+      {ok, StreamId} = quicer:get_stream_id(Stream),
+      ct:pal("New StreamID: ~p", [StreamId]),
+      receive
+        {quic, shutdown, Conn} ->
+          quicer:close_connection(Conn);
+        {quic, peer_send_shutdown, Stream} ->
+          quicer:close_stream(Stream)
+      end
+  after 1000 ->
+      {error, timeout}
   end,
-  receive done ->
-      quicer:close_listener(L),
+  receive
+    {quic, shutdown, Conn} ->
+      quicer:close_connection(Conn);
+    done ->
       ok
-  end.
+  end,
+  quicer:close_listener(L).
+
 
 ensure_server_exit_normal(MonRef) ->
   ensure_server_exit_normal(MonRef, 5000).
@@ -1032,6 +1189,7 @@ default_stream_opts() ->
 
 default_conn_opts() ->
   [{alpn, ["sample"]},
+   %{sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
    {idle_timeout_ms, 5000}
   ].
 

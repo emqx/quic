@@ -20,12 +20,15 @@
 -export([ start_link/0
         , start_listener/3
         , stop_listener/1
+        , listeners/0
+        , listener/1
         ]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
+-define(CHILD_ID(AppName), {quicer_listener, AppName}).
 
 %%%===================================================================
 %%% API functions
@@ -48,8 +51,33 @@ start_listener(AppName, Port, Options) ->
     supervisor:start_child(?MODULE, chid_spec(AppName, Port, Options)).
 
 stop_listener(AppName) ->
-    supervisor:terminate_child(?MODULE, {quicer_listener, AppName}),
-    supervisor:delete_child(?MODULE, {quicer_listener, AppName}).
+    supervisor:terminate_child(?MODULE, ?CHILD_ID(AppName)),
+    supervisor:delete_child(?MODULE, ?CHILD_ID(AppName)).
+
+-spec listeners() -> [{{atom(), integer()|string()}, pid()}].
+listeners() ->
+    lists:filtermap(
+      fun({Id, Child, _Type, _Modules}) ->
+              case supervisor:get_childspec(?MODULE, Id) of
+                  {ok, #{ id := {_, Alpn},
+                          start := {_M, _F,  [Alpn, ListenOn | _]}
+                        }} ->
+                      Res = {{Alpn, ListenOn}, Child},
+                      {true, Res};
+                  _ -> false
+              end
+      end, supervisor:which_children(?MODULE)).
+
+-spec listener(atom() | {atom(), integer()|string()}) -> pid().
+listener({Name, _ListenOn}) when is_atom(Name) ->
+    listener(Name);
+listener(Name) when is_atom(Name)->
+    [Target] = lists:filtermap(
+                 fun({?CHILD_ID(Id), Child, _Type, _Modules}) when Id =:= Name ->
+                         {true, Child};
+                    (_) -> false
+                 end, supervisor:which_children(?MODULE)),
+    Target.
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -77,10 +105,11 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-chid_spec(AppName, Port, Options)->
-    #{ id => {quicer_listener, AppName}
-     , start => {quicer_listener, start_link, [AppName, Port, Options]}
+chid_spec(AppName, ListenOn, Options)->
+    #{ id => ?CHILD_ID(AppName)
+     , start => {quicer_listener, start_link, [AppName, ListenOn, Options]}
      , restart => transient
      , shutdown => infinity
      , type => supervisor
      }.
+

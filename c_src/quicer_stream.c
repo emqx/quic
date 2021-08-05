@@ -179,6 +179,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // Data was received from the peer on the stream.
       //
+      if (0 == Event->RECEIVE.TotalBufferLength)
+        {
+          break;
+        }
       status = handle_stream_recv_event(Stream, s_ctx, Event);
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
@@ -527,10 +531,9 @@ close_stream1(ErlNifEnv *env,
   enif_keep_resource(s_ctx);
   if (!s_ctx->is_closed)
     {
-      if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
-                          s_ctx->Stream,
-                          QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
-                          0)))
+      if (QUIC_FAILED(
+              Status = MsQuic->StreamShutdown(
+                  s_ctx->Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0)))
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }

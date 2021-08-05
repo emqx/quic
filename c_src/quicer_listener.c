@@ -16,6 +16,8 @@ limitations under the License.
 
 #include "quicer_listener.h"
 #include "quicer_config.h"
+#include "quicer_tp.h"
+#include <netinet/in.h>
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -25,6 +27,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
   QuicerConnCTX *c_ctx = NULL;
+
   switch (Event->Type)
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
@@ -34,6 +37,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       // Note, c_ctx is newly init here, don't grab lock.
       //
       c_ctx = init_c_ctx();
+      ErlNifEnv *env = c_ctx->env;
 
       if (!c_ctx)
         {
@@ -48,9 +52,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!conn_owner)
         {
+          TP_CB_3(missing_acceptor, c_ctx->Connection, 0);
           destroy_c_ctx(c_ctx);
           // make msquic close the connection.
-          return QUIC_STATUS_NOT_FOUND;
+          return QUIC_STATUS_UNREACHABLE;
         }
       c_ctx->owner = conn_owner;
 
@@ -63,24 +68,30 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
 
-      if (QUIC_FAILED(MsQuic->ConnectionSetConfiguration(
-              Event->NEW_CONNECTION.Connection, l_ctx->Configuration)))
+      if (conn_owner->fast_conn)
         {
-          destroy_c_ctx(c_ctx);
-          return QUIC_STATUS_INTERNAL_ERROR;
+          TP_CB_3(fast_conn, c_ctx->Connection, 1);
+          if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
+            {
+              destroy_c_ctx(c_ctx);
+              return Status;
+            }
         }
-
-      // Apply connection owners' option overrides
-      if (QUIC_FAILED(MsQuic->SetParam(Event->NEW_CONNECTION.Connection,
-                                       QUIC_PARAM_LEVEL_CONNECTION,
-                                       QUIC_PARAM_CONN_SETTINGS,
-                                       sizeof(QUIC_SETTINGS),
-                                       &c_ctx->owner->Settings)))
+      else
         {
-          destroy_c_ctx(c_ctx);
-          return QUIC_STATUS_INTERNAL_ERROR;
+          TP_CB_3(fast_conn, c_ctx->Connection, 0);
+          if (!enif_send(NULL,
+                         &(c_ctx->owner->Pid),
+                         NULL,
+                         enif_make_tuple3(env,
+                                          ATOM_QUIC,
+                                          ATOM_NEW_CONN,
+                                          enif_make_resource(env, c_ctx))))
+            {
+              enif_mutex_unlock(c_ctx->lock);
+              return QUIC_STATUS_INTERNAL_ERROR;
+            }
         }
-
       break;
     default:
       break;
@@ -93,21 +104,36 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
-  ERL_NIF_TERM port = argv[0];
+  ERL_NIF_TERM elisten_on = argv[0];
   ERL_NIF_TERM options = argv[1];
-
-  // @todo argc checks
-  // @todo read from argv
   QUIC_ADDR Address = {};
   int UdpPort = 0;
-  if (!enif_get_int(env, port, &UdpPort) && UdpPort >= 0)
+
+  if (!enif_is_map(env, options))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
-
-  QuicAddrSetPort(&Address, (uint16_t)UdpPort);
+  char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
+  if (enif_get_string(
+          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
+      > 0)
+    {
+      if (!(QuicAddr4FromString(listen_on, &Address)
+            || QuicAddr6FromString(listen_on, &Address)))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  else if (enif_get_int(env, elisten_on, &UdpPort) && UdpPort >= 0)
+    {
+      QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
+      QuicAddrSetPort(&Address, (uint16_t)UdpPort);
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   QuicerListenerCTX *l_ctx = init_l_ctx();
 
@@ -123,10 +149,14 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       return ERROR_TUPLE_2(ATOM_PARM_ERROR);
     }
-  if (!ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config))
+
+  ERL_NIF_TERM estatus
+      = ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config);
+
+  if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
     }
 
   if (!ReloadCertConfig(l_ctx->Configuration, Config))
@@ -149,7 +179,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
               Registration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, atom_status(Status));
     }
 
   unsigned alpn_buffer_length = 0;
@@ -157,7 +187,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
     {
-      return false;
+      destroy_l_ctx(l_ctx);
+      return ERROR_TUPLE_2(ATOM_ALPN);
     }
 
   if (QUIC_FAILED(
@@ -166,7 +197,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, atom_status(Status));
     }
 
   DestroyCredConfig(Config);
@@ -185,10 +216,9 @@ close_listener1(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
-  // @todo error handling here
-  MsQuic->ListenerStop(l_ctx->Listener);
+  // calling ListenerStop is optional
+  // MsQuic->ListenerStop(l_ctx->Listener);
   MsQuic->ListenerClose(l_ctx->Listener);
   enif_release_resource(l_ctx);
-  return enif_make_atom(env, "ok");
+  return ATOM_OK;
 }

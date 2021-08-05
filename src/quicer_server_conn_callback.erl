@@ -15,7 +15,28 @@
 %%--------------------------------------------------------------------
 -module(quicer_server_conn_callback).
 
--export([new_conn/2]).
+-export([ init/1
+        , new_conn/2
+        , connected/2
+        , shutdown/2
+        ]).
 
-new_conn(Conn, {_, _, SOpts}) ->
-    quicer_stream:start_link(Conn, SOpts).
+init(ConnOpts) when is_list(ConnOpts) ->
+    init(maps:from_list(ConnOpts));
+init(ConnOpts) when is_map(ConnOpts) ->
+    ConnOpts.
+
+new_conn(Conn, #{stream_opts := SOpts} = S) ->
+    quicer_stream:start_link(Conn, SOpts),
+    ok = quicer:async_handshake(Conn),
+    {ok, S}.
+
+connected(Conn, #{slow_start := false, stream_opts := SOpts} = S) ->
+    quicer_stream:start_link(Conn, SOpts),
+    {ok, S};
+connected(_Conn, S) ->
+    {ok, S}.
+
+shutdown(Conn, S) ->
+    quicer:async_close_connection(Conn),
+    {ok, S}.

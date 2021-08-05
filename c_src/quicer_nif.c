@@ -226,6 +226,9 @@ ERL_NIF_TERM ATOM_QUIC;
 ERL_NIF_TERM ATOM_QUIC_PASSIVE;
 ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
+ERL_NIF_TERM ATOM_NEW_CONN;
+ERL_NIF_TERM ATOM_CONNECTED;
+ERL_NIF_TERM ATOM_NEW_STREAM;
 
 /*----------------------------------------------------------*/
 /* for code insert with SNABBKAFFE   */
@@ -250,6 +253,7 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /* Additional Connection Opt                                */
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
+ERL_NIF_TERM ATOM_FAST_CONN;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -453,6 +457,9 @@ ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
+  ATOM(ATOM_NEW_CONN, new_conn);                                              \
+  ATOM(ATOM_CONNECTED, connected);                                            \
+  ATOM(ATOM_NEW_STREAM, new_stream);                                          \
   ATOM(ATOM_SNABBKAFFE_COLLECTOR, snabbkaffe_collector);                      \
   ATOM(ATOM_TRACE, trace);                                                    \
   ATOM(ATOM_CONTEXT, context);                                                \
@@ -467,7 +474,9 @@ ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
   ATOM(ATOM_GEN_CAST, $gen_cast);                                             \
   ATOM(ATOM_FUNCTION, function);                                              \
   ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
-  ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);
+  ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
+  ATOM(ATOM_FAST_CONN, fast_conn);
+
 HQUIC Registration;
 const QUIC_API_TABLE *MsQuic;
 
@@ -776,6 +785,7 @@ static ErlNifFunc nif_funcs[] = {
   { "close_listener", 1, close_listener1, 0},
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
+  { "async_handshake", 1, async_handshake_1, 0},
   { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},

@@ -62,11 +62,15 @@ $ cmake -B c_build -DCMAKE_BUILD_TYPE=Release -DQUIC_ENABLE_LOGGING=OFF && make
 ### Server
 
 ``` erlang
+application:ensure_all_started(quicer),
 Port = 4567,
 LOptions = [ {cert, "cert.pem"}
-           , {key,  "key.pem"}],
+           , {key,  "key.pem"}
+           , {alpn, ["sample"]}
+             ],
 {ok, L} = quicer:listen(Port, LOptions),
 {ok, Conn} = quicer:accept(L, [], 5000),
+{ok, Conn} = quicer:handshake(Conn),
 {ok, Stm} = quicer:accept_stream(Conn, []),
 receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
 {ok, 4} = quicer:send(Stm, <<"pong">>),
@@ -76,8 +80,9 @@ quicer:close_listener(L).
 ### Client
 
 ``` erlang
+application:ensure_all_started(quicer),
 Port = 4567,
-{ok, Conn} = quicer:connect("localhost", Port, [], 5000),
+{ok, Conn} = quicer:connect("localhost", Port, [{alpn, ["sample"]}], 5000),
 {ok, Stm} = quicer:start_stream(Conn, []),
 {ok, 4} = quicer:send(Stm, <<"ping">>),
 receive {quic, <<"pong">>, Stm, _, _, _} -> ok end,
@@ -120,11 +125,14 @@ All APIs are exported though API MODULE: quicer.erl
 Start listener on specific port.
 
 ``` erlang
-quicer:listen(Port, Options) ->
+quicer:listen(ListenOn, Options) ->
   {ok, Connection} | {error, any()} | {error, any(), ErrorCode::integer()}.
+  
 ```
 
-note: port binding is done in NIF context, thus you cannot see it from `inet:i()`.
+note: 
+1. port binding is done in NIF context, thus you cannot see it from `inet:i()`.
+1. ListenOn can either be integer() for Port or be String for HOST:PORT
 
 
 ### Close listener (Server)
@@ -135,7 +143,9 @@ quicer:close_listener(Listener) -> ok.
 
 Gracefully close listener.
 
-### Accept Connection (Server)
+### Accept Connection (Server) 
+
+Accept connection
 
 ``` erlang
 quicer:accept(Listener, Options, Timeout) -> 
@@ -146,6 +156,11 @@ Blocking call to accept new connection.
 
 Caller becomes the owner of new connection.
 
+### TLS Handshake (Server)
+
+``` erlang
+quicer:handeshake(Connection) -> {ok, Connection} | {error, any()}.
+```
 
 ### Start Connection  (Client)
 
@@ -256,8 +271,7 @@ Supported Opts:
   |---------|----------------|------|-------------|
   |         |                |      |             |
 | param_conn_settings | Set            | map() | map keys: <br>conn_flow_control_window<br>max_worker_queue_delay_us<br>max_stateless_operations<br>initial_window_packets<br>send_idle_timeout_ms<br>initial_rtt_ms<br>max_ack_delay_ms<br>disconnect_timeout_ms<br>keep_alive_interval_ms<br>peer_bidi_stream_count<br>peer_unidi_stream_count<br>retry_memory_limit<br>load_balancing_mode<br>max_operations_per_drain<br>send_buffering_enabled<br>pacing_enabled<br>migration_enabled<br>datagram_receive_enabled<br>server_resumption_level<br>version_negotiation_ext_enabled<br>desired_versions_list<br>desired_versions_list_length<br> |
-|
-  
+
 
 ### Connection stat
 

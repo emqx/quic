@@ -38,6 +38,9 @@ suite() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
+  %% dbg:tracer(),
+  %% dbg:p(all,c),
+  %% dbg:tpl(snabbkaffe, do_find_pairs, cx),
   application:ensure_all_started(quicer),
   application:ensure_all_started(snabbkaffe),
   Config.
@@ -118,7 +121,9 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 all() ->
-  [tc_app_echo_server].
+  [ tc_app_echo_server
+  , tc_slow_conn
+  ].
 
 %%--------------------------------------------------------------------
 %% @spec TestCase() -> Info
@@ -143,6 +148,7 @@ tc_app_echo_server(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
+                   , {fast_conn, false}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
@@ -157,8 +163,8 @@ tc_app_echo_server(Config) ->
                  quicer:recv(Stm, 4)
                end,
                fun(Result, Trace) ->
-                   ?assertEqual({ok, <<"ping">>}, Result),
                    ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual({ok, <<"ping">>}, Result),
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "ClientStreamCallback"
                                               , tag := "event"
@@ -177,19 +183,61 @@ tc_app_echo_server(Config) ->
 
   quicer:close_stream(Stm),
   quicer:close_connection(Conn),
-  ok = quicer:stop_listener(mqtt),
-  %% test that listener could be reopened
-  {ok, _} = quicer:start_listener(mqtt, Port, Options),
-  ok.
+  ok = quicer:stop_listener(mqtt).
 
+tc_slow_conn(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 ct:pal("closing stream"),
+                 ok = quicer:close_stream(Stm),
+                 ct:pal("closing conn"),
+                 quicer:close_connection(Conn),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "ServerListenerCallback"
+                                              , tag := "fast_conn"
+                                              , mark := 0
+                                              , resource_id := _RidL
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , function := "async_handshake_1"
+                                              , tag := "start"
+                                              , mark := 0
+                                              , resource_id := _RidC
+                                              },
+                                             _RidC == _RidL,
+                                             Trace))
+               end),
+  ok.
 
 %%% Internal Helpers
 default_stream_opts() ->
   [].
 
 default_conn_opts() ->
-  [{alpn, ["sample"]},
-   {idle_timeout_ms, 5000}
+  [ {alpn, ["sample"]}
+  %% , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+  , {idle_timeout_ms, 5000}
   ].
 
 default_listen_opts(Config) ->

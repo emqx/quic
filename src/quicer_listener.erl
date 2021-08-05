@@ -35,6 +35,8 @@
                , alpn :: [string()]
                }).
 
+-type listener_name() :: atom().
+-type listen_on() :: inet:port_number() | string(). %% "127.0.0.1:8080"
 -type listener_opts() :: map().
 
 %%%===================================================================
@@ -46,21 +48,21 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Name :: string() | atom(),
-                 Port :: non_neg_integer(),
+-spec start_link(Name :: listener_name(),
+                 ListenOn :: listen_on(),
                  Options :: {listener_opts(), quicer_conn_acceptor:opts(), quicer_stream:stream_opts()}
                 ) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(Name, Port, Opts) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Name, Port, Opts], []).
+start_link(Name, ListenOn, Opts) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Name, ListenOn, Opts], []).
 
-start_listener(AppName, Port, Options) ->
-    quicer_listener_sup:start_listener(AppName, Port, Options).
+start_listener(Name, ListenOn, Options) ->
+    quicer_listener_sup:start_listener(Name, ListenOn, Options).
 
-stop_listener(AppName) ->
-    quicer_listener_sup:stop_listener(AppName).
+stop_listener(Name) ->
+    quicer_listener_sup:stop_listener(Name).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -78,11 +80,11 @@ stop_listener(AppName) ->
           {stop, Reason :: term()} |
           ignore.
 
-init([Name, Port, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
-    init([Name, Port, {maps:from_list(LOpts), COpts, SOpts}]);
-init([Name, Port, {#{conn_acceptors :=  N, alpn := Alpn} = LOpts, _COpts, _SOpts} = Opts]) ->
+init([Name, ListenOn, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
+    init([Name, ListenOn, {maps:from_list(LOpts), COpts, SOpts}]);
+init([Name, ListenOn, {#{conn_acceptors :=  N, alpn := Alpn} = LOpts, _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
-    {ok, L} = quicer:listen(Port, LOpts),
+    {ok, L} = quicer:listen(ListenOn, LOpts),
     {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
     [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
     {ok, #state{ name = Name

@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -------------------------------------------------------------------*/
 #include "quicer_connection.h"
+#include "quicer_ctx.h"
 #include <assert.h>
 #include <unistd.h>
 
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
-extern inline const char* QuicStatusToString(QUIC_STATUS Status);
+extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
@@ -145,7 +146,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                      NULL,
                      enif_make_tuple3(env,
                                       ATOM_QUIC,
-                                      enif_make_atom(env, "connected"),
+                                      ATOM_CONNECTED,
                                       enif_make_resource(env, c_ctx))))
         {
           enif_mutex_unlock(c_ctx->lock);
@@ -179,7 +180,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                      NULL,
                      enif_make_tuple3(env,
                                       ATOM_QUIC,
-                                      enif_make_atom(env, "new_stream"),
+                                      ATOM_NEW_STREAM,
                                       enif_make_resource(env, s_ctx))))
         {
           // @todo log and step counter
@@ -306,10 +307,8 @@ ServerConnectionCallback(HQUIC Connection,
       if (!enif_send(NULL,
                      acc_pid,
                      NULL,
-                     enif_make_tuple(c_ctx->env,
-                                     2,
-                                     enif_make_atom(c_ctx->env, "new_conn"),
-                                     ConnHandler)))
+                     enif_make_tuple3(
+                         c_ctx->env, ATOM_QUIC, ATOM_CONNECTED, ConnHandler)))
         {
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
@@ -377,26 +376,17 @@ ServerConnectionCallback(HQUIC Connection,
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
       s_ctx->c_ctx = c_ctx;
       s_ctx->l_ctx = c_ctx->l_ctx;
-      int retry = 100;
-      // @todo, not nice to spin here, need new method to sync with connection
-      // owner1
-      while (!(acc && acc_pid && enif_is_process_alive(env, acc_pid)))
+
+      acc = AcceptorDequeue(c_ctx->acceptor_queue);
+
+      if (!acc)
         {
-          acc = AcceptorDequeue(c_ctx->acceptor_queue);
-          acc_pid = &(acc->Pid);
-
-          enif_mutex_unlock(c_ctx->lock);
-          usleep(10000);
-          enif_mutex_lock(c_ctx->lock);
-
-          if (retry < 0)
-            {
-              enif_mutex_unlock(c_ctx->lock);
-              destroy_s_ctx(s_ctx);
-              return QUIC_STATUS_UNREACHABLE;
-            }
-          retry--;
+          acc = c_ctx->owner;
         }
+
+      assert(acc);
+      acc_pid = &(acc->Pid);
+
       s_ctx->owner = acc;
 
       // @todo add monitor here.
@@ -405,7 +395,7 @@ ServerConnectionCallback(HQUIC Connection,
                      NULL,
                      enif_make_tuple3(env,
                                       ATOM_QUIC,
-                                      enif_make_atom(env, "new_stream"),
+                                      ATOM_NEW_STREAM,
                                       enif_make_resource(env, s_ctx))))
         {
           // @todo log and step counter
@@ -470,7 +460,9 @@ async_connect3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  if (!ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true))
+  ERL_NIF_TERM estatus
+      = ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true);
+  if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }
@@ -561,6 +553,12 @@ async_accept2(ErlNifEnv *env,
     {
       AcceptorDestroy(acceptor);
       return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+    }
+
+  ERL_NIF_TERM IsFastConn;
+  if (enif_get_map_value(env, conn_opts, ATOM_FAST_CONN, &IsFastConn))
+    {
+      acceptor->fast_conn = IS_SAME_TERM(IsFastConn, ATOM_TRUE);
     }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
@@ -672,10 +670,10 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
 }
 
 ERL_NIF_TERM
-get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
+get_conn_rid1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
-  if (1 != args)
+  if (1 != argc)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -686,6 +684,62 @@ get_conn_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
     }
 
   return SUCCESS(enif_make_ulong(env, (unsigned long)c_ctx->Connection));
+}
+
+QUIC_STATUS
+continue_connection_handshake(QuicerConnCTX *c_ctx)
+{
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+
+  if (!c_ctx || !(c_ctx->l_ctx))
+    {
+      return QUIC_STATUS_INTERNAL_ERROR;
+    }
+
+  if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
+                      c_ctx->Connection, c_ctx->l_ctx->Configuration)))
+    {
+      return Status;
+    }
+
+  // Apply connection owners' option overrides
+  if (QUIC_FAILED(Status = MsQuic->SetParam(c_ctx->Connection,
+                                            QUIC_PARAM_LEVEL_CONNECTION,
+                                            QUIC_PARAM_CONN_SETTINGS,
+                                            sizeof(QUIC_SETTINGS),
+                                            &c_ctx->owner->Settings)))
+    {
+      return Status;
+    }
+  return Status;
+}
+
+ERL_NIF_TERM
+async_handshake_1(ErlNifEnv *env,
+                  __unused_parm__ int argc,
+                  const ERL_NIF_TERM argv[])
+
+{
+  QuicerConnCTX *c_ctx;
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  if (1 != argc)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  TP_NIF_3(start, c_ctx->Connection, 0);
+
+  if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
+    {
+      return ERROR_TUPLE_2(atom_status(Status));
+    }
+
+  return ATOM_OK;
 }
 
 ///_* Emacs

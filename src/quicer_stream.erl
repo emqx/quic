@@ -14,6 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 -module(quicer_stream).
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -behaviour(gen_server).
 
@@ -129,6 +130,7 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info({quic, new_stream, Stream}, #state{opts = Options} = State) ->
+    ?tp(new_stream, #{module=>?MODULE, stream=>Stream}),
     #{stream_callback := CallbackModule} = Options,
     try CallbackModule:new_stream(Stream, Options) of
         {ok, CBState} ->
@@ -140,11 +142,14 @@ handle_info({quic, new_stream, Stream}, #state{opts = Options} = State) ->
             maybe_log_stracetrace(ST),
             {stop, {new_stream_crash, Reason}, State#state{stream = Stream}}
     end;
-handle_info({quic, Bin, Stream, _, _, _},
+handle_info({quic, Bin, Stream, _, _, Flags},
             #state{stream = Stream, opts = Options, cbstate = CBState}= State) ->
+    ?tp(stream_data, #{module=>?MODULE, stream=>Stream}),
     #{stream_callback := CallbackModule} = Options,
     try CallbackModule:handle_stream_data(Stream, Bin, Options, CBState) of
         {ok, NewCBState} ->
+            %% @todo this should be a configurable behavior
+            is_fin(Flags) andalso CallbackModule:shutdown(Stream),
             {noreply, State#state{cbstate = NewCBState}};
         {error, Reason, NewCBState} ->
             {noreply, Reason, State#state{cbstate = NewCBState}}
@@ -156,15 +161,17 @@ handle_info({quic, Bin, Stream, _, _, _},
 
 handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
   when StreamB =/=StreamA ->
+    ?tp(inval_stream_data, #{module=>?MODULE, stream_a=>StreamA, stream_b => StreamB}),
     {stop, wrong_stream, State};
 
-handle_info({quic, peer_send_shutdown, Stream}, #state{stream = Stream} = State) ->
-    %% todo add callback here
-    quicer:close_stream(Stream),
+handle_info({quic, peer_send_shutdown, Stream}, #state{stream = Stream, opts = Options} = State) ->
+    ?tp(peer_shutdown, #{module=>?MODULE, stream=>Stream}),
+    #{stream_callback := CallbackModule} = Options,
+    CallbackModule:shutdown(Stream),
     {noreply, State};
 
 handle_info({quic, closed, Stream, _Reason}, #state{stream = Stream} = State) ->
-    %% todo
+    %% @todo
     {stop, normal, State}.
 
 %%--------------------------------------------------------------------
@@ -223,3 +230,9 @@ error_code(_)->
 maybe_log_stracetrace(ST)->
     logger:error("~p~n", [ST]),
     ok.
+
+-spec is_fin(integer()) ->  boolean().
+is_fin(0) ->
+    false;
+is_fin(Flags) when is_integer(Flags) ->
+    (1 bsl 1) band Flags =/= 0.
