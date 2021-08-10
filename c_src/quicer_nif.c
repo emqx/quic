@@ -20,6 +20,16 @@ limitations under the License.
 
 #include "quicer_listener.h"
 
+static ERL_NIF_TERM connection_controlling_process(ErlNifEnv *env,
+                                                   QuicerConnCTX *c_ctx,
+                                                   const ErlNifPid *caller,
+                                                   const ERL_NIF_TERM *pid);
+
+static ERL_NIF_TERM stream_controlling_process(ErlNifEnv *env,
+                                               QuicerStreamCTX *s_ctx,
+                                               const ErlNifPid *caller,
+                                               const ERL_NIF_TERM *pid);
+
 /*
 ** atoms in use, initialized while load nif
 */
@@ -776,15 +786,14 @@ atom_status(QUIC_STATUS status)
 ERL_NIF_TERM
 controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-  QuicerStreamCTX *s_ctx;
+  QuicerStreamCTX *s_ctx = NULL;
+  QuicerConnCTX *c_ctx = NULL;
   ErlNifPid target, caller;
+  ERL_NIF_TERM new_owner = argv[1];
+  ERL_NIF_TERM res = ATOM_OK;
   if (argc != 2)
     {
       return ATOM_BADARG;
-    }
-  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
   // precheck
@@ -799,30 +808,84 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(s_ctx->lock);
-
-  if (0 != enif_compare_pids(&s_ctx->owner->Pid, &caller))
+  if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
+      enif_mutex_lock(s_ctx->lock);
+      res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
       enif_mutex_unlock(s_ctx->lock);
+    }
+  else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+
+      enif_mutex_lock(c_ctx->lock);
+      res = connection_controlling_process(env, c_ctx, &caller, &new_owner);
+      enif_mutex_unlock(c_ctx->lock);
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  return res;
+}
+
+ERL_NIF_TERM
+connection_controlling_process(ErlNifEnv *env,
+                               QuicerConnCTX *c_ctx,
+                               const ErlNifPid *caller,
+                               const ERL_NIF_TERM *pid)
+{
+
+  if (0 != enif_compare_pids(&c_ctx->owner->Pid, caller))
+    {
       return ERROR_TUPLE_2(ATOM_NOT_OWNER);
     }
 
-  if (!enif_get_local_pid(env, argv[1], &s_ctx->owner->Pid))
+  if (!enif_get_local_pid(env, *pid, &c_ctx->owner->Pid))
     {
-      enif_mutex_unlock(s_ctx->lock);
+
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
+
+  enif_demonitor_process(env, c_ctx, &c_ctx->owner_mon);
+
+  if (0
+      != enif_monitor_process(
+          env, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon))
+    {
+      return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
+    }
+
+  return ATOM_OK;
+}
+
+ERL_NIF_TERM
+stream_controlling_process(ErlNifEnv *env,
+                           QuicerStreamCTX *s_ctx,
+                           const ErlNifPid *caller,
+                           const ERL_NIF_TERM *pid)
+{
+
+  if (0 != enif_compare_pids(&s_ctx->owner->Pid, caller))
+    {
+      return ERROR_TUPLE_2(ATOM_NOT_OWNER);
+    }
+
+  if (!enif_get_local_pid(env, *pid, &s_ctx->owner->Pid))
+    {
+
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_demonitor_process(env, s_ctx, &s_ctx->owner_mon);
 
   if (0
       != enif_monitor_process(
           env, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon))
     {
-      enif_mutex_unlock(s_ctx->lock);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
-  // enif_demonitor_process(env, s_ctx, s_ctx->owner_mon);
-  enif_mutex_unlock(s_ctx->lock);
   return ATOM_OK;
 }
 

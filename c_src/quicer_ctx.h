@@ -57,7 +57,7 @@ typedef struct QuicerConnCTX
   void *reserved3;
 } QuicerConnCTX;
 
-typedef struct
+typedef struct QuicerStreamCTX
 {
   QuicerListenerCTX *l_ctx;
   QuicerConnCTX *c_ctx;
