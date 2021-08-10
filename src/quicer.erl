@@ -48,6 +48,7 @@
         , peername/1
         , listeners/0
         , listener/1
+        , controlling_process/2
         ]).
 
 %% Exports for test
@@ -323,6 +324,10 @@ listeners() ->
               | {quicer_listener:listener_name(), quicer_listener:listen_on()}) -> pid().
 listener(Name) ->
   quicer_listener_sup:listener(Name).
+
+-spec controlling_process(stream_handler(), pid()) -> ok | {error, any()}.
+controlling_process(Stream, Pid) ->
+  quicer_nif:controlling_process(Stream, Pid).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

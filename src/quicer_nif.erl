@@ -32,6 +32,7 @@
         , sockname/1
         , getopt/3
         , setopt/3
+        , controlling_process/2
         ]).
 
 -export([ get_conn_rid/1
@@ -116,6 +117,8 @@ get_conn_rid(_Handle)->
 get_stream_rid(_Handle)->
   erlang:nif_error(nif_library_not_loaded).
 
+controlling_process(_H, _P) ->
+  erlang:nif_error(nif_library_not_loaded).
 
 %% Internals
 -spec locate_lib(file:name(), file:name()) ->

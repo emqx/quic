@@ -201,13 +201,27 @@ After this call is returned, the calling process becomes the owner of the stream
 
 ### Send Data over stream
 
+#### Sync Send
+
+Send data over stream and the call get blocked until the send buffer is flushed
+Note the caller must be the owner of the stream, otherwise it will not receive
+the `send_completed` msg that confirms the buffer is flushed. This will be improved
+in newer version.
+
 ``` erlang
 quicer:send(Stream, BinaryData) -> 
   {ok, Stream} | {error, any()} | {error, any(), ErrorCode::integer()}.
 ```
 
-Aync send data over stream.
+#### Async Send
 
+Send data over stream async asynchronously without waiting for the data get flushed
+in the send buffer of stack.
+
+``` erlang
+quicer:async_send(Stream, BinaryData) -> 
+  {ok, Stream} | {error, any()} | {error, any(), ErrorCode::integer()}.
+```
 
 ### Active receive from stream
 

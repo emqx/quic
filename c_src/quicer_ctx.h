@@ -46,7 +46,7 @@ typedef struct QuicerConnCTX
   QuicerListenerCTX *l_ctx;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;
-  ErlNifMonitor *owner_mon;
+  ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
   BOOLEAN is_closed;
@@ -63,7 +63,7 @@ typedef struct
   QuicerConnCTX *c_ctx;
   HQUIC Stream;
   ACCEPTOR *owner;
-  ErlNifMonitor *owner_mon;
+  ErlNifMonitor owner_mon;
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
   BOOLEAN is_closed;

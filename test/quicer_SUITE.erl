@@ -61,6 +61,8 @@
         , tc_stream_send_after_async_conn_close/1
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
+        , tc_stream_controlling_process/1
+
         , tc_getopt_raw/1
         , tc_getopt/1
         , tc_getopt_stream_active/1
@@ -576,6 +578,37 @@ tc_stream_send_after_async_conn_close(Config) ->
       ct:fail("timeout")
   end.
 
+tc_stream_controlling_process(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      ok = quicer:controlling_process(Stm, self()),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {ok, _} = quicer:recv(Stm, 11),
+      {NewOwner, MonRef} = spawn_monitor(
+                             fun() ->
+                                 receive
+                                   {quic, <<"owner_changed">>, Stm, _, _, _} ->
+                                     ok = quicer:async_close_stream(Stm)
+                                 end
+                             end),
+      ok = quicer:controlling_process(Stm, NewOwner),
+      ok = quicer:setopt(Stm, active, true),
+      %% note, I am no longer the owner of the stream, sync send won't work
+      %% because I will not get the `send_completed` msg.
+      {ok, _Len} = quicer:async_send(Stm, <<"owner_changed">>),
+      receive
+        {'DOWN', MonRef, process, NewOwner, normal} ->
+          SPid ! done
+      end,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
 
 tc_getopt_raw(Config) ->
   Parm = param_conn_quic_version,

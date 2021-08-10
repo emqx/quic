@@ -56,7 +56,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           enif_make_resource(env, s_ctx),
           enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+      if (!enif_send(NULL, &s_ctx->owner->Pid, NULL, report))
         {
           // Owner is gone, we shutdown the stream as well.
           TP_CB_3(owner_die, Stream, Event->Type);
@@ -371,7 +371,6 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 

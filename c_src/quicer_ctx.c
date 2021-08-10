@@ -47,9 +47,6 @@ init_c_ctx()
   c_ctx->env = enif_alloc_env();
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
-  //@todo handle if NULL
-  c_ctx->owner_mon
-      = CXPLAT_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
   c_ctx->is_closed = FALSE;
   c_ctx->TlsSecrets = NULL;

@@ -123,6 +123,7 @@ groups() ->
 all() ->
   [ tc_app_echo_server
   , tc_slow_conn
+  , tc_change_stream_owner
   ].
 
 %%--------------------------------------------------------------------
@@ -205,6 +206,64 @@ tc_slow_conn(Config) ->
                  quicer:recv(Stm, 4),
                  ct:pal("closing stream"),
                  ok = quicer:close_stream(Stm),
+                 ct:pal("closing conn"),
+                 quicer:close_connection(Conn),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "ServerListenerCallback"
+                                              , tag := "fast_conn"
+                                              , mark := 0
+                                              , resource_id := _RidL
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , function := "async_handshake_1"
+                                              , tag := "start"
+                                              , mark := 0
+                                              , resource_id := _RidC
+                                              },
+                                             _RidC == _RidL,
+                                             Trace))
+               end),
+  ok.
+
+
+tc_change_stream_owner(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 {NewOwner, MonRef} = spawn_monitor(
+                                        fun() ->
+                                            receive
+                                              {quic, <<"owner_changed">>, Stm, _, _, _} ->
+                                                ok = quicer:close_stream(Stm)
+                                            end
+                                        end),
+                 ok = quicer:controlling_process(Stm, NewOwner),
+                 ok = quicer:setopt(Stm, active, true),
+                 {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
+                 receive
+                   {'DOWN', MonRef, process, NewOwner, normal} ->
+                     ok
+                 end,
                  ct:pal("closing conn"),
                  quicer:close_connection(Conn),
                  ct:pal("stop listener"),

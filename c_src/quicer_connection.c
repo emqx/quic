@@ -140,7 +140,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
-      enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, c_ctx->owner_mon);
+      enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
       if (!enif_send(NULL,
                      &(c_ctx->owner->Pid),
                      NULL,
@@ -173,7 +173,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
         }
       s_ctx->owner = acc;
 
-      enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, s_ctx->owner_mon);
+      enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon);
 
       if (!enif_send(NULL,
                      &(acc->Pid),
@@ -299,7 +299,7 @@ ServerConnectionCallback(HQUIC Connection,
       assert(acc);
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
-      enif_monitor_process(NULL, c_ctx, acc_pid, c_ctx->owner_mon);
+      enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
 
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor
