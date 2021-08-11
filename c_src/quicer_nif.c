@@ -906,7 +906,7 @@ static ErlNifFunc nif_funcs[] = {
   { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
-  { "async_send", 2, send2, 0},
+  { "send", 3, send3, 0},
   { "recv", 2, recv2, 0},
   { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},

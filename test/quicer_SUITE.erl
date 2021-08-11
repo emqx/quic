@@ -53,6 +53,7 @@
 
         , tc_stream_client_init/1
         , tc_stream_client_send/1
+        , tc_stream_client_async_send/1
 
         , tc_stream_passive_receive/1
         , tc_stream_passive_receive_buffer/1
@@ -398,6 +399,33 @@ tc_stream_client_send(Config) ->
           ct:fail("Unexpected Msg ~p", [Other])
       end,
       SPid ! done,
+      ok = ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_client_async_send(Config) ->
+  Port = 4569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+      receive
+        {quic, <<"pong">>, _, _, _, _} ->
+          ok = quicer:close_stream(Stm),
+          ok = quicer:close_connection(Conn);
+        Other ->
+          ct:fail("Unexpected Msg ~p", [Other])
+      end,
+      SPid ! done,
+      receive
+        {quic, send_completed, _Stm, _} -> ct:fail("shouldn't recv send_completed")
+      after 0 ->
+            ok
+      end,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
       ct:fail("timeout")

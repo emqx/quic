@@ -85,4 +85,12 @@ void destroy_c_ctx(QuicerConnCTX *c_ctx);
 QuicerStreamCTX *init_s_ctx();
 void destroy_s_ctx(QuicerStreamCTX *s_ctx);
 
+typedef struct QuicerStreamSendCTX
+{
+  QuicerStreamCTX *s_ctx;
+  ErlNifPid caller;
+  BOOLEAN is_sync;
+  QUIC_BUFFER *Buffer;
+} QuicerStreamSendCTX;
+
 #endif // __QUICER_CTX_H_

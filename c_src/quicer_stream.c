@@ -33,6 +33,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   QuicerStreamCTX *s_ctx;
   ERL_NIF_TERM report;
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
+  QuicerStreamSendCTX *send_ctx = NULL;
   s_ctx = (QuicerStreamCTX *)Context;
 
   enif_mutex_lock(s_ctx->c_ctx->lock);
@@ -49,22 +50,35 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       // returned back to the app.
       //
       //
-      report = enif_make_tuple4(
-          env,
-          ATOM_QUIC,
-          ATOM_SEND_COMPLETE,
-          enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+      send_ctx = (QuicerStreamSendCTX *)(Event->SEND_COMPLETE.ClientContext);
 
-      if (!enif_send(NULL, &s_ctx->owner->Pid, NULL, report))
+      if (!send_ctx)
         {
-          // Owner is gone, we shutdown the stream as well.
-          TP_CB_3(owner_die, Stream, Event->Type);
-          MsQuic->StreamShutdown(
-              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
-          // @todo return proper bad status
+          status = QUIC_STATUS_INVALID_STATE;
+          break;
         }
-      free(Event->SEND_COMPLETE.ClientContext);
+
+      if (send_ctx->is_sync)
+        {
+          report = enif_make_tuple4(
+              env,
+              ATOM_QUIC,
+              ATOM_SEND_COMPLETE,
+              enif_make_resource(env, s_ctx),
+              enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+
+          if (!enif_send(NULL, &s_ctx->owner->Pid, NULL, report))
+            {
+              // Owner is gone, we shutdown the stream as well.
+              TP_CB_3(owner_die, Stream, Event->Type);
+              MsQuic->StreamShutdown(
+                  Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+              // @todo return proper bad status
+            }
+        }
+      free(send_ctx->Buffer);
+      free(send_ctx);
+
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
       //
@@ -146,6 +160,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ErlNifEnv *env;
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
+  QuicerStreamSendCTX *send_ctx = NULL;
   ERL_NIF_TERM report;
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
@@ -158,22 +173,35 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A previous StreamSend call has completed, and the context is being
       // returned back to the app.
       //
-      report = enif_make_tuple4(
-          env,
-          ATOM_QUIC,
-          ATOM_SEND_COMPLETE,
-          enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+      send_ctx = (QuicerStreamSendCTX *)(Event->SEND_COMPLETE.ClientContext);
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+      if (!send_ctx)
         {
-          TP_CB_3(app_down, Stream, 0);
-          // Owner is gone, we shutdown the stream as well.
-          MsQuic->StreamShutdown(
-              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
-          // @todo return proper bad status
+          status = QUIC_STATUS_INVALID_STATE;
         }
-      free(Event->SEND_COMPLETE.ClientContext);
+
+      if (send_ctx->is_sync)
+        {
+          report = enif_make_tuple4(
+              env,
+              ATOM_QUIC,
+              ATOM_SEND_COMPLETE,
+              enif_make_resource(env, s_ctx),
+              enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+
+          if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+            {
+              TP_CB_3(app_down, Stream, 0);
+              // Owner is gone, we shutdown the stream as well.
+              MsQuic->StreamShutdown(
+                  Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+              // @todo return proper bad status
+            }
+        }
+
+      free(send_ctx->Buffer);
+      free(send_ctx);
+
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
       //
@@ -356,12 +384,42 @@ async_accept_stream2(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerStreamCTX *s_ctx;
   ErlNifBinary bin;
   ERL_NIF_TERM estream = argv[0];
   ERL_NIF_TERM ebin = argv[1];
+  ERL_NIF_TERM eFlags = argv[2];
+  uint32_t sendflags;
+  QuicerStreamSendCTX *send_ctx = NULL;
+
+  if (3 != argc)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (enif_get_uint(env, eFlags, &sendflags))
+    {
+      send_ctx = CXPLAT_ALLOC_NONPAGED(sizeof(QuicerStreamSendCTX),
+                                       QUICER_SEND_CTX);
+      if (!send_ctx)
+        {
+          return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+        }
+
+      enif_self(env, &send_ctx->caller);
+
+      if ((sendflags & 1UL) > 0)
+        {
+          send_ctx->is_sync = TRUE;
+        }
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
   if (!enif_inspect_binary(env, ebin, &bin))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -373,6 +431,8 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
+
+  send_ctx->s_ctx = s_ctx;
 
   if (s_ctx->is_closed || s_ctx->c_ctx->is_closed)
     {
@@ -398,6 +458,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
+  send_ctx->Buffer = SendBuffer;
   /*
     Fast path plan A, requires caller holds the ref to the binary
      so that it won't get GCed.
@@ -421,7 +482,7 @@ send2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // note, SendBuffer as sendcontext, free the buffer while message is sent
   // confirmed.
   if (QUIC_FAILED(Status = MsQuic->StreamSend(
-                      Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, SendBuffer)))
+                      Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
     {
       free(SendBuffer);
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);

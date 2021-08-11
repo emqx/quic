@@ -208,7 +208,7 @@ start_stream(Conn, Opts) when is_map(Opts)->
 -spec send(stream_handler(), Data :: binary()) ->
         {ok, Len :: integer()} | {error, any(), integer()}.
 send(Stream, Data) ->
-  case async_send(Stream, Data) of
+  case quicer_nif:send(Stream, Data, _IsSync = 1) of
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
@@ -222,7 +222,7 @@ send(Stream, Data) ->
 -spec async_send(stream_handler(), Data :: binary()) ->
         {ok, Len :: integer()} | {error, any()}.
 async_send(Stream, Data) ->
-  quicer_nif:async_send(Stream, Data).
+  quicer_nif:send(Stream, Data, _IsSync = 0).
 
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
