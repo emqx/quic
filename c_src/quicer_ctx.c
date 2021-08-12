@@ -99,6 +99,6 @@ init_send_ctx()
 void
 destroy_send_ctx(QuicerStreamSendCTX *send_ctx)
 {
-  free(send_ctx->Buffer);
-  free(send_ctx);
+  CXPLAT_FREE(send_ctx->Buffer, QUICER_SND_BUFF);
+  CXPLAT_FREE(send_ctx, QUICER_SEND_CTX);
 }

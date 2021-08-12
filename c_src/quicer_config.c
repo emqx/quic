@@ -88,7 +88,7 @@ DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 {
   free((char *)Config->CertFile.CertificateFile);
   free((char *)Config->CertFile.PrivateKeyFile);
-  free(Config);
+  CXPLAT_FREE(Config, QUICER_CREDENTIAL_CONFIG_HELPER);
 }
 
 // @todo support per registration.
@@ -691,7 +691,7 @@ getopt3(ErlNifEnv *env,
           = encode_parm_to_eterm(env, Level, Param, BufferLength, Buffer);
       if (isMalloc)
         {
-          free(Buffer);
+          CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
         }
       return res;
     }

@@ -364,14 +364,14 @@ async_accept_stream2(ErlNifEnv *env,
 
   if (!enif_self(env, &(acceptor->Pid)))
     {
-      free(acceptor);
+      CXPLAT_FREE(acceptor, QUICER_ACCEPTOR);
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
   //@todo this is assertion
   if (!enif_is_process_alive(env, &(acceptor->Pid)))
     {
-      free(acceptor);
+      CXPLAT_FREE(acceptor, QUICER_ACCEPTOR);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
@@ -398,6 +398,11 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
+  if (!send_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
   if (enif_get_uint(env, eFlags, &sendflags))
     {
       enif_self(env, &send_ctx->caller);
@@ -480,7 +485,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(Status = MsQuic->StreamSend(
                       Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
     {
-      free(SendBuffer);
+      CXPLAT_FREE(SendBuffer, QUICER_SND_BUFF);
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
       enif_mutex_unlock(s_ctx->lock);
       enif_mutex_unlock(s_ctx->c_ctx->lock);
