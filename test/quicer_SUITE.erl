@@ -627,9 +627,7 @@ tc_stream_controlling_process(Config) ->
                              end),
       ok = quicer:controlling_process(Stm, NewOwner),
       ok = quicer:setopt(Stm, active, true),
-      %% note, I am no longer the owner of the stream, sync send won't work
-      %% because I will not get the `send_completed` msg.
-      {ok, _Len} = quicer:async_send(Stm, <<"owner_changed">>),
+      {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
       receive
         {'DOWN', MonRef, process, NewOwner, normal} ->
           SPid ! done
@@ -658,8 +656,6 @@ tc_conn_controlling_process(Config) ->
                                  end
                              end),
       ok = quicer:controlling_process(Conn, NewOwner),
-      %% note, I am no longer the owner of the stream, sync send won't work
-      %% because I will not get the `send_completed` msg.
       quicer:async_close_connection(Conn),
       receive
         {'DOWN', MonRef, process, NewOwner, normal} ->

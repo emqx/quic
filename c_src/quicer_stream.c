@@ -67,7 +67,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
               enif_make_resource(env, s_ctx),
               enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
-          if (!enif_send(NULL, &s_ctx->owner->Pid, NULL, report))
+          // note, report to caller instead of stream owner
+          if (!enif_send(NULL, &send_ctx->caller, NULL, report))
             {
               // Owner is gone, we shutdown the stream as well.
               TP_CB_3(owner_die, Stream, Event->Type);
@@ -76,9 +77,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
               // @todo return proper bad status
             }
         }
-      free(send_ctx->Buffer);
-      free(send_ctx);
 
+      destroy_send_ctx(send_ctx);
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
       //
@@ -189,7 +189,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
               enif_make_resource(env, s_ctx),
               enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
-          if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+          // note, report to caller instead of stream owner
+          if (!enif_send(NULL, &send_ctx->caller, NULL, report))
             {
               TP_CB_3(app_down, Stream, 0);
               // Owner is gone, we shutdown the stream as well.
@@ -199,9 +200,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
             }
         }
 
-      free(send_ctx->Buffer);
-      free(send_ctx);
-
+      destroy_send_ctx(send_ctx);
       break;
     case QUIC_STREAM_EVENT_RECEIVE:
       //
@@ -392,27 +391,24 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eFlags = argv[2];
   uint32_t sendflags;
-  QuicerStreamSendCTX *send_ctx = NULL;
 
   if (3 != argc)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  QuicerStreamSendCTX *send_ctx = init_send_ctx();
   if (enif_get_uint(env, eFlags, &sendflags))
     {
-      send_ctx = CXPLAT_ALLOC_NONPAGED(sizeof(QuicerStreamSendCTX),
-                                       QUICER_SEND_CTX);
-      if (!send_ctx)
-        {
-          return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-        }
-
       enif_self(env, &send_ctx->caller);
 
       if ((sendflags & 1UL) > 0)
         {
           send_ctx->is_sync = TRUE;
+        }
+      else
+        {
+          send_ctx->is_sync = FALSE;
         }
     }
   else

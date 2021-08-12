@@ -76,6 +76,14 @@ typedef struct QuicerStreamCTX
   void *reserved3;
 } QuicerStreamCTX;
 
+typedef struct QuicerStreamSendCTX
+{
+  QuicerStreamCTX *s_ctx;
+  ErlNifPid caller;
+  BOOLEAN is_sync;
+  QUIC_BUFFER *Buffer;
+} QuicerStreamSendCTX;
+
 QuicerListenerCTX *init_l_ctx();
 void destroy_l_ctx(QuicerListenerCTX *l_ctx);
 
@@ -85,12 +93,7 @@ void destroy_c_ctx(QuicerConnCTX *c_ctx);
 QuicerStreamCTX *init_s_ctx();
 void destroy_s_ctx(QuicerStreamCTX *s_ctx);
 
-typedef struct QuicerStreamSendCTX
-{
-  QuicerStreamCTX *s_ctx;
-  ErlNifPid caller;
-  BOOLEAN is_sync;
-  QUIC_BUFFER *Buffer;
-} QuicerStreamSendCTX;
+QuicerStreamSendCTX *init_send_ctx();
+void destroy_send_ctx(QuicerStreamSendCTX *send_ctx);
 
 #endif // __QUICER_CTX_H_
