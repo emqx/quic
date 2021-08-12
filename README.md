@@ -207,7 +207,7 @@ Send data over stream and the call get blocked until the send buffer is flushed
 
 ``` erlang
 quicer:send(Stream, BinaryData) -> 
-  {ok, Stream} | {error, any()} | {error, any(), ErrorCode::integer()}.
+  {ok, SizeSent::non_neg_integer()} | {error, any()} | {error, any(), ErrorCode::integer()}.
 ```
 
 #### Async Send
@@ -216,7 +216,7 @@ Send data over stream asynchronously without waiting for the buffer get flushed.
 
 ``` erlang
 quicer:async_send(Stream, BinaryData) -> 
-  {ok, Stream} | {error, any()} | {error, any(), ErrorCode::integer()}.
+  {ok, SizeSent::non_neg_integer()} | {error, any()} | {error, any(), ErrorCode::integer()}.
 ```
 
 ### Active receive from stream
