@@ -152,6 +152,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_INTERNAL_ERROR;
         }
+      if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
+        {
+          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
+        }
+
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
       //
@@ -237,11 +242,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
         {
           MsQuic->ConnectionClose(Connection);
           c_ctx->is_closed = TRUE;
-        }
-
-      if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
-        {
-          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
         }
 
       destroy_c_ctx(c_ctx);
