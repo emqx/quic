@@ -70,8 +70,11 @@ init_s_ctx()
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->is_closed = FALSE;
   s_ctx->is_wait_for_data = FALSE;
-  s_ctx->Buffer = NULL;
-  s_ctx->BufferLen = 0;
+  s_ctx->Buffers[0].Buffer = NULL;
+  s_ctx->Buffers[0].Length = 0;
+  s_ctx->Buffers[1].Buffer = NULL;
+  s_ctx->Buffers[1].Length = 0;
+  s_ctx->TotalBufferLength = 0;
   s_ctx->is_buff_ready = FALSE;
   return s_ctx;
 }

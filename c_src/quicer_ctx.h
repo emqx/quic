@@ -67,8 +67,9 @@ typedef struct QuicerStreamCTX
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
   BOOLEAN is_closed;
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint8_t *Buffer;
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t BufferLen;
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint32_t BufferCount;
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
   _CTX_CALLBACK_WRITE_ BOOLEAN is_buff_ready;
   void *reserved1;

@@ -206,15 +206,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // Data was received from the peer on the stream.
       //
-      if (0 == Event->RECEIVE.TotalBufferLength)
-        {
-          break;
-        }
       status = handle_stream_recv_event(Stream, s_ctx, Event);
       break;
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
       //
-      // The peer gracefully shut down its send direction of the stream.
+      // The peer gracefully shutdown its send direction of the stream.
       //
       report = enif_make_tuple4(
           env,
@@ -527,32 +523,42 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_EINVAL);
     }
 
-  if (s_ctx->is_buff_ready && s_ctx->Buffer && s_ctx->BufferLen > 0
-      && (0 == size_req || size_req <= s_ctx->BufferLen))
+  if (s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0
+      && (0 == size_req || size_req <= s_ctx->TotalBufferLength))
     { // buffer is ready to consume
       uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
+
       s_ctx->is_wait_for_data = FALSE;
       MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
 
-      if (size_consumed != s_ctx->BufferLen)
+      if (size_consumed != s_ctx->TotalBufferLength)
         {
           // explicit enable recv since we have some data left unconusmed
           MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
         }
 
-      if (0 == s_ctx->BufferLen - size_consumed || 0 == size_req)
+      if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
         {
           // Buffer has perfect bytes consumed
-          s_ctx->Buffer = NULL;
-          s_ctx->BufferLen = 0;
+
+          s_ctx->Buffers[0].Buffer = NULL;
+          s_ctx->Buffers[0].Length = 0;
+          s_ctx->Buffers[1].Buffer = NULL;
+          s_ctx->Buffers[1].Length = 0;
+
+          s_ctx->TotalBufferLength = 0;
           s_ctx->is_buff_ready = FALSE;
         }
       else
         {
           // Buffer has more data than we need
+          s_ctx->Buffers[0].Buffer = NULL;
+          s_ctx->Buffers[0].Length = 0;
+          s_ctx->Buffers[1].Buffer = NULL;
+          s_ctx->Buffers[1].Length = 0;
+
           s_ctx->is_buff_ready = FALSE;
-          s_ctx->Buffer = NULL;
-          s_ctx->BufferLen = 0;
+          s_ctx->TotalBufferLength = 0;
         }
 
       res = SUCCESS(enif_make_binary(env, &bin));
@@ -605,26 +611,44 @@ close_stream1(ErlNifEnv *env,
   return ret;
 }
 
-uint64_t
+static uint64_t
 recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 {
   // note, make sure ownership of bin should be transfered, after call
-  uint64_t bin_size = 0;
-  assert(req_len <= s_ctx->BufferLen);
-  // Decide binary size
+  uint64_t size = 0;
+  assert(req_len <= s_ctx->TotalBufferLength);
+
   if (req_len == 0)
     { // we need more data than buffer has
-      bin_size = s_ctx->BufferLen;
+      size = s_ctx->TotalBufferLength;
     }
   else
     { // buffer size is larger than we want
-      bin_size = req_len;
+      size = req_len;
     }
 
-  enif_alloc_binary(bin_size, bin);
+  enif_alloc_binary(size, bin);
+  assert(size == bin->size);
+  assert(size > 0);
 
-  CxPlatCopyMemory(bin->data, s_ctx->Buffer, bin_size);
-  return bin_size;
+  unsigned char *dest = bin->data;
+
+  for (uint32_t i = 0; size > 0; ++i)
+    {
+      if (s_ctx->Buffers[i].Length <= size)
+        { // copy whole buffer
+          CxPlatCopyMemory(
+              dest, s_ctx->Buffers[i].Buffer, s_ctx->Buffers[i].Length);
+          dest += s_ctx->Buffers[i].Length;
+          size -= s_ctx->Buffers[i].Length;
+        }
+      else
+        { // copy part of the buffer, end of copy
+          CxPlatCopyMemory(dest, s_ctx->Buffers[i].Buffer, size);
+          size = 0;
+        }
+    }
+  return bin->size;
 }
 
 QUIC_STATUS
@@ -636,8 +660,21 @@ handle_stream_recv_event(HQUIC Stream,
   ErlNifEnv *env = s_ctx->env;
   ErlNifBinary bin;
 
-  s_ctx->Buffer = Event->RECEIVE.Buffers->Buffer;
-  s_ctx->BufferLen = Event->RECEIVE.TotalBufferLength;
+  assert(NULL != Event->RECEIVE.Buffers[0].Buffer);
+  assert(Event->RECEIVE.BufferCount > 0
+         || Event->RECEIVE.Flags == QUIC_RECEIVE_FLAG_FIN);
+
+  s_ctx->Buffers[0].Buffer = Event->RECEIVE.Buffers[0].Buffer;
+  s_ctx->Buffers[0].Length = Event->RECEIVE.Buffers[0].Length;
+  s_ctx->Buffers[1].Buffer = Event->RECEIVE.Buffers[1].Buffer;
+  s_ctx->Buffers[1].Length = Event->RECEIVE.Buffers[1].Length;
+  s_ctx->BufferCount = Event->RECEIVE.BufferCount;
+  s_ctx->TotalBufferLength = Event->RECEIVE.TotalBufferLength;
+
+  if (0 == Event->RECEIVE.TotalBufferLength)
+    {
+      return status;
+    }
 
   if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active)
     { // passive receive
@@ -653,7 +690,6 @@ handle_stream_recv_event(HQUIC Stream,
       if (s_ctx->is_wait_for_data)
         { // Owner is waiting for data
           // notify owner to trigger async recv
-          // @todo, can we expect some owner to take over?
           if (!enif_send(NULL,
                          &(s_ctx->owner->Pid),
                          NULL,

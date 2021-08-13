@@ -61,6 +61,7 @@
         , tc_stream_passive_receive_large_buffer_2/1
         , tc_stream_send_after_conn_close/1
         , tc_stream_send_after_async_conn_close/1
+        , tc_stream_sendrecv_large_data_passive/1
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
         , tc_stream_controlling_process/1
@@ -428,6 +429,28 @@ tc_stream_client_async_send(Config) ->
       end,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_sendrecv_large_data_passive(Config) ->
+  Port = 24570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, [{stream_recv_window_default, 1048576} | Config], Port)
+                  end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  [{stream_recv_window_default, 1048576} | default_conn_opts()], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      TestData = list_to_binary(lists:duplicate(1000000,1)),
+      {ok, _} = quicer:async_send(Stm, TestData),
+      %timer:sleep(500),
+      {ok, _} = quicer:recv(Stm, byte_size(TestData)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
       ct:fail("timeout")
   end.
 

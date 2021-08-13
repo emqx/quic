@@ -773,7 +773,7 @@ setopt3(ErlNifEnv *env,
       enif_mutex_lock(s_ctx->lock);
 
       if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
-          && s_ctx->is_buff_ready && s_ctx->Buffer && s_ctx->BufferLen > 0)
+          && s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0)
         {
           // trigger callback of event recv.
           MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
