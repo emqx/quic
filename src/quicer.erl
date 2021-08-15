@@ -227,6 +227,19 @@ async_send(Stream, Data) ->
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
 recv(Stream, Count) ->
+  case quicer:getopt(Stream, param_conn_settings, false) of
+  {ok, Settings} ->
+      case proplists:get_value(stream_recv_window_default, Settings, 0) of
+        X when X < Count ->
+          {error, stream_recv_window_too_small};
+        _ ->
+          do_recv(Stream, Count)
+      end;
+  {error, _} = Error ->
+      Error
+  end.
+
+do_recv(Stream, Count) ->
   case quicer_nif:recv(Stream, Count) of
     {ok, not_ready} ->
       %% Data is not ready yet but last call has been reg.

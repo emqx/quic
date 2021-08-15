@@ -62,6 +62,8 @@
         , tc_stream_send_after_conn_close/1
         , tc_stream_send_after_async_conn_close/1
         , tc_stream_sendrecv_large_data_passive/1
+        , tc_stream_sendrecv_large_data_passive_2/1
+        , tc_stream_sendrecv_large_data_active/1
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
         , tc_stream_controlling_process/1
@@ -444,10 +446,53 @@ tc_stream_sendrecv_large_data_passive(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port,
                                   [{stream_recv_window_default, 1048576} | default_conn_opts()], 5000),
       {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-      TestData = list_to_binary(lists:duplicate(1000000,1)),
+      TestData = crypto:strong_rand_bytes(1000000),
       {ok, _} = quicer:async_send(Stm, TestData),
-      %timer:sleep(500),
-      {ok, _} = quicer:recv(Stm, byte_size(TestData)),
+      {ok, TestData} = quicer:recv(Stm, byte_size(TestData)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_sendrecv_large_data_passive_2(Config) ->
+  %% test when stream_recv_window_default isn't large enough
+  Port = 24570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      TestData = crypto:strong_rand_bytes(1000000),
+      {ok, _} = quicer:async_send(Stm, TestData),
+      {error, stream_recv_window_too_small} = quicer:recv(Stm, byte_size(TestData)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_sendrecv_large_data_active(Config) ->
+  %% test when stream_recv_window_default isn't large enough
+  Port = 24570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+      TestData = crypto:strong_rand_bytes(1000000),
+      {ok, _} = quicer:async_send(Stm, TestData),
+      active_recv(Stm, byte_size(TestData), []),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 6000 ->
@@ -1314,6 +1359,17 @@ default_listen_opts(Config) ->
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   ].
+
+active_recv(Stream, Len, BinList) ->
+  case iolist_size(BinList) >= Len of
+    true ->
+      BinList;
+    false ->
+      receive {quic, Bin, Stream, _, _, _} ->
+          ct:pal("recv ~p ", [byte_size(Bin)]),
+          active_recv(Stream, Len, [Bin |BinList])
+      end
+end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

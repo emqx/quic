@@ -258,6 +258,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       MsQuic->StreamClose(Stream);
       destroy_s_ctx(s_ctx);
       break;
+    /* case QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE: */
+    /*   printf("ideal send buff size: %lu\n", Event->IDEAL_SEND_BUFFER_SIZE.ByteCount); */
+    /*   break; */
     default:
       break;
     }
@@ -670,6 +673,11 @@ handle_stream_recv_event(HQUIC Stream,
   s_ctx->Buffers[1].Length = Event->RECEIVE.Buffers[1].Length;
   s_ctx->BufferCount = Event->RECEIVE.BufferCount;
   s_ctx->TotalBufferLength = Event->RECEIVE.TotalBufferLength;
+
+  if (Event->RECEIVE.Flags != 0)
+  {
+    TP_CB_3(event_recv_flag, Stream, Event->RECEIVE.Flags);
+  }
 
   if (0 == Event->RECEIVE.TotalBufferLength)
     {

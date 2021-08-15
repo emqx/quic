@@ -248,6 +248,8 @@ If Len > 0, desired bytes will be returned, other data would be buffered in proc
 
 Suggested to use Len=0 if caller want to buffer or reassemble the data on its own.
 
+note, the requested Len cannot exceeed the stream recv window size of connection opts otherwise {error, stream_recv_window_too_small} will be returned.
+
 ### Shutdown stream
 
 ``` erlang
