@@ -492,7 +492,7 @@ tc_stream_sendrecv_large_data_active(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
       TestData = crypto:strong_rand_bytes(1000000),
       {ok, _} = quicer:async_send(Stm, TestData),
-      active_recv(Stm, byte_size(TestData), []),
+      TestData = active_recv(Stm, byte_size(TestData)),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 6000 ->
@@ -1360,13 +1360,14 @@ default_listen_opts(Config) ->
   , {peer_bidi_stream_count, 10}
   ].
 
+active_recv(Stream, Len) ->
+  active_recv(Stream, Len, []).
 active_recv(Stream, Len, BinList) ->
   case iolist_size(BinList) >= Len of
     true ->
-      BinList;
+      binary:list_to_bin(lists:reverse(BinList));
     false ->
       receive {quic, Bin, Stream, _, _, _} ->
-          ct:pal("recv ~p ", [byte_size(Bin)]),
           active_recv(Stream, Len, [Bin |BinList])
       end
 end.
