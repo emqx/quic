@@ -201,13 +201,23 @@ After this call is returned, the calling process becomes the owner of the stream
 
 ### Send Data over stream
 
+#### Sync Send
+
+Send data over stream and the call get blocked until the send buffer is flushed
+
 ``` erlang
 quicer:send(Stream, BinaryData) -> 
-  {ok, Stream} | {error, any()} | {error, any(), ErrorCode::integer()}.
+  {ok, SizeSent::non_neg_integer()} | {error, any()} | {error, any(), ErrorCode::integer()}.
 ```
 
-Aync send data over stream.
+#### Async Send
 
+Send data over stream asynchronously without waiting for the buffer get flushed.
+
+``` erlang
+quicer:async_send(Stream, BinaryData) -> 
+  {ok, SizeSent::non_neg_integer()} | {error, any()} | {error, any(), ErrorCode::integer()}.
+```
 
 ### Active receive from stream
 
@@ -237,6 +247,8 @@ If Len = 0, return all data in buffer if it is not empty.
 If Len > 0, desired bytes will be returned, other data would be buffered in proc dict.
 
 Suggested to use Len=0 if caller want to buffer or reassemble the data on its own.
+
+note, the requested Len cannot exceeed the stream recv window size of connection opts otherwise {error, stream_recv_window_too_small} will be returned.
 
 ### Shutdown stream
 

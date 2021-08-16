@@ -46,7 +46,7 @@ typedef struct QuicerConnCTX
   QuicerListenerCTX *l_ctx;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;
-  ErlNifMonitor *owner_mon;
+  ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
   BOOLEAN is_closed;
@@ -57,24 +57,33 @@ typedef struct QuicerConnCTX
   void *reserved3;
 } QuicerConnCTX;
 
-typedef struct
+typedef struct QuicerStreamCTX
 {
   QuicerListenerCTX *l_ctx;
   QuicerConnCTX *c_ctx;
   HQUIC Stream;
   ACCEPTOR *owner;
-  ErlNifMonitor *owner_mon;
+  ErlNifMonitor owner_mon;
   ErlNifEnv *env; //@todo destruct env
   ErlNifMutex *lock;
   BOOLEAN is_closed;
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint8_t *Buffer;
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t BufferLen;
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
+  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint32_t BufferCount;
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
   _CTX_CALLBACK_WRITE_ BOOLEAN is_buff_ready;
   void *reserved1;
   void *reserved2;
   void *reserved3;
 } QuicerStreamCTX;
+
+typedef struct QuicerStreamSendCTX
+{
+  QuicerStreamCTX *s_ctx;
+  ErlNifPid caller;
+  BOOLEAN is_sync;
+  QUIC_BUFFER *Buffer;
+} QuicerStreamSendCTX;
 
 QuicerListenerCTX *init_l_ctx();
 void destroy_l_ctx(QuicerListenerCTX *l_ctx);
@@ -84,5 +93,8 @@ void destroy_c_ctx(QuicerConnCTX *c_ctx);
 
 QuicerStreamCTX *init_s_ctx();
 void destroy_s_ctx(QuicerStreamCTX *s_ctx);
+
+QuicerStreamSendCTX *init_send_ctx();
+void destroy_send_ctx(QuicerStreamSendCTX *send_ctx);
 
 #endif // __QUICER_CTX_H_

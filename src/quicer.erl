@@ -48,6 +48,7 @@
         , peername/1
         , listeners/0
         , listener/1
+        , controlling_process/2
         ]).
 
 %% Exports for test
@@ -207,7 +208,7 @@ start_stream(Conn, Opts) when is_map(Opts)->
 -spec send(stream_handler(), Data :: binary()) ->
         {ok, Len :: integer()} | {error, any(), integer()}.
 send(Stream, Data) ->
-  case async_send(Stream, Data) of
+  case quicer_nif:send(Stream, Data, _IsSync = 1) of
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
@@ -221,11 +222,24 @@ send(Stream, Data) ->
 -spec async_send(stream_handler(), Data :: binary()) ->
         {ok, Len :: integer()} | {error, any()}.
 async_send(Stream, Data) ->
-  quicer_nif:async_send(Stream, Data).
+  quicer_nif:send(Stream, Data, _IsSync = 0).
 
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
 recv(Stream, Count) ->
+  case quicer:getopt(Stream, param_conn_settings, false) of
+  {ok, Settings} ->
+      case proplists:get_value(stream_recv_window_default, Settings, 0) of
+        X when X < Count ->
+          {error, stream_recv_window_too_small};
+        _ ->
+          do_recv(Stream, Count)
+      end;
+  {error, _} = Error ->
+      Error
+  end.
+
+do_recv(Stream, Count) ->
   case quicer_nif:recv(Stream, Count) of
     {ok, not_ready} ->
       %% Data is not ready yet but last call has been reg.
@@ -323,6 +337,10 @@ listeners() ->
               | {quicer_listener:listener_name(), quicer_listener:listen_on()}) -> pid().
 listener(Name) ->
   quicer_listener_sup:listener(Name).
+
+-spec controlling_process(stream_handler(), pid()) -> ok | {error, any()}.
+controlling_process(Stream, Pid) ->
+  quicer_nif:controlling_process(Stream, Pid).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

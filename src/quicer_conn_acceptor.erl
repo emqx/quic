@@ -165,9 +165,10 @@ handle_info({'EXIT', _Pid, normal}, State) ->
     %% @todo
     {noreply, State};
 
-handle_info({quic, shutdown, C}, #state{conn = C, callback = M} = State) ->
+handle_info({quic, shutdown, C}, #state{conn = C, callback = M,
+                                        callback_state = CBState} = State) ->
     ?tp(quic_shutdown, #{module=>?MODULE}),
-    M:shutdown(C),
+    M:shutdown(C, CBState),
     {noreply, State};
 
 handle_info({quic, closed, C}, #state{conn = C} = State) ->

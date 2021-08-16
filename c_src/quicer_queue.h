@@ -32,8 +32,9 @@ limitations under the License.
 #define QUICER_OPT_BUFF '40rQ' // Qr04 - QUICER OPT
 #define QUICER_SETTINGS '50rQ' // Qr05 - QUICER CONNECTION SETTINGS
 #define QUICER_TLS_SECRETS                                                    \
-  '60rQ'                    // Qr06 - QUICER TLS SECRETS for SSLKeyLogFile
-#define QUICER_TRACE '70rQ' // Qr07 - QUICER TRACE, unimportant
+  '60rQ'                       // Qr06 - QUICER TLS SECRETS for SSLKeyLogFile
+#define QUICER_TRACE '70rQ'    // Qr07 - QUICER TRACE, unimportant
+#define QUICER_SEND_CTX '80rQ' // Qr08 - QUICER STREAM SEND CONTEXT
 typedef enum ACCEPTOR_RECV_MODE
 {
   ACCEPTOR_RECV_MODE_PASSIVE,

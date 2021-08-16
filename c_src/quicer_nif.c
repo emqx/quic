@@ -20,6 +20,16 @@ limitations under the License.
 
 #include "quicer_listener.h"
 
+static ERL_NIF_TERM connection_controlling_process(ErlNifEnv *env,
+                                                   QuicerConnCTX *c_ctx,
+                                                   const ErlNifPid *caller,
+                                                   const ERL_NIF_TERM *pid);
+
+static ERL_NIF_TERM stream_controlling_process(ErlNifEnv *env,
+                                               QuicerStreamCTX *s_ctx,
+                                               const ErlNifPid *caller,
+                                               const ERL_NIF_TERM *pid);
+
 /*
 ** atoms in use, initialized while load nif
 */
@@ -48,6 +58,7 @@ ERL_NIF_TERM ATOM_STREAM_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_SEND_ERROR;
 ERL_NIF_TERM ATOM_SOCKNAME_ERROR;
 ERL_NIF_TERM ATOM_OWNER_DEAD;
+ERL_NIF_TERM ATOM_NOT_OWNER;
 
 // Mirror 'errors' in msquic_linux.h
 ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -283,6 +294,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_STREAM_START_ERROR, stm_start_error);                             \
   ATOM(ATOM_STREAM_SEND_ERROR, stm_send_error);                               \
   ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
+  ATOM(ATOM_NOT_OWNER, not_owner);                                            \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
   ATOM(ATOM_ERROR_CONTINUE, contiune);                                        \
@@ -505,11 +517,10 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
                                void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
-  enif_demonitor_process(c_ctx->env, c_ctx, c_ctx->owner_mon);
+  enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
-  CXPLAT_FREE(c_ctx->owner_mon, QUICER_OWNER_MON);
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
   CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
   AcceptorDestroy(c_ctx->owner);
@@ -772,6 +783,112 @@ atom_status(QUIC_STATUS status)
   return eterm;
 }
 
+ERL_NIF_TERM
+controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx = NULL;
+  QuicerConnCTX *c_ctx = NULL;
+  ErlNifPid target, caller;
+  ERL_NIF_TERM new_owner = argv[1];
+  ERL_NIF_TERM res = ATOM_OK;
+  if (argc != 2)
+    {
+      return ATOM_BADARG;
+    }
+
+  // precheck
+  if (!enif_get_local_pid(env, argv[1], &target))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_self(env, &caller))
+    {
+      // unlikely
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      enif_mutex_lock(s_ctx->lock);
+      res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
+      enif_mutex_unlock(s_ctx->lock);
+    }
+  else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+
+      enif_mutex_lock(c_ctx->lock);
+      res = connection_controlling_process(env, c_ctx, &caller, &new_owner);
+      enif_mutex_unlock(c_ctx->lock);
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  return res;
+}
+
+ERL_NIF_TERM
+connection_controlling_process(ErlNifEnv *env,
+                               QuicerConnCTX *c_ctx,
+                               const ErlNifPid *caller,
+                               const ERL_NIF_TERM *pid)
+{
+
+  if (0 != enif_compare_pids(&c_ctx->owner->Pid, caller))
+    {
+      return ERROR_TUPLE_2(ATOM_NOT_OWNER);
+    }
+
+  if (!enif_get_local_pid(env, *pid, &c_ctx->owner->Pid))
+    {
+
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_demonitor_process(env, c_ctx, &c_ctx->owner_mon);
+
+  if (0
+      != enif_monitor_process(
+          env, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon))
+    {
+      return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
+    }
+
+  return ATOM_OK;
+}
+
+ERL_NIF_TERM
+stream_controlling_process(ErlNifEnv *env,
+                           QuicerStreamCTX *s_ctx,
+                           const ErlNifPid *caller,
+                           const ERL_NIF_TERM *pid)
+{
+
+  if (0 != enif_compare_pids(&s_ctx->owner->Pid, caller))
+    {
+      return ERROR_TUPLE_2(ATOM_NOT_OWNER);
+    }
+
+  if (!enif_get_local_pid(env, *pid, &s_ctx->owner->Pid))
+    {
+
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_demonitor_process(env, s_ctx, &s_ctx->owner_mon);
+
+  if (0
+      != enif_monitor_process(
+          env, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon))
+    {
+      return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
+    }
+
+  return ATOM_OK;
+}
+
 static ErlNifFunc nif_funcs[] = {
   /* |  name  | arity| funptr | flags|
    *
@@ -789,12 +906,13 @@ static ErlNifFunc nif_funcs[] = {
   { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
-  { "async_send", 2, send2, 0},
+  { "send", 3, send3, 0},
   { "recv", 2, recv2, 0},
   { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
   { "setopt", 3, setopt3, 0},
+  { "controlling_process", 2, controlling_process, 0},
   /* for DEBUG */
   { "get_conn_rid", 1, get_conn_rid1, 1},
   { "get_stream_rid", 1, get_stream_rid1, 1}

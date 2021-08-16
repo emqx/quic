@@ -140,7 +140,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
-      enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, c_ctx->owner_mon);
+      enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
       if (!enif_send(NULL,
                      &(c_ctx->owner->Pid),
                      NULL,
@@ -152,6 +152,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_INTERNAL_ERROR;
         }
+      if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
+        {
+          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
+        }
+
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
       //
@@ -173,7 +178,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
         }
       s_ctx->owner = acc;
 
-      enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, s_ctx->owner_mon);
+      enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon);
 
       if (!enif_send(NULL,
                      &(acc->Pid),
@@ -239,11 +244,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           c_ctx->is_closed = TRUE;
         }
 
-      if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
-        {
-          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
-        }
-
       destroy_c_ctx(c_ctx);
       break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
@@ -299,7 +299,7 @@ ServerConnectionCallback(HQUIC Connection,
       assert(acc);
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
-      enif_monitor_process(NULL, c_ctx, acc_pid, c_ctx->owner_mon);
+      enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
 
       ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
       // testing this, just unblock accecptor

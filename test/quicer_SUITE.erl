@@ -49,9 +49,11 @@
         , tc_conn_basic_slow_start/1
         , tc_conn_double_close/1
         , tc_conn_other_port/1
+        , tc_conn_controlling_process/1
 
         , tc_stream_client_init/1
         , tc_stream_client_send/1
+        , tc_stream_client_async_send/1
 
         , tc_stream_passive_receive/1
         , tc_stream_passive_receive_buffer/1
@@ -59,8 +61,13 @@
         , tc_stream_passive_receive_large_buffer_2/1
         , tc_stream_send_after_conn_close/1
         , tc_stream_send_after_async_conn_close/1
+        , tc_stream_sendrecv_large_data_passive/1
+        , tc_stream_sendrecv_large_data_passive_2/1
+        , tc_stream_sendrecv_large_data_active/1
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
+        , tc_stream_controlling_process/1
+
         , tc_getopt_raw/1
         , tc_getopt/1
         , tc_getopt_stream_active/1
@@ -400,6 +407,98 @@ tc_stream_client_send(Config) ->
       ct:fail("timeout")
   end.
 
+tc_stream_client_async_send(Config) ->
+  Port = 4569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+      receive
+        {quic, <<"pong">>, _, _, _, _} ->
+          ok = quicer:close_stream(Stm),
+          ok = quicer:close_connection(Conn);
+        Other ->
+          ct:fail("Unexpected Msg ~p", [Other])
+      end,
+      SPid ! done,
+      receive
+        {quic, send_completed, _Stm, _} -> ct:fail("shouldn't recv send_completed")
+      after 0 ->
+            ok
+      end,
+      ok = ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_sendrecv_large_data_passive(Config) ->
+  Port = 24570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, [{stream_recv_window_default, 1048576} | Config], Port)
+                  end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  [{stream_recv_window_default, 1048576} | default_conn_opts()], 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      TestData = crypto:strong_rand_bytes(1000000),
+      {ok, _} = quicer:async_send(Stm, TestData),
+      {ok, TestData} = quicer:recv(Stm, byte_size(TestData)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_sendrecv_large_data_passive_2(Config) ->
+  %% test when stream_recv_window_default isn't large enough
+  Port = 24570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      TestData = crypto:strong_rand_bytes(1000000),
+      {ok, _} = quicer:async_send(Stm, TestData),
+      {error, stream_recv_window_too_small} = quicer:recv(Stm, byte_size(TestData)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_sendrecv_large_data_active(Config) ->
+  %% test when stream_recv_window_default isn't large enough
+  Port = 24570,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+      TestData = crypto:strong_rand_bytes(1000000),
+      {ok, _} = quicer:async_send(Stm, TestData),
+      TestData = active_recv(Stm, byte_size(TestData)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
 tc_stream_passive_switch_to_active(Config) ->
   Port = 24569,
   Owner = self(),
@@ -576,6 +675,64 @@ tc_stream_send_after_async_conn_close(Config) ->
       ct:fail("timeout")
   end.
 
+tc_stream_controlling_process(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      ok = quicer:controlling_process(Stm, self()),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {ok, _} = quicer:recv(Stm, 11),
+      {NewOwner, MonRef} = spawn_monitor(
+                             fun() ->
+                                 receive
+                                   {quic, <<"owner_changed">>, Stm, _, _, _} ->
+                                     ok = quicer:async_close_stream(Stm)
+                                 end
+                             end),
+      ok = quicer:controlling_process(Stm, NewOwner),
+      ok = quicer:setopt(Stm, active, true),
+      {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
+      receive
+        {'DOWN', MonRef, process, NewOwner, normal} ->
+          SPid ! done
+      end,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_controlling_process(Config) ->
+  Port = 24569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      ok = quicer:controlling_process(Conn, self()),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {ok, _} = quicer:recv(Stm, 11),
+      {NewOwner, MonRef} = spawn_monitor(
+                             fun() ->
+                                 receive
+                                   {quic, closed, Conn} ->
+                                     ok
+                                 end
+                             end),
+      ok = quicer:controlling_process(Conn, NewOwner),
+      quicer:async_close_connection(Conn),
+      receive
+        {'DOWN', MonRef, process, NewOwner, normal} ->
+          SPid ! done
+      end,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
 
 tc_getopt_raw(Config) ->
   Parm = param_conn_quic_version,
@@ -1202,6 +1359,18 @@ default_listen_opts(Config) ->
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   ].
+
+active_recv(Stream, Len) ->
+  active_recv(Stream, Len, []).
+active_recv(Stream, Len, BinList) ->
+  case iolist_size(BinList) >= Len of
+    true ->
+      binary:list_to_bin(lists:reverse(BinList));
+    false ->
+      receive {quic, Bin, Stream, _, _, _} ->
+          active_recv(Stream, Len, [Bin |BinList])
+      end
+end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

@@ -47,9 +47,6 @@ init_c_ctx()
   c_ctx->env = enif_alloc_env();
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
-  //@todo handle if NULL
-  c_ctx->owner_mon
-      = CXPLAT_ALLOC_NONPAGED(sizeof(ErlNifMonitor), QUICER_OWNER_MON);
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
   c_ctx->is_closed = FALSE;
   c_ctx->TlsSecrets = NULL;
@@ -73,8 +70,11 @@ init_s_ctx()
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->is_closed = FALSE;
   s_ctx->is_wait_for_data = FALSE;
-  s_ctx->Buffer = NULL;
-  s_ctx->BufferLen = 0;
+  s_ctx->Buffers[0].Buffer = NULL;
+  s_ctx->Buffers[0].Length = 0;
+  s_ctx->Buffers[1].Buffer = NULL;
+  s_ctx->Buffers[1].Length = 0;
+  s_ctx->TotalBufferLength = 0;
   s_ctx->is_buff_ready = FALSE;
   return s_ctx;
 }
@@ -84,4 +84,24 @@ destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
   // note, see resource_stream_dealloc_callback
   enif_release_resource(s_ctx);
+}
+
+QuicerStreamSendCTX *
+init_send_ctx()
+{
+  QuicerStreamSendCTX *send_ctx
+      = CXPLAT_ALLOC_NONPAGED(sizeof(QuicerStreamSendCTX), QUICER_SEND_CTX);
+
+  if (send_ctx)
+    {
+      CxPlatZeroMemory(send_ctx, sizeof(QuicerStreamSendCTX));
+    }
+  return send_ctx;
+}
+
+void
+destroy_send_ctx(QuicerStreamSendCTX *send_ctx)
+{
+  CXPLAT_FREE(send_ctx->Buffer, QUICER_SND_BUFF);
+  CXPLAT_FREE(send_ctx, QUICER_SEND_CTX);
 }

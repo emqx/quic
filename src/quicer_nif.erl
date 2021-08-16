@@ -26,12 +26,13 @@
         , async_close_connection/1
         , async_accept_stream/2
         , start_stream/2
-        , async_send/2
+        , send/3
         , recv/2
         , async_close_stream/1
         , sockname/1
         , getopt/3
         , setopt/3
+        , controlling_process/2
         ]).
 
 -export([ get_conn_rid/1
@@ -92,7 +93,7 @@ async_accept_stream(_Conn, _Opts)->
 start_stream(_Conn, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_send(_Stream, _Data) ->
+send(_Stream, _Data, _IsSync) ->
   erlang:nif_error(nif_library_not_loaded).
 
 recv(_Stream, _Len) ->
@@ -116,6 +117,8 @@ get_conn_rid(_Handle)->
 get_stream_rid(_Handle)->
   erlang:nif_error(nif_library_not_loaded).
 
+controlling_process(_H, _P) ->
+  erlang:nif_error(nif_library_not_loaded).
 
 %% Internals
 -spec locate_lib(file:name(), file:name()) ->
