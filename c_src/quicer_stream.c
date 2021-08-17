@@ -29,17 +29,16 @@ static QUIC_STATUS handle_stream_recv_event(HQUIC Stream,
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
-  ErlNifEnv *env;
-  QuicerStreamCTX *s_ctx;
+
+  QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
+  ErlNifEnv *env = s_ctx->env;
   ERL_NIF_TERM report;
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   QuicerStreamSendCTX *send_ctx = NULL;
-  s_ctx = (QuicerStreamCTX *)Context;
+  BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
-
-  env = s_ctx->env;
 
   TP_CB_3(event, Stream, Event->Type);
   switch (Event->Type)
@@ -136,16 +135,27 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
-      MsQuic->StreamClose(Stream);
-      s_ctx->is_closed = true;
 
-      destroy_s_ctx(s_ctx);
+      s_ctx->is_closed = TRUE;
+      is_destroy = TRUE;
       break;
     default:
       break;
     }
+
+  if (!is_destroy)
+    {
+      enif_clear_env(env);
+    }
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_unlock(s_ctx->c_ctx->lock);
+
+  if (is_destroy)
+    {
+      // must be called after mutex unlock
+      MsQuic->StreamClose(Stream);
+      destroy_s_ctx(s_ctx);
+    }
   return status;
 }
 
@@ -165,6 +175,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
   env = s_ctx->env;
+  BOOLEAN is_destroy = FALSE;
   TP_CB_3(event, Stream, Event->Type);
   switch (Event->Type)
     {
@@ -255,8 +266,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
-      MsQuic->StreamClose(Stream);
-      destroy_s_ctx(s_ctx);
+      is_destroy = TRUE;
       break;
     case QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE:
       TP_CB_3(event_ideal_send_buffer_size,
@@ -266,8 +276,21 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     default:
       break;
     }
+
+  if (!is_destroy)
+    {
+      enif_clear_env(env);
+    }
+
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_unlock(s_ctx->c_ctx->lock);
+
+  if (is_destroy)
+    {
+      // must be called after mutex unlock
+      MsQuic->StreamClose(Stream);
+      destroy_s_ctx(s_ctx);
+    }
   return status;
 }
 
@@ -387,7 +410,6 @@ ERL_NIF_TERM
 send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerStreamCTX *s_ctx;
-  ErlNifBinary bin;
   ERL_NIF_TERM estream = argv[0];
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eFlags = argv[2];
@@ -398,11 +420,20 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
   if (!send_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
+
+  ebin = enif_make_copy(send_ctx->env, ebin);
+
+  ErlNifBinary *bin = &send_ctx->bin;
 
   if (enif_get_uint(env, eFlags, &sendflags))
     {
@@ -419,18 +450,16 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   else
     {
+      destroy_send_ctx(send_ctx);
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!enif_inspect_binary(env, ebin, &bin))
+  if (!enif_inspect_binary(env, ebin, bin) || bin->size > UINT32_MAX)
     {
+      destroy_send_ctx(send_ctx);
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
@@ -438,6 +467,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (s_ctx->is_closed || s_ctx->c_ctx->is_closed)
     {
+      destroy_send_ctx(send_ctx);
       enif_mutex_unlock(s_ctx->c_ctx->lock);
       enif_mutex_unlock(s_ctx->lock);
       return ERROR_TUPLE_2(ATOM_CLOSED);
@@ -449,54 +479,31 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // Allocates and builds the buffer to send over the stream.
   //
 
-  assert(bin.data != NULL);
-  QUIC_BUFFER *SendBuffer
-      = CXPLAT_ALLOC_NONPAGED(sizeof(QUIC_BUFFER) + bin.size, QUICER_SND_BUFF);
-
-  if (SendBuffer == NULL)
-    {
-      enif_mutex_unlock(s_ctx->lock);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-    }
-
-  send_ctx->Buffer = SendBuffer;
-  /*
-    Fast path plan A, requires caller holds the ref to the binary
-     so that it won't get GCed.
-     SendBuffer->Buffer = bin.data;
-  */
-
-  /*
-    Fast path plan B, make a term copy of bin term to stream ctx env, and
-    *release* it in callback enif_make_copy(s_ctx->env, argv[1]);
-    SendBuffer->Buffer = bin.data;
-  */
-
-  /*
-  **  Slow path, safe but requires memcpy copy
-  */
-  SendBuffer->Buffer = (uint8_t *)SendBuffer + sizeof(QUIC_BUFFER);
-  CxPlatCopyMemory(SendBuffer->Buffer, bin.data, bin.size);
-  SendBuffer->Length = (uint32_t)bin.size;
+  assert(bin->data != NULL);
+  send_ctx->Buffer.Buffer = (uint8_t *)bin->data;
+  send_ctx->Buffer.Length = (uint32_t)bin->size;
 
   QUIC_STATUS Status;
   // note, SendBuffer as sendcontext, free the buffer while message is sent
   // confirmed.
-  if (QUIC_FAILED(Status = MsQuic->StreamSend(
-                      Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
+  if (QUIC_FAILED(
+          Status = MsQuic->StreamSend(
+              Stream, &send_ctx->Buffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
     {
-      CXPLAT_FREE(SendBuffer, QUICER_SND_BUFF);
+      destroy_send_ctx(send_ctx);
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
       enif_mutex_unlock(s_ctx->lock);
       enif_mutex_unlock(s_ctx->c_ctx->lock);
       //@todo return error code
-      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ETERM_INT(Status));
+      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, atom_status(Status));
     }
-  uint64_t len = bin.size;
-  enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
-  return SUCCESS(ETERM_UINT_64(len));
+
+  else
+    {
+      enif_mutex_unlock(s_ctx->lock);
+      enif_mutex_unlock(s_ctx->c_ctx->lock);
+      return SUCCESS(ETERM_UINT_64(bin->size));
+    }
 }
 
 ERL_NIF_TERM

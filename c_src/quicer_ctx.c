@@ -96,12 +96,13 @@ init_send_ctx()
     {
       CxPlatZeroMemory(send_ctx, sizeof(QuicerStreamSendCTX));
     }
+  send_ctx->env = enif_alloc_env();
   return send_ctx;
 }
 
 void
 destroy_send_ctx(QuicerStreamSendCTX *send_ctx)
 {
-  CXPLAT_FREE(send_ctx->Buffer, QUICER_SND_BUFF);
+  enif_free_env(send_ctx->env);
   CXPLAT_FREE(send_ctx, QUICER_SEND_CTX);
 }

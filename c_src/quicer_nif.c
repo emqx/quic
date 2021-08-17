@@ -540,7 +540,9 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
                                  void *obj)
 {
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
+  enif_mutex_lock(s_ctx->lock);
   enif_free_env(s_ctx->env);
+  enif_mutex_unlock(s_ctx->lock);
   enif_mutex_destroy(s_ctx->lock);
 }
 

@@ -64,7 +64,7 @@ typedef struct QuicerStreamCTX
   HQUIC Stream;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;
-  ErlNifEnv *env; //@todo destruct env
+  ErlNifEnv *env;
   ErlNifMutex *lock;
   BOOLEAN is_closed;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
@@ -80,9 +80,11 @@ typedef struct QuicerStreamCTX
 typedef struct QuicerStreamSendCTX
 {
   QuicerStreamCTX *s_ctx;
+  ErlNifEnv *env;
   ErlNifPid caller;
   BOOLEAN is_sync;
-  QUIC_BUFFER *Buffer;
+  QUIC_BUFFER Buffer;
+  ErlNifBinary bin;
 } QuicerStreamSendCTX;
 
 QuicerListenerCTX *init_l_ctx();

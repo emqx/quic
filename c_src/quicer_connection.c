@@ -209,7 +209,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           ATOM_QUIC,
           ATOM_TRANS_SHUTDOWN,
           enif_make_resource(env, c_ctx),
-          enif_make_uint(env, Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
+          atom_status(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
       break;
@@ -257,6 +257,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     default:
       break;
     }
+  enif_clear_env(c_ctx->env);
   enif_mutex_unlock(c_ctx->lock);
   return QUIC_STATUS_SUCCESS;
 }
@@ -423,7 +424,7 @@ ServerConnectionCallback(HQUIC Connection,
     default:
       break;
     }
-
+  enif_clear_env(env);
   enif_mutex_unlock(c_ctx->lock);
   return QUIC_STATUS_SUCCESS;
 }
