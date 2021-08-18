@@ -95,8 +95,8 @@ init_send_ctx()
   if (send_ctx)
     {
       CxPlatZeroMemory(send_ctx, sizeof(QuicerStreamSendCTX));
+      send_ctx->env = enif_alloc_env();
     }
-  send_ctx->env = enif_alloc_env();
   return send_ctx;
 }
 

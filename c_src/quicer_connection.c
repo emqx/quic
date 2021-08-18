@@ -130,6 +130,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   QuicerStreamCTX *s_ctx = NULL;
   ErlNifEnv *env = c_ctx->env;
   ERL_NIF_TERM report;
+  BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
   switch (Event->Type)
@@ -244,7 +245,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           c_ctx->is_closed = TRUE;
         }
 
-      destroy_c_ctx(c_ctx);
+      is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
       //
@@ -259,6 +260,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     }
   enif_clear_env(c_ctx->env);
   enif_mutex_unlock(c_ctx->lock);
+
+  if (is_destroy)
+    {
+      destroy_c_ctx(c_ctx);
+    }
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -272,6 +278,8 @@ ServerConnectionCallback(HQUIC Connection,
   ErlNifPid *acc_pid = NULL;
   ERL_NIF_TERM report;
   ErlNifEnv *env = c_ctx->env;
+  BOOLEAN is_destroy = FALSE;
+
   enif_mutex_lock(c_ctx->lock);
   switch (Event->Type)
     {
@@ -363,7 +371,8 @@ ServerConnectionCallback(HQUIC Connection,
           MsQuic->ConnectionClose(Connection);
           c_ctx->is_closed = TRUE;
         }
-      destroy_c_ctx(c_ctx);
+
+      is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
         //
@@ -426,6 +435,12 @@ ServerConnectionCallback(HQUIC Connection,
     }
   enif_clear_env(env);
   enif_mutex_unlock(c_ctx->lock);
+
+  if (is_destroy)
+    {
+      destroy_c_ctx(c_ctx);
+    }
+
   return QUIC_STATUS_SUCCESS;
 }
 
