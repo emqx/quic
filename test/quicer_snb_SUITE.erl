@@ -123,6 +123,7 @@ groups() ->
 all() ->
   [ tc_app_echo_server
   , tc_slow_conn
+  , tc_stream_owner_down
   ].
 
 %%--------------------------------------------------------------------
@@ -228,6 +229,85 @@ tc_slow_conn(Config) ->
                                              _RidC == _RidL,
                                              Trace))
                end),
+  ok.
+
+tc_stream_owner_down(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 Pid = spawn(fun() ->
+                                 receive down -> ok end
+                             end),
+                 quicer:controlling_process(Stm, Pid),
+                 Pid ! down,
+                 ?block_until(
+                    #{'$kind' := debug, context := "callback",
+                      function := "ServerStreamCallback", mark := 7,
+                      tag := "event"}, 1000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% check that stream down callback is triggered when stream owner process is dead
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "stream_controlling_process"
+                                              , tag := "exit"
+                                              , resource_id := _RidL
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , function := "resource_stream_down_callback"
+                                              , tag := "start"
+                                              , mark := 0
+                                              , resource_id := _RidS
+                                              },
+                                             _RidS == _RidL,
+                                             Trace)),
+                   %% check that it triggered a immediate stream shutdown
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "resource_stream_down_callback"
+                                              , tag := "start"
+                                              , mark := 0
+                                              , resource_id := _RidS
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , tag := "event"
+                                              , mark := 6
+                                              , resource_id := _RidL
+                                              },
+                                             _RidS == _RidL,
+                                             Trace)),
+
+                   %% check that client side immediate shutdown trigger an peer_send_abort event at server side
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , tag := "event"
+                                              , mark := 6
+                                              },
+                                             #{'$kind' := peer_send_aborted
+                                               , module := quicer_stream
+                                               , reason := 0
+                                              },
+                                             Trace))
+                     end),
   ok.
 
 %%% Internal Helpers

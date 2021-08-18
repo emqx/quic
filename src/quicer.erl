@@ -338,9 +338,9 @@ listeners() ->
 listener(Name) ->
   quicer_listener_sup:listener(Name).
 
--spec controlling_process(stream_handler(), pid()) -> ok | {error, any()}.
-controlling_process(Stream, Pid) ->
-  quicer_nif:controlling_process(Stream, Pid).
+-spec controlling_process(stream_handler() | connection_handler(), pid()) -> ok | {error, any()}.
+controlling_process(Handler, Pid) ->
+  quicer_nif:controlling_process(Handler, Pid).
 
 %%% Internal helpers
 stats_map(recv_cnt) ->

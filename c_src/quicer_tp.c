@@ -9,7 +9,7 @@ tp_snk(ErlNifEnv *env,
        const char *fun,
        const char *tag,
        uint64_t rid,
-       int mark)
+       uint64_t mark)
 {
   ErlNifPid pid;
   if (enif_whereis_pid(env, ATOM_SNABBKAFFE_COLLECTOR, &pid))
@@ -27,7 +27,7 @@ tp_snk(ErlNifEnv *env,
         enif_make_string(env, fun, ERL_NIF_LATIN1), // fun
         enif_make_string(env, tag, ERL_NIF_LATIN1), // tag
         enif_make_uint64(env, rid),                 // rid
-        enif_make_int(env, mark),                   // mark
+        enif_make_uint64(env, mark),                // mark
         enif_make_new_map(env)                      // snk_meta
       };
 

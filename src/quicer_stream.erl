@@ -164,6 +164,17 @@ handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
     ?tp(inval_stream_data, #{module=>?MODULE, stream_a=>StreamA, stream_b => StreamB}),
     {stop, wrong_stream, State};
 
+handle_info({quic, peer_send_aborted, Stream, Reason}, #state{stream = Stream, opts = Options} = State) ->
+    ?tp(peer_send_aborted, #{module=>?MODULE, stream=>Stream, reason=>Reason}),
+    #{stream_callback := CallbackModule} = Options,
+    case erlang:function_exported(CallbackModule, peer_send_aborted, 2) of
+        true ->
+            NewState = CallbackModule:peer_send_aborted(Stream, State),
+            {noreply, NewState};
+        false ->
+            {noreply, State}
+    end;
+
 handle_info({quic, peer_send_shutdown, Stream}, #state{stream = Stream, opts = Options} = State) ->
     ?tp(peer_shutdown, #{module=>?MODULE, stream=>Stream}),
     #{stream_callback := CallbackModule} = Options,

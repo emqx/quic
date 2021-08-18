@@ -65,7 +65,7 @@ void tp_snk(ErlNifEnv *env,
             const char *fun,
             const char *tag,
             uint64_t rid,
-            int mark);
+            uint64_t mark);
 /* END of ifdef QUICER_USE_SNK */
 #else /* NO TP is defined */
 
