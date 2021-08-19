@@ -218,15 +218,14 @@ tc_slow_conn(Config) ->
                                               , function := "ServerListenerCallback"
                                               , tag := "fast_conn"
                                               , mark := 0
-                                              , resource_id := _RidL
+                                              , resource_id := _Rid
                                               },
                                              #{ ?snk_kind := debug
                                               , function := "async_handshake_1"
                                               , tag := "start"
                                               , mark := 0
-                                              , resource_id := _RidC
+                                              , resource_id := _Rid
                                               },
-                                             _RidC == _RidL,
                                              Trace))
                end),
   ok.
@@ -268,31 +267,29 @@ tc_stream_owner_down(Config) ->
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "stream_controlling_process"
                                               , tag := "exit"
-                                              , resource_id := _RidL
+                                              , resource_id := _Rid
                                               },
                                              #{ ?snk_kind := debug
                                               , function := "resource_stream_down_callback"
                                               , tag := "start"
                                               , mark := 0
-                                              , resource_id := _RidS
+                                              , resource_id := _Rid
                                               },
-                                             _RidS == _RidL,
                                              Trace)),
                    %% check that it triggered a immediate stream shutdown
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "resource_stream_down_callback"
                                               , tag := "start"
                                               , mark := 0
-                                              , resource_id := _RidS
+                                              , resource_id := _Rid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ClientStreamCallback"
                                               , tag := "event"
                                               , mark := 6
-                                              , resource_id := _RidL
+                                              , resource_id := _Rid
                                               },
-                                             _RidS == _RidL,
                                              Trace)),
 
                    %% check that client side immediate shutdown trigger an peer_send_abort event at server side
@@ -302,9 +299,9 @@ tc_stream_owner_down(Config) ->
                                               , tag := "event"
                                               , mark := 6
                                               },
-                                             #{'$kind' := peer_send_aborted
-                                               , module := quicer_stream
-                                               , reason := 0
+                                             #{ ?snk_kind := peer_send_aborted
+                                              , module := quicer_stream
+                                              , reason := 0
                                               },
                                              Trace))
                      end),
