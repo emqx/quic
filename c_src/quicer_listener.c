@@ -92,10 +92,12 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
               return QUIC_STATUS_INTERNAL_ERROR;
             }
         }
+      enif_clear_env(env);
       break;
     default:
       break;
     }
+
   return Status;
 }
 

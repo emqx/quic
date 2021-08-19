@@ -540,17 +540,40 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
                                  void *obj)
 {
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
+  enif_mutex_lock(s_ctx->lock);
   enif_free_env(s_ctx->env);
+  enif_mutex_unlock(s_ctx->lock);
   enif_mutex_destroy(s_ctx->lock);
 }
 
 void
-resource_stream_down_callback(__unused_parm__ ErlNifEnv *caller_env,
-                              __unused_parm__ void *obj,
+resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
+                              __unused_parm__ void *ctx,
                               __unused_parm__ ErlNifPid *pid,
                               __unused_parm__ ErlNifMonitor *mon)
 {
-  // @todo
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
+  QuicerStreamCTX *s_ctx = ctx;
+
+  if (!ctx)
+    {
+      return;
+    }
+
+  TP_CB_3(start, s_ctx->Stream, 0);
+  if (QUIC_FAILED(status = MsQuic->StreamShutdown(
+                      s_ctx->Stream,
+                      QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE
+                          | QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE
+                          | QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND,
+                      0)))
+    {
+      TP_CB_3(shutdown_fail, s_ctx->Stream, status);
+    }
+  else
+    {
+      TP_CB_3(shutdown_success, s_ctx->Stream, status);
+    }
 }
 
 static int
@@ -866,6 +889,7 @@ stream_controlling_process(ErlNifEnv *env,
                            const ERL_NIF_TERM *pid)
 {
 
+  TP_NIF_3(enter, s_ctx->Stream, (uint64_t)&s_ctx->owner->Pid);
   if (0 != enif_compare_pids(&s_ctx->owner->Pid, caller))
     {
       return ERROR_TUPLE_2(ATOM_NOT_OWNER);
@@ -886,6 +910,7 @@ stream_controlling_process(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
+  TP_NIF_3(exit, s_ctx->Stream, (uint64_t)&s_ctx->owner->Pid);
   return ATOM_OK;
 }
 
