@@ -173,6 +173,7 @@ handle_info({quic, shutdown, C}, #state{conn = C, callback = M,
 
 handle_info({quic, closed, C}, #state{conn = C} = State) ->
     %% @todo, connection closed
+    ?tp(quic_closed, #{module=>?MODULE}),
     {stop, normal, State}.
 
 %%--------------------------------------------------------------------

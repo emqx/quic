@@ -133,6 +133,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
+  TP_CB_3(event, Connection, Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -150,6 +151,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                                       ATOM_CONNECTED,
                                       enif_make_resource(env, c_ctx))))
         {
+          TP_CB_3(app_down, Connection, Event->Type);
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_INTERNAL_ERROR;
         }

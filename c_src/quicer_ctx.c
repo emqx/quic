@@ -57,6 +57,7 @@ init_c_ctx()
 void
 destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
+  enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   enif_release_resource(c_ctx);
 }
 
@@ -83,6 +84,7 @@ void
 destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
   // note, see resource_stream_dealloc_callback
+  enif_demonitor_process(s_ctx->env, s_ctx, &s_ctx->owner_mon);
   enif_release_resource(s_ctx);
 }
 

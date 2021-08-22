@@ -20,6 +20,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
+%-include_lib("quicer/include/quicer.hrl").
 -include("quicer_nif_macro.hrl").
 
 %%--------------------------------------------------------------------
@@ -124,6 +125,7 @@ all() ->
   [ tc_app_echo_server
   , tc_slow_conn
   , tc_stream_owner_down
+  , tc_conn_owner_down
   ].
 
 %%--------------------------------------------------------------------
@@ -255,7 +257,7 @@ tc_stream_owner_down(Config) ->
                  Pid ! down,
                  ?block_until(
                     #{'$kind' := debug, context := "callback",
-                      function := "ServerStreamCallback", mark := 7,
+                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
                       tag := "event"}, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
@@ -287,23 +289,126 @@ tc_stream_owner_down(Config) ->
                                               , context := "callback"
                                               , function := "ClientStreamCallback"
                                               , tag := "event"
-                                              , mark := 6
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
                                               , resource_id := _Rid
                                               },
                                              Trace)),
 
-                   %% check that client side immediate shutdown trigger an peer_send_abort event at server side
+                   %% check that client side immediate shutdown trigger a peer_send_abort event at server side
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ClientStreamCallback"
                                               , tag := "event"
-                                              , mark := 6
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
                                               },
                                              #{ ?snk_kind := peer_send_aborted
                                               , module := quicer_stream
                                               , reason := 0
                                               },
                                              Trace))
+                     end),
+  ok.
+
+
+tc_conn_owner_down(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 Pid = spawn(fun() ->
+                                 receive down -> ok end
+                             end),
+                 quicer:controlling_process(Conn, Pid),
+                 Pid ! down,
+                 ?block_until(
+                    #{'$kind' := debug, context := "callback",
+                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                      tag := "event"}, 1000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% check that conn down callback is triggered when conn owner process is dead
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "connection_controlling_process"
+                                              , tag := "exit"
+                                              , resource_id := _Rid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , function := "resource_conn_down_callback"
+                                              , tag := "start"
+                                              , resource_id := _Rid
+                                              },
+                                             Trace)),
+                   %% check that it triggered a immediate connection shutdown
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "resource_conn_down_callback"
+                                              , tag := "end"
+                                              , resource_id := _Rid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                              , resource_id := _Rid
+                                              },
+                                             Trace)),
+                   %% check that client side immediate shutdown triggers a stream shutdown
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "resource_conn_down_callback"
+                                              , tag := "end"
+                                              , resource_id := _Rid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+                                              , tag := "event"
+                                              },
+                                             Trace)),
+                   %% check that client side conn shutdown happens after stream shutdown
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+                                              , tag := "event"
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                              },
+                                             Trace)),
+                   %% check that client side immediate shutdown trigger a close at server side
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(true,
+                                            #{ ?snk_kind := debug
+                                             , context := "callback"
+                                             , function := "ClientConnectionCallback"
+                                             , tag := "event"
+                                             , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                             },
+                                            #{ ?snk_kind := quic_closed
+                                             , module := quicer_conn_acceptor
+                                             },
+                                            Trace))
                      end),
   ok.
 
