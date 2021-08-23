@@ -593,14 +593,25 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
-close_stream1(ErlNifEnv *env,
+close_stream3(ErlNifEnv *env,
               __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
   QuicerStreamCTX *s_ctx;
+  uint32_t app_errcode = 0, flags = 0;
   if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_uint(env, argv[1], &flags))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_uint(env, argv[2], &app_errcode))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -612,7 +623,7 @@ close_stream1(ErlNifEnv *env,
     {
       if (QUIC_FAILED(
               Status = MsQuic->StreamShutdown(
-                  s_ctx->Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0)))
+                  s_ctx->Stream, flags, app_errcode)))
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }

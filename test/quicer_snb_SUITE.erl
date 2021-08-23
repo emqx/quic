@@ -294,7 +294,7 @@ tc_stream_owner_down(Config) ->
                                               },
                                              Trace)),
 
-                   %% check that client side immediate shutdown trigger a peer_send_abort event at server side
+                   %% check that client side immediate shutdown triggers a peer_send_abort event at server side
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ClientStreamCallback"
@@ -396,7 +396,7 @@ tc_conn_owner_down(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               },
                                              Trace)),
-                   %% check that client side immediate shutdown trigger a close at server side
+                   %% check that client side immediate shutdown triggers a close at server side
                    ?assertMatch([{pair, _, _}],
                                 ?find_pairs(true,
                                             #{ ?snk_kind := debug

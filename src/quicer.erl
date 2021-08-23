@@ -16,6 +16,7 @@
 
 -module(quicer).
 
+-include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -export([ listen/2
@@ -38,7 +39,9 @@
         , recv/2
         , close_stream/1
         , close_stream/2
+        , close_stream/4
         , async_close_stream/1
+        , async_close_stream/3
         , sockname/1
         , getopt/2
         , getopt/3
@@ -260,7 +263,12 @@ close_stream(Stream) ->
 
 -spec close_stream(stream_handler(), timer:timeout()) -> ok | {error, any()}.
 close_stream(Stream, Timeout) ->
-  case async_close_stream(Stream) of
+  close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
+
+-spec close_stream(stream_handler(), non_neg_integer(), non_neg_integer(), time:timeout())
+        -> ok | {error, any()}.
+close_stream(Stream, Flags, ErrorCode, Timeout) ->
+  case async_close_stream(Stream, Flags, ErrorCode) of
     ok ->
       receive
         {quic, closed, Stream, _IsGraceful} ->
@@ -272,9 +280,14 @@ close_stream(Stream, Timeout) ->
       Err
   end.
 
+
 -spec async_close_stream(stream_handler()) -> ok | {error, any()}.
 async_close_stream(Stream) ->
-  quicer_nif:async_close_stream(Stream).
+  quicer_nif:async_close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
+
+-spec async_close_stream(stream_handler(), non_neg_integer(), non_neg_integer()) -> ok | {error, any()}.
+async_close_stream(Stream, Flags, Reason) ->
+  quicer_nif:async_close_stream(Stream, Flags, Reason).
 
 -spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.

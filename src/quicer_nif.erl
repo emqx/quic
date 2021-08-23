@@ -28,7 +28,7 @@
         , start_stream/2
         , send/3
         , recv/2
-        , async_close_stream/1
+        , async_close_stream/3
         , sockname/1
         , getopt/3
         , setopt/3
@@ -99,7 +99,7 @@ send(_Stream, _Data, _IsSync) ->
 recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_close_stream(_Stream) ->
+async_close_stream(_Stream, _Flags, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
 sockname(_Conn) ->
