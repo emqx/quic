@@ -283,6 +283,7 @@ ServerConnectionCallback(HQUIC Connection,
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
+  TP_CB_3(event, Connection, Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -363,6 +364,9 @@ ServerConnectionCallback(HQUIC Connection,
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
+      TP_CB_3(shutdown_complete,
+              Connection,
+              Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
       report = enif_make_tuple3(
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 

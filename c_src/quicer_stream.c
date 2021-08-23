@@ -105,6 +105,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // The peer aborted its send direction of the stream.
       //
+      TP_CB_3(peer_send_aborted, Stream, Event->PEER_SEND_ABORTED.ErrorCode);
       report = enif_make_tuple4(
           env,
           ATOM_QUIC,
