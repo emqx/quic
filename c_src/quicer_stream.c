@@ -621,9 +621,8 @@ close_stream3(ErlNifEnv *env,
   enif_keep_resource(s_ctx);
   if (!s_ctx->is_closed)
     {
-      if (QUIC_FAILED(
-              Status = MsQuic->StreamShutdown(
-                  s_ctx->Stream, flags, app_errcode)))
+      if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
+                          s_ctx->Stream, flags, app_errcode)))
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }

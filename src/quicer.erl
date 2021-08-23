@@ -29,7 +29,10 @@
         , accept/3
         , close_connection/1
         , close_connection/2
+        , close_connection/3
+        , close_connection/4
         , async_close_connection/1
+        , async_close_connection/3
         , accept_stream/2
         , accept_stream/3
         , async_accept_stream/2
@@ -157,9 +160,16 @@ accept(LSock, Opts, Timeout) ->
 close_connection(Conn) ->
   close_connection(Conn, 5000).
 
--spec close_connection(connection_handler(), timer:timeout()) -> ok.
 close_connection(Conn, Timeout) ->
-  ok = async_close_connection(Conn),
+  close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
+
+-spec close_connection(connection_handler(), non_neg_integer(), non_neg_integer()) -> ok.
+close_connection(Conn, Flags, ErrorCode) ->
+  close_connection(Conn, Flags, ErrorCode, 5000).
+
+-spec close_connection(connection_handler(), timer:timeout()) -> ok.
+close_connection(Conn, Flags, ErrorCode, Timeout) ->
+  ok = async_close_connection(Conn, Flags, ErrorCode),
   %% @todo make_ref
   receive
     {quic, closed, Conn} ->
@@ -170,7 +180,11 @@ close_connection(Conn, Timeout) ->
 
 -spec async_close_connection(connection_handler()) -> ok.
 async_close_connection(Conn) ->
-  quicer_nif:async_close_connection(Conn).
+  quicer_nif:async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
+
+-spec async_close_connection(connection_handler(), non_neg_integer(), non_neg_integer()) -> ok.
+async_close_connection(Conn, Flags, ErrorCode) ->
+  quicer_nif:async_close_connection(Conn, Flags, ErrorCode).
 
 -spec accept_stream(connection_handler(), proplists:proplist() | map()) ->
         {ok, stream_handler()} | {error, any()}.
