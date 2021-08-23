@@ -167,9 +167,9 @@ handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
 handle_info({quic, peer_send_aborted, Stream, Reason}, #state{stream = Stream, opts = Options} = State) ->
     ?tp(peer_send_aborted, #{module=>?MODULE, stream=>Stream, reason=>Reason}),
     #{stream_callback := CallbackModule} = Options,
-    case erlang:function_exported(CallbackModule, peer_send_aborted, 2) of
+    case erlang:function_exported(CallbackModule, peer_send_aborted, 3) of
         true ->
-            NewState = CallbackModule:peer_send_aborted(Stream, State),
+            NewState = CallbackModule:peer_send_aborted(Stream, State, Reason),
             {noreply, NewState};
         false ->
             {noreply, State}
