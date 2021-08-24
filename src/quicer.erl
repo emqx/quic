@@ -160,6 +160,7 @@ accept(LSock, Opts, Timeout) ->
 close_connection(Conn) ->
   close_connection(Conn, 5000).
 
+-spec close_connection(connection_handler(), timer:timeout()) -> ok.
 close_connection(Conn, Timeout) ->
   close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
 
@@ -167,7 +168,7 @@ close_connection(Conn, Timeout) ->
 close_connection(Conn, Flags, ErrorCode) ->
   close_connection(Conn, Flags, ErrorCode, 5000).
 
--spec close_connection(connection_handler(), timer:timeout()) -> ok.
+-spec close_connection(connection_handler(), non_neg_integer(), non_neg_integer(), timer:timeout()) -> ok.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
   ok = async_close_connection(Conn, Flags, ErrorCode),
   %% @todo make_ref

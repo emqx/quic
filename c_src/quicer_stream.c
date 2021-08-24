@@ -607,6 +607,7 @@ close_stream3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  // only check type, actual flag will be validated by msquic
   if (!enif_get_uint(env, argv[1], &flags))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);

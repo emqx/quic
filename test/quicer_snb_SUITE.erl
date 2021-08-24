@@ -235,7 +235,7 @@ tc_slow_conn(Config) ->
   ok.
 
 tc_stream_owner_down(Config) ->
-Port = 8888,
+  Port = 8888,
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -258,7 +258,7 @@ Port = 8888,
                  quicer:controlling_process(Stm, Pid),
                  Pid ! down,
                  ?block_until(
-                    #{'$kind' := debug, context := "callback",
+                    #{?snk_kind := debug, context := "callback",
                       function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
                       tag := "event"}, 1000),
                  ct:pal("stop listener"),
@@ -280,7 +280,7 @@ Port = 8888,
                                               , resource_id := _Rid
                                               },
                                              Trace)),
-                   %% check that it triggers a immediate stream shutdown
+                   %% check that it triggers an immediate stream shutdown
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "resource_stream_down_callback"
                                               , tag := "start"
@@ -337,7 +337,7 @@ tc_conn_owner_down(Config) ->
                  quicer:controlling_process(Conn, Pid),
                  Pid ! down,
                  ?block_until(
-                    #{'$kind' := debug, context := "callback",
+                    #{?snk_kind := debug, context := "callback",
                       function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
                       tag := "event"}, 1000),
                  ct:pal("stop listener"),
@@ -360,7 +360,7 @@ tc_conn_owner_down(Config) ->
                                               , resource_id := CRid
                                               },
                                              Trace)),
-                   %% check that it triggered a immediate connection shutdown
+                   %% check that it triggers an immediate connection shutdown
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "resource_conn_down_callback"
                                               , tag := "end"
@@ -532,7 +532,7 @@ tc_stream_close_errno(Config) ->
                  quicer:close_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND, Errno, 5000),
                  quicer:close_connection(Conn),
                  ?block_until(
-                    #{'$kind' := debug, context := "callback",
+                    #{?snk_kind := debug, context := "callback",
                       function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
                       tag := "event"}, 1000),
                  ct:pal("stop listener"),
