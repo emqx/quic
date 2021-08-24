@@ -23,12 +23,12 @@
         , async_connect/3
         , async_accept/2
         , async_handshake/1
-        , async_close_connection/1
+        , async_close_connection/3
         , async_accept_stream/2
         , start_stream/2
         , send/3
         , recv/2
-        , async_close_stream/1
+        , async_close_stream/3
         , sockname/1
         , getopt/3
         , setopt/3
@@ -69,25 +69,25 @@ reg_open() ->
 reg_close() ->
   erlang:nif_error(nif_library_not_loaded).
 
-listen(_Port, _Options)->
+listen(_Port, _Options) ->
   erlang:nif_error(nif_library_not_loaded).
 
 close_listener(_Listener) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_connect(_Host, _Port, _Opts)->
+async_connect(_Host, _Port, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
 async_accept(_Listener, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_handshake(_Connection)->
+async_handshake(_Connection) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_close_connection(_Conn) ->
+async_close_connection(_Conn, _Flags, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_accept_stream(_Conn, _Opts)->
+async_accept_stream(_Conn, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
 start_stream(_Conn, _Opts) ->
@@ -99,7 +99,7 @@ send(_Stream, _Data, _IsSync) ->
 recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 
-async_close_stream(_Stream) ->
+async_close_stream(_Stream, _Flags, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
 sockname(_Conn) ->
@@ -111,10 +111,10 @@ getopt(_Handle, _Optname, _IsRaw) ->
 setopt(_Handle, _Opt, _Value) ->
   erlang:nif_error(nif_library_not_loaded).
 
-get_conn_rid(_Handle)->
+get_conn_rid(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
-get_stream_rid(_Handle)->
+get_stream_rid(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 controlling_process(_H, _P) ->

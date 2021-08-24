@@ -513,10 +513,10 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
 }
 
 void
-resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
-                               void *obj)
+resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
+  TP_CB_3(start, c_ctx->Connection, 0);
   enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
@@ -524,31 +524,44 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
   CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
   AcceptorDestroy(c_ctx->owner);
+  TP_CB_3(end, c_ctx->Connection, 0);
 }
 
 void
-resource_conn_down_callback(__unused_parm__ ErlNifEnv *caller_env,
-                            __unused_parm__ void *obj,
+resource_conn_down_callback(__unused_parm__ ErlNifEnv *env,
+                            void *ctx,
                             __unused_parm__ ErlNifPid *pid,
                             __unused_parm__ ErlNifMonitor *mon)
 {
-  // todo
+  QuicerConnCTX *c_ctx = ctx;
+  if (!ctx)
+    {
+      return;
+    }
+  else
+    {
+      TP_CB_3(start, c_ctx->Connection, (uint64_t)ctx);
+      MsQuic->ConnectionShutdown(
+          c_ctx->Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+      TP_CB_3(end, c_ctx->Connection, (uint64_t)ctx);
+    }
 }
 
 void
-resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *caller_env,
-                                 void *obj)
+resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
+  TP_CB_3(start, s_ctx->Stream, 0);
   enif_mutex_lock(s_ctx->lock);
   enif_free_env(s_ctx->env);
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_destroy(s_ctx->lock);
+  TP_CB_3(end, s_ctx->Stream, 0);
 }
 
 void
 resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
-                              __unused_parm__ void *ctx,
+                              void *ctx,
                               __unused_parm__ ErlNifPid *pid,
                               __unused_parm__ ErlNifMonitor *mon)
 {
@@ -858,7 +871,7 @@ connection_controlling_process(ErlNifEnv *env,
                                const ErlNifPid *caller,
                                const ERL_NIF_TERM *pid)
 {
-
+  TP_NIF_3(enter, c_ctx->Connection, (uint64_t)&c_ctx);
   if (0 != enif_compare_pids(&c_ctx->owner->Pid, caller))
     {
       return ERROR_TUPLE_2(ATOM_NOT_OWNER);
@@ -879,6 +892,7 @@ connection_controlling_process(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
+  TP_NIF_3(exit, c_ctx->Connection, (uint64_t)&c_ctx);
   return ATOM_OK;
 }
 
@@ -928,12 +942,12 @@ static ErlNifFunc nif_funcs[] = {
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
   { "async_handshake", 1, async_handshake_1, 0},
-  { "async_close_connection", 1, close_connection1, 0},
+  { "async_close_connection", 3, close_connection3, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 3, send3, 0},
   { "recv", 2, recv2, 0},
-  { "async_close_stream", 1, close_stream1, 0},
+  { "async_close_stream", 3, close_stream3, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
   { "setopt", 3, setopt3, 0},

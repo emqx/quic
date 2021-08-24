@@ -20,7 +20,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
--include("quicer_nif_macro.hrl").
+-include("quicer.hrl").
 
 %%--------------------------------------------------------------------
 %% @spec suite() -> Info
@@ -124,6 +124,10 @@ all() ->
   [ tc_app_echo_server
   , tc_slow_conn
   , tc_stream_owner_down
+  , tc_conn_owner_down
+  , tc_conn_close_flag_1
+  , tc_conn_close_flag_2
+  , tc_stream_close_errno
   ].
 
 %%--------------------------------------------------------------------
@@ -254,8 +258,8 @@ tc_stream_owner_down(Config) ->
                  quicer:controlling_process(Stm, Pid),
                  Pid ! down,
                  ?block_until(
-                    #{'$kind' := debug, context := "callback",
-                      function := "ServerStreamCallback", mark := 7,
+                    #{?snk_kind := debug, context := "callback",
+                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
                       tag := "event"}, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
@@ -276,7 +280,7 @@ tc_stream_owner_down(Config) ->
                                               , resource_id := _Rid
                                               },
                                              Trace)),
-                   %% check that it triggered a immediate stream shutdown
+                   %% check that it triggers an immediate stream shutdown
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "resource_stream_down_callback"
                                               , tag := "start"
@@ -287,17 +291,17 @@ tc_stream_owner_down(Config) ->
                                               , context := "callback"
                                               , function := "ClientStreamCallback"
                                               , tag := "event"
-                                              , mark := 6
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
                                               , resource_id := _Rid
                                               },
                                              Trace)),
 
-                   %% check that client side immediate shutdown trigger an peer_send_abort event at server side
+                   %% check that client side immediate shutdown triggers a peer_send_abort event at server side
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ClientStreamCallback"
                                               , tag := "event"
-                                              , mark := 6
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
                                               },
                                              #{ ?snk_kind := peer_send_aborted
                                               , module := quicer_stream
@@ -306,6 +310,265 @@ tc_stream_owner_down(Config) ->
                                              Trace))
                      end),
   ok.
+
+
+tc_conn_owner_down(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:send(Stm, <<"ping">>),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
+                 {ok, SRid} = quicer:get_stream_rid(Stm),
+                 Pid = spawn(fun() ->
+                                 receive down -> ok end
+                             end),
+                 quicer:controlling_process(Conn, Pid),
+                 Pid ! down,
+                 ?block_until(
+                    #{?snk_kind := debug, context := "callback",
+                      function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+                      tag := "event"}, 1000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
+                 {CRid, SRid}
+               end,
+               fun(Result, Trace) ->
+                   {CRid, SRid} = Result,
+                   ct:pal("Rid is ~p~n Sid is ~p~nTrace is ~p, ", [CRid, SRid,Trace]),
+                   %% check that conn down callback is triggered when conn owner process is dead
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "connection_controlling_process"
+                                              , tag := "exit"
+                                              , resource_id := CRid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , function := "resource_conn_down_callback"
+                                              , tag := "start"
+                                              , resource_id := CRid
+                                              },
+                                             Trace)),
+                   %% check that it triggers an immediate connection shutdown
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , function := "resource_conn_down_callback"
+                                              , tag := "end"
+                                              , resource_id := CRid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                              , resource_id := CRid
+                                              },
+                                             Trace)),
+                   %% check that client side immediate shutdown triggers a stream shutdown
+                   ?assert(?causality(#{ ?snk_kind := debug
+                                       , function := "resource_conn_down_callback"
+                                       , tag := "end"
+                                       , resource_id := CRid
+                                       },
+                                      #{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ClientStreamCallback"
+                                       , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+                                       , tag := "event"
+                                       , resource_id := SRid
+                                       },
+                                      Trace)),
+                   %% check that client side conn shutdown happens after stream shutdown
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+                                              , tag := "event"
+                                              , resource_id := SRid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                              , resource_id := CRid
+                                              },
+                                             Trace)),
+                   %% check that client side immediate shutdown triggers a close at server side
+                   ?assert(?strict_causality( #{ ?snk_kind := quic_shutdown
+                                               , module := quicer_conn_acceptor
+                                               , '~meta' := #{pid := _PID}},
+                                              #{ ?snk_kind := quic_closed
+                                               , module := quicer_conn_acceptor
+                                               ,'~meta' := #{pid := _PID}},
+                                              Trace))
+               end),
+  ok.
+
+
+tc_conn_close_flag_1(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
+                 ?block_until(
+                    #{ ?snk_kind := debug
+                     , context := "callback"
+                     , function := "ServerConnectionCallback"
+                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                     , tag := "event"}, 1000, 3000),
+                 ?block_until(
+                    #{ ?snk_kind := debug
+                     , context := "callback"
+                     , function := "ClientConnectionCallback"
+                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                     , tag := "event"}, 1000, 3000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% verify that client close_connection with default flag
+                   %% triggers a close at server side
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
+                                              , tag := "event"
+                                              , resource_id := _CRid
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                              , resource_id := _CRid
+                                              },
+                                             Trace))
+               end),
+  ok.
+
+tc_conn_close_flag_2(Config) ->
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 111),
+                 ?block_until(
+                    #{?snk_kind := debug
+                     , context := "callback"
+                     , function := "ServerConnectionCallback"
+                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                     , tag := "event"}, 3000, 3000), %% assume idle_timeout_is 5s
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% check that client conn silent shutdown does not trigger
+                   %% active connection shutdown at server side
+                   ?assertEqual([], ?of_kind(quic_closed, Trace))
+               end),
+  ok.
+
+tc_stream_close_errno(Config) ->
+  Errno = 1234,
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 quicer:close_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND, Errno, 5000),
+                 quicer:close_connection(Conn),
+                 ?block_until(
+                    #{?snk_kind := debug, context := "callback",
+                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                      tag := "event"}, 1000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% check that server side
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_PEER_SEND_ABORTED
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "peer_send_aborted"
+                                              , mark := Errno
+                                              },
+                                             Trace)),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_PEER_SEND_ABORTED
+                                              },
+                                             #{ ?snk_kind := peer_send_aborted
+                                              , module := quicer_stream
+                                              , reason := Errno
+                                              },
+                                             Trace))
+                     end),
+  ok.
+
 
 %%% Internal Helpers
 default_stream_opts() ->

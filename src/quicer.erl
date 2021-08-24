@@ -16,6 +16,7 @@
 
 -module(quicer).
 
+-include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -export([ listen/2
@@ -28,7 +29,10 @@
         , accept/3
         , close_connection/1
         , close_connection/2
+        , close_connection/3
+        , close_connection/4
         , async_close_connection/1
+        , async_close_connection/3
         , accept_stream/2
         , accept_stream/3
         , async_accept_stream/2
@@ -38,7 +42,9 @@
         , recv/2
         , close_stream/1
         , close_stream/2
+        , close_stream/4
         , async_close_stream/1
+        , async_close_stream/3
         , sockname/1
         , getopt/2
         , getopt/3
@@ -68,6 +74,10 @@
 -type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().
 -type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
 
+-type stream_shutdown_flags() :: non_neg_integer().
+-type conn_shutdown_flags() :: non_neg_integer().
+-type reason_int() :: non_neg_integer().
+
 -spec start_listener(atom(), inet:port_number(),
                      {listener_opts(), connection_opts(), stream_opts()}) ->
         {ok, pid()} | {error, any()}.
@@ -80,9 +90,9 @@ stop_listener(AppName) ->
 
 -spec listen(quicer_listener:listen_on(), proplists:proplists() | map()) ->
         {ok, listener_handler()} | {error, any()}.
-listen(ListenOn, Opts) when is_list(Opts)->
+listen(ListenOn, Opts) when is_list(Opts) ->
   listen(ListenOn, maps:from_list(Opts));
-listen(ListenOn, Opts) when is_map(Opts)->
+listen(ListenOn, Opts) when is_map(Opts) ->
   quicer_nif:listen(ListenOn, Opts).
 
 -spec close_listener(listener_handler()) -> ok.
@@ -97,7 +107,8 @@ connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
   connect(inet:ntoa(Host), Port, Opts, Timeout);
 connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
-  case quicer_nif:async_connect(Host, Port, maps:merge(default_conn_opts(), Opts)) of
+  NewOpts = maps:merge(default_conn_opts(), Opts),
+  case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, _H} ->
       receive
         {quic, connected, Ctx} ->
@@ -140,7 +151,8 @@ accept(LSock, Opts, Timeout) when is_list(Opts) ->
   accept(LSock, maps:from_list(Opts), Timeout);
 accept(LSock, Opts, Timeout) ->
   % non-blocking
-  {ok, LSock} = quicer_nif:async_accept(LSock, maps:merge(default_conn_opts(), Opts)),
+  NewOpts = maps:merge(default_conn_opts(), Opts),
+  {ok, LSock} = quicer_nif:async_accept(LSock, NewOpts),
   receive
     {quic, new_conn, C} ->
       {ok, C};
@@ -156,7 +168,21 @@ close_connection(Conn) ->
 
 -spec close_connection(connection_handler(), timer:timeout()) -> ok.
 close_connection(Conn, Timeout) ->
-  ok = async_close_connection(Conn),
+  close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
+
+-spec close_connection(connection_handler(),
+                       conn_shutdown_flags(),
+                       reason_int()
+                      ) -> ok.
+close_connection(Conn, Flags, ErrorCode) ->
+  close_connection(Conn, Flags, ErrorCode, 5000).
+
+-spec close_connection(connection_handler(),
+                       conn_shutdown_flags(),
+                       reason_int(),
+                       timer:timeout()) -> ok.
+close_connection(Conn, Flags, ErrorCode, Timeout) ->
+  ok = async_close_connection(Conn, Flags, ErrorCode),
   %% @todo make_ref
   receive
     {quic, closed, Conn} ->
@@ -167,9 +193,15 @@ close_connection(Conn, Timeout) ->
 
 -spec async_close_connection(connection_handler()) -> ok.
 async_close_connection(Conn) ->
-  quicer_nif:async_close_connection(Conn).
+  quicer_nif:async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
 
--spec accept_stream(connection_handler(), proplists:proplist() | map()) ->
+-spec async_close_connection(connection_handler(),
+                             conn_shutdown_flags(),
+                             reason_int()) -> ok.
+async_close_connection(Conn, Flags, ErrorCode) ->
+  quicer_nif:async_close_connection(Conn, Flags, ErrorCode).
+
+-spec accept_stream(connection_handler(), stream_opts()) ->
         {ok, stream_handler()} | {error, any()}.
 accept_stream(Conn, Opts) ->
   accept_stream(Conn, Opts, infinity).
@@ -178,7 +210,8 @@ accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
 accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
   % @todo make_ref
   % @todo error handling
-  case quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)) of
+  NewOpts = maps:merge(default_stream_opts(), Opts),
+  case quicer_nif:async_accept_stream(Conn, NewOpts) of
     {ok, Conn} ->
       receive
         {quic, new_stream, Stream} ->
@@ -186,22 +219,22 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
       after Timeout ->
           {error, timeout}
       end;
-    {error, _} = E->
+    {error, _} = E ->
       E
   end.
 
 -spec async_accept_stream(connection_handler(), proplists:proplist() | map()) ->
         {ok, connection_handler()} | {error, any()}.
-async_accept_stream(Conn, Opts) when is_list(Opts)->
+async_accept_stream(Conn, Opts) when is_list(Opts) ->
   async_accept_stream(Conn, maps:from_list(Opts));
 async_accept_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 -spec start_stream(connection_handler(), proplists:proplists() | map()) ->
         {ok, stream_handler()} | {error, any()}.
-start_stream(Conn, Opts) when is_list(Opts)->
+start_stream(Conn, Opts) when is_list(Opts) ->
   start_stream(Conn, maps:from_list(Opts));
-start_stream(Conn, Opts) when is_map(Opts)->
+start_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 
@@ -260,7 +293,15 @@ close_stream(Stream) ->
 
 -spec close_stream(stream_handler(), timer:timeout()) -> ok | {error, any()}.
 close_stream(Stream, Timeout) ->
-  case async_close_stream(Stream) of
+  close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
+
+-spec close_stream(stream_handler(),
+                   stream_shutdown_flags(),
+                   reason_int(),
+                   time:timeout()) ->
+        ok | {error, any()}.
+close_stream(Stream, Flags, ErrorCode, Timeout) ->
+  case async_close_stream(Stream, Flags, ErrorCode) of
     ok ->
       receive
         {quic, closed, Stream, _IsGraceful} ->
@@ -274,20 +315,33 @@ close_stream(Stream, Timeout) ->
 
 -spec async_close_stream(stream_handler()) -> ok | {error, any()}.
 async_close_stream(Stream) ->
-  quicer_nif:async_close_stream(Stream).
+  quicer_nif:async_close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
+
+-spec async_close_stream(stream_handler(),
+                         stream_shutdown_flags(),
+                         reason_int())
+                        -> ok | {error, any()}.
+async_close_stream(Stream, Flags, Reason) ->
+  quicer_nif:async_close_stream(Stream, Flags, Reason).
 
 -spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 sockname(Conn) ->
   quicer_nif:sockname(Conn).
 
--spec getopt(Handle::connection_handler() | stream_handler() | listener_handler(),
-             Optname::atom()) -> {ok, OptVal::any()} | {error, any()}.
+-spec getopt(Handle::connection_handler()
+                   | stream_handler()
+                   | listener_handler(),
+             Optname::atom()) ->
+        {ok, OptVal::any()} | {error, any()}.
 getopt(Handle, Opt) ->
   quicer_nif:getopt(Handle, Opt, true).
 
--spec getopt(Handle::connection_handler() | stream_handler() | listener_handler(),
-             Optname::atom(), IsRaw::boolean()) -> {ok, OptVal::any()} | {error, any()}.
+-spec getopt(Handle::connection_handler()
+                   | stream_handler()
+                   | listener_handler(),
+             Optname::atom(), IsRaw::boolean())
+            -> {ok, OptVal::any()} | {error, any()}.
 getopt(Handle, Opt, IsRaw) ->
   quicer_nif:getopt(Handle, Opt, IsRaw).
 
@@ -296,10 +350,10 @@ setopt(Handle, Opt, Value) when is_list(Value) ->
 setopt(Handle, Opt, Value) ->
   quicer_nif:setopt(Handle, Opt, Value).
 
--spec get_stream_id(Stream::stream_handler()) -> {ok, integer()} | {error, any()}.
+-spec get_stream_id(Stream::stream_handler()) ->
+        {ok, integer()} | {error, any()}.
 get_stream_id(Stream) ->
   quicer_nif:getopt(Stream, param_stream_id, false).
-
 
 -spec getstat(connection_handler(), [inet:stat_option()]) ->
         {ok, list()} | {error, any()}.
@@ -321,24 +375,30 @@ getstat(Conn, Cnts) ->
 peername(Handle) ->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
 
--spec get_conn_rid(connection_handler()) -> {ok, non_neg_integer()} | {error, any()}.
+-spec get_conn_rid(connection_handler()) ->
+        {ok, non_neg_integer()} | {error, any()}.
 get_conn_rid(Conn) ->
   quicer_nif:get_conn_rid(Conn).
 
--spec get_stream_rid(stream_handler()) -> {ok, non_neg_integer()} | {error, any()}.
+-spec get_stream_rid(stream_handler()) ->
+        {ok, non_neg_integer()} | {error, any()}.
 get_stream_rid(Stream) ->
   quicer_nif:get_stream_rid(Stream).
 
--spec listeners() ->  [{{quicer_listener:listener_name(), quicer_listener:listen_on()}, pid()}].
+-spec listeners() -> [{{ quicer_listener:listener_name()
+                       , quicer_listener:listen_on()},
+                       pid()}].
 listeners() ->
   quicer_listener_sup:listeners().
 
 -spec listener(quicer_listener:listener_name()
-              | {quicer_listener:listener_name(), quicer_listener:listen_on()}) -> pid().
+              | {quicer_listener:listener_name(),
+                 quicer_listener:listen_on()}) -> pid().
 listener(Name) ->
   quicer_listener_sup:listener(Name).
 
--spec controlling_process(stream_handler() | connection_handler(), pid()) -> ok | {error, any()}.
+-spec controlling_process(stream_handler() | connection_handler(),
+                          pid()) -> ok | {error, any()}.
 controlling_process(Handler, Pid) ->
   quicer_nif:controlling_process(Handler, Pid).
 
@@ -356,10 +416,10 @@ stats_map(send_pend) ->
 stats_map(_) ->
   undefined.
 
-default_stream_opts()->
+default_stream_opts() ->
   #{active => true}.
 
-default_conn_opts()->
+default_conn_opts() ->
   #{ peer_bidi_stream_count => 1
    , peer_unidi_stream_count => 1
    }.

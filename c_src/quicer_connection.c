@@ -133,6 +133,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
+  TP_CB_3(event, Connection, Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -150,6 +151,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                                       ATOM_CONNECTED,
                                       enif_make_resource(env, c_ctx))))
         {
+          TP_CB_3(app_down, Connection, Event->Type);
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_INTERNAL_ERROR;
         }
@@ -281,6 +283,7 @@ ServerConnectionCallback(HQUIC Connection,
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
+  TP_CB_3(event, Connection, Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -361,6 +364,9 @@ ServerConnectionCallback(HQUIC Connection,
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
+      TP_CB_3(shutdown_complete,
+              Connection,
+              Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
       report = enif_make_tuple3(
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
@@ -587,12 +593,23 @@ async_accept2(ErlNifEnv *env,
 
 //@todo,  shutdown with error
 ERL_NIF_TERM
-close_connection1(ErlNifEnv *env,
+close_connection3(ErlNifEnv *env,
                   __unused_parm__ int argc,
                   const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
+  uint32_t app_errcode = 0, flags = 0;
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_uint(env, argv[1], &flags))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_uint(env, argv[2], &app_errcode))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -600,10 +617,7 @@ close_connection1(ErlNifEnv *env,
   if (!c_ctx->is_closed)
     {
       c_ctx->is_closed = TRUE;
-      MsQuic->ConnectionShutdown(c_ctx->Connection,
-                                 //@todo, check rfc for the error code
-                                 QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                 0);
+      MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
     }
   enif_mutex_unlock(c_ctx->lock);
   return ATOM_OK;

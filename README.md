@@ -169,13 +169,20 @@ quicer:connection(Hostname, Port, Options, Timeout) ->
   {ok, Connection} | {error, any()} | {error, any(), ErrorCode::integer()}.
 ```
 
-### close_connection
+### Close_connection
 
 ``` erlang
 quicer:close_connection(Connection) -> ok.
+quicer:close_connection(Connection, Timeout) -> ok.
+quicer:close_connection(Connection, Flag, Reason) -> ok.
+quicer:close_connection(Connection, Flag, Reason, Timeout) -> ok.
+
+Flag :: ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE | ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
 ```
 
-Gracefully Shutdown connection.
+Shutdown connection with app specific reason, it also implicitly shuts down the streams.
+
+`QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT` is used for lowmem scenarios without sending a connection_close frame to the peer.
 
 ## Stream API
 
@@ -253,10 +260,15 @@ note, the requested Len cannot exceeed the stream recv window size of connection
 ### Shutdown stream
 
 ``` erlang
-quicer:close_stream(Stream) -> ok.
+quicer:close_stream(Stream) -> ok | {error, any()}.
+quicer:close_stream(Stream, Timeout) -> ok | {error, any()}.
+quicer:close_stream(Stream, Flags, Reason, Timeout) -> ok | {error, any()}.
 ```
+Shutdown stream with an app specific reason (integer) indicate to the peer as the reason for the shutdown.
 
-Shutdown stream gracefully.
+Use flags to control of the behavior of shutdown, check ?QUIC_STREAM_SHUTDOWN_FLAG_* in =quicer.hrl= for more.
+
+note, could return error if wrong combination of flags are set.
 
 ### Get/Set Connection/Stream Opts
 

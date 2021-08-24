@@ -30,7 +30,9 @@
 -record(state, { listener :: quicer:listener_handler()
                , sup :: pid()
                , conn = undefined
-               , opts :: {quicer_listener:listener_opts(), conn_opts(), quicer_steam:stream_opts()}
+               , opts :: {quicer_listener:listener_opts(),
+                          conn_opts(),
+                          quicer_steam:stream_opts()}
                , callback :: module()
                , callback_state :: map()
                , slow_start :: boolean()
@@ -78,7 +80,7 @@ init([Listener, {_, #{conn_callback := CallbackModule} = COpts, SOpts} = Opts, S
     {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
     {ok, #state{ listener = Listener
                , callback = CallbackModule
-               , callback_state = CallbackModule:init(COpts#{stream_opts => SOpts} )
+               , callback_state = CallbackModule:init(COpts#{stream_opts => SOpts})
                , opts = Opts
                , slow_start = not maps:get(fast_conn, COpts, false)
                , sup = Sup}}.
@@ -127,7 +129,8 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info({quic, new_conn, C}, #state{callback = M, sup = Sup, callback_state = CBState} = State) ->
+handle_info({quic, new_conn, C},
+            #state{callback = M, sup = Sup, callback_state = CBState} = State) ->
     ?tp(quic_new_conn, #{module=>?MODULE, conn=>C}),
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
@@ -173,6 +176,7 @@ handle_info({quic, shutdown, C}, #state{conn = C, callback = M,
 
 handle_info({quic, closed, C}, #state{conn = C} = State) ->
     %% @todo, connection closed
+    ?tp(quic_closed, #{module=>?MODULE}),
     {stop, normal, State}.
 
 %%--------------------------------------------------------------------

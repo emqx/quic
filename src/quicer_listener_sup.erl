@@ -71,7 +71,7 @@ listeners() ->
 -spec listener(atom() | {atom(), integer()|string()}) -> pid().
 listener({Name, _ListenOn}) when is_atom(Name) ->
     listener(Name);
-listener(Name) when is_atom(Name)->
+listener(Name) when is_atom(Name) ->
     [Target] = lists:filtermap(
                  fun({?CHILD_ID(Id), Child, _Type, _Modules}) when Id =:= Name ->
                          {true, Child};
@@ -105,7 +105,7 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-chid_spec(AppName, ListenOn, Options)->
+chid_spec(AppName, ListenOn, Options) ->
     #{ id => ?CHILD_ID(AppName)
      , start => {quicer_listener, start_link, [AppName, ListenOn, Options]}
      , restart => transient

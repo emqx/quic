@@ -105,6 +105,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // The peer aborted its send direction of the stream.
       //
+      TP_CB_3(peer_send_aborted, Stream, Event->PEER_SEND_ABORTED.ErrorCode);
       report = enif_make_tuple4(
           env,
           ATOM_QUIC,
@@ -593,14 +594,26 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
-close_stream1(ErlNifEnv *env,
+close_stream3(ErlNifEnv *env,
               __unused_parm__ int argc,
               const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
   QuicerStreamCTX *s_ctx;
+  uint32_t app_errcode = 0, flags = 0;
   if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  // only check type, actual flag will be validated by msquic
+  if (!enif_get_uint(env, argv[1], &flags))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_uint(env, argv[2], &app_errcode))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -610,9 +623,8 @@ close_stream1(ErlNifEnv *env,
   enif_keep_resource(s_ctx);
   if (!s_ctx->is_closed)
     {
-      if (QUIC_FAILED(
-              Status = MsQuic->StreamShutdown(
-                  s_ctx->Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0)))
+      if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
+                          s_ctx->Stream, flags, app_errcode)))
         {
           ret = ERROR_TUPLE_2(ETERM_INT(Status));
         }

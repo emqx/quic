@@ -35,7 +35,7 @@ ERL_NIF_TERM send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
-close_stream1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+close_stream3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_STREAM_CALLBACK) QUIC_STATUS QUIC_API

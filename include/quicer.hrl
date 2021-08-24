@@ -14,6 +14,8 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
+-ifndef(QUICER_HRL).
+-define(QUICER_HRL, true).
 
 %%% ========================================
 %%% mirror macro from NIF code
@@ -51,3 +53,18 @@
 -define(QUIC_CONNECTION_EVENT_RESUMED                           , 13).
 -define(QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED        , 14).
 -define(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED         , 15).
+
+
+%% STREAM SHUTDOWN FLAGS
+-define(QUIC_STREAM_SHUTDOWN_FLAG_NONE          , 0).
+-define(QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL      , 1).   % Cleanly closes the send path.
+-define(QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND    , 2).   % Abruptly closes the send path.
+-define(QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE , 4).   % Abruptly closes the receive path.
+-define(QUIC_STREAM_SHUTDOWN_FLAG_ABORT         , 6).   % Abruptly closes both send and receive paths.
+-define(QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE     , 8).
+
+
+%% CONNECTED SHUTDOWN FLAGS
+-define(QUIC_CONNECTION_SHUTDOWN_FLAG_NONE      , 0).
+-define(QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT    , 1).
+-endif. %% QUICER_HRL
