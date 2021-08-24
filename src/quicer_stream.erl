@@ -164,7 +164,8 @@ handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
     ?tp(inval_stream_data, #{module=>?MODULE, stream_a=>StreamA, stream_b => StreamB}),
     {stop, wrong_stream, State};
 
-handle_info({quic, peer_send_aborted, Stream, Reason}, #state{stream = Stream, opts = Options} = State) ->
+handle_info({quic, peer_send_aborted, Stream, Reason},
+            #state{stream = Stream, opts = Options} = State) ->
     ?tp(peer_send_aborted, #{module=>?MODULE, stream=>Stream, reason=>Reason}),
     #{stream_callback := CallbackModule} = Options,
     case erlang:function_exported(CallbackModule, peer_send_aborted, 3) of
@@ -175,7 +176,8 @@ handle_info({quic, peer_send_aborted, Stream, Reason}, #state{stream = Stream, o
             {noreply, State}
     end;
 
-handle_info({quic, peer_send_shutdown, Stream}, #state{stream = Stream, opts = Options} = State) ->
+handle_info({quic, peer_send_shutdown, Stream},
+            #state{stream = Stream, opts = Options} = State) ->
     ?tp(peer_shutdown, #{module=>?MODULE, stream=>Stream}),
     #{stream_callback := CallbackModule} = Options,
     CallbackModule:shutdown(Stream),
@@ -229,16 +231,16 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-error_code(normal)->
+error_code(normal) ->
     'QUIC_ERROR_NO_ERROR';
-error_code(shutdown)->
+error_code(shutdown) ->
     'QUIC_ERROR_NO_ERROR';
-error_code(_)->
+error_code(_) ->
     %% @todo mapping errors to error code
     %% for closing stream
     'QUIC_ERROR_INTERNAL_ERROR'.
 
-maybe_log_stracetrace(ST)->
+maybe_log_stracetrace(ST) ->
     logger:error("~p~n", [ST]),
     ok.
 
