@@ -66,9 +66,9 @@
         , stop_listener/1
         ]).
 
--type listener_handler() :: reference().
--type connection_handler() :: reference().
--type stream_handler() :: reference().
+-type listener_handler()   :: quicer_nif:listener_handler().
+-type connection_handler() :: quicer_nif:connection_handler().
+-type stream_handler()     :: quicer_nif:handler().
 
 -type stream_opts() :: proplists:proplist() | quicer_stream:stream_opts().
 -type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().

@@ -231,7 +231,7 @@ quicer:async_send(Stream, BinaryData) ->
 If the stream option `active` is set to `true`, stream data will be delivered to the stream owner's process message queue as following format
 
 ``` erlang
-{quic, Data, Stream, AbsOffset,  Length, Flag}
+{quic, Data, Stream, AbsOffset, Length, Flag}
 when ->
   Data::binary(),
   Stream::stream_handler(),
