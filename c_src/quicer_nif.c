@@ -168,6 +168,8 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET;
 // Parameters for QUIC_PARAM_LEVEL_TLS.
 //
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
+ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO;
+ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_STREAM.
@@ -356,6 +358,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
        param_global_load_balacing_mode);                                      \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, param_global_perf_counters);     \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, param_global_settings);               \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, param_global_version);                 \
                                                                               \
   /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
   ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \

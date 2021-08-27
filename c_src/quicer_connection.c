@@ -662,7 +662,8 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status
                   = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
     {
-      return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR); // @TODO is this err useful? use atom_status instead?
+      return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR); // @TODO is this err useful?
+                                                 // use atom_status instead?
     }
 
   return SUCCESS(addr2eterm(env, &addr));
