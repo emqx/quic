@@ -942,7 +942,7 @@ tc_idle_timeout(Config) ->
       {ok, Stm0} = quicer:start_stream(Conn, []),
       {ok, 5} = quicer:send(Stm0, <<"ping0">>),
       timer:sleep(5000),
-      {error, stm_open_error, 22} = quicer:start_stream(Conn, []),
+      {error, stm_open_error, invalid_parameter} = quicer:start_stream(Conn, []),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   end.

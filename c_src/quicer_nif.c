@@ -124,6 +124,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SETTINGS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_VERSION;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
@@ -408,7 +409,13 @@ ERL_NIF_TERM ATOM_FAST_CONN;
                                                                               \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
        param_tls_schannel_context_attribute_w);                               \
-                                                                              \
+                                                                        \
+  ATOM(ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO,                      \
+       param_tls_handshake_info);                               \
+                                                                \
+  ATOM(ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN,                      \
+       param_tls_negotiated_alpn);                               \
+                                                  \
   /*  Parameters for QUIC_PARAM_LEVEL_STREAM.  */                             \
                                                                               \
   ATOM(ATOM_QUIC_PARAM_STREAM_ID, param_stream_id);                           \
