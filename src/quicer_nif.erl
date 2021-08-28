@@ -93,9 +93,9 @@
         %% /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */|
         param_conn_quic_version                   |           %% |  X  |    |
         param_conn_local_address                  |           %% |  X  |    | @TODO
-        param_conn_remote_address                 |           %% |  X  |  X | @TODO
+        param_conn_remote_address                 |           %% |  X  |  X | @TODO SET
         param_conn_ideal_processor                |           %% |  X  |    | @TODO
-        param_conn_settings                       |           %% |  X  |  X | @TODO
+        param_conn_settings                       |           %% |  X  |  X |
         param_conn_statistics                     |           %% |  X  |    |
         param_conn_statistics_plat                |           %% |  X  |    | @TODO
         param_conn_share_udp_binding              |           %% |  X  |  X | @TODO
@@ -118,7 +118,7 @@
 -type optname_stream() ::
         active                                    |           %% |  X  |  X | @TODO GET
         controlling_process                       |           %% |     |    | @TODO GET SET
-        param_stream_id                           |           %% |     |  X | @TODO
+        param_stream_id                           |           %% |     |  X |
         param_stream_0rtt_length                  |           %% |  X  |    | @TODO
         param_stream_ideal_send_buffer_size.                  %% |  X  |    | @TODO
 
@@ -130,11 +130,11 @@
         param_global_settings             |                   %% |  X  | X  | @TODO
         param_global_version.                                 %% |  X  |    | @TODO
 
--type optname_reg() :: param_registration_cid_prefix.        %% |  X  |  X  | @TODO
+-type optname_reg() :: param_registration_cid_prefix.         %% |  X  | X  | @TODO
 
--type optname_configuration() ::                             %% with config_handler()
-        param_configuration_settings        |                %% |  X  |  X  | @TODO
-        param_configuration_ticket_keys.                     %% |     |  X  | @TODO
+-type optname_configuration() ::                              %% with config_handler()
+        param_configuration_settings        |                 %% |  X  | X  | @TODO
+        param_configuration_ticket_keys.                      %% |     | X  | @TODO
 
 -type conn_settings() :: [{conn_settings_key(), non_neg_integer()}].
 -type conn_settings_key() ::

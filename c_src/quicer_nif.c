@@ -163,6 +163,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
 
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_TLS.
@@ -401,7 +402,8 @@ ERL_NIF_TERM ATOM_FAST_CONN;
        param_conn_disable_1rtt_encryption);                                   \
                                                                               \
   ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, param_conn_resumption_ticket); \
-                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID,                           \
+       param_conn_peer_certificate_valid);                                    \
   /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
                                                                               \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
