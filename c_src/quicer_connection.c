@@ -249,6 +249,16 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       is_destroy = TRUE;
       break;
+    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
+      // @TODO
+      break;
+    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
+      // @TODO
+      // UpdateMaxStreams
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
+      // @TODO
+      break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
       //
       // A resumption ticket (also called New Session Ticket or NST) was
@@ -256,6 +266,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       //
       // @todo
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+      // @TODO
+      // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
       break;
     default:
       break;
