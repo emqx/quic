@@ -685,7 +685,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
     {
       isLibOpened = false;
-      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ETERM_INT(status));
+      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, atom_status(status));
     }
 
   isLibOpened = true;

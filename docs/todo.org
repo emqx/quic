@@ -1,0 +1,25 @@
+#+TITLE: TODO LISTS
+#+OPTIONS: toc:2
+#+OPTIONS: ^:nil
+
+* Features List
+Feature todo list, priority descending
+
+** Stream send iolist
+
+** Stream send flags
+
+** Unintentional Transport Migration
+
+** NIF Segfault recover
+
+** Stream unidirectional/bidirectional awareness
+
+** Different Application Profile (low latency, high throughput)
+
+** NIF Upgrade
+
+** 0RTT support
+
+** Secure Datagrams [DRAFT]
+https://tools.ietf.org/html/draft-ietf-quic-datagram
