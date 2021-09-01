@@ -499,4 +499,71 @@ Or use quicer:recv/2 to receive in passive mode
 {quic, passive, stream_handler()}
 #+end_src
 
+** Messages to Connection Owner
+
+*** Connection connected
+
+#+begin_src erlang
+{quic, connected, connection_handler()}
+#+end_src
+
+This message notifies the connection owner that quic connection is established(TLS handshake is done).
+
+also see [[Accept New Connection (Server)]]
+
+
+*** New Stream Started
+
+#+begin_src erlang
+{quic, new_stream, stream_handler()} %% @TODO, it should carry connection_handler() as well
+#+end_src
+
+This message is sent to notify the process which is accpeting new stream.
+
+The process become the owner of the stream.
+
+also see [[Accept Stream (Server)]]
+
+*** Transport Shutdown
+
+Connection has been shutdown by the transport locally, such as idle timeout.
+
+#+begin_src erlang
+{quic, trans_shutdown, connection_handler(), Status :: atom_status()}
+#+end_src
+
+*** Shutdown initiated by PEER
+
+Peer side initiated connection shutdown.
+
+#+begin_src erlang
+{quic, shutdown, connection_handler()}
+#+end_src
+
+*** Shutdown Complete
+
+The connection has completed the shutdown process and is ready to be
+safely cleaned up.
+
+#+begin_src erlang
+{quic, closed, connection_handler()}
+#+end_src
+
+** Messages to Listener Owner
+
+*** New connection
+
+#+begin_src erlang
+{quic, new_conn, connection_handler()}
+#+end_src
+
+This message is sent to the process who is accepting new connections.
+
+The process becomes the connection owner.
+
+To complete the TLS handshake, quicer:handshake/1,2 should be called.
+
+also see
+  [[TLS Handshake (Server)]]
+
 * TODO Upgrade
