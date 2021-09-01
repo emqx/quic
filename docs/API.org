@@ -428,4 +428,75 @@ Change the owner process of connection/stream
         {error, badarg | owner_dead | not_owner}.
 #+end_src
 
+
+* Erlang Messges
+
+Since most of API calls are asynchronous, the API caller or the stream/connection owner can receive
+async messages as following
+
+** Messages to Stream Owner
+
+*** active received data
+
+Data received in binary format
+
+#+begin_src erlang
+{quic, binary(), stream_handler(), AbsoluteOffset::integer(), TotalBufferLength::integer(), Flag :: integer()}
+#+end_src
+
+*** peer_send_shutdown
+
+#+begin_src erlang
+{quic, peer_send_shutdown, stream_handler(), ErrorCode}
+#+end_src
+
+*** peer_send_aborted
+
+#+begin_src erlang
+{quic, peer_send_aborted, stream_handler(), ErrorCode}
+#+end_src
+
+*** stream closed, shutdown_completed,
+
+Both directions of the stream have been shut down.
+
+#+begin_src erlang
+{quic, closed, stream_handler(), IsGraceFul:: 0 | 1}
+#+end_src
+
+*** send_complete
+
+Send call is handled by stack, caller is ok to release the sndbuffer
+
+This message is for sync send only.
+
+#+begin_src erlang
+{quic, send_complete, stream_handler(), IsSendCanceled :: 0 | 1}
+#+end_src
+
+
+*** continue recv
+
+This is for passive recv only, this is used to notify
+caller that new data is ready in recv buffer. The data in the recv buffer
+will be pulled by NIF function instead of by sending the erlang messages
+
+see usage in: quicer:recv/2
+
+#+begin_src erlang
+{quic, continue, stream_handler()}
+#+end_src
+
+*** passive mode
+
+Running out of *active_n*, stream now is in passive mode.
+
+Need to call setopt active_n to make it back to passive mode again
+
+Or use quicer:recv/2 to receive in passive mode
+
+#+begin_src erlang
+{quic, passive, stream_handler()}
+#+end_src
+
 * TODO Upgrade
