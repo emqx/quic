@@ -9,6 +9,7 @@ Project Status: WIP (actively), POC quality
 API: is not stable, might be changed in the future.
 
 ![CI](https://github.com/emqx/quic/workflows/ci/badge.svg)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # OS Support
 | OS      | Status    |
@@ -51,8 +52,8 @@ make
 ## Without DEBUG
 
 ``` sh
-$ git submodule update --init --recursive
-$ cmake -B c_build -DCMAKE_BUILD_TYPE=Release -DQUIC_ENABLE_LOGGING=OFF && make 
+export CMAKE_BUILD_TYPE=Release
+make
 ```
 
 # Examples
@@ -99,6 +100,7 @@ $ make test
 # Documentation
 
 [API DOC](./docs/API.org)
+
 [TODO LIST](./docs/todo.org)
 
 # License
