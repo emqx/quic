@@ -20,7 +20,30 @@
 -include("quicer.hrl").
 
 %% Msquic Status Code Translation
--type atom_reason() :: atom().
+-type atom_reason() ::
+        success             |
+        pending             |
+        continue            |
+        out_of_memory       |
+        invalid_parameter   |
+        invalid_state       |
+        not_supported       |
+        not_found           |
+        buffer_too_small    |
+        handshake_failure   |
+        aborted             |
+        address_in_use      |
+        connection_timeout  |
+        connection_idle     |
+        internal_error      |
+        connection_refused  |
+        protocol_error      |
+        ver_neg_error       |
+        unreachable         |
+        tls_error           |
+        user_canceled       |
+        alpn_neg_failure.
+
 -type app_errno() :: non_neg_integer().
 -type hostname() :: string().
 
