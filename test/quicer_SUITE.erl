@@ -156,14 +156,14 @@ init_per_testcase(_TestCase, Config) ->
   Config.
 
 end_per_testcase(tc_close_lib_test, _Config) ->
-  quicer_nif:open_lib();
+  quicer:open_lib();
 end_per_testcase(tc_lib_registration, _Config) ->
-  quicer_nif:reg_open();
+  quicer:reg_open();
 end_per_testcase(tc_lib_re_registration, _Config) ->
-  quicer_nif:reg_open();
+  quicer:reg_open();
 end_per_testcase(tc_open_listener_neg_1, _Config) ->
-  quicer_nif:open_lib(),
-  quicer_nif:reg_open();
+  quicer:open_lib(),
+  quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   quicer:stop_listener(mqtt),
   ok.
@@ -179,41 +179,41 @@ tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
 
 tc_open_lib_test(_Config) ->
-  {ok, false} = quicer_nif:open_lib(),
+  {ok, false} = quicer:open_lib(),
   %% verify that reopen lib success.
-  {ok, false} = quicer_nif:open_lib().
+  {ok, false} = quicer:open_lib().
 
 tc_close_lib_test(_Config) ->
-  {ok, false} = quicer_nif:open_lib(),
+  {ok, false} = quicer:open_lib(),
   %% @todo  close reg before close lib
-  ok = quicer_nif:reg_close(),
-  ok = quicer_nif:close_lib(),
-  ok = quicer_nif:close_lib(),
-  {ok, Res0} = quicer_nif:open_lib(),
+  ok = quicer:reg_close(),
+  ok = quicer:close_lib(),
+  ok = quicer:close_lib(),
+  {ok, Res0} = quicer:open_lib(),
   ?assert(Res0 == true orelse Res0 == debug).
 
 tc_lib_registration(_Config) ->
-  ok = quicer_nif:reg_open(),
-  ok = quicer_nif:reg_close().
+  ok = quicer:reg_open(),
+  ok = quicer:reg_close().
 
 tc_open_listener_neg_1(Config) ->
   Port = 4567,
-  ok = quicer_nif:reg_close(),
-  ok = quicer_nif:close_lib(),
+  ok = quicer:reg_close(),
+  ok = quicer:close_lib(),
   {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
   ok.
 
 tc_open_listener_neg_2(Config) ->
-  {error, badarg} = quicer_nif:listen("localhost:4567", default_listen_opts(Config)),
+  {error, badarg} = quicer:listen("localhost:4567", default_listen_opts(Config)),
   %% following test should fail, but msquic has some hack to let it pass, ref: MsQuicListenerStart in msquic listener.c
-  %% {error, badarg} = quicer_nif:listen("8.8.8.8:4567", default_listen_opts(Config)),
+  %% {error, badarg} = quicer:listen("8.8.8.8:4567", default_listen_opts(Config)),
   ok.
 
 tc_lib_re_registration(_Config) ->
-  ok = quicer_nif:reg_open(),
-  ok = quicer_nif:reg_open(),
-  ok = quicer_nif:reg_close(),
-  ok = quicer_nif:reg_close().
+  ok = quicer:reg_open(),
+  ok = quicer:reg_open(),
+  ok = quicer:reg_close(),
+  ok = quicer:reg_close().
 
 tc_open_listener(Config) ->
   Port = 4567,
@@ -942,7 +942,7 @@ tc_idle_timeout(Config) ->
       {ok, Stm0} = quicer:start_stream(Conn, []),
       {ok, 5} = quicer:send(Stm0, <<"ping0">>),
       timer:sleep(5000),
-      {error, stm_open_error, 22} = quicer:start_stream(Conn, []),
+      {error, stm_open_error, invalid_parameter} = quicer:start_stream(Conn, []),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   end.

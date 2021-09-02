@@ -17,8 +17,19 @@
 -module(quicer).
 
 -include("quicer.hrl").
+-include("quicer_types.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
+
+%% Library APIs
+-export([ open_lib/0
+        , close_lib/0
+        , reg_open/0
+        , reg_close/0
+        ]
+       ).
+
+%% Traffic APIs
 -export([ listen/2
         , close_listener/1
         , connect/4
@@ -27,6 +38,7 @@
         , async_handshake/1
         , accept/2
         , accept/3
+        , async_accept/2
         , close_connection/1
         , close_connection/2
         , close_connection/3
@@ -66,19 +78,30 @@
         , stop_listener/1
         ]).
 
--type listener_handler() :: reference().
--type connection_handler() :: reference().
--type stream_handler() :: reference().
-
--type stream_opts() :: proplists:proplist() | quicer_stream:stream_opts().
 -type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().
 -type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
 
--type stream_shutdown_flags() :: non_neg_integer().
--type conn_shutdown_flags() :: non_neg_integer().
--type reason_int() :: non_neg_integer().
+-spec open_lib() ->
+        {ok, true}  | %% opened
+        {ok, false} | %% already opened
+        {ok, debug} | %% opened with lttng debug library loaded (if present)
+        {error, open_failed, atom_reason()}.
+open_lib() ->
+  quicer_nif:open_lib().
 
--spec start_listener(atom(), inet:port_number(),
+-spec close_lib() -> ok.
+close_lib() ->
+  quicer_nif:close_lib().
+
+-spec reg_open() -> ok.
+reg_open() ->
+  quicer_nif:reg_open().
+
+-spec reg_close() -> ok.
+reg_close() ->
+  quicer_nif:reg_close().
+
+-spec start_listener(Appname :: atom(), listen_on(),
                      {listener_opts(), connection_opts(), stream_opts()}) ->
         {ok, pid()} | {error, any()}.
 start_listener(AppName, Port, Options) ->
@@ -88,8 +111,10 @@ start_listener(AppName, Port, Options) ->
 stop_listener(AppName) ->
   quicer_listener:stop_listener(AppName).
 
--spec listen(quicer_listener:listen_on(), proplists:proplists() | map()) ->
-        {ok, listener_handler()} | {error, any()}.
+-spec listen(listen_on(), listen_opts()) ->
+        {ok, listener_handler()} |
+        {error, listener_open_error,  atom_reason()} |
+        {error, listener_start_error, atom_reason()}.
 listen(ListenOn, Opts) when is_list(Opts) ->
   listen(ListenOn, maps:from_list(Opts));
 listen(ListenOn, Opts) when is_map(Opts) ->
@@ -100,21 +125,27 @@ close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
 -spec connect(inet:hostname() | inet:ip_address(),
-              inet:port_number(), proplists:proplists() | map(), timeout()) ->
-        {ok, connection_handler()} | {error, any(), integer()}.
+              inet:port_number(), conn_opts(), timeout()) ->
+          {ok, connection_handler()} |
+          {error, conn_open_error | config_error | conn_start_error} |
+          {error, timeout}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
   connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
   connect(inet:ntoa(Host), Port, Opts, Timeout);
-connect(Host, Port, Opts, _Timeout) when is_map(Opts) ->
+connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   NewOpts = maps:merge(default_conn_opts(), Opts),
   case quicer_nif:async_connect(Host, Port, NewOpts) of
-    {ok, _H} ->
+    {ok, H} ->
       receive
         {quic, connected, Ctx} ->
           {ok, Ctx};
         {quic, transport_shutdown, _, Reason} ->
           {error, transport_down, Reason}
+      after Timeout ->
+          %% @TODO caller should provide the method to handle timeout
+          async_close_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
+          {error, timeout}
       end;
     {error, _} = Err ->
       Err
@@ -140,13 +171,15 @@ handshake(Conn, Timeout) ->
 async_handshake(Conn) ->
   quicer_nif:async_handshake(Conn).
 
--spec accept(listener_handler(), proplists:proplists() | map()) ->
+-spec accept(listener_handler(), acceptor_opts()) ->
         {ok, connection_handler()} | {error, any()}.
 accept(LSock, Opts) ->
   accept(LSock, Opts, infinity).
 
--spec accept(listener_handler(), proplists:proplists() | map(), timeout()) ->
-        {ok, connection_handler()} | {error, any()}.
+-spec accept(listener_handler(), acceptor_opts(), timer:timeout()) ->
+        {ok, connection_handler()} |
+        {error, badarg | parm_error | not_enough_mem | badpid} |
+        {error, timeout}.
 accept(LSock, Opts, Timeout) when is_list(Opts) ->
   accept(LSock, maps:from_list(Opts), Timeout);
 accept(LSock, Opts, Timeout) ->
@@ -162,6 +195,12 @@ accept(LSock, Opts, Timeout) ->
     {error, timeout}
   end.
 
+-spec async_accept(listener_handler(), acceptor_opts()) ->
+        {ok, listener_handler()} |
+        {error, badarg | parm_error | not_enough_mem | badpid}.
+async_accept(Listener, Opts) ->
+  quicer_nif:async_accept(Listener, Opts).
+
 -spec close_connection(connection_handler()) -> ok.
 close_connection(Conn) ->
   close_connection(Conn, 5000).
@@ -171,15 +210,15 @@ close_connection(Conn, Timeout) ->
   close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
 
 -spec close_connection(connection_handler(),
-                       conn_shutdown_flags(),
-                       reason_int()
+                       conn_close_flag(),
+                       app_errno()
                       ) -> ok.
 close_connection(Conn, Flags, ErrorCode) ->
   close_connection(Conn, Flags, ErrorCode, 5000).
 
 -spec close_connection(connection_handler(),
-                       conn_shutdown_flags(),
-                       reason_int(),
+                       conn_close_flag(),
+                       app_errno(),
                        timer:timeout()) -> ok.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
   ok = async_close_connection(Conn, Flags, ErrorCode),
@@ -196,15 +235,22 @@ async_close_connection(Conn) ->
   quicer_nif:async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
 
 -spec async_close_connection(connection_handler(),
-                             conn_shutdown_flags(),
-                             reason_int()) -> ok.
+                             conn_close_flag(),
+                             app_errno()) -> ok.
 async_close_connection(Conn, Flags, ErrorCode) ->
   quicer_nif:async_close_connection(Conn, Flags, ErrorCode).
 
 -spec accept_stream(connection_handler(), stream_opts()) ->
-        {ok, stream_handler()} | {error, any()}.
+        {ok, stream_handler()} |
+        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {erro, timeout}.
 accept_stream(Conn, Opts) ->
   accept_stream(Conn, Opts, infinity).
+
+-spec accept_stream(connection_handler(), stream_opts(), timeout()) ->
+        {ok, stream_handler()} |
+        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {erro, timeout}.
 accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
   accept_stream(Conn, maps:from_list(Opts), Timeout);
 accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
@@ -230,16 +276,21 @@ async_accept_stream(Conn, Opts) when is_list(Opts) ->
 async_accept_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
--spec start_stream(connection_handler(), proplists:proplists() | map()) ->
-        {ok, stream_handler()} | {error, any()}.
+-spec start_stream(connection_handler(), stream_opts()) ->
+        {ok, stream_handler()} |
+        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {error, stream_open_error, atom_reason()} |
+        {error, stream_start_error, atom_reason()}.
 start_stream(Conn, Opts) when is_list(Opts) ->
   start_stream(Conn, maps:from_list(Opts));
 start_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 
--spec send(stream_handler(), Data :: binary()) ->
-        {ok, Len :: integer()} | {error, any(), integer()}.
+-spec send(stream_handler(), binary()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, badarg | not_enough_mem | closed} |
+        {error, stream_send_error, atom_reason()}.
 send(Stream, Data) ->
   case quicer_nif:send(Stream, Data, _IsSync = 1) of
     %% @todo make ref
@@ -252,8 +303,10 @@ send(Stream, Data) ->
       E
   end.
 
--spec async_send(stream_handler(), Data :: binary()) ->
-        {ok, Len :: integer()} | {error, any()}.
+-spec async_send(stream_handler(), binary()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, badarg | not_enough_mem | closed} |
+        {error, stream_send_error, atom_reason()}.
 async_send(Stream, Data) ->
   quicer_nif:send(Stream, Data, _IsSync = 0).
 
@@ -291,15 +344,19 @@ do_recv(Stream, Count) ->
 close_stream(Stream) ->
   close_stream(Stream, infinity).
 
--spec close_stream(stream_handler(), timer:timeout()) -> ok | {error, any()}.
+-spec close_stream(stream_handler(), timer:timeout()) ->
+        ok |
+        {error, badarg | atom_reason()} |
+        {error, timeout}.
 close_stream(Stream, Timeout) ->
   close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
 
 -spec close_stream(stream_handler(),
-                   stream_shutdown_flags(),
-                   reason_int(),
+                   stream_close_flags(),
+                   app_errno(),
                    time:timeout()) ->
-        ok | {error, any()}.
+        {error, badarg | atom_reason()} |
+        {error, timeout}.
 close_stream(Stream, Flags, ErrorCode, Timeout) ->
   case async_close_stream(Stream, Flags, ErrorCode) of
     ok ->
@@ -313,14 +370,16 @@ close_stream(Stream, Flags, ErrorCode, Timeout) ->
       Err
   end.
 
--spec async_close_stream(stream_handler()) -> ok | {error, any()}.
+-spec async_close_stream(stream_handler()) ->
+        ok |
+        {error, badarg | atom_reason()}.
 async_close_stream(Stream) ->
   quicer_nif:async_close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
 
 -spec async_close_stream(stream_handler(),
-                         stream_shutdown_flags(),
-                         reason_int())
-                        -> ok | {error, any()}.
+                         stream_close_flags(),
+                         app_errno())
+                        -> ok | {error, badarg | atom_reason()}.
 async_close_stream(Stream, Flags, Reason) ->
   quicer_nif:async_close_stream(Stream, Flags, Reason).
 
@@ -332,19 +391,23 @@ sockname(Conn) ->
 -spec getopt(Handle::connection_handler()
                    | stream_handler()
                    | listener_handler(),
-             Optname::atom()) ->
+             optname()) ->
         {ok, OptVal::any()} | {error, any()}.
 getopt(Handle, Opt) ->
   quicer_nif:getopt(Handle, Opt, true).
 
--spec getopt(Handle::connection_handler()
-                   | stream_handler()
-                   | listener_handler(),
-             Optname::atom(), IsRaw::boolean())
-            -> {ok, OptVal::any()} | {error, any()}.
+-spec getopt(handler(), optname(), boolean()) ->
+        {ok, binary()} | %% when IsRaw
+        {ok, conn_settings()}   | %% when optname = param_conn_settings
+        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, atom_reason()}.
 getopt(Handle, Opt, IsRaw) ->
   quicer_nif:getopt(Handle, Opt, IsRaw).
 
+-spec setopt(handler(), optname(), any()) ->
+        ok |
+        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, atom_reason()}.
 setopt(Handle, Opt, Value) when is_list(Value) ->
   setopt(Handle, Opt, maps:from_list(Value));
 setopt(Handle, Opt, Value) ->
@@ -397,8 +460,9 @@ listeners() ->
 listener(Name) ->
   quicer_listener_sup:listener(Name).
 
--spec controlling_process(stream_handler() | connection_handler(),
-                          pid()) -> ok | {error, any()}.
+-spec controlling_process(connection_handler() | stream_handler(), pid()) ->
+        ok |
+        {error, badarg | owner_dead | not_owner}.
 controlling_process(Handler, Pid) ->
   quicer_nif:controlling_process(Handler, Pid).
 

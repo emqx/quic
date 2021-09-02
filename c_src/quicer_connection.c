@@ -249,6 +249,16 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       is_destroy = TRUE;
       break;
+    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
+      // @TODO
+      break;
+    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
+      // @TODO
+      // UpdateMaxStreams
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
+      // @TODO
+      break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
       //
       // A resumption ticket (also called New Session Ticket or NST) was
@@ -256,6 +266,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       //
       // @todo
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+      // @TODO
+      // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
       break;
     default:
       break;
@@ -539,6 +553,7 @@ async_connect3(ErlNifEnv *env,
     {
       MsQuic->ConnectionClose(c_ctx->Connection);
       destroy_c_ctx(c_ctx);
+      // @TODO return atom status
       return ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
     }
 
@@ -661,7 +676,8 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status
                   = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
     {
-      return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR);
+      return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR); // @TODO is this err useful?
+                                                 // use atom_status instead?
     }
 
   return SUCCESS(addr2eterm(env, &addr));

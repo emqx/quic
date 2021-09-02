@@ -21,8 +21,8 @@
         ]).
 
 start(_StartType, _StartArgs) ->
-    quicer_nif:open_lib(),
-    quicer_nif:reg_open(),
+    quicer:open_lib(),
+    quicer:reg_open(),
     quicer_sup:start_link().
 
 stop(_) ->

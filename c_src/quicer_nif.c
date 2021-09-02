@@ -124,6 +124,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SETTINGS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_VERSION;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
@@ -163,11 +164,14 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
 
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_TLS.
 //
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
+ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO;
+ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_STREAM.
@@ -356,6 +360,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
        param_global_load_balacing_mode);                                      \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, param_global_perf_counters);     \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, param_global_settings);               \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, param_global_version);                 \
                                                                               \
   /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
   ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \
@@ -398,11 +403,16 @@ ERL_NIF_TERM ATOM_FAST_CONN;
        param_conn_disable_1rtt_encryption);                                   \
                                                                               \
   ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, param_conn_resumption_ticket); \
-                                                                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID,                           \
+       param_conn_peer_certificate_valid);                                    \
   /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
                                                                               \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
        param_tls_schannel_context_attribute_w);                               \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO, param_tls_handshake_info);         \
+                                                                              \
+  ATOM(ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN, param_tls_negotiated_alpn);       \
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_STREAM.  */                             \
                                                                               \
@@ -675,7 +685,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
     {
       isLibOpened = false;
-      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ETERM_INT(status));
+      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, atom_status(status));
     }
 
   isLibOpened = true;
