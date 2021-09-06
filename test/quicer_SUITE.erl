@@ -72,6 +72,7 @@
         , tc_getopt/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
+        , tc_setopt_conn_local_addr/1
         , tc_strm_opt_active_n/1
         , tc_strm_opt_active_once/1
         , tc_strm_opt_active_1/1
@@ -985,6 +986,47 @@ tc_setopt(Config) ->
   end.
 
 
+tc_setopt_conn_local_addr(Config) ->
+  Port = 4578,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm0, _, _, _} ->
+      ok
+  after 1000 ->
+      ct:fail("recv ping1 timeout")
+  end,
+  {ok, OldAddr} = quicer:sockname(Stm0),
+  %% change local addr with a new random port (0)
+  ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
+  %% sleep is needed to finish migration at protocol level
+  timer:sleep(50),
+  {ok, NewAddr} = quicer:sockname(Stm0),
+  ?assertNotEqual(OldAddr, NewAddr),
+  ?assertNotEqual({ok, {{127,0,0,1}, 5060}}, NewAddr),
+  ?assertNotEqual({ok, {{127,0,0,1}, 5060}}, OldAddr),
+  %% change local addr with a new port 5060
+  ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:5060")),
+  %% sleep is needed to finish migration at protocol level
+  timer:sleep(50),
+  ?assertEqual({ok, {{127,0,0,1}, 5060}}, quicer:sockname(Stm0)),
+  {ok, 5} = quicer:send(Stm0, <<"ping2">>),
+  receive
+    {quic, <<"ping2">>, Stm0, _, _, _} ->
+      ok
+  after 1000 ->
+      ct:fail("recv ping2 timeout")
+  end,
+  %% check with server if peer addr is correct.
+  SPid ! {peer_addr, self()},
+  receive {peer_addr, Peer} -> ok end,
+    ?assertEqual({ok, {{127,0,0,1}, 5060}}, Peer),
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
+
 tc_app_echo_server(Config) ->
   Port = 8888,
   application:ensure_all_started(quicer),
@@ -1222,6 +1264,9 @@ echo_server_stm_loop(L, Conn, Stm) ->
       ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => N}),
       {ok, NewStm} = quicer:accept_stream(Conn, []),
       echo_server_stm_loop(L, Conn, NewStm);
+    {peer_addr, From} ->
+      From ! {peer_addr, quicer:peername(Conn)},
+      echo_server_stm_loop(L, Conn, Stm);
     done ->
       ct:pal("echo server shuting down", []),
       quicer:async_close_connection(Conn),

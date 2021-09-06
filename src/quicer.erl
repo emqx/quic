@@ -408,8 +408,8 @@ getopt(Handle, Opt, IsRaw) ->
         ok |
         {error, badarg | parm_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
-setopt(Handle, Opt, Value) when is_list(Value) ->
-  setopt(Handle, Opt, maps:from_list(Value));
+setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
+  setopt(Handle, param_conn_settings, maps:from_list(Value));
 setopt(Handle, Opt, Value) ->
   quicer_nif:setopt(Handle, Opt, Value).
 
