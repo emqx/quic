@@ -184,8 +184,7 @@ accept(LSock, Opts, Timeout) when is_list(Opts) ->
   accept(LSock, maps:from_list(Opts), Timeout);
 accept(LSock, Opts, Timeout) ->
   % non-blocking
-  NewOpts = maps:merge(default_conn_opts(), Opts),
-  {ok, LSock} = quicer_nif:async_accept(LSock, NewOpts),
+  {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
   receive
     {quic, new_conn, C} ->
       {ok, C};
@@ -199,7 +198,8 @@ accept(LSock, Opts, Timeout) ->
         {ok, listener_handler()} |
         {error, badarg | parm_error | not_enough_mem | badpid}.
 async_accept(Listener, Opts) ->
-  quicer_nif:async_accept(Listener, Opts).
+  NewOpts = maps:merge(default_conn_opts(), Opts),
+  quicer_nif:async_accept(Listener, NewOpts).
 
 -spec close_connection(connection_handler()) -> ok.
 close_connection(Conn) ->
