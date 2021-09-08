@@ -108,6 +108,15 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_TLS_ERROR;
 ERL_NIF_TERM ATOM_QUIC_STATUS_USER_CANCELED;
 ERL_NIF_TERM ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
+// TLS ERROR_STATUS
+ERL_NIF_TERM ATOM_QUIC_STATUS_CLOSE_NOTIFY;
+ERL_NIF_TERM ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_UNSUPPORTED_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_REVOKED_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_EXPIRED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
 
 // option keys
 ERL_NIF_TERM ATOM_CERT;
@@ -348,6 +357,20 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_STATUS_USER_CANCELED, user_canceled);                        \
   ATOM(ATOM_QUIC_STATUS_ALPN_NEG_FAILURE, alpn_neg_failure);                  \
   ATOM(ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED, stream_limit_reached);          \
+  ATOM(ATOM_QUIC_STATUS_CLOSE_NOTIFY, atom_quic_status_close_notify);         \
+  /*  TLS Error Status */                                                     \
+  ATOM(ATOM_QUIC_STATUS_BAD_CERTIFICATE, atom_quic_status_bad_certificate);   \
+  ATOM(ATOM_QUIC_STATUS_UNSUPPORTED_CERTIFICATE,                              \
+       atom_quic_status_unsupported_certificate);                             \
+  ATOM(ATOM_QUIC_STATUS_REVOKED_CERTIFICATE,                                  \
+       atom_quic_status_revoked_certificate);                                 \
+  ATOM(ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE,                                  \
+       atom_quic_status_expired_certificate);                                 \
+  ATOM(ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE,                                  \
+       atom_quic_status_unknown_certificate);                                 \
+  ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, atom_quic_status_cert_expired);         \
+  ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
+       atom_quic_status_cert_untrusted_root);                                 \
   /*-----------------------------------------*/                               \
   /*         msquic parms starts             */                               \
   /*-----------------------------------------*/                               \
