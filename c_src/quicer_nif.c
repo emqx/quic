@@ -107,6 +107,7 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_UNREACHABLE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_TLS_ERROR;
 ERL_NIF_TERM ATOM_QUIC_STATUS_USER_CANCELED;
 ERL_NIF_TERM ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
 
 // option keys
 ERL_NIF_TERM ATOM_CERT;
@@ -346,6 +347,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_STATUS_TLS_ERROR, tls_error);                                \
   ATOM(ATOM_QUIC_STATUS_USER_CANCELED, user_canceled);                        \
   ATOM(ATOM_QUIC_STATUS_ALPN_NEG_FAILURE, alpn_neg_failure);                  \
+  ATOM(ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED, stream_limit_reached);          \
   /*-----------------------------------------*/                               \
   /*         msquic parms starts             */                               \
   /*-----------------------------------------*/                               \
@@ -824,6 +826,9 @@ atom_status(QUIC_STATUS status)
       break;
     case QUIC_STATUS_ALPN_NEG_FAILURE:
       eterm = ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
+      break;
+    case QUIC_STATUS_STREAM_LIMIT_REACHED:
+      eterm = ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
       break;
     }
   return eterm;

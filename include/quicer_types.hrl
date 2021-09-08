@@ -42,7 +42,8 @@
         unreachable         |
         tls_error           |
         user_canceled       |
-        alpn_neg_failure.
+        alpn_neg_failure    |
+        stream_limit_reached.
 
 -type app_errno() :: non_neg_integer().
 -type hostname() :: string().
