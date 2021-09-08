@@ -69,6 +69,7 @@ extern ERL_NIF_TERM ATOM_ERROR_SSL_ERROR;
 extern ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 extern ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
+extern ERL_NIF_TERM ATOM_UNKNOWN_STATUS_CODE;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_SUCCESS;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_PENDING;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_CONTINUE;
@@ -274,6 +275,8 @@ extern ERL_NIF_TERM ATOM_FAST_CONN;
 #define SUCCESS(Term) enif_make_tuple(env, 2, ATOM_OK, Term)
 #define ERROR_TUPLE_2(Err) enif_make_tuple2(env, ATOM_ERROR, Err)
 #define ERROR_TUPLE_3(Err1, Err2) enif_make_tuple3(env, ATOM_ERROR, Err1, Err2)
+
+#define ATOM_STATUS(status) atom_status(env, status)
 
 #define OK_TUPLE_2(Term) enif_make_tuple2(env, ATOM_OK, Term)
 

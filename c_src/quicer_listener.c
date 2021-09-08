@@ -181,7 +181,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
               Registration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
     }
 
   unsigned alpn_buffer_length = 0;
@@ -199,7 +199,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
 
   DestroyCredConfig(Config);

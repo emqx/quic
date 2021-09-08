@@ -131,7 +131,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
                                                      NULL,
                                                      Configuration)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   //
@@ -140,7 +140,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
                       *Configuration, &Config->CredConfig)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   return ATOM_OK;
@@ -149,7 +149,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
 // @todo return status instead
 ERL_NIF_TERM
 ClientLoadConfiguration(ErlNifEnv *env,
-                        const ERL_NIF_TERM *option,
+                        const ERL_NIF_TERM *option, // map
                         HQUIC *Configuration,
                         bool Unsecure)
 {
@@ -204,7 +204,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
                                                      NULL,
                                                      Configuration)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   //
@@ -214,7 +214,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
                                                                &CredConfig)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   return ATOM_OK;
@@ -678,7 +678,7 @@ getopt3(ErlNifEnv *env,
         {
           enif_release_binary(&bin);
         }
-      return ERROR_TUPLE_2(atom_status(status));
+      return ERROR_TUPLE_2(ATOM_STATUS(status));
     }
 
   if (isReturnRaw)
@@ -803,7 +803,7 @@ setopt3(ErlNifEnv *env,
                                                 sizeof(QUIC_ADDR),
                                                 &Address)))
         {
-          return ERROR_TUPLE_2(atom_status(status));
+          return ERROR_TUPLE_2(ATOM_STATUS(status));
         }
       else
         {

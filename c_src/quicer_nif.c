@@ -85,6 +85,7 @@ ERL_NIF_TERM ATOM_ERROR_SSL_ERROR;
 ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
+ERL_NIF_TERM ATOM_UNKNOWN_STATUS_CODE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_SUCCESS;
 ERL_NIF_TERM ATOM_QUIC_STATUS_PENDING;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CONTINUE;
@@ -334,6 +335,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_ERROR_USER_CANCELED, user_canceled);                              \
   ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);                        \
                                                                               \
+  ATOM(ATOM_UNKNOWN_STATUS_CODE, unknown_quic_status);                        \
   ATOM(ATOM_QUIC_STATUS_SUCCESS, success);                                    \
   ATOM(ATOM_QUIC_STATUS_PENDING, pending);                                    \
   ATOM(ATOM_QUIC_STATUS_CONTINUE, continue);                                  \
@@ -710,7 +712,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
     {
       isLibOpened = false;
-      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, atom_status(status));
+      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
     }
 
   isLibOpened = true;
@@ -779,9 +781,9 @@ deregistration(__unused_parm__ ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-atom_status(QUIC_STATUS status)
+atom_status(ErlNifEnv *env, QUIC_STATUS status)
 {
-  ERL_NIF_TERM eterm = ATOM_OK;
+  ERL_NIF_TERM eterm = ATOM_UNKNOWN_STATUS_CODE;
   switch (status)
     {
     case QUIC_STATUS_SUCCESS:
@@ -853,6 +855,9 @@ atom_status(QUIC_STATUS status)
     case QUIC_STATUS_STREAM_LIMIT_REACHED:
       eterm = ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
       break;
+    default:
+      eterm = enif_make_tuple2(
+          env, ATOM_UNKNOWN_STATUS_CODE, ETERM_UINT_64(status));
     }
   return eterm;
 }
