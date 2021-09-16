@@ -53,6 +53,8 @@ set(SOURCES
   c_src/quicer_connection.h
   c_src/quicer_stream.c
   c_src/quicer_stream.h
+  c_src/quicer_dgram.c
+  c_src/quicer_dgram.h
   c_src/quicer_tp.c
   c_src/quicer_tp.h
   )

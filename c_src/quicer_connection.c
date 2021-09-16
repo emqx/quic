@@ -23,6 +23,14 @@ EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
 extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
+static void handle_dgram_state_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event);
+
+static void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
+                                          QUIC_CONNECTION_EVENT *Event);
+
+static void handle_dgram_recv_event(QuicerConnCTX *c_ctx,
+                                    QUIC_CONNECTION_EVENT *Event);
+
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
                    _In_ CXPLAT_TLS_SECRETS TlsSecrets)
@@ -271,6 +279,15 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // @TODO
       // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
       break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
+      handle_dgram_state_event(c_ctx, Event);
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
+      handle_dgram_send_state_event(c_ctx, Event);
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+      handle_dgram_recv_event(c_ctx, Event);
+      break;
     default:
       break;
     }
@@ -463,6 +480,15 @@ ServerConnectionCallback(HQUIC Connection,
       // The connection succeeded in doing a TLS resumption of a previous
       // connection's session.
       //
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
+      handle_dgram_state_event(c_ctx, Event);
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
+      handle_dgram_send_state_event(c_ctx, Event);
+      break;
+    case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+      handle_dgram_recv_event(c_ctx, Event);
       break;
     default:
       break;
@@ -821,6 +847,60 @@ async_handshake_1(ErlNifEnv *env,
     }
 
   return ATOM_OK;
+}
+
+void
+handle_dgram_state_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
+{
+  if (Event->DATAGRAM_STATE_CHANGED.SendEnabled == 1)
+    {
+      ErlNifEnv *env = c_ctx->env;
+      int max_len = Event->DATAGRAM_STATE_CHANGED.MaxSendLength;
+      enif_send(NULL,
+                &(c_ctx->owner->Pid),
+                NULL,
+                enif_make_tuple3(env,
+                                 ATOM_QUIC,
+                                 ATOM_DGRAM_MAX_LEN,
+                                 enif_make_int(env, max_len)));
+    }
+}
+
+void
+handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
+                              QUIC_CONNECTION_EVENT *Event)
+{
+  ErlNifEnv *env = c_ctx->env;
+  if (Event->DATAGRAM_SEND_STATE_CHANGED.State == QUIC_DATAGRAM_SEND_SENT)
+    {
+      QuicerDgramSendCTX *dgram_send_ctx
+          = (QuicerDgramSendCTX *)(Event->DATAGRAM_SEND_STATE_CHANGED
+                                       .ClientContext);
+      enif_send(NULL,
+                &dgram_send_ctx->caller,
+                NULL,
+                enif_make_tuple3(env,
+                                 ATOM_QUIC,
+                                 ATOM_SEND_DGRAM_COMPLETE,
+                                 enif_make_resource(env, c_ctx)));
+      destroy_dgram_send_ctx(dgram_send_ctx);
+    }
+}
+
+void
+handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
+{
+  ErlNifEnv *env = c_ctx->env;
+  ErlNifBinary bin;
+  ERL_NIF_TERM report;
+  enif_alloc_binary(Event->DATAGRAM_RECEIVED.Buffer->Length, &bin);
+  CxPlatCopyMemory(bin.data,
+                   Event->DATAGRAM_RECEIVED.Buffer->Buffer,
+                   Event->DATAGRAM_RECEIVED.Buffer->Length);
+  bin.size = Event->DATAGRAM_RECEIVED.Buffer->Length;
+  report = enif_make_tuple3(
+      env, ATOM_QUIC, ATOM_DGRAM, enif_make_binary(env, &bin));
+  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 }
 
 ///_* Emacs
