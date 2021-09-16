@@ -52,6 +52,7 @@
         , send/2
         , async_send/2
         , recv/2
+        , send_dgram/2
         , close_stream/1
         , close_stream/2
         , close_stream/4
@@ -339,6 +340,22 @@ do_recv(Stream, Count) ->
     {error, _} = E ->
       E
    end.
+
+-spec send_dgram(connection_handler(), binary()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, badarg | not_enough_mem | closed} |
+        {error, dgram_send_error, atom_reason()}.
+send_dgram(Conn, Data) ->
+  case quicer_nif:send_dgram(Conn, Data, _IsSync = 1) of
+    %% @todo make ref
+    {ok, _Len} = OK ->
+      receive
+        {quic, send_dgram_completed, Conn} ->
+          OK
+      end;
+    E ->
+      E
+  end.
 
 -spec close_stream(stream_handler()) -> ok | {error, any()}.
 close_stream(Stream) ->

@@ -56,6 +56,7 @@ ERL_NIF_TERM ATOM_CONN_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_OPEN_ERROR;
 ERL_NIF_TERM ATOM_STREAM_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_SEND_ERROR;
+ERL_NIF_TERM ATOM_DGRAM_SEND_ERROR;
 ERL_NIF_TERM ATOM_SOCKNAME_ERROR;
 ERL_NIF_TERM ATOM_OWNER_DEAD;
 ERL_NIF_TERM ATOM_NOT_OWNER;
@@ -236,9 +237,12 @@ ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 ERL_NIF_TERM ATOM_SEND_COMPLETE;
+ERL_NIF_TERM ATOM_SEND_DGRAM_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
 ERL_NIF_TERM ATOM_QUIC_PASSIVE;
+ERL_NIF_TERM ATOM_DGRAM;
+ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
 ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
 ERL_NIF_TERM ATOM_NEW_CONN;
@@ -297,6 +301,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_STREAM_OPEN_ERROR, stm_open_error);                               \
   ATOM(ATOM_STREAM_START_ERROR, stm_start_error);                             \
   ATOM(ATOM_STREAM_SEND_ERROR, stm_send_error);                               \
+  ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                               \
   ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
   ATOM(ATOM_NOT_OWNER, not_owner);                                            \
                                                                               \
@@ -474,9 +479,12 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_SEND_COMPLETE, send_completed);                                   \
+  ATOM(ATOM_SEND_DGRAM_COMPLETE, send_dgram_completed);                       \
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
+  ATOM(ATOM_DGRAM, dgram);                                                    \
+  ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                                    \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \
@@ -957,6 +965,7 @@ static ErlNifFunc nif_funcs[] = {
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 3, send3, 0},
   { "recv", 2, recv2, 0},
+  { "send_dgram", 3, send_dgram, 0},
   { "async_close_stream", 3, close_stream3, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},

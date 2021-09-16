@@ -111,3 +111,23 @@ destroy_send_ctx(QuicerStreamSendCTX *send_ctx)
   enif_free_env(send_ctx->env);
   CXPLAT_FREE(send_ctx, QUICER_SEND_CTX);
 }
+
+QuicerDgramSendCTX *
+init_dgram_send_ctx()
+{
+  QuicerDgramSendCTX *dgram_send_ctx = CXPLAT_ALLOC_NONPAGED(
+      sizeof(QuicerDgramSendCTX), QUICER_DGRAM_SEND_CTX);
+
+  if (dgram_send_ctx)
+    {
+      CxPlatZeroMemory(dgram_send_ctx, sizeof(QuicerDgramSendCTX));
+      dgram_send_ctx->env = enif_alloc_env();
+    }
+  return dgram_send_ctx;
+}
+void
+destroy_dgram_send_ctx(QuicerDgramSendCTX *dgram_send_ctx)
+{
+  enif_free_env(dgram_send_ctx->env);
+  CXPLAT_FREE(dgram_send_ctx, QUICER_DGRAM_SEND_CTX);
+}

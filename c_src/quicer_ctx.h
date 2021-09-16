@@ -87,6 +87,15 @@ typedef struct QuicerStreamSendCTX
   ErlNifBinary bin;
 } QuicerStreamSendCTX;
 
+typedef struct QuicerDgramSendCTX
+{
+  ErlNifEnv *env;
+  ErlNifPid caller;
+  BOOLEAN is_sync;
+  QUIC_BUFFER Buffer;
+  ErlNifBinary bin;
+} QuicerDgramSendCTX;
+
 QuicerListenerCTX *init_l_ctx();
 void destroy_l_ctx(QuicerListenerCTX *l_ctx);
 
@@ -98,5 +107,8 @@ void destroy_s_ctx(QuicerStreamCTX *s_ctx);
 
 QuicerStreamSendCTX *init_send_ctx();
 void destroy_send_ctx(QuicerStreamSendCTX *send_ctx);
+
+QuicerDgramSendCTX *init_dgram_send_ctx();
+void destroy_dgram_send_ctx(QuicerDgramSendCTX *dgram_send_ctx);
 
 #endif // __QUICER_CTX_H_

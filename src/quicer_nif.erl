@@ -28,6 +28,7 @@
         , start_stream/2
         , send/3
         , recv/2
+        , send_dgram/3
         , async_close_stream/3
         , sockname/1
         , getopt/3
@@ -141,6 +142,13 @@ send(_Stream, _Data, _Flags) ->
         {ok, not_ready}     |
         {error, badarg | einval}.
 recv(_Stream, _Len) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec send_dgram(connection_handler(), binary(), send_flags()) ->
+  {ok, BytesSent :: pos_integer()} |
+  {error, badarg | not_enough_memory | closed} |
+  {error, dgram_send_error, atom_reason()}.
+send_dgram(_Conn, _Data, _Flags) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec async_close_stream(stream_handler(), stream_close_flags(), app_errno()) ->

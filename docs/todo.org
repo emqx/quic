@@ -20,6 +20,3 @@ Feature todo list, priority descending
 ** NIF Upgrade
 
 ** 0RTT support
-
-** Secure Datagrams [DRAFT]
-https://tools.ietf.org/html/draft-ietf-quic-datagram
