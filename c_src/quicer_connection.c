@@ -442,6 +442,7 @@ ServerConnectionCallback(HQUIC Connection,
           MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
                                      (void *)ServerStreamCallback,
                                      s_ctx);
+          enif_keep_resource(c_ctx);
         }
       break;
     case QUIC_CONNECTION_EVENT_RESUMED:
@@ -552,8 +553,8 @@ async_connect3(ErlNifEnv *env,
                                                    port)))
     {
       MsQuic->ConnectionClose(c_ctx->Connection);
+      c_ctx->is_closed = TRUE;
       destroy_c_ctx(c_ctx);
-      // @TODO return atom status
       return ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
     }
 

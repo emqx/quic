@@ -23,9 +23,15 @@ init_l_ctx()
 {
   QuicerListenerCTX *l_ctx
       = enif_alloc_resource(ctx_listener_t, sizeof(QuicerListenerCTX));
+  if (!l_ctx)
+    {
+      return NULL;
+    }
+  CxPlatZeroMemory(l_ctx, sizeof(QuicerListenerCTX));
   l_ctx->env = enif_alloc_env();
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
+  l_ctx->is_closed = FALSE;
   return l_ctx;
 }
 
@@ -41,9 +47,13 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
 QuicerConnCTX *
 init_c_ctx()
 {
-  //@todo return NULL if error.
   QuicerConnCTX *c_ctx
       = enif_alloc_resource(ctx_connection_t, sizeof(QuicerConnCTX));
+  if (!c_ctx)
+    {
+      return NULL;
+    }
+  CxPlatZeroMemory(c_ctx, sizeof(QuicerConnCTX));
   c_ctx->env = enif_alloc_env();
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
@@ -51,6 +61,7 @@ init_c_ctx()
   c_ctx->is_closed = FALSE;
   c_ctx->TlsSecrets = NULL;
   c_ctx->ssl_keylogfile = NULL;
+  c_ctx->l_ctx = NULL;
   return c_ctx;
 }
 
@@ -68,7 +79,12 @@ init_s_ctx()
 {
   QuicerStreamCTX *s_ctx
       = enif_alloc_resource(ctx_stream_t, sizeof(QuicerStreamCTX));
-  // @todo would be better to useacceptor's env.
+  if (!s_ctx)
+    {
+      return NULL;
+    }
+  CxPlatZeroMemory(s_ctx, sizeof(QuicerStreamCTX));
+
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->is_closed = FALSE;
@@ -88,6 +104,7 @@ destroy_s_ctx(QuicerStreamCTX *s_ctx)
   // Since enif_release_resource is async call,
   // we should demon the owner now!
   enif_demonitor_process(s_ctx->env, s_ctx, &s_ctx->owner_mon);
+  enif_release_resource(s_ctx->c_ctx);
   enif_release_resource(s_ctx);
 }
 

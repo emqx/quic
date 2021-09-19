@@ -316,10 +316,19 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   //
-  // note, ctx is not shared yet, thus no locking is needed.
+  // note, s_ctx is not shared yet, thus no locking is needed.
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
+
+  enif_mutex_lock(c_ctx->lock);
+  if (c_ctx->is_closed)
+    {
+      enif_mutex_unlock(c_ctx->lock);
+      return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
+    }
+  enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
+  enif_mutex_unlock(c_ctx->lock);
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();

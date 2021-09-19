@@ -220,6 +220,7 @@ close_listener1(ErlNifEnv *env,
     }
   // calling ListenerStop is optional
   // MsQuic->ListenerStop(l_ctx->Listener);
+  l_ctx->is_closed = TRUE;
   MsQuic->ListenerClose(l_ctx->Listener);
   enif_release_resource(l_ctx);
   return ATOM_OK;

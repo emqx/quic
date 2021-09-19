@@ -554,7 +554,6 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, c_ctx->Connection, 0);
-  enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
@@ -648,8 +647,9 @@ on_load(ErlNifEnv *env,
       = { .dtor = resource_stream_dealloc_callback,
           .down = resource_stream_down_callback,
           .stop = NULL };
-  ErlNifResourceTypeInit connInit
-      = { .dtor = NULL, .down = resource_conn_down_callback, .stop = NULL };
+  ErlNifResourceTypeInit connInit = { .dtor = resource_conn_dealloc_callback,
+                                      .down = resource_conn_down_callback,
+                                      .stop = NULL };
   ErlNifResourceTypeInit listenerInit = {
     .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
   };
