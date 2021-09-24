@@ -1032,17 +1032,144 @@ get_connection_opt(ErlNifEnv *env, QuicerConnCTX *c_ctx, ERL_NIF_TERM optname)
       BufferLength = sizeof(QUIC_ADDR);
       Buffer = &addr;
     }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS))
+
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
     {
       Level = QUIC_PARAM_LEVEL_CONNECTION;
-      Param = QUIC_PARAM_CONN_STATISTICS;
-      BufferLength = sizeof(QUIC_STATISTICS);
+      Param = QUIC_PARAM_CONN_IDEAL_PROCESSOR;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_IDEAL_PROCESSOR;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SETTINGS))
     {
       Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_SETTINGS;
       BufferLength = sizeof(QUIC_SETTINGS);
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_STATISTICS;
+      BufferLength = sizeof(QUIC_STATISTICS);
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_STATISTICS_PLAT;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_SHARE_UDP_BINDING;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname,
+                        ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_MAX_STREAM_IDS;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_CLOSE_REASON_PHRASE;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname,
+                        ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname,
+                        ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  /*
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  */
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_RESUMPTION_TICKET;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE))
+    {
+      Level = QUIC_PARAM_LEVEL_CONNECTION;
+      Param = QUIC_PARAM_CONN_LOCAL_INTERFACE;
+      // @TODO
+      res = ERROR_TUPLE_2(atom_status(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
     }
   else if (c_ctx->l_ctx)
     {
