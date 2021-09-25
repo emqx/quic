@@ -130,6 +130,7 @@ ERL_NIF_TERM ATOM_ALPN;
 
 // Parameters for QUIC_PARAM_LEVEL_GLOBAL.
 //
+ERL_NIF_TERM ATOM_QUIC_GLOBAL;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
@@ -379,7 +380,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   /*-----------------------------------------*/                               \
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
-                                                                              \
+  ATOM(ATOM_QUIC_GLOBAL, quic_global);                                        \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT,                           \
        param_global_retry_memory_percent);                                    \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS,                             \

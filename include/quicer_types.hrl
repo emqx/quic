@@ -53,7 +53,7 @@
 -type stream_handler()     :: reference().
 -type conf_handler()       :: reference().
 -type reg_handler()        :: reference().
--type global_handler()     :: undefined.
+-type global_handler()     :: quic_global.
 
 -type handler() ::
         global_handler()     |
