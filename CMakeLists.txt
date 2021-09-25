@@ -91,3 +91,8 @@ set_target_properties(quicer_nif
     PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/priv/
 )
+
+
+if (QUIC_ENABLE_LOGGING)
+set_target_properties(msquic.lttng PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/priv)
+endif()
