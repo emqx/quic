@@ -990,7 +990,7 @@ tc_setopt_conn_local_addr(Config) ->
   Port = 4578,
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
-  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
   {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
   {ok, 5} = quicer:send(Stm0, <<"ping1">>),
   receive
@@ -1006,13 +1006,13 @@ tc_setopt_conn_local_addr(Config) ->
   timer:sleep(50),
   {ok, NewAddr} = quicer:sockname(Stm0),
   ?assertNotEqual(OldAddr, NewAddr),
-  ?assertNotEqual({ok, {{127,0,0,1}, 5060}}, NewAddr),
-  ?assertNotEqual({ok, {{127,0,0,1}, 5060}}, OldAddr),
+  ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, NewAddr),
+  ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, OldAddr),
   %% change local addr with a new port 5060
-  ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:5060")),
+  ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
   %% sleep is needed to finish migration at protocol level
-  timer:sleep(50),
-  ?assertEqual({ok, {{127,0,0,1}, 5060}}, quicer:sockname(Stm0)),
+  timer:sleep(200),
+  ?assertEqual({ok, {{127,0,0,1}, 50600}}, quicer:sockname(Stm0)),
   {ok, 5} = quicer:send(Stm0, <<"ping2">>),
   receive
     {quic, <<"ping2">>, Stm0, _, _, _} ->
@@ -1023,7 +1023,7 @@ tc_setopt_conn_local_addr(Config) ->
   %% check with server if peer addr is correct.
   SPid ! {peer_addr, self()},
   receive {peer_addr, Peer} -> ok end,
-    ?assertEqual({ok, {{127,0,0,1}, 5060}}, Peer),
+    ?assertEqual({ok, {{127,0,0,1}, 50600}}, Peer),
   SPid ! done,
   ensure_server_exit_normal(Ref).
 
