@@ -81,6 +81,12 @@
 
 -type send_flags() :: non_neg_integer(). %% is sync send or not
 
+-type optlevel() :: false | %% unspecified
+                    quic_global |
+                    quic_registration |
+                    quic_configuration |
+                    quic_tls.
+
 -type optname() ::
         optname_global()        |
         optname_conn()          |
