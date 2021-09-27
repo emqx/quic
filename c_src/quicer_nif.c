@@ -141,11 +141,13 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_VERSION;
 //
 // Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
 //
+ERL_NIF_TERM ATOM_QUIC_REGISTRATION;
 ERL_NIF_TERM ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_CONFIGURATION.
 //
+ERL_NIF_TERM ATOM_QUIC_CONFIGURATION;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS;
 
 //
@@ -182,6 +184,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE;
 //
 // Parameters for QUIC_PARAM_LEVEL_TLS.
 //
+ERL_NIF_TERM ATOM_QUIC_TLS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN;
@@ -392,11 +395,12 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, param_global_version);                 \
                                                                               \
   /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
+  ATOM(ATOM_QUIC_REGISTRATION, quic_registration);                            \
   ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \
        param_registration_cid_prefix);                                        \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_CONFIGURATION. */                        \
-                                                                              \
+  ATOM(ATOM_QUIC_CONFIGURATION, quic_configuration);                          \
   ATOM(ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS, param_configuration_settings); \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_LISTENER. */                             \
@@ -436,7 +440,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
        param_conn_peer_certificate_valid);                                    \
   ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE, param_conn_local_interface);     \
   /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
-                                                                              \
+  ATOM(ATOM_QUIC_TLS, quic_tls)                                               \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
        param_tls_schannel_context_attribute_w);                               \
                                                                               \
