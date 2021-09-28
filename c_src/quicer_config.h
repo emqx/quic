@@ -61,4 +61,8 @@ ERL_NIF_TERM setopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 bool create_settings(ErlNifEnv *env,
                      const ERL_NIF_TERM *emap,
                      QUIC_SETTINGS *Settings);
+
+bool
+parse_listen_on(ErlNifEnv *env, ERL_NIF_TERM elisten_on, QUIC_ADDR *Address);
+
 #endif // __QUICER_CONFIG_H_

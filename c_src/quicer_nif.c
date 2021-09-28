@@ -85,6 +85,7 @@ ERL_NIF_TERM ATOM_ERROR_SSL_ERROR;
 ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
+ERL_NIF_TERM ATOM_UNKNOWN_STATUS_CODE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_SUCCESS;
 ERL_NIF_TERM ATOM_QUIC_STATUS_PENDING;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CONTINUE;
@@ -107,6 +108,16 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_UNREACHABLE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_TLS_ERROR;
 ERL_NIF_TERM ATOM_QUIC_STATUS_USER_CANCELED;
 ERL_NIF_TERM ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
+// TLS ERROR_STATUS
+ERL_NIF_TERM ATOM_QUIC_STATUS_CLOSE_NOTIFY;
+ERL_NIF_TERM ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_UNSUPPORTED_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_REVOKED_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_EXPIRED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
 
 // option keys
 ERL_NIF_TERM ATOM_CERT;
@@ -324,6 +335,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_ERROR_USER_CANCELED, user_canceled);                              \
   ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);                        \
                                                                               \
+  ATOM(ATOM_UNKNOWN_STATUS_CODE, unknown_quic_status);                        \
   ATOM(ATOM_QUIC_STATUS_SUCCESS, success);                                    \
   ATOM(ATOM_QUIC_STATUS_PENDING, pending);                                    \
   ATOM(ATOM_QUIC_STATUS_CONTINUE, continue);                                  \
@@ -346,6 +358,21 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_STATUS_TLS_ERROR, tls_error);                                \
   ATOM(ATOM_QUIC_STATUS_USER_CANCELED, user_canceled);                        \
   ATOM(ATOM_QUIC_STATUS_ALPN_NEG_FAILURE, alpn_neg_failure);                  \
+  ATOM(ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED, stream_limit_reached);          \
+  ATOM(ATOM_QUIC_STATUS_CLOSE_NOTIFY, atom_quic_status_close_notify);         \
+  /*  TLS Error Status */                                                     \
+  ATOM(ATOM_QUIC_STATUS_BAD_CERTIFICATE, atom_quic_status_bad_certificate);   \
+  ATOM(ATOM_QUIC_STATUS_UNSUPPORTED_CERTIFICATE,                              \
+       atom_quic_status_unsupported_certificate);                             \
+  ATOM(ATOM_QUIC_STATUS_REVOKED_CERTIFICATE,                                  \
+       atom_quic_status_revoked_certificate);                                 \
+  ATOM(ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE,                                  \
+       atom_quic_status_expired_certificate);                                 \
+  ATOM(ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE,                                  \
+       atom_quic_status_unknown_certificate);                                 \
+  ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, atom_quic_status_cert_expired);         \
+  ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
+       atom_quic_status_cert_untrusted_root);                                 \
   /*-----------------------------------------*/                               \
   /*         msquic parms starts             */                               \
   /*-----------------------------------------*/                               \
@@ -685,7 +712,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
     {
       isLibOpened = false;
-      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, atom_status(status));
+      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
     }
 
   isLibOpened = true;
@@ -754,9 +781,9 @@ deregistration(__unused_parm__ ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-atom_status(QUIC_STATUS status)
+atom_status(ErlNifEnv *env, QUIC_STATUS status)
 {
-  ERL_NIF_TERM eterm = ATOM_OK;
+  ERL_NIF_TERM eterm = ATOM_UNKNOWN_STATUS_CODE;
   switch (status)
     {
     case QUIC_STATUS_SUCCESS:
@@ -825,6 +852,12 @@ atom_status(QUIC_STATUS status)
     case QUIC_STATUS_ALPN_NEG_FAILURE:
       eterm = ATOM_QUIC_STATUS_ALPN_NEG_FAILURE;
       break;
+    case QUIC_STATUS_STREAM_LIMIT_REACHED:
+      eterm = ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
+      break;
+    default:
+      eterm = enif_make_tuple2(
+          env, ATOM_UNKNOWN_STATUS_CODE, ETERM_UINT_64(status));
     }
   return eterm;
 }

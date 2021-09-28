@@ -1,4 +1,34 @@
 #+TITLE: Interworking
+* Thread models
+#+begin_src plantuml :file thread_models.png
+@startuml
+component "Beam Process" #9F353A {
+
+   component "Scheduler (NIF CTX)" #81C7D4 {
+     control stream_owner_pid
+     control conn_owner_pid
+   }
+
+   component "MsQuicWorker (CALLBACK CTX)" #D9AB42{
+    queue work_queue
+    queue network_queue
+    control execute
+   }
+}
+
+
+stream_owner_pid -down-> work_queue #blue: async \nwork submit
+execute -up-> stream_owner_pid #FBE251: "erl msg: {quic, ...}"
+execute <--> work_queue
+execute <==>  network_queue #336774: DATA
+
+conn_owner_pid -down-> work_queue #blue: async \nwork submit
+execute -up-> conn_owner_pid #FBE251: "erl msg: {quic, ...}"
+@enduml
+#+end_src
+#+results:
+[[file:thread_models.png]]
+
 * Basic flow [Happy path]
  note, 'C-c C-c' to produce.
 #+begin_src plantuml :file basic_flow_happy_path.png
@@ -68,7 +98,7 @@ NIF call `handshake` to complete TLS handshake,
 otherwise drop the connection here
 end note
 
-msw ---> client: continue connection establishment
+msw <---> client: continue connection establishment
 
 msw --> conn_acceptor: erl msg:  '{quic, connected, ... }'
 

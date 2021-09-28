@@ -49,7 +49,7 @@ extern ErlNifResourceType *ctx_stream_t;
 extern void CxPlatSystemLoad(void);
 extern void MsQuicLibraryLoad(void);
 
-ERL_NIF_TERM atom_status(QUIC_STATUS status);
+ERL_NIF_TERM atom_status(ErlNifEnv *env, QUIC_STATUS status);
 
 // Compiler attributes
 #define __unused_parm__ __attribute__((unused))

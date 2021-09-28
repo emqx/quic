@@ -342,7 +342,7 @@ async_start_stream2(ErlNifEnv *env,
                                               &(s_ctx->Stream))))
     {
       destroy_s_ctx(s_ctx);
-      return ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, ATOM_STATUS(Status));
     }
 
   //
@@ -355,7 +355,7 @@ async_start_stream2(ErlNifEnv *env,
     {
       // note, stream call back would close the stream.
       // return ERROR_TUPLE_2(ATOM_STREAM_OPEN_ERROR);
-      return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
 
   return SUCCESS(enif_make_resource(env, s_ctx));
@@ -496,7 +496,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       enif_mutex_unlock(s_ctx->lock);
       enif_mutex_unlock(s_ctx->c_ctx->lock);
       //@todo return error code
-      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
     }
 
   else

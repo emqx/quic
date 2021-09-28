@@ -131,7 +131,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
                                                      NULL,
                                                      Configuration)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   //
@@ -140,7 +140,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
                       *Configuration, &Config->CredConfig)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   return ATOM_OK;
@@ -149,7 +149,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
 // @todo return status instead
 ERL_NIF_TERM
 ClientLoadConfiguration(ErlNifEnv *env,
-                        const ERL_NIF_TERM *option,
+                        const ERL_NIF_TERM *option, // map
                         HQUIC *Configuration,
                         bool Unsecure)
 {
@@ -204,7 +204,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
                                                      NULL,
                                                      Configuration)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   //
@@ -214,7 +214,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
                                                                &CredConfig)))
     {
-      return atom_status(Status);
+      return ATOM_STATUS(Status);
     }
 
   return ATOM_OK;
@@ -678,7 +678,7 @@ getopt3(ErlNifEnv *env,
         {
           enif_release_binary(&bin);
         }
-      return ERROR_TUPLE_2(atom_status(status));
+      return ERROR_TUPLE_2(ATOM_STATUS(status));
     }
 
   if (isReturnRaw)
@@ -708,6 +708,7 @@ setopt3(ErlNifEnv *env,
 
   HQUIC Handle = NULL;
   QUIC_PARAM_LEVEL Level;
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
 
   void *q_ctx;
 
@@ -787,6 +788,27 @@ setopt3(ErlNifEnv *env,
 
       enif_mutex_unlock(s_ctx->lock);
       return ATOM_OK;
+    }
+  else if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
+    {
+      QUIC_ADDR Address;
+      if (!parse_listen_on(env, evalue, &Address))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+
+      if (QUIC_FAILED(status = MsQuic->SetParam(Handle,
+                                                QUIC_PARAM_LEVEL_CONNECTION,
+                                                QUIC_PARAM_CONN_LOCAL_ADDRESS,
+                                                sizeof(QUIC_ADDR),
+                                                &Address)))
+        {
+          return ERROR_TUPLE_2(ATOM_STATUS(status));
+        }
+      else
+        {
+          return ATOM_OK;
+        }
     }
   else
     { //@todo support more param
@@ -1007,4 +1029,21 @@ create_settings(ErlNifEnv *env,
     }
 
   return true;
+}
+
+bool
+parse_listen_on(ErlNifEnv *env, ERL_NIF_TERM elisten_on, QUIC_ADDR *Address)
+{
+  char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
+  if (enif_get_string(
+          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
+      > 0)
+    {
+      if ((QuicAddr4FromString(listen_on, Address)
+           || QuicAddr6FromString(listen_on, Address)))
+        {
+          return TRUE;
+        }
+    }
+  return FALSE;
 }

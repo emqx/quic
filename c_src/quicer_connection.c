@@ -212,7 +212,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           ATOM_QUIC,
           ATOM_TRANS_SHUTDOWN,
           enif_make_resource(env, c_ctx),
-          atom_status(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
+          ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
       break;
@@ -677,7 +677,7 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
                   = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
     {
       return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR); // @TODO is this err useful?
-                                                 // use atom_status instead?
+                                                 // use ATOM_STATUS instead?
     }
 
   return SUCCESS(addr2eterm(env, &addr));
@@ -782,7 +782,7 @@ async_handshake_1(ErlNifEnv *env,
 
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {
-      return ERROR_TUPLE_2(atom_status(Status));
+      return ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
 
   return ATOM_OK;
