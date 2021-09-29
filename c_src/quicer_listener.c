@@ -149,7 +149,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!Config)
     {
-      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
     }
 
   ERL_NIF_TERM estatus
@@ -220,6 +220,7 @@ close_listener1(ErlNifEnv *env,
     }
   // calling ListenerStop is optional
   // MsQuic->ListenerStop(l_ctx->Listener);
+  l_ctx->is_closed = TRUE;
   MsQuic->ListenerClose(l_ctx->Listener);
   enif_release_resource(l_ctx);
   return ATOM_OK;

@@ -45,7 +45,7 @@ ERL_NIF_TERM ATOM_OPEN_FAILED;
 ERL_NIF_TERM ATOM_CTX_INIT_FAILED;
 ERL_NIF_TERM ATOM_BAD_PID;
 ERL_NIF_TERM ATOM_CONFIG_ERROR;
-ERL_NIF_TERM ATOM_PARM_ERROR;
+ERL_NIF_TERM ATOM_PARAM_ERROR;
 ERL_NIF_TERM ATOM_CERT_ERROR;
 ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
@@ -130,6 +130,7 @@ ERL_NIF_TERM ATOM_ALPN;
 
 // Parameters for QUIC_PARAM_LEVEL_GLOBAL.
 //
+ERL_NIF_TERM ATOM_QUIC_GLOBAL;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
@@ -140,11 +141,13 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_VERSION;
 //
 // Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
 //
+ERL_NIF_TERM ATOM_QUIC_REGISTRATION;
 ERL_NIF_TERM ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_CONFIGURATION.
 //
+ERL_NIF_TERM ATOM_QUIC_CONFIGURATION;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS;
 
 //
@@ -176,10 +179,12 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
 
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_TLS.
 //
+ERL_NIF_TERM ATOM_QUIC_TLS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN;
@@ -297,7 +302,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_CTX_INIT_FAILED, ctx_init_failed);                                \
   ATOM(ATOM_BAD_PID, bad_pid);                                                \
   ATOM(ATOM_CONFIG_ERROR, config_error);                                      \
-  ATOM(ATOM_PARM_ERROR, parm_error);                                          \
+  ATOM(ATOM_PARAM_ERROR, param_error);                                        \
   ATOM(ATOM_CERT_ERROR, cert_error);                                          \
   ATOM(ATOM_BAD_MON, bad_mon);                                                \
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
@@ -378,7 +383,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   /*-----------------------------------------*/                               \
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
-                                                                              \
+  ATOM(ATOM_QUIC_GLOBAL, quic_global);                                        \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT,                           \
        param_global_retry_memory_percent);                                    \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS,                             \
@@ -390,11 +395,12 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, param_global_version);                 \
                                                                               \
   /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
+  ATOM(ATOM_QUIC_REGISTRATION, quic_registration);                            \
   ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \
        param_registration_cid_prefix);                                        \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_CONFIGURATION. */                        \
-                                                                              \
+  ATOM(ATOM_QUIC_CONFIGURATION, quic_configuration);                          \
   ATOM(ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS, param_configuration_settings); \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_LISTENER. */                             \
@@ -432,8 +438,9 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, param_conn_resumption_ticket); \
   ATOM(ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID,                           \
        param_conn_peer_certificate_valid);                                    \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE, param_conn_local_interface);     \
   /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
-                                                                              \
+  ATOM(ATOM_QUIC_TLS, quic_tls)                                               \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
        param_tls_schannel_context_attribute_w);                               \
                                                                               \
@@ -554,7 +561,6 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, c_ctx->Connection, 0);
-  enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
@@ -648,8 +654,9 @@ on_load(ErlNifEnv *env,
       = { .dtor = resource_stream_dealloc_callback,
           .down = resource_stream_down_callback,
           .stop = NULL };
-  ErlNifResourceTypeInit connInit
-      = { .dtor = NULL, .down = resource_conn_down_callback, .stop = NULL };
+  ErlNifResourceTypeInit connInit = { .dtor = resource_conn_dealloc_callback,
+                                      .down = resource_conn_down_callback,
+                                      .stop = NULL };
   ErlNifResourceTypeInit listenerInit = {
     .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
   };
