@@ -178,7 +178,7 @@ accept(LSock, Opts) ->
 
 -spec accept(listener_handler(), acceptor_opts(), timer:timeout()) ->
         {ok, connection_handler()} |
-        {error, badarg | parm_error | not_enough_mem | badpid} |
+        {error, badarg | param_error | not_enough_mem | badpid} |
         {error, timeout}.
 accept(LSock, Opts, Timeout) when is_list(Opts) ->
   accept(LSock, maps:from_list(Opts), Timeout);
@@ -196,7 +196,7 @@ accept(LSock, Opts, Timeout) ->
 
 -spec async_accept(listener_handler(), acceptor_opts()) ->
         {ok, listener_handler()} |
-        {error, badarg | parm_error | not_enough_mem | badpid}.
+        {error, badarg | param_error | not_enough_mem | badpid}.
 async_accept(Listener, Opts) ->
   NewOpts = maps:merge(default_conn_opts(), Opts),
   quicer_nif:async_accept(Listener, NewOpts).
@@ -394,19 +394,19 @@ sockname(Conn) ->
              optname()) ->
         {ok, OptVal::any()} | {error, any()}.
 getopt(Handle, Opt) ->
-  quicer_nif:getopt(Handle, Opt, true).
+  quicer_nif:getopt(Handle, Opt, false).
 
--spec getopt(handler(), optname(), boolean()) ->
-        {ok, binary()} | %% when IsRaw
+-spec getopt(handler(), optname(), optlevel()) ->
+        not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
         {ok, conn_settings()}   | %% when optname = param_conn_settings
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
-getopt(Handle, Opt, IsRaw) ->
-  quicer_nif:getopt(Handle, Opt, IsRaw).
+getopt(Handle, Opt, Optlevel) ->
+  quicer_nif:getopt(Handle, Opt, Optlevel).
 
 -spec setopt(handler(), optname(), any()) ->
         ok |
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
   setopt(Handle, param_conn_settings, maps:from_list(Value));

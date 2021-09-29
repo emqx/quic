@@ -109,12 +109,12 @@ Calling Process becomes the owner of the connection.
 %% accept connection with infinit timeout.
 -spec accept(listener_handler(), acceptor_opts()) ->
           {ok, connection_handler()} |
-          {error, badarg | parm_error | not_enough_mem | badpid}.
+          {error, badarg | param_error | not_enough_mem | badpid}.
 
 %% accept connection with timeout specified.
 -spec accept(listener_handler(), acceptor_opts(), timer:timeout()) ->
           {ok, connection_handler()} |
-          {error, badarg | parm_error | not_enough_mem | badpid} |
+          {error, badarg | param_error | not_enough_mem | badpid} |
           {error, timeout}.
 #+end_src
 
@@ -122,7 +122,7 @@ Calling Process becomes the owner of the connection.
 #+begin_src erlang
 -spec async_accept(listener_handler(), acceptor_opts()) ->
         {ok, listener_handler()} |
-        {error, badarg | parm_error | not_enough_mem | badpid}.
+        {error, badarg | param_error | not_enough_mem | badpid}.
 #+end_src
 
 ** TLS Handshake (Server)
@@ -376,7 +376,7 @@ Get one option for a connecton/stream/listener
 -spec getopt(handler(), optname(), optlevel()) ->
         not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
         {ok, conn_settings()}   | %% when optname = param_conn_settings
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 #+end_src
 
@@ -387,7 +387,7 @@ Set one option for connection/stream/listener
 #+begin_src erlang
 -spec setopt(handler(), optname(), any()) ->
         ok |
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 #+end_src
 
@@ -398,7 +398,7 @@ Gets one or more statistic options for a connection.
 #+begin_src erlang
 -spec getstat(connection_handler(), [inet:stat_option()]) ->
         {ok, list()} |
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 #+end_src
 

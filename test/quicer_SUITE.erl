@@ -795,7 +795,7 @@ tc_getopt_stream_active(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
-      {error,parm_error} = quicer:getopt(Conn, Parm, false),
+      {error,param_error} = quicer:getopt(Conn, Parm, false),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
       {ok, true} = quicer:getopt(Stm, Parm, false),
@@ -825,7 +825,7 @@ tc_get_stream_id(Config) ->
       {ok, Stm3} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm3, <<"ping">>),
       {ok, 8} = quicer:get_stream_id(Stm3),
-      {error, parm_error} = quicer:get_stream_id(Conn),
+      {error, param_error} = quicer:get_stream_id(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)

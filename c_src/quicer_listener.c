@@ -149,7 +149,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!Config)
     {
-      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
     }
 
   ERL_NIF_TERM estatus

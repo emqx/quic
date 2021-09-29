@@ -694,7 +694,7 @@ setopt3(ErlNifEnv *env,
       if (!set_owner_recv_mode(s_ctx->owner, env, evalue))
         {
           enif_mutex_unlock(s_ctx->lock);
-          return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+          return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
 
       enif_mutex_unlock(s_ctx->lock);
@@ -723,7 +723,7 @@ setopt3(ErlNifEnv *env,
     }
   else
     { //@todo support more param
-      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
     }
 }
 
@@ -1025,7 +1025,7 @@ get_stream_opt(ErlNifEnv *env,
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 
@@ -1234,7 +1234,7 @@ get_connection_opt(ErlNifEnv *env,
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 
@@ -1312,7 +1312,7 @@ get_listener_opt(ErlNifEnv *env,
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 
@@ -1362,7 +1362,7 @@ get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 
@@ -1435,7 +1435,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 
@@ -1474,7 +1474,7 @@ get_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 
@@ -1513,7 +1513,7 @@ get_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
   else
     {
-      res = ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
       goto Exit;
     }
 

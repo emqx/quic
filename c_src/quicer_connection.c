@@ -590,7 +590,7 @@ async_accept2(ErlNifEnv *env,
   if (!create_settings(env, &conn_opts, &acceptor->Settings))
     {
       AcceptorDestroy(acceptor);
-      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
     }
 
   ERL_NIF_TERM IsFastConn;

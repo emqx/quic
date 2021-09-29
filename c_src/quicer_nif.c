@@ -45,7 +45,7 @@ ERL_NIF_TERM ATOM_OPEN_FAILED;
 ERL_NIF_TERM ATOM_CTX_INIT_FAILED;
 ERL_NIF_TERM ATOM_BAD_PID;
 ERL_NIF_TERM ATOM_CONFIG_ERROR;
-ERL_NIF_TERM ATOM_PARM_ERROR;
+ERL_NIF_TERM ATOM_PARAM_ERROR;
 ERL_NIF_TERM ATOM_CERT_ERROR;
 ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
@@ -302,7 +302,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_CTX_INIT_FAILED, ctx_init_failed);                                \
   ATOM(ATOM_BAD_PID, bad_pid);                                                \
   ATOM(ATOM_CONFIG_ERROR, config_error);                                      \
-  ATOM(ATOM_PARM_ERROR, parm_error);                                          \
+  ATOM(ATOM_PARAM_ERROR, param_error);                                        \
   ATOM(ATOM_CERT_ERROR, cert_error);                                          \
   ATOM(ATOM_BAD_MON, bad_mon);                                                \
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
