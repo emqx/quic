@@ -4,7 +4,7 @@
 
 * Features List
 Feature todo list, priority descending
-** add safty check for closed handlers
+** add safety check for closed handlers
 
 ** Stream send iolist
 
