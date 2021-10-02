@@ -31,7 +31,7 @@
         , async_close_stream/3
         , sockname/1
         , getopt/3
-        , setopt/3
+        , setopt/4
         , controlling_process/2
         ]).
 
@@ -164,11 +164,11 @@ sockname(_Conn) ->
 getopt(_Handle, _Optname, _IsRaw) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec setopt(handler(), optname(), any()) ->
+-spec setopt(handler(), optname(), any(), optlevel()) ->
         ok |
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
-setopt(_Handle, _Opt, _Value) ->
+setopt(_Handle, _Opt, _Value, _Level) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec get_conn_rid(connection_handler()) ->

@@ -56,7 +56,7 @@ bool get_uint64_from_map(ErlNifEnv *env,
                          uint64_t *value);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM setopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 bool create_settings(ErlNifEnv *env,
                      const ERL_NIF_TERM *emap,

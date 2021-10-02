@@ -1000,7 +1000,7 @@ static ErlNifFunc nif_funcs[] = {
   { "async_close_stream", 3, close_stream3, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
-  { "setopt", 3, setopt3, 0},
+  { "setopt", 4, setopt4, 0},
   { "controlling_process", 2, controlling_process, 0},
   /* for DEBUG */
   { "get_conn_rid", 1, get_conn_rid1, 1},
