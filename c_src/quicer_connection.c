@@ -310,6 +310,7 @@ ServerConnectionCallback(HQUIC Connection,
       acc = c_ctx->owner;
       acc_pid = &(acc->Pid);
 
+      // for fast connect:
       if (!(acc && enif_is_process_alive(c_ctx->env, acc_pid)))
         {
           acc = AcceptorDequeue(
@@ -323,6 +324,12 @@ ServerConnectionCallback(HQUIC Connection,
         }
 
       assert(acc);
+
+      if(!acc->fast_conn)
+      {
+        enif_release_resource(c_ctx);
+      }
+
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
       enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
@@ -381,6 +388,11 @@ ServerConnectionCallback(HQUIC Connection,
       TP_CB_3(shutdown_complete,
               Connection,
               Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
+
+      if(!c_ctx->owner->fast_conn && !Event->SHUTDOWN_COMPLETE.HandshakeCompleted)
+      {
+        enif_release_resource(c_ctx);
+      }
       report = enif_make_tuple3(
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
@@ -743,9 +755,13 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
       return QUIC_STATUS_INTERNAL_ERROR;
     }
 
+  // and releases resource in callback
+  enif_keep_resource(c_ctx);
+
   if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
                       c_ctx->Connection, c_ctx->l_ctx->Configuration)))
-    {
+   {
+      enif_release_resource(c_ctx);
       return Status;
     }
 
@@ -756,6 +772,7 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
                                             sizeof(QUIC_SETTINGS),
                                             &c_ctx->owner->Settings)))
     {
+      enif_release_resource(c_ctx);
       return Status;
     }
   return Status;
