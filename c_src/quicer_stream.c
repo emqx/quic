@@ -300,8 +300,9 @@ async_start_stream2(ErlNifEnv *env,
                     __unused_parm__ int argc,
                     const ERL_NIF_TERM argv[])
 {
-  QUIC_STATUS Status;
-  QuicerConnCTX *c_ctx;
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  QuicerConnCTX *c_ctx = NULL;
+  ERL_NIF_TERM res = ATOM_ERROR_INTERNAL_ERROR;
   ERL_NIF_TERM active_val;
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
@@ -315,23 +316,34 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  enif_mutex_lock(c_ctx->lock);
+  if (c_ctx->is_closed)
+    {
+      enif_mutex_unlock(c_ctx->lock);
+      return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
+    }
+  enif_keep_resource(c_ctx);
+  enif_mutex_unlock(c_ctx->lock);
+
   //
-  // note, ctx is not shared yet, thus no locking is needed.
+  // note, s_ctx is not shared yet, thus no locking is needed.
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
+
   s_ctx->c_ctx = c_ctx;
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
   if (!enif_self(env, &(s_ctx->owner->Pid)))
     {
-      destroy_s_ctx(s_ctx);
-      return ERROR_TUPLE_2(ATOM_BAD_PID);
+      res = ERROR_TUPLE_2(ATOM_BAD_PID);
+      goto ErrorExit;
     }
 
   if (!set_owner_recv_mode(s_ctx->owner, env, active_val))
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto ErrorExit;
     }
 
   // @todo check if stream is null
@@ -341,8 +353,9 @@ async_start_stream2(ErlNifEnv *env,
                                               s_ctx,
                                               &(s_ctx->Stream))))
     {
-      destroy_s_ctx(s_ctx);
-      return ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, atom_status(Status));
+
+      res = ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, ATOM_STATUS(Status));
+      goto ErrorExit;
     }
 
   //
@@ -353,12 +366,16 @@ async_start_stream2(ErlNifEnv *env,
                                                // @todo flag in options
                                                QUIC_STREAM_START_FLAG_NONE)))
     {
-      // note, stream call back would close the stream.
-      // return ERROR_TUPLE_2(ATOM_STREAM_OPEN_ERROR);
-      return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, atom_status(Status));
+      // note, stream call back would close the stream
+      // destroy_s_ctx should not be called here
+      return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
 
   return SUCCESS(enif_make_resource(env, s_ctx));
+
+ErrorExit:
+  destroy_s_ctx(s_ctx);
+  return res;
 }
 
 // accept streams on top of connection.
@@ -496,7 +513,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       enif_mutex_unlock(s_ctx->lock);
       enif_mutex_unlock(s_ctx->c_ctx->lock);
       //@todo return error code
-      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
     }
 
   else

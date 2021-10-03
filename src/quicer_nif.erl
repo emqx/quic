@@ -102,7 +102,7 @@ async_connect(_Host, _Port, _Opts) ->
 
 -spec async_accept(listener_handler(), acceptor_opts()) ->
         {ok, listener_handler()} |
-        {error, badarg | parm_error | not_enough_mem | badpid}.
+        {error, badarg | param_error | not_enough_mem | badpid}.
 async_accept(_Listener, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
@@ -163,10 +163,10 @@ async_close_stream(_Stream, _Flags, _ErrorCode) ->
 sockname(_Conn) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec getopt(handler(), optname(), boolean()) ->
-        {ok, binary()} | %% when IsRaw
+-spec getopt(handler(), optname(), optlevel()) ->
+        not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
         {ok, conn_settings()}   | %% when optname = param_conn_settings
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 
 getopt(_Handle, _Optname, _IsRaw) ->
@@ -174,7 +174,7 @@ getopt(_Handle, _Optname, _IsRaw) ->
 
 -spec setopt(handler(), optname(), any()) ->
         ok |
-        {error, badarg | parm_error | internal_error | not_enough_mem} |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 setopt(_Handle, _Opt, _Value) ->
   erlang:nif_error(nif_library_not_loaded).

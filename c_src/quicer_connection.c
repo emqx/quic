@@ -220,7 +220,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           ATOM_QUIC,
           ATOM_TRANS_SHUTDOWN,
           enif_make_resource(env, c_ctx),
-          atom_status(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
+          ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
       break;
@@ -459,6 +459,7 @@ ServerConnectionCallback(HQUIC Connection,
           MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
                                      (void *)ServerStreamCallback,
                                      s_ctx);
+          enif_keep_resource(c_ctx);
         }
       break;
     case QUIC_CONNECTION_EVENT_RESUMED:
@@ -578,8 +579,8 @@ async_connect3(ErlNifEnv *env,
                                                    port)))
     {
       MsQuic->ConnectionClose(c_ctx->Connection);
+      c_ctx->is_closed = TRUE;
       destroy_c_ctx(c_ctx);
-      // @TODO return atom status
       return ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
     }
 
@@ -615,7 +616,7 @@ async_accept2(ErlNifEnv *env,
   if (!create_settings(env, &conn_opts, &acceptor->Settings))
     {
       AcceptorDestroy(acceptor);
-      return ERROR_TUPLE_2(ATOM_PARM_ERROR);
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
     }
 
   ERL_NIF_TERM IsFastConn;
@@ -703,7 +704,7 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
                   = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
     {
       return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR); // @TODO is this err useful?
-                                                 // use atom_status instead?
+                                                 // use ATOM_STATUS instead?
     }
 
   return SUCCESS(addr2eterm(env, &addr));
@@ -808,7 +809,7 @@ async_handshake_1(ErlNifEnv *env,
 
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {
-      return ERROR_TUPLE_2(atom_status(Status));
+      return ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
 
   return ATOM_OK;

@@ -42,7 +42,8 @@
         unreachable         |
         tls_error           |
         user_canceled       |
-        alpn_neg_failure.
+        alpn_neg_failure    |
+        stream_limit_reached.
 
 -type app_errno() :: non_neg_integer().
 -type hostname() :: string().
@@ -52,7 +53,7 @@
 -type stream_handler()     :: reference().
 -type conf_handler()       :: reference().
 -type reg_handler()        :: reference().
--type global_handler()     :: undefined.
+-type global_handler()     :: quic_global.
 
 -type handler() ::
         global_handler()     |
@@ -79,6 +80,12 @@
                               ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE. %% @TODO add xor
 
 -type send_flags() :: non_neg_integer(). %% is sync send or not
+
+-type optlevel() :: false | %% unspecified
+                    quic_global |
+                    quic_registration |
+                    quic_configuration |
+                    quic_tls.
 
 -type optname() ::
         optname_global()        |
@@ -107,7 +114,8 @@
         param_conn_datagram_send_enabled          |           %% |  X  |    | @TODO
         param_conn_disable_1rtt_encryption        |           %% |  X  |  X | @TODO
         param_conn_resumption_ticket              |           %% |     |  X | @TODO
-        param_conn_peer_certificate_valid.                    %% |     |  X | @TODO
+        param_conn_peer_certificate_valid         |           %% |     |  X | @TODO
+        param_conn_local_interface.                           %% |     |  X | @TODO
 
 -type optname_tls()   ::  %% with connection_handler()
         param_tls_schannel_context_attribute_w    |           %% |  X  |    | @TODO
