@@ -98,7 +98,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
       destroy_dgram_send_ctx(dgram_send_ctx);
       enif_mutex_unlock(c_ctx->lock);
-      return ERROR_TUPLE_3(ATOM_DGRAM_SEND_ERROR, atom_status(Status));
+      return ERROR_TUPLE_3(ATOM_DGRAM_SEND_ERROR, ATOM_STATUS(Status));
     }
   else
     {
