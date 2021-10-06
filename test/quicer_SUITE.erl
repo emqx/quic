@@ -1047,8 +1047,10 @@ tc_setopt_conn_local_addr(Config) ->
   %% change local addr with a new port 5060
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
   %% sleep is needed to finish migration at protocol level
-  timer:sleep(200),
-  ?assertEqual({ok, {{127,0,0,1}, 50600}}, quicer:sockname(Stm0)),
+  retry_with(fun() ->
+               timer:sleep(100),
+               {ok, {{127,0,0,1}, 50600}} == quicer:sockname(Stm0)
+             end, 20, "addr migration failed"),
   {ok, 5} = quicer:send(Stm0, <<"ping2">>),
   receive
     {quic, <<"ping2">>, Stm0, _, _, _} ->
@@ -1496,6 +1498,17 @@ active_recv(Stream, Len, BinList) ->
       end
 end.
 
+retry_with(_Fun, 0, ErrorInfo) ->
+  ct:fail(ErrorInfo);
+retry_with(Fun, Retry, ErrorInfo) ->
+  case Fun() of
+    true ->
+      ok;
+    false ->
+      retry_with(Fun, Retry -1, ErrorInfo);
+    {false, NewErrorInfo} ->
+      retry_with(Fun, Retry -1, NewErrorInfo)
+  end.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t
