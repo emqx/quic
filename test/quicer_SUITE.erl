@@ -73,6 +73,7 @@
         , tc_getopt_stream_active/1
         , tc_setopt/1
         , tc_setopt_conn_local_addr/1
+        , tc_setopt_conn_local_addr_in_use/1
         , tc_strm_opt_active_n/1
         , tc_strm_opt_active_once/1
         , tc_strm_opt_active_1/1
@@ -1058,6 +1059,49 @@ tc_setopt_conn_local_addr(Config) ->
   SPid ! {peer_addr, self()},
   receive {peer_addr, Peer} -> ok end,
     ?assertEqual({ok, {{127,0,0,1}, 50600}}, Peer),
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
+
+tc_setopt_conn_local_addr_in_use(Config) ->
+  Port = 4578,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm0, _, _, _} ->
+      ok
+  after 1000 ->
+      ct:fail("recv ping1 timeout")
+  end,
+  {ok, OldAddr} = quicer:sockname(Stm0),
+  %% change local addr with a new random port (0)
+  ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
+  %% sleep is needed to finish migration at protocol level
+  timer:sleep(50),
+  {ok, NewAddr} = quicer:sockname(Stm0),
+  ?assertNotEqual(OldAddr, NewAddr),
+  ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, NewAddr),
+  ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, OldAddr),
+
+  %% Occupy 50600
+  {ok, ESocket} = gen_udp:open(50600, [{ip, element(1, NewAddr)}]),
+  %% change local addr with a new port 5060
+  ?assertEqual({error,address_in_use}, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
+  gen_udp:close(ESocket),
+  %% sleep is needed to finish migration at protocol level
+  {ok, 5} = quicer:send(Stm0, <<"ping2">>),
+  receive
+    {quic, <<"ping2">>, Stm0, _, _, _} ->
+      ok
+  after 1000 ->
+      ct:fail("recv ping2 timeout")
+  end,
+  %% check with server if peer addr is correct.
+  SPid ! {peer_addr, self()},
+  receive {peer_addr, Peer} -> ok end,
+  ?assertEqual({ok, NewAddr}, Peer),
   SPid ! done,
   ensure_server_exit_normal(Ref).
 
