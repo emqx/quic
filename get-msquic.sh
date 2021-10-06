@@ -18,5 +18,5 @@ fi
 
 if [ "$CURRENT_VSN" != "$VERSION" ]; then
     echo "undesired_msquic_version, required=$VERSION, got=$CURRENT_VSN"
-    exit 0
+    exit 1
 fi
