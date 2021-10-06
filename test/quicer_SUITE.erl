@@ -863,6 +863,7 @@ tc_getstat_closed(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive {quic, _, _, _,_,_} -> ok end,
       ok = quicer:close_stream(Stm),
+      ok = quicer:close_connection(Conn),
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
