@@ -72,8 +72,11 @@
         , tc_getopt/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
-        , tc_setopt_conn_local_addr/1
-        , tc_setopt_conn_local_addr_in_use/1
+
+        %% @TODO following two tcs are failing due to:
+        %  https://github.com/microsoft/msquic/issues/2033
+        % , tc_setopt_conn_local_addr/1
+        % , tc_setopt_conn_local_addr_in_use/1
         , tc_strm_opt_active_n/1
         , tc_strm_opt_active_once/1
         , tc_strm_opt_active_1/1
@@ -1048,8 +1051,11 @@ tc_setopt_conn_local_addr(Config) ->
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
   %% sleep is needed to finish migration at protocol level
   retry_with(fun() ->
-               timer:sleep(100),
-               {ok, {{127,0,0,1}, 50600}} == quicer:sockname(Stm0)
+                 timer:sleep(100),
+                 case quicer:sockname(Stm0) of
+                   {ok, {{127,0,0,1}, 50600}} -> true;
+                   {ok, Other} -> {false, Other}
+                 end
              end, 20, "addr migration failed"),
   {ok, 5} = quicer:send(Stm0, <<"ping2">>),
   receive
@@ -1092,8 +1098,11 @@ tc_setopt_conn_local_addr_in_use(Config) ->
   {ok, ESocket} = gen_udp:open(50600, [{ip, element(1, NewAddr)}]),
   %% change local addr with a new port 5060
   ?assertEqual({error,address_in_use}, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
-  gen_udp:close(ESocket),
+
+  %gen_udp:close(ESocket),
+
   %% sleep is needed to finish migration at protocol level
+  ct:pal("send after migration failed"),
   {ok, 5} = quicer:send(Stm0, <<"ping2">>),
   receive
     {quic, <<"ping2">>, Stm0, _, _, _} ->
@@ -1505,9 +1514,9 @@ retry_with(Fun, Retry, ErrorInfo) ->
     true ->
       ok;
     false ->
-      retry_with(Fun, Retry -1, ErrorInfo);
+      retry_with(Fun, Retry - 1, ErrorInfo);
     {false, NewErrorInfo} ->
-      retry_with(Fun, Retry -1, NewErrorInfo)
+      retry_with(Fun, Retry - 1, NewErrorInfo)
   end.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
