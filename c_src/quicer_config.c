@@ -35,11 +35,6 @@ static ERL_NIF_TERM get_connection_opt(ErlNifEnv *env,
                                        QuicerConnCTX *c_ctx,
                                        ERL_NIF_TERM optname,
                                        ERL_NIF_TERM elevel);
-static ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
-                                       QuicerConnCTX *c_ctx,
-                                       ERL_NIF_TERM optname,
-                                       ERL_NIF_TERM optval,
-                                       ERL_NIF_TERM elevel);
 
 static ERL_NIF_TERM get_listener_opt(ErlNifEnv *env,
                                      QuicerListenerCTX *l_ctx,
@@ -1454,7 +1449,7 @@ Exit:
   return res;
 }
 
-static ERL_NIF_TERM
+ERL_NIF_TERM
 set_connection_opt(ErlNifEnv *env,
                    QuicerConnCTX *c_ctx,
                    ERL_NIF_TERM optname,

@@ -65,4 +65,10 @@ bool create_settings(ErlNifEnv *env,
 bool
 parse_listen_on(ErlNifEnv *env, ERL_NIF_TERM elisten_on, QUIC_ADDR *Address);
 
+ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
+                                QuicerConnCTX *c_ctx,
+                                ERL_NIF_TERM optname,
+                                ERL_NIF_TERM optval,
+                                ERL_NIF_TERM elevel);
+
 #endif // __QUICER_CONFIG_H_

@@ -49,6 +49,7 @@
         , tc_conn_basic_slow_start/1
         , tc_conn_double_close/1
         , tc_conn_other_port/1
+        , tc_conn_with_localaddr/1
         , tc_conn_controlling_process/1
 
         , tc_stream_client_init/1
@@ -366,6 +367,26 @@ tc_conn_other_port(Config)->
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ok = ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_with_localaddr(Config)->
+  Port = 5568,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
+
+  {ok, CPort0} = gen_udp:open(0, [{ip, {127, 0, 0, 1}}]),
+  {ok, {{127, 0, 0, 1}, PortX}} = inet:sockname(CPort0),
+  ok = gen_udp:close(CPort0),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("127.0.0.1", Port, [{param_conn_local_address, "127.0.0.1:" ++ integer_to_list(PortX)}
+                                                     | default_conn_opts()], 5000),
+      ?assertEqual({ok, {{127,0,0,1}, PortX}}, quicer:sockname(Conn)),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
