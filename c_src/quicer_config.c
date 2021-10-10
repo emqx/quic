@@ -48,23 +48,31 @@ static ERL_NIF_TERM set_listener_opt(ErlNifEnv *env,
 
 static ERL_NIF_TERM
 get_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
-static ERL_NIF_TERM
-set_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval);
+static ERL_NIF_TERM set_config_opt(ErlNifEnv *env,
+                                   HQUIC Hanlder,
+                                   ERL_NIF_TERM optname,
+                                   ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
 get_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
-static ERL_NIF_TERM
-set_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval);
+static ERL_NIF_TERM set_reg_opt(ErlNifEnv *env,
+                                HQUIC Hanlder,
+                                ERL_NIF_TERM optname,
+                                ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
 get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
-static ERL_NIF_TERM
-set_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval);
+static ERL_NIF_TERM set_tls_opt(ErlNifEnv *env,
+                                HQUIC Hanlder,
+                                ERL_NIF_TERM optname,
+                                ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
 get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
-static ERL_NIF_TERM
-set_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval);
+static ERL_NIF_TERM set_global_opt(ErlNifEnv *env,
+                                   HQUIC Hanlder,
+                                   ERL_NIF_TERM optname,
+                                   ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM get_level_param(ErlNifEnv *env,
                                     HQUIC Handle,
@@ -74,8 +82,7 @@ static ERL_NIF_TERM set_level_param(ErlNifEnv *env,
                                     HQUIC Handle,
                                     ERL_NIF_TERM level,
                                     ERL_NIF_TERM eopt,
-                                    ERL_NIF_TERM optval
-);
+                                    ERL_NIF_TERM optval);
 
 bool
 ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
@@ -684,15 +691,18 @@ setopt4(ErlNifEnv *env,
     }
   if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
-      res = set_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, evalue, elevel);
+      res = set_stream_opt(
+          env, (QuicerStreamCTX *)q_ctx, eopt, evalue, elevel);
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
-      res = set_connection_opt(env, (QuicerConnCTX *)q_ctx, eopt, evalue, elevel);
+      res = set_connection_opt(
+          env, (QuicerConnCTX *)q_ctx, eopt, evalue, elevel);
     }
   else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
     {
-      res = set_listener_opt(env, (QuicerListenerCTX *)q_ctx, eopt, evalue, elevel);
+      res = set_listener_opt(
+          env, (QuicerListenerCTX *)q_ctx, eopt, evalue, elevel);
     }
   else
     { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
@@ -1213,8 +1223,7 @@ set_stream_opt(ErlNifEnv *env,
       goto Exit;
     }
 
-  status
-      = MsQuic->SetParam(s_ctx->Stream, Level, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(s_ctx->Stream, Level, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1522,7 +1531,7 @@ set_connection_opt(ErlNifEnv *env,
       QUIC_SETTINGS Settings = { 0 };
       if (!create_settings(env, &optval, &Settings))
         {
-          res =  ERROR_TUPLE_2(ATOM_BADARG);
+          res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Exit;
         }
       Buffer = &Settings;
@@ -1805,11 +1814,8 @@ set_listener_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(l_ctx->Listener,
-                            QUIC_PARAM_LEVEL_LISTENER,
-                            Param,
-                            BufferLength,
-                            Buffer);
+  status = MsQuic->SetParam(
+      l_ctx->Listener, QUIC_PARAM_LEVEL_LISTENER, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1870,7 +1876,10 @@ Exit:
 }
 
 static ERL_NIF_TERM
-set_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, __unused_parm__ ERL_NIF_TERM optval)
+set_tls_opt(ErlNifEnv *env,
+            HQUIC Hanlder,
+            ERL_NIF_TERM optname,
+            __unused_parm__ ERL_NIF_TERM optval)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1988,7 +1997,10 @@ Exit:
 }
 
 static ERL_NIF_TERM
-set_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval)
+set_global_opt(ErlNifEnv *env,
+               HQUIC Hanlder,
+               ERL_NIF_TERM optname,
+               ERL_NIF_TERM optval)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -2002,10 +2014,10 @@ set_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM
       uint32_t percent = 0;
       BufferLength = sizeof(uint32_t);
       if (!enif_get_uint(env, optval, &percent) || percent > UINT16_MAX)
-      {
-        res = ERROR_TUPLE_2(ATOM_BADARG);
-        goto Exit;
-      }
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
       Buffer = &percent;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS))
@@ -2105,7 +2117,10 @@ Exit:
 }
 
 static ERL_NIF_TERM
-set_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval)
+set_config_opt(ErlNifEnv *env,
+               HQUIC Hanlder,
+               ERL_NIF_TERM optname,
+               ERL_NIF_TERM optval)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -2185,7 +2200,10 @@ Exit:
 }
 
 static ERL_NIF_TERM
-set_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM optval)
+set_reg_opt(ErlNifEnv *env,
+            HQUIC Hanlder,
+            ERL_NIF_TERM optname,
+            ERL_NIF_TERM optval)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -2197,10 +2215,10 @@ set_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname, ERL_NIF_TERM op
     {
       Param = QUIC_PARAM_REGISTRATION_CID_PREFIX;
       if (!enif_get_string(env, optval, Buffer, BufferLength, ERL_NIF_LATIN1))
-      {
-        res = ERROR_TUPLE_2(ATOM_BADARG);
-        goto Exit;
-      }
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
     }
   else
     {
