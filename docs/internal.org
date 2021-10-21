@@ -1,0 +1,101 @@
+Notes for internal impl. , API caller don't need to understand this
+
+* Handler Lifecycle
+** What is Handler
+
+In erlang code, Handler (a handle term) is a Ref to the contexts and they are
+
+Listener handler for accessing l_ctx (Listener Context)
+
+Connection handler for accessing c_ctx (Connection Context)
+
+Stream handler for accessing s_ctx (Stream Context)
+
+`*_ctx` is the NIF resource object in C code, and it has
+
+1. A MsQuic handler (HQUIC) for interworking with MsQuic.
+2. A is_closed boolean flag mark the HQUIC is valid or not.
+   If it is false, the HQUIC may become invalid and it is not safe to use it for calling MsQuic APIs
+3. ... Other which is irrelevant here.
+
+** Creation
+
+Creation is the op of allocating NIF resources.
+
+*** Listener handler
+
+created in quicer_nif:listen/2
+
+*** Connection handler
+
+look for init_c_ctx
+
+1. server: is created in listener callback when there is new incoming connection
+2. client: is created in quicer_nif:async_connect3/3
+
+*** Stream handler
+
+look for init_s_ctx
+
+1. server: is created in conn callback
+2. client: is created in quicer_nif:async_start_stream2/2
+
+** Destroy
+
+In the erlang code, if there is a var holding the handler, it will not be a target for GC.
+
+Same in C NIF code, if the handler is one of the input arguments, it is safe to access the *_ctx because the var in erlang is still holding the handler but we cannot assume the API caller will hold the handler for the entire lifecycle.
+
+** Keeping and Using
+
+In C code, the resource object  is not deallocated until the last handle term is garbage collected by the VM and the resource is released with enif_release_resource (not necessarily in that order).
+
+Thus in term of thread safety, There are three players in quicer that could access the resource object simultaneously.
+
+1. The MsQuic worker thread is accessing *_ctx in the callback function
+2. VM scheduler is executing a NIF function such as quicer:send/2
+3. VM scheduler thread is doing GC of the handler object
+
+For safety, we need to ref count the usage by calling a pair of function: enif_keep_resource and enif_release_resource.
+
+1. Ensure the 3) happens last.
+
+2. In the nif function that needs access resource object
+
+   call enif_keep_resource before the access
+
+   call enif_release_resource after the access
+
+3. In the nif Function that calls the MsQuic API which will create task for MsQuic worker
+
+   After checking that the resource is not in the closing/closed state (a lock is needed),
+   call enif_keep_resource before calling the MsQuic API
+
+   In MsQuic callback function
+
+   call enif_release_resource when the async task is done
+
+4. In MsQuic callback function
+
+   call enif_release_resource when the corresponding handler of MsQuic is closed.
+
+   also, ensure the is_closed is set to *TRUE*
+
+5. In MsQuic callback function and NIF function
+
+   When the high-level resource object is created on top of a lower level.
+
+   For example: when a stream is created in a connection, we need to call enif_keep_resource for connection resource object bump the refcnt.
+
+6. Deinit the resource object in `resource_*_dealloc_callback`
+
+   call enif_release_resource for corresponding lower-level resource object.
+
+   Such like when deinit the s_ctx, it should deref the c_ctx.
+
+   Everything contained in the resource object becomes invalid.
+
+7. TBD: MsQuic callback signaling
+
+   This needs to be double-checked, if callback fun could signal the resource owner to let it access the c_ctx?
+   If so, GC will be a problem become the receiver could die and not be able to dec the refcnt.
