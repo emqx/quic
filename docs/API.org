@@ -461,7 +461,7 @@ Data received in binary format
 Both directions of the stream have been shut down.
 
 #+begin_src erlang
-{quic, closed, stream_handler(), IsGraceFul:: 0 | 1}
+{quic, closed, stream_handler(), ConnectionShutdown:: 0 | 1}
 #+end_src
 
 *** send_complete
@@ -529,7 +529,7 @@ also see [[Accept Stream (Server)]]
 Connection has been shutdown by the transport locally, such as idle timeout.
 
 #+begin_src erlang
-{quic, trans_shutdown, connection_handler(), Status :: atom_status()}
+{quic, transport_shutdown, connection_handler(), Status :: atom_status()}
 #+end_src
 
 *** Shutdown initiated by PEER

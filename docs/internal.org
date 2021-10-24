@@ -30,15 +30,15 @@ created in quicer_nif:listen/2
 
 look for init_c_ctx
 
-1. server: is created in listener callback when there is new incoming connection
-2. client: is created in quicer_nif:async_connect3/3
+1. server: ctx is created in listener callback when there is new incoming connection
+2. client: ctx is created in quicer_nif:async_connect3/3
 
 *** Stream handler
 
 look for init_s_ctx
 
-1. server: is created in conn callback
-2. client: is created in quicer_nif:async_start_stream2/2
+1. server: ctx is created in conn callback
+2. client: ctx is created in quicer_nif:async_start_stream2/2
 
 ** Destroy
 
@@ -48,17 +48,17 @@ Same in C NIF code, if the handler is one of the input arguments, it is safe to 
 
 ** Keeping and Using
 
-In C code, the resource object  is not deallocated until the last handle term is garbage collected by the VM and the resource is released with enif_release_resource (not necessarily in that order).
+In C code, the resource object is not deallocated until the last handle term is garbage collected by the VM and the resource is released with enif_release_resource (not necessarily in that order).
 
 Thus in term of thread safety, There are three players in quicer that could access the resource object simultaneously.
 
-1. The MsQuic worker thread is accessing *_ctx in the callback function
-2. VM scheduler is executing a NIF function such as quicer:send/2
-3. VM scheduler thread is doing GC of the handler object
+a. The MsQuic worker thread is accessing *_ctx in the callback function
+b. VM scheduler is executing a NIF function such as quicer:send/2
+c. VM scheduler thread is doing GC of the handler object
 
 For safety, we need to ref count the usage by calling a pair of function: enif_keep_resource and enif_release_resource.
 
-1. Ensure the 3) happens last.
+1. Ensure the c) happens last.
 
 2. In the nif function that needs access resource object
 
@@ -79,7 +79,7 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
    call enif_release_resource when the corresponding handler of MsQuic is closed.
 
-   also, ensure the is_closed is set to *TRUE*
+   also, ensure the is_closed is set to *TRUE* and the set is lock protected.
 
 5. In MsQuic callback function and NIF function
 
@@ -95,7 +95,15 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
    Everything contained in the resource object becomes invalid.
 
-7. TBD: MsQuic callback signaling
+7. When shutdown the connection via quicer_nif:close_connection3
+
+   Mark ctx.is_closed = True if it is unset
+
+8. Close msquic handler only in callback ctx, never do it in nif ctx
+
+   Close the msquic handler when shutdown_complete event is received.
+
+9. TBD: MsQuic callback signaling
 
    This needs to be double-checked, if callback fun could signal the resource owner to let it access the c_ctx?
    If so, GC will be a problem become the receiver could die and not be able to dec the refcnt.

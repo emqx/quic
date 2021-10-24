@@ -127,6 +127,7 @@ all() ->
   , tc_conn_owner_down
   , tc_conn_close_flag_1
   , tc_conn_close_flag_2
+  , tc_conn_idle_close
   , tc_stream_close_errno
   ].
 
@@ -567,6 +568,80 @@ tc_stream_close_errno(Config) ->
                                               },
                                              Trace))
                      end),
+  ok.
+
+
+tc_conn_idle_close(Config) ->
+  Errno = 1234,
+  Port = 8888,
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                   , {idle_timeout_ms, 5000}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
+                 ?block_until(
+                    #{?snk_kind := debug, context := "callback",
+                      function := "ClientConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT,
+                      tag := "transport_down"}, 1000),
+                 receive
+                   {quic, transport_shutdown, _Conn, Status} ->
+                     ct:pal("conn trans_shutdown status ~p~n", [Status])
+                 end,
+                 {error, closed} = quicer:async_send(Stm, <<"ping2">>),
+
+                 ?block_until(
+                    #{?snk_kind := debug, context := "callback",
+                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                      tag := "event"}, 1000),
+                 ok
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% check that transport shutdown due to idle timeout is triggerd at client side
+                   %% check that shutdown_complete is triggered after idle timeout
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                              },
+                                             Trace)),
+
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE
+                                              },
+                                             Trace))
+                     end),
+  ct:pal("stop listener"),
+  ok = quicer:stop_listener(mqtt),
   ok.
 
 

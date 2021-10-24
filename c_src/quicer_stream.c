@@ -133,7 +133,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           ATOM_QUIC,
           ATOM_CLOSED,
           enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+          enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
 
@@ -153,8 +153,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
   if (is_destroy)
     {
-      // must be called after mutex unlock
       MsQuic->StreamClose(Stream);
+      // must be called after mutex unlock
       destroy_s_ctx(s_ctx);
     }
   return status;
@@ -264,9 +264,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           ATOM_QUIC,
           ATOM_CLOSED,
           enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+          enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+      //  invalid the handler now
+      s_ctx->is_closed = TRUE;
+      // Then we destroy the ctx without holding lock.
       is_destroy = TRUE;
       break;
     case QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE:
@@ -288,8 +291,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
   if (is_destroy)
     {
-      // must be called after mutex unlock
+
       MsQuic->StreamClose(Stream);
+      // must be called after mutex unlock,
       destroy_s_ctx(s_ctx);
     }
   return status;

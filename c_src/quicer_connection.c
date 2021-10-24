@@ -241,6 +241,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
+      if (Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+        {
+          CXPLAT_FRE_ASSERT(c_ctx->is_closed);
+        }
+
       if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
@@ -398,6 +403,11 @@ ServerConnectionCallback(HQUIC Connection,
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+
+      if (Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+        {
+          CXPLAT_FRE_ASSERT(c_ctx->is_closed);
+        }
 
       if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
@@ -661,6 +671,7 @@ close_connection3(ErlNifEnv *env,
   enif_mutex_lock(c_ctx->lock);
   if (!c_ctx->is_closed)
     {
+      // mark invalid handler now!
       c_ctx->is_closed = TRUE;
       MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
     }
