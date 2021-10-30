@@ -897,14 +897,29 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
       enif_mutex_lock(s_ctx->lock);
-      res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
+      if (s_ctx->is_closed)
+        {
+          res = ERROR_TUPLE_2(ATOM_CLOSED);
+        }
+      else
+        {
+          res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
+        }
       enif_mutex_unlock(s_ctx->lock);
     }
   else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
 
       enif_mutex_lock(c_ctx->lock);
-      res = connection_controlling_process(env, c_ctx, &caller, &new_owner);
+      if (c_ctx->is_closed)
+        {
+          res = ERROR_TUPLE_2(ATOM_CLOSED);
+        }
+      else
+        {
+          res = connection_controlling_process(
+              env, c_ctx, &caller, &new_owner);
+        }
       enif_mutex_unlock(c_ctx->lock);
     }
   else

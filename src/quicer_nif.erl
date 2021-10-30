@@ -185,7 +185,7 @@ get_stream_rid(_Handle) ->
 
 -spec controlling_process(connection_handler() | stream_handler(), pid()) ->
         ok |
-        {error, badarg | owner_dead | not_owner}.
+        {error, closed | badarg | owner_dead | not_owner}.
 controlling_process(_H, _P) ->
   erlang:nif_error(nif_library_not_loaded).
 
