@@ -62,11 +62,15 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
 2. In the nif function that needs access resource object
 
-   call enif_keep_resource before the access
+   +call enif_keep_resource before the access+
 
-   call enif_release_resource after the access
+   +call enif_release_resource after the access+
 
-3. In the nif Function that calls the MsQuic API which will create task for MsQuic worker
+   At the time of accessing resource object, the Var is still refereced and GC will not reclaim it.
+
+   It is unnecessary to keep/release the resource.
+
+3. In the nif Function that calls the MsQuic API which can cause resource object in the callback context
 
    After checking that the resource is not in the closing/closed state (a lock is needed),
    call enif_keep_resource before calling the MsQuic API
