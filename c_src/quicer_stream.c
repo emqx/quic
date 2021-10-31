@@ -638,21 +638,20 @@ close_stream3(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  //@todo support application specific error code.
+
   // we don't use trylock since we are in NIF call.
   enif_mutex_lock(s_ctx->lock);
-  enif_keep_resource(s_ctx);
   if (!s_ctx->is_closed)
     {
       if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
                           s_ctx->Stream, flags, app_errcode)))
         {
-          ret = ERROR_TUPLE_2(ETERM_INT(Status));
+          ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
         }
       s_ctx->is_closed = TRUE;
     }
   enif_mutex_unlock(s_ctx->lock);
-  enif_release_resource(s_ctx);
+
   return ret;
 }
 
