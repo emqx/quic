@@ -686,10 +686,14 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   HQUIC Handle = NULL;
   uint32_t Param;
   QUIC_PARAM_LEVEL Level;
+  BOOLEAN is_closed = FALSE;
 
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
-      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
+      is_closed = (((QuicerConnCTX *)q_ctx))->is_closed;
+      enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
+      Handle = (((QuicerConnCTX *)q_ctx))->Connection;
       Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
     }
@@ -701,6 +705,10 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
     }
   else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
     {
+      enif_mutex_lock(((QuicerStreamCTX *)q_ctx)->lock);
+      is_closed = (((QuicerStreamCTX *)q_ctx))->is_closed;
+      enif_mutex_unlock(((QuicerStreamCTX *)q_ctx)->lock);
+
       Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
       Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
@@ -708,6 +716,11 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   else
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (is_closed)
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
   QUIC_STATUS status;
