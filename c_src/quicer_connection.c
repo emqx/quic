@@ -796,13 +796,9 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
       return QUIC_STATUS_INTERNAL_ERROR;
     }
 
-  // and releases resource in callback
-  enif_keep_resource(c_ctx);
-
   if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
                       c_ctx->Connection, c_ctx->l_ctx->Configuration)))
     {
-      enif_release_resource(c_ctx);
       return Status;
     }
 
@@ -813,7 +809,6 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
                                             sizeof(QUIC_SETTINGS),
                                             &c_ctx->owner->Settings)))
     {
-      enif_release_resource(c_ctx);
       return Status;
     }
   return Status;
@@ -827,6 +822,7 @@ async_handshake_1(ErlNifEnv *env,
 {
   QuicerConnCTX *c_ctx;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM res = ATOM_OK;
   if (1 != argc)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -837,14 +833,28 @@ async_handshake_1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  enif_mutex_lock(c_ctx->lock);
+  if (c_ctx->is_closed)
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      enif_mutex_unlock(c_ctx->lock);
+      goto Exit;
+    }
+  else
+    {
+      enif_keep_resource(c_ctx);
+      enif_mutex_unlock(c_ctx->lock);
+    }
+
   TP_NIF_3(start, c_ctx->Connection, 0);
 
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {
-      return ERROR_TUPLE_2(ATOM_STATUS(Status));
+      enif_release_resource(c_ctx);
+      res = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-
-  return ATOM_OK;
+Exit:
+  return res;
 }
 
 ///_* Emacs
