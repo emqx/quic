@@ -214,7 +214,7 @@ Calling process becomes the owner of the stream.
 #+begin_src erlang
 -spec start_stream(connection_handler(), stream_opts()) ->
         {ok, stream_handler()} |
-        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {error, badarg | internal_error | bad_pid | owner_dead | not_enough_mem} |
         {error, stream_open_error, atom_reason()} |
         {error, stream_start_error, atom_reason()}.
 #+end_src

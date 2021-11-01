@@ -123,7 +123,7 @@ async_accept_stream(_Conn, _Opts) ->
 
 -spec start_stream(connection_handler(), stream_opts()) ->
         {ok, stream_handler()} |
-        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {error, badarg | internal_error | bad_pid | owner_dead | not_enough_mem} |
         {error, stream_open_error, atom_reason()} |
         {error, stream_start_error, atom_reason()}.
 start_stream(_Conn, _Opts) ->

@@ -326,6 +326,7 @@ async_start_stream2(ErlNifEnv *env,
       enif_mutex_unlock(c_ctx->lock);
       return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
     }
+  // note, release resource in destroy_s_ctx
   enif_keep_resource(c_ctx);
   enif_mutex_unlock(c_ctx->lock);
 
@@ -334,10 +335,22 @@ async_start_stream2(ErlNifEnv *env,
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
 
+  if (!s_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
   s_ctx->c_ctx = c_ctx;
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
+
+  if (!s_ctx->owner)
+    {
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto ErrorExit;
+    }
+
   if (!enif_self(env, &(s_ctx->owner->Pid)))
     {
       res = ERROR_TUPLE_2(ATOM_BAD_PID);
@@ -350,7 +363,6 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
-  // @todo check if stream is null
   if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
                                               QUIC_STREAM_OPEN_FLAG_NONE,
                                               ClientStreamCallback,
