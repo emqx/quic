@@ -431,10 +431,11 @@ async_accept_stream2(ErlNifEnv *env,
 ERL_NIF_TERM
 send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-  QuicerStreamCTX *s_ctx;
+  QuicerStreamCTX *s_ctx = NULL;
   ERL_NIF_TERM estream = argv[0];
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eFlags = argv[2];
+  ERL_NIF_TERM res = ATOM_OK;
   uint32_t sendflags;
 
   if (3 != argc)
@@ -489,10 +490,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (s_ctx->is_closed || s_ctx->c_ctx->is_closed)
     {
-      destroy_send_ctx(send_ctx);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      enif_mutex_unlock(s_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto ErrorExit;
     }
 
   HQUIC Stream = s_ctx->Stream;
@@ -512,20 +511,22 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           Status = MsQuic->StreamSend(
               Stream, &send_ctx->Buffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
     {
-      destroy_send_ctx(send_ctx);
+      res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
-      enif_mutex_unlock(s_ctx->lock);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      //@todo return error code
-      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
+      goto ErrorExit;
     }
 
   else
     {
-      enif_mutex_unlock(s_ctx->lock);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      return SUCCESS(ETERM_UINT_64(bin->size));
+      res = SUCCESS(ETERM_UINT_64(bin->size));
+      goto Exit;
     }
+ErrorExit:
+  destroy_send_ctx(send_ctx);
+Exit:
+  enif_mutex_unlock(s_ctx->lock);
+  enif_mutex_unlock(s_ctx->c_ctx->lock);
+  return res;
 }
 
 ERL_NIF_TERM
