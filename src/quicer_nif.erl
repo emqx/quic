@@ -139,7 +139,7 @@ send(_Stream, _Data, _Flags) ->
 -spec recv(stream_handler(), non_neg_integer()) ->
         {ok, binary()}     |
         {ok, not_ready}     |
-        {error, badarg | einval}.
+        {error, badarg | einval | closed}.
 recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 

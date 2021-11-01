@@ -5,11 +5,17 @@ Notes for internal impl. , API caller don't need to understand this
 
 In erlang code, Handler (a handle term) is a Ref to the contexts and they are
 
-Listener handler for accessing l_ctx (Listener Context)
+- Listener handler
 
-Connection handler for accessing c_ctx (Connection Context)
+  For accessing l_ctx (Listener Context)
 
-Stream handler for accessing s_ctx (Stream Context)
+- Connection handler
+
+  For accessing c_ctx (Connection Context)
+
+- Stream handler
+
+  For accessing s_ctx (Stream Context)
 
 `*_ctx` is the NIF resource object in C code, and it has
 
@@ -60,7 +66,7 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
 1. Ensure the c) happens last.
 
-2. In the nif function that needs access resource object
+2. In the nif function that needs access resource object:
 
    +call enif_keep_resource before the access+
 
@@ -68,9 +74,11 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
    At the time of accessing resource object, the Var is still refereced and GC will not reclaim it.
 
-   It is unnecessary to keep/release the resource.
+   It is unnecessary to keep/release the resources.
 
-3. In the nif Function that calls the MsQuic API which can cause resource object in the callback context
+   Note, unsure about if it is true for the NIF that runs on dirty scheduler.
+
+3. In the nif function that calls the MsQuic API which can cause later accessing resource object in the callback context:
 
    After checking that the resource is not in the closing/closed state (a lock is needed),
    call enif_keep_resource before calling the MsQuic API
@@ -107,7 +115,13 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
    Close the msquic handler when shutdown_complete event is received.
 
-9. TBD: MsQuic callback signaling
+9. TODO: MsQuic callback signaling
 
    This needs to be double-checked, if callback fun could signal the resource owner to let it access the c_ctx?
-   If so, GC will be a problem become the receiver could die and not be able to dec the refcnt.
+
+   We need put some assertions:
+
+   1. Callback won't get called for a closed HQUIC.
+   2. enif_make_resource should return the same object if already present.
+
+   If so, GC will be a problem because the receiver could die and not be able to dec the refcnt.

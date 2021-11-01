@@ -295,7 +295,7 @@ otherwise {error, stream_recv_window_too_small} will be returned.
 
 #+begin_src erlang
 -spec recv(stream_handler(), Count::non_neg_integer())
-          -> {ok, binary()} | {error, any()}.
+          -> {ok, binary()} | {ok, not_ready} | {error, badarg | closed | einval}.
 #+end_src
 
 note,
