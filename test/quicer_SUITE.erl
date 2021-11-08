@@ -744,7 +744,7 @@ tc_dgram_client_send(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
+      {ok, 10} = quicer:send_dgram(Conn, <<"ping_dgram">>),
       dgram_client_recv_loop(Conn, false, false),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
@@ -757,7 +757,7 @@ dgram_client_recv_loop(Conn, true, true) ->
 
 dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram) ->
   receive
-    {quic, dgram, <<"pong">>} ->
+    {quic, dgram, <<"pong_dgram">>} ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, true);
     {quic, <<"pong">>, _, _, _, _} ->
       dgram_client_recv_loop(Conn, true, ReceivedViaDgram);
@@ -1477,9 +1477,9 @@ ping_pong_server_dgram_loop(L, Conn, Stm) ->
       ct:pal("send pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_stm_loop(L, Conn, Stm);
-    {quic, dgram, <<"ping">>} ->
-      ct:pal("send pong"),
-      {ok, 4} = quicer:send_dgram(Conn, <<"pong">>),
+    {quic, dgram, <<"ping_dgram">>} ->
+      ct:pal("send pong_dgram"),
+      {ok, 10} = quicer:send_dgram(Conn, <<"pong_dgram">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);
     {quic, peer_send_shutdown, Stm} ->
       ct:pal("closing stream"),
