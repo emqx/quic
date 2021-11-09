@@ -1476,7 +1476,7 @@ ping_pong_server_dgram_loop(L, Conn, Stm) ->
     {quic, <<"ping">>, _, _, _, _} ->
       ct:pal("send pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
-      ping_pong_server_stm_loop(L, Conn, Stm);
+      ping_pong_server_dgram_loop(L, Conn, Stm);
     {quic, dgram, <<"ping_dgram">>} ->
       ct:pal("send pong_dgram"),
       {ok, 10} = quicer:send_dgram(Conn, <<"pong_dgram">>),
