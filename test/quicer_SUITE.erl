@@ -735,7 +735,7 @@ tc_stream_controlling_process(Config) ->
   end.
 
 tc_dgram_client_send(Config) ->
-  Port = 4569,
+  Port = 34569,
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
   receive
