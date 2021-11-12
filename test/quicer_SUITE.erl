@@ -1397,11 +1397,11 @@ ping_pong_server_dgram(Owner, Config, Port) ->
 ping_pong_server_dgram_loop(L, Conn, Stm) ->
   receive
     {quic, <<"ping">>, _, _, _, _} ->
-      ct:pal("send pong"),
+      ct:pal("send stream pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
-      ping_pong_server_stm_loop(L, Conn, Stm);
+      ping_pong_server_dgram_loop(L, Conn, Stm);
     {quic, dgram, <<"ping">>} ->
-      ct:pal("send pong"),
+      ct:pal("send dgram pong"),
       {ok, 4} = quicer:send_dgram(Conn, <<"pong">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);
     {quic, peer_send_shutdown, Stm} ->
