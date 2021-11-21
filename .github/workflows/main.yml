@@ -56,6 +56,7 @@ jobs:
           sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace liblttng-ust-dev
           which lttng
           uname -a
+          echo $PWD
           mkdir msquic_lttng
           lttng create msquic -o=./msquic_lttng
           lttng enable-event --userspace CLOG_*
@@ -63,7 +64,9 @@ jobs:
           lttng start
 
           cleanup () {
+            echo $PWD
             lttng stop msquic;
+            sleep 5;
             babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt
           }
 
