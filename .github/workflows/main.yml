@@ -64,10 +64,13 @@ jobs:
           lttng start
 
           cleanup () {
+            echo "cleanup... "
             echo $PWD
             lttng stop msquic;
             sleep 5;
-            babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt
+            ls ./msquic_lttng
+            babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt || \
+              echo "failed to convert trace with babelbtrace"
           }
 
           trap "cleanup"  EXIT
