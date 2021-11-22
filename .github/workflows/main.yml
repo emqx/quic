@@ -51,7 +51,7 @@ jobs:
           ulimit -c unlimited
           export CMAKE_BUILD_TYPE=${{ matrix.build_type }}
           export QUIC_ENABLE_LOGGING=ON
-          sudo apt-add-repository ppa:lttng/stable-2.12
+          sudo apt-add-repository ppa:lttng/stable-2.13
           sudo apt-get update
           sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace liblttng-ust-dev
           which lttng
