@@ -56,7 +56,7 @@ bool get_uint64_from_map(ErlNifEnv *env,
                          uint64_t *value);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-ERL_NIF_TERM setopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 bool create_settings(ErlNifEnv *env,
                      const ERL_NIF_TERM *emap,
@@ -64,5 +64,11 @@ bool create_settings(ErlNifEnv *env,
 
 bool
 parse_listen_on(ErlNifEnv *env, ERL_NIF_TERM elisten_on, QUIC_ADDR *Address);
+
+ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
+                                QuicerConnCTX *c_ctx,
+                                ERL_NIF_TERM optname,
+                                ERL_NIF_TERM optval,
+                                ERL_NIF_TERM elevel);
 
 #endif // __QUICER_CONFIG_H_

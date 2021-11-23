@@ -5,6 +5,7 @@
 * Features List
 Feature todo list, priority descending
 ** add safety check for closed handlers
+check the is_closed flag or delay the close in ctx dealloc callback?
 
 ** Stream send iolist
 

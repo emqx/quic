@@ -428,7 +428,7 @@ getopt(Handle, Opt, Optlevel) ->
 setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
   setopt(Handle, param_conn_settings, maps:from_list(Value));
 setopt(Handle, Opt, Value) ->
-  quicer_nif:setopt(Handle, Opt, Value).
+  quicer_nif:setopt(Handle, Opt, Value, false).
 
 -spec get_stream_id(Stream::stream_handler()) ->
         {ok, integer()} | {error, any()}.
