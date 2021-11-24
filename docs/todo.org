@@ -22,6 +22,3 @@ check the is_closed flag or delay the close in ctx dealloc callback?
 ** NIF Upgrade
 
 ** 0RTT support
-
-** Secure Datagrams [DRAFT]
-https://tools.ietf.org/html/draft-ietf-quic-datagram
