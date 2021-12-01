@@ -127,7 +127,8 @@
         controlling_process                       |           %% |     |    | @TODO GET SET
         param_stream_id                           |           %% |     |  X |
         param_stream_0rtt_length                  |           %% |  X  |    | @TODO
-        param_stream_ideal_send_buffer_size.                  %% |  X  |    | @TODO
+        param_stream_ideal_send_buffer_size       |           %% |  X  |    | @TODO
+        param_stream_priority.                                %% |     |    |
 
 -type optname_global() ::                                     %% with `undefined' handler
         param_global_retry_memory_percent |                   %% |  X  | X  | @TODO
