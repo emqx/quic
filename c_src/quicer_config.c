@@ -330,6 +330,27 @@ load_alpn(ErlNifEnv *env,
 }
 
 bool
+get_uint16(ErlNifEnv *env,
+           const ERL_NIF_TERM term,
+           uint16_t *value)
+{
+  unsigned int value0 = 0;
+  if (!enif_get_uint(env, term, &value0))
+    {
+      return false;
+    }
+
+  if (value0 > UINT16_MAX)
+    {
+      return false;
+    }
+
+  *value = (uint16_t)value0;
+  return true;
+}
+
+
+bool
 get_uint8_from_map(ErlNifEnv *env,
                    const ERL_NIF_TERM map,
                    ERL_NIF_TERM key,
@@ -1211,6 +1232,21 @@ set_stream_opt(ErlNifEnv *env,
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
+    }
+  else if (ATOM_QUIC_PARAM_STREAM_PRIORITY == optname)
+    {
+      Param = QUIC_PARAM_STREAM_PRIORITY;
+      Level = QUIC_PARAM_LEVEL_STREAM;
+      uint16_t priority;
+      if (get_uint16(env, optval, &priority))
+        {
+          BufferLength = sizeof(uint16_t);
+          Buffer = &priority;
+        }
+      else
+        {
+          return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+        }
     }
   else if (s_ctx->c_ctx)
     {
