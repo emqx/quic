@@ -3,7 +3,7 @@ Notes for internal impl. , API caller don't need to understand this
 * Handler Lifecycle
 ** What is Handler
 
-In erlang code, Handler (a handle term) is a Ref to the contexts and they are
+In erlang code, Handler (a handle term) is a REF to the contexts and they are
 
 - Listener handler
 
@@ -30,18 +30,18 @@ Creation is the op of allocating NIF resources.
 
 *** Listener handler
 
-created in quicer_nif:listen/2
+Created in quicer_nif:listen/2
 
 *** Connection handler
 
-look for init_c_ctx
+Created in init_c_ctx
 
 1. server: ctx is created in listener callback when there is new incoming connection
 2. client: ctx is created in quicer_nif:async_connect3/3
 
 *** Stream handler
 
-look for init_s_ctx
+Created in init_s_ctx
 
 1. server: ctx is created in conn callback
 2. client: ctx is created in quicer_nif:async_start_stream2/2
@@ -50,13 +50,15 @@ look for init_s_ctx
 
 In the erlang code, if there is a var holding the handler, it will not be a target for GC.
 
-Same in C NIF code, if the handler is one of the input arguments, it is safe to access the *_ctx because the var in erlang is still holding the handler but we cannot assume the API caller will hold the handler for the entire lifecycle.
+Same as in C NIF code, if the handler is one of the input arguments, it is safe to access the *_ctx because the var in erlang is still holding the handler but we cannot assume the API caller will hold the handler for the entire lifecycle.
 
-** Keeping and Using
+** Thread Safety with ref counting.
 
-In C code, the resource object is not deallocated until the last handle term is garbage collected by the VM and the resource is released with enif_release_resource (not necessarily in that order).
+In C code, the resource object is not deallocated (become *invalid**) until the last handle term is garbage collected by the VM and the resource is released with enif_release_resource (not necessarily in that order).
 
-Thus in term of thread safety, There are three players in quicer that could access the resource object simultaneously.
+Access a *invalid* resource object via the pointer could cause SEGFAULT.
+
+In term of thread safety, There are three players in quicer that could access the resource object simultaneously.
 
 a. The MsQuic worker thread is accessing *_ctx in the callback function
 b. VM scheduler is executing a NIF function such as quicer:send/2
@@ -66,32 +68,32 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
 1. Ensure the c) happens last.
 
-2. In the nif function that needs access resource object:
+2. In the nif function that needs to access the resource object:
 
    +call enif_keep_resource before the access+
 
    +call enif_release_resource after the access+
 
-   At the time of accessing resource object, the Var is still refereced and GC will not reclaim it.
+   At the time of accessing resource object, the Var is still refereced thus GC( in c. ) will not reclaim it.
 
    It is unnecessary to keep/release the resources.
 
-   Note, unsure about if it is true for the NIF that runs on dirty scheduler.
+   *Note*: It is uncertain if it is still true for the NIF that runs on dirty scheduler.
 
-3. In the nif function that calls the MsQuic API which can cause later accessing resource object in the callback context:
+3. In the nif function that calls the MsQuic API which can cause later accessing resource object in the callback context in the msquic worker thread:
 
    After checking that the resource is not in the closing/closed state (a lock is needed),
    call enif_keep_resource before calling the MsQuic API
 
-   In MsQuic callback function
+   In MsQuic callback function, call enif_release_resource when the async task is done.
 
-   call enif_release_resource when the async task is done
+4. In MsQuic callback function when the corresponding handler(HQUIC) of MsQuic will be closed.
 
-4. In MsQuic callback function
-
-   call enif_release_resource when the corresponding handler of MsQuic is closed.
+   call enif_release_resource
 
    also, ensure the is_closed is set to *TRUE* and the set is lock protected.
+
+   This prevents others to access the closing/closed HQUIC that could cause runtime error in msquic.
 
 5. In MsQuic callback function and NIF function
 
@@ -99,25 +101,26 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
 
    For example: when a stream is created in a connection, we need to call enif_keep_resource for connection resource object bump the refcnt.
 
-6. Deinit the resource object in `resource_*_dealloc_callback`
+6. Deinit the resource object in resource destruct function`resource_*_dealloc_callback`
 
    call enif_release_resource for corresponding lower-level resource object.
 
    Such like when deinit the s_ctx, it should deref the c_ctx.
 
-   Everything contained in the resource object becomes invalid.
+   Everything contained in the resource object becomes invalid and it will be impossible to access the destructed
+   resource obj from a) and b). But for accessing from c) it is out of our control.
 
 7. When shutdown the connection via quicer_nif:close_connection3
 
    Mark ctx.is_closed = True if it is unset
 
-8. Close msquic handler only in callback ctx, never do it in nif ctx
+8. Close msquic handler (HQUIC) only in callback ctx, never do it in NIF ctx
 
    Close the msquic handler when shutdown_complete event is received.
 
-9. TODO: MsQuic callback signaling
+9. @TODO: MsQuic callback signaling,
 
-   This needs to be double-checked, if callback fun could signal the resource owner to let it access the c_ctx?
+   This needs to be double-checked, we need to add a new test case for it, if callback fun could signal the resource owner to let it access the c_ctx?
 
    We need put some assertions:
 
@@ -125,3 +128,8 @@ For safety, we need to ref count the usage by calling a pair of function: enif_k
    2. enif_make_resource should return the same object if already present.
 
    If so, GC will be a problem because the receiver could die and not be able to dec the refcnt.
+
+10. @TODO: Catch runtime error signals from msquic
+    To not 'crash' the erlang VM. we need some signal handling to handle the runtime error signals from msquic such as runtime assertions and raise an alarm for 'need maintaince'.
+
+    If the resource that links to the error is identical, we could try to mark it blacklisted and deny further accessing.
