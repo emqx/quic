@@ -651,7 +651,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
 
       // NIF caller will get {ok, not_ready}
-      // this is a ack to its call
+      // this is an ack to its call
       res = SUCCESS(ATOM_ERROR_NOT_READY);
     }
 
