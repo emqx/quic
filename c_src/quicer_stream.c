@@ -267,7 +267,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
-      //  invalid the handler now
+      // Invalidate the handler now
       s_ctx->is_closed = TRUE;
       // Then we destroy the ctx without holding lock.
       is_destroy = TRUE;

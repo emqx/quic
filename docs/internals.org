@@ -22,7 +22,7 @@ In erlang code, Handler (a handle term) is a REF to the contexts and they are
 1. A MsQuic handler (HQUIC) for interworking with MsQuic.
 2. A 'is_closed' boolean flag mark if the HQUIC is valid or not.
    If it is false, the HQUIC may become (or is becoming) invalid and it is unsafe to be used for calling MsQuic APIs.
-3. ... Other which is irrelevant here.
+3. ... Other members(fields) are irrelevant here.
 
 ** Creation
 
@@ -103,7 +103,7 @@ note, The refcounting is very expensive call.
 
    For example: when a stream is created in a connection, we need to call enif_keep_resource for connection resource object bump the refcnt.
 
-6. Deinit the resource object in resource destruct function`resource_*_dealloc_callback`
+6. Deinit the resource object in resource destruct function ~resource_*_dealloc_callback~
 
    Call enif_release_resource for corresponding lower-level resource object.
 
@@ -116,7 +116,7 @@ note, The refcounting is very expensive call.
 
    Mark ctx.is_closed = True if it is unset.
 
-8. Close msquic handler (HQUIC) only in callback ctx, never do it in NIF ctx
+8. Close msquic handler (HQUIC) only in msquic callback handler function, never do it in NIF ctx
 
    Close the msquic handler when shutdown_complete event is received.
 

@@ -580,7 +580,7 @@ tc_conn_idle_close(Config) ->
                    , {fast_conn, false}
                    , {stream_acceptors, 32}
                    , {idle_timeout_ms, 1000}
-                     | default_conn_opts()],
+                   | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
@@ -722,7 +722,7 @@ tc_conn_no_gc(Config) ->
                    , {fast_conn, false}
                    , {stream_acceptors, 32}
                    , {idle_timeout_ms, 1000}
-                     | default_conn_opts()],
+                   | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
@@ -794,16 +794,6 @@ default_listen_opts(Config) ->
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   ].
-
-
-loop_timeout() ->
-  receive
-    done ->
-      ok
-  after 200 ->
-      erlang:garbage_collect(self(), [{type,'major'}]),
-      loop_timeout()
-  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
