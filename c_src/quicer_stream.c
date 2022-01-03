@@ -133,7 +133,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           ATOM_QUIC,
           ATOM_CLOSED,
           enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+          enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
 
@@ -153,8 +153,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
   if (is_destroy)
     {
-      // must be called after mutex unlock
       MsQuic->StreamClose(Stream);
+      // must be called after mutex unlock
       destroy_s_ctx(s_ctx);
     }
   return status;
@@ -264,9 +264,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           ATOM_QUIC,
           ATOM_CLOSED,
           enif_make_resource(env, s_ctx),
-          enif_make_uint64(env, Event->SEND_SHUTDOWN_COMPLETE.Graceful));
+          enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+      // Invalidate the handler now
+      s_ctx->is_closed = TRUE;
+      // Then we destroy the ctx without holding lock.
       is_destroy = TRUE;
       break;
     case QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE:
@@ -288,8 +291,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
   if (is_destroy)
     {
-      // must be called after mutex unlock
+
       MsQuic->StreamClose(Stream);
+      // must be called after mutex unlock,
       destroy_s_ctx(s_ctx);
     }
   return status;
@@ -322,6 +326,7 @@ async_start_stream2(ErlNifEnv *env,
       enif_mutex_unlock(c_ctx->lock);
       return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
     }
+  // note, release resource in destroy_s_ctx
   enif_keep_resource(c_ctx);
   enif_mutex_unlock(c_ctx->lock);
 
@@ -330,10 +335,22 @@ async_start_stream2(ErlNifEnv *env,
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
 
+  if (!s_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
   s_ctx->c_ctx = c_ctx;
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
+
+  if (!s_ctx->owner)
+    {
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto ErrorExit;
+    }
+
   if (!enif_self(env, &(s_ctx->owner->Pid)))
     {
       res = ERROR_TUPLE_2(ATOM_BAD_PID);
@@ -346,7 +363,6 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
-  // @todo check if stream is null
   if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
                                               QUIC_STREAM_OPEN_FLAG_NONE,
                                               ClientStreamCallback,
@@ -427,10 +443,11 @@ async_accept_stream2(ErlNifEnv *env,
 ERL_NIF_TERM
 send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-  QuicerStreamCTX *s_ctx;
+  QuicerStreamCTX *s_ctx = NULL;
   ERL_NIF_TERM estream = argv[0];
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eFlags = argv[2];
+  ERL_NIF_TERM res = ATOM_OK;
   uint32_t sendflags;
 
   if (3 != argc)
@@ -485,10 +502,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (s_ctx->is_closed || s_ctx->c_ctx->is_closed)
     {
-      destroy_send_ctx(send_ctx);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      enif_mutex_unlock(s_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto ErrorExit;
     }
 
   HQUIC Stream = s_ctx->Stream;
@@ -508,20 +523,22 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           Status = MsQuic->StreamSend(
               Stream, &send_ctx->Buffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
     {
-      destroy_send_ctx(send_ctx);
+      res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
-      enif_mutex_unlock(s_ctx->lock);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      //@todo return error code
-      return ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
+      goto ErrorExit;
     }
 
   else
     {
-      enif_mutex_unlock(s_ctx->lock);
-      enif_mutex_unlock(s_ctx->c_ctx->lock);
-      return SUCCESS(ETERM_UINT_64(bin->size));
+      res = SUCCESS(ETERM_UINT_64(bin->size));
+      goto Exit;
     }
+ErrorExit:
+  destroy_send_ctx(send_ctx);
+Exit:
+  enif_mutex_unlock(s_ctx->lock);
+  enif_mutex_unlock(s_ctx->c_ctx->lock);
+  return res;
 }
 
 ERL_NIF_TERM
@@ -533,6 +550,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM estream = argv[0];
   ErlNifUInt64 size_req = 0;
   ERL_NIF_TERM res;
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
 
   if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
     {
@@ -548,10 +566,17 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
     {
-      // follow otp behavior
-      enif_mutex_unlock(s_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_EINVAL);
+      res = ERROR_TUPLE_2(ATOM_EINVAL);
+      goto Exit;
     }
+
+  if (s_ctx->is_closed)
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto Exit;
+    }
+  // We have checked that the Stream is not closed/closing
+  // it is safe to use the s_ctx->Stream in following MsQuic API calls
 
   if (s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0
       && (0 == size_req || size_req <= s_ctx->TotalBufferLength))
@@ -559,12 +584,24 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
 
       s_ctx->is_wait_for_data = FALSE;
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
+
+      if (QUIC_FAILED(status = MsQuic->StreamReceiveComplete(s_ctx->Stream,
+                                                             size_consumed)))
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto Exit;
+        }
 
       if (size_consumed != s_ctx->TotalBufferLength)
         {
           // explicit enable recv since we have some data left unconusmed
-          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+          //
+          if (QUIC_FAILED(status = MsQuic->StreamReceiveSetEnabled(
+                              s_ctx->Stream, true)))
+            {
+              res = ERROR_TUPLE_2(ATOM_STATUS(status));
+              goto Exit;
+            }
         }
 
       if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
@@ -598,15 +635,28 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       s_ctx->is_wait_for_data = TRUE;
 
       // let msquic buffer more and explicit enable recv
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-      MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
+      //
+      if (QUIC_FAILED(status = MsQuic->StreamReceiveComplete(s_ctx->Stream, 0))
+          && QUIC_STATUS_INVALID_STATE != status)
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto Exit;
+        }
 
-      // nif caller will get {ok, not_ready}
-      // this is a ack to its call
+      if (QUIC_FAILED(status
+                      = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto Exit;
+        }
+
+      // NIF caller will get {ok, not_ready}
+      // this is an ack to its call
       res = SUCCESS(ATOM_ERROR_NOT_READY);
     }
-  enif_mutex_unlock(s_ctx->lock);
 
+Exit:
+  enif_mutex_unlock(s_ctx->lock);
   return res;
 }
 
@@ -634,21 +684,20 @@ close_stream3(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  //@todo support application specific error code.
+
   // we don't use trylock since we are in NIF call.
   enif_mutex_lock(s_ctx->lock);
-  enif_keep_resource(s_ctx);
   if (!s_ctx->is_closed)
     {
       if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
                           s_ctx->Stream, flags, app_errcode)))
         {
-          ret = ERROR_TUPLE_2(ETERM_INT(Status));
+          ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
         }
       s_ctx->is_closed = TRUE;
     }
   enif_mutex_unlock(s_ctx->lock);
-  enif_release_resource(s_ctx);
+
   return ret;
 }
 

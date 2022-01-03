@@ -214,7 +214,7 @@ Calling process becomes the owner of the stream.
 #+begin_src erlang
 -spec start_stream(connection_handler(), stream_opts()) ->
         {ok, stream_handler()} |
-        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {error, badarg | internal_error | bad_pid | owner_dead | not_enough_mem} |
         {error, stream_open_error, atom_reason()} |
         {error, stream_start_error, atom_reason()}.
 #+end_src
@@ -295,7 +295,7 @@ otherwise {error, stream_recv_window_too_small} will be returned.
 
 #+begin_src erlang
 -spec recv(stream_handler(), Count::non_neg_integer())
-          -> {ok, binary()} | {error, any()}.
+          -> {ok, binary()} | {ok, not_ready} | {error, badarg | closed | einval}.
 #+end_src
 
 note,
@@ -425,7 +425,7 @@ Change the owner process of connection/stream
 #+begin_src erlang
 -spec controlling_process(connection_handler() | stream_handler(), pid()) ->
         ok |
-        {error, badarg | owner_dead | not_owner}.
+        {error, closed | badarg | owner_dead | not_owner}.
 #+end_src
 
 
@@ -461,7 +461,7 @@ Data received in binary format
 Both directions of the stream have been shut down.
 
 #+begin_src erlang
-{quic, closed, stream_handler(), IsGraceFul:: 0 | 1}
+{quic, closed, stream_handler(), ConnectionShutdown:: 0 | 1}
 #+end_src
 
 *** send_complete
@@ -529,7 +529,7 @@ also see [[Accept Stream (Server)]]
 Connection has been shutdown by the transport locally, such as idle timeout.
 
 #+begin_src erlang
-{quic, trans_shutdown, connection_handler(), Status :: atom_status()}
+{quic, transport_shutdown, connection_handler(), Status :: atom_status()}
 #+end_src
 
 *** Shutdown initiated by PEER

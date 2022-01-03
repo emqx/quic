@@ -249,6 +249,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
+      if (Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+        {
+          CXPLAT_FRE_ASSERT(c_ctx->is_closed);
+        }
+
       if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
           MsQuic->ConnectionClose(Connection);
@@ -415,6 +420,11 @@ ServerConnectionCallback(HQUIC Connection,
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+
+      if (Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
+        {
+          CXPLAT_FRE_ASSERT(c_ctx->is_closed);
+        }
 
       if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
         {
@@ -687,6 +697,7 @@ close_connection3(ErlNifEnv *env,
   enif_mutex_lock(c_ctx->lock);
   if (!c_ctx->is_closed)
     {
+      // mark invalid handler now!
       c_ctx->is_closed = TRUE;
       MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
     }
@@ -701,10 +712,14 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   HQUIC Handle = NULL;
   uint32_t Param;
   QUIC_PARAM_LEVEL Level;
+  BOOLEAN is_closed = FALSE;
 
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
-      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
+      enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
+      is_closed = (((QuicerConnCTX *)q_ctx))->is_closed;
+      enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
+      Handle = (((QuicerConnCTX *)q_ctx))->Connection;
       Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
     }
@@ -716,6 +731,10 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
     }
   else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
     {
+      enif_mutex_lock(((QuicerStreamCTX *)q_ctx)->lock);
+      is_closed = (((QuicerStreamCTX *)q_ctx))->is_closed;
+      enif_mutex_unlock(((QuicerStreamCTX *)q_ctx)->lock);
+
       Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
       Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
@@ -723,6 +742,11 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   else
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (is_closed)
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
   QUIC_STATUS status;
@@ -798,13 +822,9 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
       return QUIC_STATUS_INTERNAL_ERROR;
     }
 
-  // and releases resource in callback
-  enif_keep_resource(c_ctx);
-
   if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
                       c_ctx->Connection, c_ctx->l_ctx->Configuration)))
     {
-      enif_release_resource(c_ctx);
       return Status;
     }
 
@@ -815,7 +835,6 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
                                             sizeof(QUIC_SETTINGS),
                                             &c_ctx->owner->Settings)))
     {
-      enif_release_resource(c_ctx);
       return Status;
     }
   return Status;
@@ -829,6 +848,7 @@ async_handshake_1(ErlNifEnv *env,
 {
   QuicerConnCTX *c_ctx;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM res = ATOM_OK;
   if (1 != argc)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -839,14 +859,28 @@ async_handshake_1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  enif_mutex_lock(c_ctx->lock);
+  if (c_ctx->is_closed)
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      enif_mutex_unlock(c_ctx->lock);
+      goto Exit;
+    }
+  else
+    {
+      enif_keep_resource(c_ctx);
+      enif_mutex_unlock(c_ctx->lock);
+    }
+
   TP_NIF_3(start, c_ctx->Connection, 0);
 
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {
-      return ERROR_TUPLE_2(ATOM_STATUS(Status));
+      enif_release_resource(c_ctx);
+      res = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-
-  return ATOM_OK;
+Exit:
+  return res;
 }
 
 void

@@ -479,7 +479,7 @@ listener(Name) ->
 
 -spec controlling_process(connection_handler() | stream_handler(), pid()) ->
         ok |
-        {error, badarg | owner_dead | not_owner}.
+        {error, closed | badarg | owner_dead | not_owner}.
 controlling_process(Handler, Pid) ->
   quicer_nif:controlling_process(Handler, Pid).
 

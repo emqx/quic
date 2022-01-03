@@ -124,7 +124,7 @@ async_accept_stream(_Conn, _Opts) ->
 
 -spec start_stream(connection_handler(), stream_opts()) ->
         {ok, stream_handler()} |
-        {error, badarg | internal_error | bad_pid | owner_dead} |
+        {error, badarg | internal_error | bad_pid | owner_dead | not_enough_mem} |
         {error, stream_open_error, atom_reason()} |
         {error, stream_start_error, atom_reason()}.
 start_stream(_Conn, _Opts) ->
@@ -140,7 +140,7 @@ send(_Stream, _Data, _Flags) ->
 -spec recv(stream_handler(), non_neg_integer()) ->
         {ok, binary()}     |
         {ok, not_ready}     |
-        {error, badarg | einval}.
+        {error, badarg | einval | closed}.
 recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 
@@ -193,7 +193,7 @@ get_stream_rid(_Handle) ->
 
 -spec controlling_process(connection_handler() | stream_handler(), pid()) ->
         ok |
-        {error, badarg | owner_dead | not_owner}.
+        {error, closed | badarg | owner_dead | not_owner}.
 controlling_process(_H, _P) ->
   erlang:nif_error(nif_library_not_loaded).
 
