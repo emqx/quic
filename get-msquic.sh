@@ -17,6 +17,7 @@ if [ "$CURRENT_VSN" = 'unknown' ]; then
 fi
 
 if [ "$CURRENT_VSN" != "$VERSION" ]; then
-    echo "undesired_msquic_version, required=$VERSION, got=$CURRENT_VSN"
+    echo "ERROR: undesired_msquic_version, required=$VERSION, got=$CURRENT_VSN"
+    echo "Maybe delete $(pwd)/msquic and try again"
     exit 1
 fi
