@@ -487,7 +487,7 @@ tc_conn_close_flag_2(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -525,7 +525,7 @@ tc_stream_close_errno(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -585,7 +585,7 @@ tc_conn_idle_close(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
@@ -727,7 +727,7 @@ tc_conn_no_gc(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 10000},
                begin
                  %% Spawn a process that will die without handler cleanup
                  %% The dead process should not trigger a connection close
