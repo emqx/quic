@@ -95,25 +95,25 @@ jobs:
 
           if ${{ matrix.logging }}"" == "true" ; then
             export QUIC_ENABLE_LOGGING=ON
+
+            sudo apt-add-repository ppa:lttng/stable-2.13
+            sudo apt-get update
+            sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace liblttng-ust-dev
+            which lttng
+            uname -a
+            mkdir msquic_lttng
+            lttng create msquic -o=./msquic_lttng
+            lttng enable-event --userspace CLOG_*
+            lttng add-context --userspace --type=vpid --type=vtid
+            lttng start
+
+            cleanup () {
+              lttng stop msquic;
+              babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt
+            }
+            trap "cleanup"  EXIT
           fi
 
-          sudo apt-add-repository ppa:lttng/stable-2.13
-          sudo apt-get update
-          sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace liblttng-ust-dev
-          which lttng
-          uname -a
-          mkdir msquic_lttng
-          lttng create msquic -o=./msquic_lttng
-          lttng enable-event --userspace CLOG_*
-          lttng add-context --userspace --type=vpid --type=vtid
-          lttng start
-
-          cleanup () {
-            lttng stop msquic;
-            babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt
-          }
-
-          trap "cleanup"  EXIT
           make ci
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2
