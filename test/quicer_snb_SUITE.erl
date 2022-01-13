@@ -248,7 +248,7 @@ tc_stream_owner_down(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -260,10 +260,16 @@ tc_stream_owner_down(Config) ->
                              end),
                  quicer:controlling_process(Stm, Pid),
                  Pid ! down,
-                 ?block_until(
-                    #{?snk_kind := debug, context := "callback",
-                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
-                      tag := "event"}, 1000),
+                 ?assert(timeout =/=
+                           ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000)),
+                 ?assert(timeout =/=
+                           ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ClientStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000)),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -326,7 +332,7 @@ tc_conn_owner_down(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -339,10 +345,19 @@ tc_conn_owner_down(Config) ->
                              end),
                  quicer:controlling_process(Conn, Pid),
                  Pid ! down,
-                 ?block_until(
-                    #{?snk_kind := debug, context := "callback",
-                      function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
-                      tag := "event"}, 1000),
+                 ?assert(timeout =/=
+                           ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ClientConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000)),
+                 ?assert(timeout =/=
+                           ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000)),
+                 ?assert(timeout =/=
+                           ?block_until(
+                              #{?snk_kind := quic_closed, module := quicer_conn_acceptor}, 1000, 1000)),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt),
                  {ok, CRid} = quicer:get_conn_rid(Conn),
