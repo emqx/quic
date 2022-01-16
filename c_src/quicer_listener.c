@@ -52,7 +52,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!conn_owner)
         {
-          TP_CB_3(missing_acceptor, c_ctx->Connection, 0);
+          TP_CB_3(missing_acceptor, (uintptr_t)c_ctx->Connection, 0);
           destroy_c_ctx(c_ctx);
           // make msquic close the connection.
           return QUIC_STATUS_UNREACHABLE;
@@ -70,7 +70,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (conn_owner->fast_conn)
         {
-          TP_CB_3(fast_conn, c_ctx->Connection, 1);
+          TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 1);
           if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
             {
               destroy_c_ctx(c_ctx);
@@ -79,7 +79,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         }
       else
         {
-          TP_CB_3(fast_conn, c_ctx->Connection, 0);
+          TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 0);
           if (!enif_send(NULL,
                          &(c_ctx->owner->Pid),
                          NULL,

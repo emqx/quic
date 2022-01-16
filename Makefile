@@ -24,7 +24,7 @@ eunit: compile
 	$(REBAR) eunit verbose=truen
 
 .PHONY: ct
-ct: compile
+ct: 
 	QUICER_USE_SNK=1 $(REBAR) as test ct -v
 
 cover:
