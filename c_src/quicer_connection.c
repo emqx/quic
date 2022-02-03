@@ -141,7 +141,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
-  TP_CB_3(event, Connection, Event->Type);
+  TP_CB_3(event, (uintptr_t)Connection, Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -159,7 +159,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
                                       ATOM_CONNECTED,
                                       enif_make_resource(env, c_ctx))))
         {
-          TP_CB_3(app_down, Connection, Event->Type);
+          TP_CB_3(app_down, (uintptr_t)Connection, Event->Type);
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_INTERNAL_ERROR;
         }
@@ -319,7 +319,7 @@ ServerConnectionCallback(HQUIC Connection,
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(c_ctx->lock);
-  TP_CB_3(event, Connection, Event->Type);
+  TP_CB_3(event, (uintptr_t)Connection, Event->Type);
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -408,7 +408,7 @@ ServerConnectionCallback(HQUIC Connection,
       // safely cleaned up.
       //
       TP_CB_3(shutdown_complete,
-              Connection,
+              (uintptr_t)Connection,
               Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
 
       if (!c_ctx->owner->fast_conn
@@ -872,7 +872,7 @@ async_handshake_1(ErlNifEnv *env,
       enif_mutex_unlock(c_ctx->lock);
     }
 
-  TP_NIF_3(start, c_ctx->Connection, 0);
+  TP_NIF_3(start, (uintptr_t)c_ctx->Connection, 0);
 
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {

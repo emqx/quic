@@ -40,7 +40,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
-  TP_CB_3(event, Stream, Event->Type);
+  TP_CB_3(event, (uintptr_t)Stream, Event->Type);
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -70,7 +70,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           if (!enif_send(NULL, &send_ctx->caller, NULL, report))
             {
               // Owner is gone, we shutdown the stream as well.
-              TP_CB_3(owner_die, Stream, Event->Type);
+              TP_CB_3(owner_die, (uintptr_t)Stream, Event->Type);
               MsQuic->StreamShutdown(
                   Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
               // @todo return proper bad status
@@ -97,7 +97,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // App down, close it.
-          TP_CB_3(app_down, Stream, Event->Type);
+          TP_CB_3(app_down, (uintptr_t)Stream, Event->Type);
           MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
         }
       break;
@@ -105,7 +105,9 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       // The peer aborted its send direction of the stream.
       //
-      TP_CB_3(peer_send_aborted, Stream, Event->PEER_SEND_ABORTED.ErrorCode);
+      TP_CB_3(peer_send_aborted,
+              (uintptr_t)Stream,
+              Event->PEER_SEND_ABORTED.ErrorCode);
       report = enif_make_tuple4(
           env,
           ATOM_QUIC,
@@ -116,7 +118,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
           // Owner is gone, we shutdown the stream as well.
-          TP_CB_3(app_down, Stream, Event->Type);
+          TP_CB_3(app_down, (uintptr_t)Stream, Event->Type);
           MsQuic->StreamShutdown(
               Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
           // @todo return proper bad status
@@ -177,7 +179,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   enif_mutex_lock(s_ctx->lock);
   env = s_ctx->env;
   BOOLEAN is_destroy = FALSE;
-  TP_CB_3(event, Stream, Event->Type);
+  TP_CB_3(event, (uintptr_t)Stream, Event->Type);
   switch (Event->Type)
     {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
@@ -204,7 +206,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           // note, report to caller instead of stream owner
           if (!enif_send(NULL, &send_ctx->caller, NULL, report))
             {
-              TP_CB_3(app_down, Stream, 0);
+              TP_CB_3(app_down, (uintptr_t)Stream, 0);
               // Owner is gone, we shutdown the stream as well.
               MsQuic->StreamShutdown(
                   Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
@@ -274,7 +276,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       break;
     case QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE:
       TP_CB_3(event_ideal_send_buffer_size,
-              Stream,
+              (uintptr_t)Stream,
               Event->IDEAL_SEND_BUFFER_SIZE.ByteCount);
       break;
     default:
@@ -763,7 +765,7 @@ handle_stream_recv_event(HQUIC Stream,
 
   if (Event->RECEIVE.Flags != 0)
     {
-      TP_CB_3(event_recv_flag, Stream, Event->RECEIVE.Flags);
+      TP_CB_3(event_recv_flag, (uintptr_t)Stream, Event->RECEIVE.Flags);
     }
 
   if (0 == Event->RECEIVE.TotalBufferLength)
