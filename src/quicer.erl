@@ -288,7 +288,7 @@ start_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 
--spec send(stream_handler(), binary()) ->
+-spec send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
@@ -304,7 +304,7 @@ send(Stream, Data) ->
       E
   end.
 
--spec async_send(stream_handler(), binary()) ->
+-spec async_send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.

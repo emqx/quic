@@ -468,7 +468,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  ebin = enif_make_copy(send_ctx->env, ebin);
 
   ErlNifBinary *bin = &send_ctx->bin;
 
@@ -491,7 +490,9 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!enif_inspect_binary(env, ebin, bin) || bin->size > UINT32_MAX)
+  ebin = enif_make_copy(send_ctx->env, ebin);
+  if (!(enif_inspect_iolist_as_binary(env, ebin, bin) || enif_inspect_binary(env, ebin, bin))
+      || bin->size > UINT32_MAX)
     {
       destroy_send_ctx(send_ctx);
       return ERROR_TUPLE_2(ATOM_BADARG);
