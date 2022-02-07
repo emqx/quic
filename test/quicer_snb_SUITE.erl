@@ -679,16 +679,36 @@ tc_conn_gc(Config) ->
                  %% The dead process should trigger a GC
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  _Child = spawn_link(fun() ->
+                                         %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
                                          {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4)
                                      end),
-                 ?block_until(#{ ?snk_kind := debug
-                               , context := "callback"
-                               , function := "resource_conn_dealloc_callback"
-                               , tag := "end"},
-                              10000),
+
+                 %% Server Process
+                 {ok, #{resource_id := _SRid}}
+                   = ?block_until(#{ ?snk_kind := debug
+                                   , context := "callback"
+                                   , function := "ServerConnectionCallback"
+                                   , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , tag := "event" },
+                                  5000),
+                 %% Client Process
+                 {ok, #{resource_id := CRid}}
+                   = ?block_until(#{ ?snk_kind := debug
+                                   , context := "callback"
+                                   , function := "ClientConnectionCallback"
+                                   , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , tag := "event" },
+                                  5000, 1000),
+                 %% OTP GC callback
+                 {ok, _} = ?block_until(#{ ?snk_kind := debug
+                                         , context := "callback"
+                                         , function := "resource_conn_dealloc_callback"
+                                         , resource_id := CRid
+                                         , tag := "end"},
+                                        5000, 1000),
                  ok
                end,
                fun(Result, Trace) ->
@@ -723,7 +743,8 @@ tc_conn_gc(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
-                   ?assertEqual(2, length([ E || #{function := "resource_conn_dealloc_callback" } = E <- Trace]))
+                   ?assertEqual(1, length([ E || #{function := "resource_conn_dealloc_callback"
+                                                  , tag := "end"} = E <- Trace]))
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
@@ -744,10 +765,12 @@ tc_conn_no_gc(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 %% Spawn a process that will die without handler cleanup
-                 %% The dead process should not trigger a connection close
-                 %% The dead process should trigger a GC but c_ctx deallc should not happen
+                 %% Spawn a client process that will close the connection explicitly before die.
+                 %% The dead client process should trigger a connection close at server end.
+                 %% The dead client process should not trigger a GC of 'Conn' because the parent process
+                 %% still holds the 'Conn' var ref.
                  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 %% We hold a ref the Conn in this process, so Conn won't be gc-ed.
                  {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
                  _Child = spawn_link(fun() ->
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
@@ -755,13 +778,31 @@ tc_conn_no_gc(Config) ->
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:async_close_connection(Conn)
                                      end),
-                 ?block_until(
-                    #{?snk_kind := debug, context := "callback",
-                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
-                      tag := "event"}, 1000),
-
-                 %% give it time for gc
-                 timer:sleep(3000),
+                 %% Server Process
+                 {ok, #{resource_id := _SRid}}
+                   = ?block_until(#{ ?snk_kind := debug
+                                   , context := "callback"
+                                   , function := "ServerConnectionCallback"
+                                   , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , tag := "event" },
+                                  5000, 1000),
+                 %% Client Process
+                 {ok, #{resource_id := CRid}}
+                   = ?block_until(#{ ?snk_kind := debug
+                                   , context := "callback"
+                                   , function := "ClientConnectionCallback"
+                                   , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , tag := "event" },
+                                  5000, 1000),
+                 %% Give it time for gc that should not happen on var 'Conn', could be the source of flakiness.
+                 %% We are rather testing the OTP behavior here but proves our understandings are correct.
+                 %% OTP GC callback, should not happen
+                 timeout = ?block_until(#{ ?snk_kind := debug
+                                         , context := "callback"
+                                         , function := "resource_conn_dealloc_callback"
+                                         , resource_id := CRid
+                                         , tag := "end"},
+                                        5000, 1000),
                  ok
 
                end,
@@ -783,6 +824,7 @@ tc_conn_no_gc(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
+                   %% Check that there is no GC
                    ?assertEqual(0, length([ E || #{function := "resource_conn_dealloc_callback" } = E <- Trace]))
                end),
   ct:pal("stop listener"),
