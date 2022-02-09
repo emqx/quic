@@ -53,7 +53,8 @@
         , tc_conn_controlling_process/1
 
         , tc_stream_client_init/1
-        , tc_stream_client_send/1
+        , tc_stream_client_send_binary/1
+        , tc_stream_client_send_iolist/1
         , tc_stream_client_async_send/1
 
         , tc_stream_passive_receive/1
@@ -415,7 +416,8 @@ tc_stream_client_init(Config) ->
       ct:fail("timeout")
   end.
 
-tc_stream_client_send(Config) ->
+
+tc_stream_client_send_binary(Config) ->
   Port = 4569,
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
@@ -424,6 +426,28 @@ tc_stream_client_send(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive
+        {quic, <<"pong">>, _, _, _, _} ->
+          ok = quicer:close_stream(Stm),
+          ok = quicer:close_connection(Conn);
+        Other ->
+          ct:fail("Unexpected Msg ~p", [Other])
+      end,
+      SPid ! done,
+      ok = ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_client_send_iolist(Config) ->
+  Port = 4569,
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, ["p", ["i", ["n"]], <<"g">>]),
       receive
         {quic, <<"pong">>, _, _, _, _} ->
           ok = quicer:close_stream(Stm),

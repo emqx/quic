@@ -130,7 +130,7 @@ async_accept_stream(_Conn, _Opts) ->
 start_stream(_Conn, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec send(stream_handler(), binary(), send_flags()) ->
+-spec send(stream_handler(), iodata(), send_flags()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
@@ -144,7 +144,7 @@ send(_Stream, _Data, _Flags) ->
 recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec send_dgram(connection_handler(), binary(), send_flags()) ->
+-spec send_dgram(connection_handler(), iodata(), send_flags()) ->
   {ok, BytesSent :: pos_integer()} |
   {error, badarg | not_enough_memory | closed} |
   {error, dgram_send_error, atom_reason()}.

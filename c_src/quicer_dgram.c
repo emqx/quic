@@ -41,9 +41,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  ebin = enif_make_copy(dgram_send_ctx->env, ebin);
-
-  ErlNifBinary *bin = &dgram_send_ctx->bin;
+    ErlNifBinary *bin = &dgram_send_ctx->bin;
 
   if (enif_get_uint(env, eFlags, &sendflags))
     {
@@ -64,7 +62,9 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!enif_inspect_binary(env, ebin, bin) || bin->size > UINT32_MAX)
+  ebin = enif_make_copy(dgram_send_ctx->env, ebin);
+  if (!(enif_inspect_iolist_as_binary(env, ebin, bin) || enif_inspect_binary(env, ebin, bin))
+      || bin->size > UINT32_MAX)
     {
       destroy_dgram_send_ctx(dgram_send_ctx);
       return ERROR_TUPLE_2(ATOM_BADARG);
