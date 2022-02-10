@@ -46,3 +46,7 @@ clang-format:
 
 .PHONY: ci
 ci: test dialyzer
+
+.PHONY: tar
+tar:
+	$(REBAR) tar

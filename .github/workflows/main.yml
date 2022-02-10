@@ -3,23 +3,39 @@ on: [push, pull_request]
 
 jobs:
   mac:
-    runs-on: macos-10.15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-10.15
+          - macos-11
+        otp:
+          - 23
+          - 24
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
         with:
           submodules: recursive
+      - name: Configure Homebrew cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/Library/Caches/Homebrew/
+            ~/Library/Caches/Homebrew/downloads/
+          key: brew-${{ matrix.os }}-${{ matrix.otp  }}
       - name: prepare
         run: |
           brew update
-          brew install erlang@23
+          brew install erlang@${{ matrix.otp }}
       - name: install rebar3
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
           cp ./rebar3 /usr/local/bin/rebar3
       - name: release build
         run: |
-          export PATH="/usr/local/opt/erlang@23/bin:$PATH"
+          export PATH="/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
           ulimit -c unlimited
           make ci
 
@@ -29,14 +45,38 @@ jobs:
         with:
           name: mac-ct-logs
           path: _build/test/logs
-          retention-days: 5
+          retention-days: 1
+
+      - name: build rel tar file
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          export PATH="/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
+          make tar
+          mv _build/default/rel/quicer/quicer-*.tar.gz quicer.tar.gz
+
+      - name: upload rel tar file
+        uses: actions/upload-artifact@v2
+        with:
+          name: quicer-${{ matrix.os }}-otp${{ matrix.otp }}
+          path: quicer.tar.gz
+          retention-days: 1
 
   linux:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        otp: [22.3.4.9, 23.2, 24.0.2]
-        build_type: [RelWithDebInfo, Debug]
+        otp:
+          - 22.3.4.9
+          - 23.2
+          - 24.0.2
+        build_type:
+          - RelWithDebInfo
+          - Debug
+        logging:
+          - true
+          - false
+        arch:
+          - x86_64
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -47,27 +87,33 @@ jobs:
           otp-version: ${{ matrix.otp }}
       - name: release build with debug log off
         run: |
+          echo "github ref: ${{ github.event.ref }}"
+          echo "github ref: ${{ github.ref }}"
           sudo sysctl -w kernel.core_pattern=core
           ulimit -c unlimited
           export CMAKE_BUILD_TYPE=${{ matrix.build_type }}
-          export QUIC_ENABLE_LOGGING=ON
-          sudo apt-add-repository ppa:lttng/stable-2.13
-          sudo apt-get update
-          sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace liblttng-ust-dev
-          which lttng
-          uname -a
-          mkdir msquic_lttng
-          lttng create msquic -o=./msquic_lttng
-          lttng enable-event --userspace CLOG_*
-          lttng add-context --userspace --type=vpid --type=vtid
-          lttng start
 
-          cleanup () {
-            lttng stop msquic;
-            babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt
-          }
+          if ${{ matrix.logging }}"" == "true" ; then
+            export QUIC_ENABLE_LOGGING=ON
 
-          trap "cleanup"  EXIT
+            sudo apt-add-repository ppa:lttng/stable-2.13
+            sudo apt-get update
+            sudo apt-get install -y lttng-tools lttng-modules-dkms babeltrace liblttng-ust-dev
+            which lttng
+            uname -a
+            mkdir msquic_lttng
+            lttng create msquic -o=./msquic_lttng
+            lttng enable-event --userspace CLOG_*
+            lttng add-context --userspace --type=vpid --type=vtid
+            lttng start
+
+            cleanup () {
+              lttng stop msquic;
+              babeltrace --names all ./msquic_lttng/* > _build/test/quic.babel.txt
+            }
+            trap "cleanup"  EXIT
+          fi
+
           make ci
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2
@@ -75,7 +121,96 @@ jobs:
         with:
           name: linux-ct-logs
           path: _build/test/
-          retention-days: 5
+          retention-days: 1
+
+      - name: build rel tar file
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          make tar
+          mv _build/default/rel/quicer/quicer-*.tar.gz quicer.tar.gz
+
+      - name: upload rel tar file
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v2
+        with:
+          name: quicer-linux-${{ matrix.otp }}-${{ matrix.arch }}-${{ matrix.build_type }}-logging-${{ matrix.logging }}
+          path: quicer.tar.gz
+          retention-days: 1
+
+  make-release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: [linux, mac, multiarch]
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: true
+
+  linux-release-upload-artifact:
+    needs: make-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        otp: [22.3.4.9, 23.2, 24.0.2]
+        os:
+          - linux
+        arch:
+          - x86_64
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+
+      - name: Check downloads
+        run: |
+          tree
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.make-release.outputs.upload_url }}
+          asset_path: quicer-${{ matrix.os }}-${{ matrix.otp }}-${{ matrix.arch }}-RelWithDebInfo-logging-false/quicer.tar.gz
+          asset_name: quicer-${{ matrix.os }}-${{ matrix.otp }}-${{ matrix.arch }}/quicer.tar.gz
+          asset_content_type: application/zip
+
+  mac-release-upload-artifact:
+    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: make-release
+    strategy:
+      matrix:
+        os:
+          - macos-10.15
+          - macos-11
+        otp:
+          - 23
+          - 24
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.make-release.outputs.upload_url }}
+          asset_path: quicer-${{ matrix.os }}-otp${{ matrix.otp }}/quicer.tar.gz
+          asset_name: quicer-${{ matrix.os }}-otp${{ matrix.otp }}/quicer.tar.gz
+          asset_content_type: application/zip
 
   multiarch:
     ### note:
@@ -93,14 +228,42 @@ jobs:
     - name: make ci arm32v7
       uses: docker://emqx/build-env:erl24.0.1-emqx-1-alpine-arm32v7
       with:
-        args: >
-          make
+        args: |
+          make tar
+
+    - name: move arm32v7
+      if: startsWith(github.event.ref, 'refs/tags/')
+      run: |
+        sudo mv _build/default/rel/quicer/quicer-*.tar.gz quicer.tar.gz
+        sudo chmod o+r quicer.tar.gz
+
+    - name: upload rel tar file
+      if: startsWith(github.event.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v2
+      with:
+        name: quicer-linux-24.0.1-arm32v7
+        path: quicer.tar.gz
+        retention-days: 3
 
     - name: make ci arm64v8
       uses: docker://emqx/build-env:erl24.0.1-emqx-1-alpine-arm64v8
       with:
-        args: >
-          make
+        args: |
+          make clean tar
+
+    - name: move arm64v8
+      if: startsWith(github.event.ref, 'refs/tags/')
+      run: |
+        sudo mv _build/default/rel/quicer/quicer-*.tar.gz quicer.tar.gz
+        sudo chmod o+r quicer.tar.gz
+
+    - name: upload rel tar file
+      if: startsWith(github.event.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v2
+      with:
+        name: quicer-linux-24.0.1-arm64v8
+        path: quicer.tar.gz
+        retention-days: 3
 
     - name: Archive CT Logs
       uses: actions/upload-artifact@v2
@@ -108,4 +271,28 @@ jobs:
       with:
         name: linux-ct-logs
         path: _build/test/
-        retention-days: 5
+        retention-days: 3
+
+  multiarch-release-upload-artifact:
+    if: startsWith(github.event.ref, 'refs/tags/')
+    needs: make-release
+    strategy:
+      matrix:
+        arch:
+          - arm64v8
+          - arm32v7
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.make-release.outputs.upload_url }}
+          asset_path: quicer-linux-24.0.1-${{ matrix.arch }}/quicer.tar.gz
+          asset_name: quicer-linux-24.0.1-${{ matrix.arch }}/quicer.tar.gz
+          asset_content_type: application/zip
