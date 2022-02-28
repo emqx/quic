@@ -150,6 +150,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
+
       enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
       if (!enif_send(NULL,
                      &(c_ctx->owner->Pid),
@@ -249,17 +250,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
-      if (Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
-        {
-          CXPLAT_FRE_ASSERT(c_ctx->is_closed);
-        }
-
-      if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
-        {
-          MsQuic->ConnectionClose(Connection);
-          c_ctx->is_closed = TRUE;
-        }
-
       is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
@@ -300,7 +290,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
-    {
+  {
+    enif_release_resource(c_ctx);
       destroy_c_ctx(c_ctx);
     }
   return QUIC_STATUS_SUCCESS;
@@ -393,12 +384,9 @@ ServerConnectionCallback(HQUIC Connection,
         {
           // Owner is gone, we shutdown our side as well.
           // connection shutdown could result a connection close
-          if (!c_ctx->is_closed)
-            {
-              MsQuic->ConnectionShutdown(Connection,
-                                         QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                         QUIC_STATUS_UNREACHABLE);
-            }
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
         }
 
       break;
@@ -420,18 +408,6 @@ ServerConnectionCallback(HQUIC Connection,
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-
-      if (Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
-        {
-          CXPLAT_FRE_ASSERT(c_ctx->is_closed);
-        }
-
-      if (!c_ctx->is_closed && !Event->SHUTDOWN_COMPLETE.AppCloseInProgress)
-        {
-          MsQuic->ConnectionClose(Connection);
-          c_ctx->is_closed = TRUE;
-        }
-
       is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -507,7 +483,7 @@ ServerConnectionCallback(HQUIC Connection,
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
-    {
+  {
       destroy_c_ctx(c_ctx);
     }
 
@@ -611,14 +587,16 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
+  // On behavior of Callback
+  enif_keep_resource(c_ctx);
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
                                                    c_ctx->Configuration,
                                                    QUIC_ADDRESS_FAMILY_UNSPEC,
                                                    host,
                                                    port)))
     {
-      MsQuic->ConnectionClose(c_ctx->Connection);
-      c_ctx->is_closed = TRUE;
+      // On behavior of Callback
+      enif_release_resource(c_ctx);
       destroy_c_ctx(c_ctx);
       return ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
     }
@@ -694,14 +672,8 @@ close_connection3(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  enif_mutex_lock(c_ctx->lock);
-  if (!c_ctx->is_closed)
-    {
-      // mark invalid handler now!
-      c_ctx->is_closed = TRUE;
-      MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
-    }
-  enif_mutex_unlock(c_ctx->lock);
+
+  MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
   return ATOM_OK;
 }
 
@@ -712,12 +684,10 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   HQUIC Handle = NULL;
   uint32_t Param;
   QUIC_PARAM_LEVEL Level;
-  BOOLEAN is_closed = FALSE;
 
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
       enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
-      is_closed = (((QuicerConnCTX *)q_ctx))->is_closed;
       enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
       Handle = (((QuicerConnCTX *)q_ctx))->Connection;
       Level = QUIC_PARAM_LEVEL_CONNECTION;
@@ -731,10 +701,6 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
     }
   else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
     {
-      enif_mutex_lock(((QuicerStreamCTX *)q_ctx)->lock);
-      is_closed = (((QuicerStreamCTX *)q_ctx))->is_closed;
-      enif_mutex_unlock(((QuicerStreamCTX *)q_ctx)->lock);
-
       Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
       Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
@@ -742,11 +708,6 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   else
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  if (is_closed)
-    {
-      return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
   QUIC_STATUS status;
@@ -859,27 +820,12 @@ async_handshake_1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(c_ctx->lock);
-  if (c_ctx->is_closed)
-    {
-      res = ERROR_TUPLE_2(ATOM_CLOSED);
-      enif_mutex_unlock(c_ctx->lock);
-      goto Exit;
-    }
-  else
-    {
-      enif_keep_resource(c_ctx);
-      enif_mutex_unlock(c_ctx->lock);
-    }
-
   TP_NIF_3(start, (uintptr_t)c_ctx->Connection, 0);
 
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {
-      enif_release_resource(c_ctx);
       res = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-Exit:
   return res;
 }
 

@@ -72,13 +72,6 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   enif_mutex_lock(c_ctx->lock);
 
-  if (c_ctx->is_closed)
-    {
-      destroy_dgram_send_ctx(dgram_send_ctx);
-      enif_mutex_unlock(c_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
-    }
-
   HQUIC Connection = c_ctx->Connection;
 
   //

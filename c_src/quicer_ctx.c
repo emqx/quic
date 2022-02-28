@@ -58,7 +58,6 @@ init_c_ctx()
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
-  c_ctx->is_closed = FALSE;
   c_ctx->TlsSecrets = NULL;
   c_ctx->ssl_keylogfile = NULL;
   c_ctx->l_ctx = NULL;
@@ -87,7 +86,6 @@ init_s_ctx()
 
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
-  s_ctx->is_closed = FALSE;
   s_ctx->is_wait_for_data = FALSE;
   s_ctx->Buffers[0].Buffer = NULL;
   s_ctx->Buffers[0].Length = 0;

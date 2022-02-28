@@ -208,7 +208,7 @@ tc_lib_registration(_Config) ->
   ok = quicer:reg_close().
 
 tc_open_listener_neg_1(Config) ->
-  Port = 4567,
+  Port = select_port(),
   ok = quicer:reg_close(),
   ok = quicer:close_lib(),
   {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
@@ -227,7 +227,7 @@ tc_lib_re_registration(_Config) ->
   ok = quicer:reg_close().
 
 tc_open_listener(Config) ->
-  Port = 4567,
+  Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   {ok, {_, _}} = quicer:sockname(L),
   {error,eaddrinuse} = gen_udp:open(Port),
@@ -307,7 +307,7 @@ tc_get_listener(Config) ->
   lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
 
 tc_conn_basic(Config)->
-  Port = 4567,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
                    fun() ->
@@ -325,7 +325,7 @@ tc_conn_basic(Config)->
   end.
 
 tc_conn_basic_slow_start(Config)->
-  Port = 4567,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
                    fun() ->
@@ -343,7 +343,7 @@ tc_conn_basic_slow_start(Config)->
   end.
 
 tc_conn_double_close(Config)->
-  Port = 4567,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
                    fun() ->
@@ -365,7 +365,7 @@ tc_conn_double_close(Config)->
   end.
 
 tc_conn_other_port(Config)->
-  Port = 4568,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
   receive
@@ -379,7 +379,7 @@ tc_conn_other_port(Config)->
   end.
 
 tc_conn_with_localaddr(Config)->
-  Port = 5568,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
 
@@ -399,7 +399,7 @@ tc_conn_with_localaddr(Config)->
   end.
 
 tc_stream_client_init(Config) ->
-  Port = 4568,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> simple_stream_server(Owner, Config, Port) end),
   receive
@@ -418,7 +418,7 @@ tc_stream_client_init(Config) ->
 
 
 tc_stream_client_send_binary(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
@@ -462,7 +462,7 @@ tc_stream_client_send_iolist(Config) ->
   end.
 
 tc_stream_client_async_send(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
@@ -489,7 +489,7 @@ tc_stream_client_async_send(Config) ->
   end.
 
 tc_stream_sendrecv_large_data_passive(Config) ->
-  Port = 24570,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
                   fun() ->
@@ -511,7 +511,7 @@ tc_stream_sendrecv_large_data_passive(Config) ->
 
 tc_stream_sendrecv_large_data_passive_2(Config) ->
   %% test when stream_recv_window_default isn't large enough
-  Port = 24570,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
                   fun() ->
@@ -533,7 +533,7 @@ tc_stream_sendrecv_large_data_passive_2(Config) ->
 
 tc_stream_sendrecv_large_data_active(Config) ->
   %% test when stream_recv_window_default isn't large enough
-  Port = 24570,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
                   fun() ->
@@ -554,7 +554,7 @@ tc_stream_sendrecv_large_data_active(Config) ->
   end.
 
 tc_stream_passive_switch_to_active(Config) ->
-  Port = 24569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -581,7 +581,7 @@ tc_stream_passive_switch_to_active(Config) ->
   end.
 
 tc_stream_active_switch_to_passive(Config) ->
-  Port = 24569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -610,7 +610,7 @@ tc_stream_active_switch_to_passive(Config) ->
   end.
 
 tc_stream_passive_receive(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
@@ -630,7 +630,7 @@ tc_stream_passive_receive(Config) ->
   end.
 
 tc_stream_passive_receive_buffer(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
@@ -651,7 +651,7 @@ tc_stream_passive_receive_buffer(Config) ->
 
 
 tc_stream_passive_receive_large_buffer_1(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -673,7 +673,7 @@ tc_stream_passive_receive_large_buffer_1(Config) ->
   end.
 
 tc_stream_passive_receive_large_buffer_2(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
   receive
@@ -694,7 +694,7 @@ tc_stream_passive_receive_large_buffer_2(Config) ->
   end.
 
 tc_stream_send_after_conn_close(Config) ->
-  Port = 4568,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> simple_stream_server(Owner, Config, Port) end),
   receive
@@ -703,7 +703,7 @@ tc_stream_send_after_conn_close(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_connection(Conn),
-      {error, closed} = quicer:send(Stm, <<"ping">>),
+      {error,stm_send_error,invalid_state} = quicer:send(Stm, <<"ping">>),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -711,7 +711,7 @@ tc_stream_send_after_conn_close(Config) ->
   end.
 
 tc_stream_send_after_async_conn_close(Config) ->
-  Port = 4568,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> simple_stream_server(Owner, Config, Port) end),
   receive
@@ -730,7 +730,7 @@ tc_stream_send_after_async_conn_close(Config) ->
   end.
 
 tc_stream_controlling_process(Config) ->
-  Port = 24569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -760,7 +760,7 @@ tc_stream_controlling_process(Config) ->
   end.
 
 tc_dgram_client_send(Config) ->
-  Port = 4569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
   receive
@@ -793,7 +793,7 @@ dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram) ->
   end.
 
 tc_conn_controlling_process(Config) ->
-  Port = 24569,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -823,7 +823,7 @@ tc_conn_controlling_process(Config) ->
 
 %% tc_getopt_raw(Config) ->
 %%   Parm = param_conn_quic_version,
-%%   Port = 4569,
+%%   Port = select_port(),
 %%   Owner = self(),
 %%   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
 %%   receive
@@ -844,7 +844,7 @@ tc_conn_controlling_process(Config) ->
 
 tc_getopt(Config) ->
   Parm = param_conn_statistics,
-  Port = 4570,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -873,7 +873,7 @@ tc_getopt(Config) ->
 
 tc_getopt_stream_active(Config) ->
   Parm = active,
-  Port = 4570,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -893,9 +893,8 @@ tc_getopt_stream_active(Config) ->
       ct:fail("listener_timeout")
   end.
 
-
 tc_get_stream_id(Config) ->
-  Port = 4571,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -920,7 +919,7 @@ tc_get_stream_id(Config) ->
 
 
 tc_getstat(Config) ->
-  Port = 4572,
+  Port = select_port(),
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -937,7 +936,7 @@ tc_getstat(Config) ->
   end.
 
 tc_getstat_closed(Config) ->
-  Port = 4572,
+  Port = select_port(),
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -951,9 +950,11 @@ tc_getstat_closed(Config) ->
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
-        {error, closed} -> ok
+        {error, closed} -> ok;
+        {ok, [{send_cnt, _},{recv_oct, _},{send_pend, _}]} -> ok
       end,
       case quicer:getstat(Stm, [send_cnt, recv_oct, send_pend]) of
+        {ok, [{send_cnt, _},{recv_oct, _},{send_pend, _}]} -> ok;
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
         {error, closed} -> ok
@@ -965,7 +966,7 @@ tc_getstat_closed(Config) ->
   end.
 
 tc_peername_v6(Config) ->
-  Port = 4573,
+  Port = select_port(),
   Owner = self(),
   {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -987,7 +988,7 @@ tc_peername_v6(Config) ->
   end.
 
 tc_peername_v4(Config) ->
-  Port = 4574,
+  Port = select_port(),
   Owner = self(),
   {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -1009,7 +1010,7 @@ tc_peername_v4(Config) ->
   end.
 
 tc_alpn(Config) ->
-  Port = 4575,
+  Port = select_port(),
   Owner = self(),
   Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["sample2", "sample"]}),
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
@@ -1024,7 +1025,7 @@ tc_alpn(Config) ->
   end.
 
 tc_alpn_mismatch(Config) ->
-  Port = 4576,
+  Port = select_port(),
   Owner = self(),
   Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["no"]}),
   {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
@@ -1046,7 +1047,7 @@ tc_alpn_mismatch(Config) ->
   end.
 
 tc_idle_timeout(Config) ->
-  Port = 4577,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -1062,6 +1063,9 @@ tc_idle_timeout(Config) ->
           ok;
         {error, stm_open_error, invalid_parameter} ->
           %% connection is closed
+          ok;
+        {error, stm_open_error, invalid_state} ->
+          %% Invalid state
           ok
       end,
       SPid ! done,
@@ -1070,7 +1074,7 @@ tc_idle_timeout(Config) ->
 
 
 tc_setopt(Config) ->
-  Port = 4578,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -1107,9 +1111,17 @@ tc_setopt(Config) ->
 
 
 tc_setopt_conn_local_addr(Config) ->
-  Port = 4578,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
+
   {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
   {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
   {ok, 5} = quicer:send(Stm0, <<"ping1">>),
@@ -1123,7 +1135,7 @@ tc_setopt_conn_local_addr(Config) ->
   %% change local addr with a new random port (0)
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
   %% sleep is needed to finish migration at protocol level
-  timer:sleep(50),
+  timer:sleep(100),
   {ok, NewAddr} = quicer:sockname(Stm0),
   ?assertNotEqual(OldAddr, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, NewAddr),
@@ -1153,9 +1165,15 @@ tc_setopt_conn_local_addr(Config) ->
   ensure_server_exit_normal(Ref).
 
 tc_setopt_conn_local_addr_in_use(Config) ->
-  Port = 4578,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
   {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
   {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
   {ok, 5} = quicer:send(Stm0, <<"ping1">>),
@@ -1199,7 +1217,7 @@ tc_setopt_conn_local_addr_in_use(Config) ->
   ensure_server_exit_normal(Ref).
 
 tc_setopt_stream_priority(Config) ->
-  Port = 4578,
+  Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
@@ -1218,7 +1236,7 @@ tc_setopt_stream_priority(Config) ->
   end.
 
 tc_app_echo_server(Config) ->
-  Port = 8888,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1245,7 +1263,7 @@ tc_app_echo_server(Config) ->
   ok.
 
 tc_strm_opt_active_1(Config) ->
-  Port = 8889,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1271,7 +1289,7 @@ tc_strm_opt_active_1(Config) ->
   quicer:close_connection(Conn).
 
 tc_strm_opt_active_n(Config) ->
-  Port = 8889,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1304,7 +1322,7 @@ tc_strm_opt_active_n(Config) ->
   quicer:close_connection(Conn).
 
 tc_strm_opt_active_once(Config) ->
-  Port = 8890,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1332,7 +1350,7 @@ tc_strm_opt_active_once(Config) ->
   quicer:close_connection(Conn).
 
 tc_strm_opt_active_badarg(Config) ->
-  Port = 8891,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1347,7 +1365,7 @@ tc_strm_opt_active_badarg(Config) ->
   {error, badarg} = quicer:start_stream(Conn, [{active, twice}]).
 
 tc_get_conn_rid(Config) ->
-  Port = 8891,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1363,7 +1381,7 @@ tc_get_conn_rid(Config) ->
   ?assert(is_integer(Rid) andalso Rid =/=0).
 
 tc_get_stream_rid(Config) ->
-  Port = 8891,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1385,7 +1403,7 @@ tc_get_stream_rid(Config) ->
   ?assert(Rid =/= 0).
 
 tc_conn_opt_sslkeylogfile(Config) ->
-  Port = 8892,
+  Port = select_port(),
   TargetFName = "SSLKEYLOGFILE",
   file:delete(TargetFName),
   application:ensure_all_started(quicer),
@@ -1655,6 +1673,13 @@ retry_with(Fun, Retry, ErrorInfo) ->
     {false, NewErrorInfo} ->
       retry_with(Fun, Retry - 1, NewErrorInfo)
   end.
+
+%% select a random port picked by OS
+select_port()->
+  {ok, S} = gen_udp:open(0),
+  {ok, {_, Port}} = inet:sockname(S),
+  gen_udp:close(S),
+  Port.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t

@@ -571,6 +571,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, 0);
+  MsQuic->ConnectionClose(c_ctx->Connection);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
@@ -606,6 +607,7 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
   TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
   enif_mutex_lock(s_ctx->lock);
+  MsQuic->StreamClose(s_ctx->Stream);
   enif_free_env(s_ctx->env);
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_destroy(s_ctx->lock);
@@ -907,29 +909,15 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
       enif_mutex_lock(s_ctx->lock);
-      if (s_ctx->is_closed)
-        {
-          res = ERROR_TUPLE_2(ATOM_CLOSED);
-        }
-      else
-        {
-          res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
-        }
+      res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
       enif_mutex_unlock(s_ctx->lock);
     }
   else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
 
       enif_mutex_lock(c_ctx->lock);
-      if (c_ctx->is_closed)
-        {
-          res = ERROR_TUPLE_2(ATOM_CLOSED);
-        }
-      else
-        {
-          res = connection_controlling_process(
+      res = connection_controlling_process(
               env, c_ctx, &caller, &new_owner);
-        }
       enif_mutex_unlock(c_ctx->lock);
     }
   else

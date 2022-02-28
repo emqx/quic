@@ -615,7 +615,7 @@ tc_conn_idle_close(Config) ->
                    {quic, transport_shutdown, _Conn, Status} ->
                      ct:pal("conn trans_shutdown status ~p~n", [Status])
                  end,
-                 {error, closed} = quicer:async_send(Stm, <<"ping2">>),
+                 {error, stm_send_error, invalid_state} = quicer:async_send(Stm, <<"ping2">>),
 
                  ?block_until(
                     #{?snk_kind := debug, context := "callback",
