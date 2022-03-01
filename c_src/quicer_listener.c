@@ -59,6 +59,9 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         }
       c_ctx->owner = conn_owner;
 
+
+      // For the callbacks
+      enif_keep_resource(c_ctx);
       //
       // A new connection is being attempted by a client. For the handshake to
       // proceed, the server must provide a configuration for QUIC to use. The
