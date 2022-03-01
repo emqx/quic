@@ -318,7 +318,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_STREAM_OPEN_ERROR, stm_open_error);                               \
   ATOM(ATOM_STREAM_START_ERROR, stm_start_error);                             \
   ATOM(ATOM_STREAM_SEND_ERROR, stm_send_error);                               \
-  ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                               \
+  ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                              \
   ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
   ATOM(ATOM_NOT_OWNER, not_owner);                                            \
                                                                               \
@@ -520,7 +520,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC, quic);                                                      \
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
   ATOM(ATOM_DGRAM, dgram);                                                    \
-  ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                                    \
+  ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                    \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \
@@ -916,8 +916,7 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
 
       enif_mutex_lock(c_ctx->lock);
-      res = connection_controlling_process(
-              env, c_ctx, &caller, &new_owner);
+      res = connection_controlling_process(env, c_ctx, &caller, &new_owner);
       enif_mutex_unlock(c_ctx->lock);
     }
   else
@@ -1005,7 +1004,8 @@ static ErlNifFunc nif_funcs[] = {
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
   { "async_handshake", 1, async_handshake_1, 0},
-  { "async_close_connection", 3, close_connection3, 0},
+  { "async_shutdown_connection", 3, shutdown_connection3, 0},
+  { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 3, send3, 0},

@@ -16,6 +16,7 @@
 
 -module(quicer_SUITE).
 -include_lib("kernel/include/file.hrl").
+-include("quicer.hrl").
 
 %% API
 -export([all/0,
@@ -164,7 +165,7 @@ end_per_group(_Groupname, _Config) ->
 %%% Testcase specific setup/teardown
 %%%===================================================================
 init_per_testcase(_TestCase, Config) ->
-  Config.
+  [{timetrap, 5000} | Config].
 
 end_per_testcase(tc_close_lib_test, _Config) ->
   quicer:open_lib();
@@ -317,6 +318,7 @@ tc_conn_basic(Config)->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, {_, _}} = quicer:sockname(Conn),
+      ct:pal("closing connection : ~p", [Conn]),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -355,7 +357,6 @@ tc_conn_double_close(Config)->
       {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done,
-      timer:sleep(1000),
       quicer:async_close_connection(Conn),
       %% Wait for it crash if it will
       timer:sleep(1000),
@@ -701,9 +702,10 @@ tc_stream_send_after_conn_close(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_connection(Conn),
-      {error,stm_send_error,invalid_state} = quicer:send(Stm, <<"ping">>),
+      {error, stm_send_error, invalid_state} = quicer:send(Stm, <<"ping2">>),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -722,7 +724,7 @@ tc_stream_send_after_async_conn_close(Config) ->
       ok = quicer:async_close_connection(Conn),
       %% we created a race here, the send can success or fail
       %% but it should not crash
-      quicer:send(Stm, <<"ping">>),
+      quicer:send(Stm, <<"ping2">>),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -811,7 +813,8 @@ tc_conn_controlling_process(Config) ->
                                  end
                              end),
       ok = quicer:controlling_process(Conn, NewOwner),
-      quicer:async_close_connection(Conn),
+      %% Trigger *async* connection shutdown since I am not the conn owner
+      quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
       receive
         {'DOWN', MonRef, process, NewOwner, normal} ->
           SPid ! done
@@ -950,11 +953,9 @@ tc_getstat_closed(Config) ->
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
-        {error, closed} -> ok;
-        {ok, [{send_cnt, _},{recv_oct, _},{send_pend, _}]} -> ok
+        {error, closed} -> ok
       end,
       case quicer:getstat(Stm, [send_cnt, recv_oct, send_pend]) of
-        {ok, [{send_cnt, _},{recv_oct, _},{send_pend, _}]} -> ok;
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
         {error, closed} -> ok
@@ -1456,13 +1457,16 @@ echo_server_stm_loop(L, Conn, Stm) ->
       ct:pal("echo server peer_send_aborted", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stm);
-    {quic, peer_send_shutdown, Stm, _Error} ->
+    {quic, peer_send_shutdown, Stm} ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stm);
     {quic, shutdown, Conn} ->
       ct:pal("echo server conn shutdown ~p", [Conn]),
       quicer:close_connection(Conn),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, closed, Conn} ->
+      ct:pal("echo server Conn closed", []),
       echo_server_stm_loop(L, Conn, Stm);
     {quic, closed, Stm, Flag} ->
       ct:pal("echo server stream closed ~p", [Flag]),
@@ -1603,15 +1607,17 @@ simple_stream_server(Owner, Config, Port) ->
       ct:pal("New StreamID: ~p", [StreamId]),
       receive
         {quic, shutdown, Conn} ->
+          ct:pal("closing ~p", [Conn]),
           quicer:close_connection(Conn);
         {quic, peer_send_shutdown, Stream} ->
-          quicer:close_stream(Stream)
+          quicer:close_stream(Stream);
+        done ->
+          exit(normal)
       end
-  after 1000 ->
-      ok
   end,
   receive
     {quic, shutdown, Conn} ->
+      ct:pal("Received Conn close for ~p", [Conn]),
       quicer:close_connection(Conn);
     done ->
       ok

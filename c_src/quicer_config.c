@@ -330,9 +330,7 @@ load_alpn(ErlNifEnv *env,
 }
 
 bool
-get_uint16(ErlNifEnv *env,
-           const ERL_NIF_TERM term,
-           uint16_t *value)
+get_uint16(ErlNifEnv *env, const ERL_NIF_TERM term, uint16_t *value)
 {
   unsigned int value0 = 0;
   if (!enif_get_uint(env, term, &value0))
@@ -348,7 +346,6 @@ get_uint16(ErlNifEnv *env,
   *value = (uint16_t)value0;
   return true;
 }
-
 
 bool
 get_uint8_from_map(ErlNifEnv *env,

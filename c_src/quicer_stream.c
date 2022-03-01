@@ -459,7 +459,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-
   ErlNifBinary *bin = &send_ctx->bin;
 
   if (enif_get_uint(env, eFlags, &sendflags))
@@ -482,7 +481,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   ebin = enif_make_copy(send_ctx->env, ebin);
-  if (!(enif_inspect_iolist_as_binary(env, ebin, bin) || enif_inspect_binary(env, ebin, bin))
+  if (!(enif_inspect_iolist_as_binary(env, ebin, bin)
+        || enif_inspect_binary(env, ebin, bin))
       || bin->size > UINT32_MAX)
     {
       destroy_send_ctx(send_ctx);
@@ -493,7 +493,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   enif_mutex_lock(s_ctx->lock);
 
   send_ctx->s_ctx = s_ctx;
-
 
   HQUIC Stream = s_ctx->Stream;
 
@@ -665,14 +664,14 @@ close_stream3(ErlNifEnv *env,
 
   if (!enif_get_uint(env, argv[2], &app_errcode))
     {
-      ret =  ERROR_TUPLE_2(ATOM_BADARG);
+      ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
-                    s_ctx->Stream, flags, app_errcode)))
-  {
-    ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
-  }
+  if (QUIC_FAILED(Status
+                  = MsQuic->StreamShutdown(s_ctx->Stream, flags, app_errcode)))
+    {
+      ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
+    }
 
   return ret;
 }

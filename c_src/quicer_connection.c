@@ -23,7 +23,8 @@ EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
 extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
-static void handle_dgram_state_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event);
+static void handle_dgram_state_event(QuicerConnCTX *c_ctx,
+                                     QUIC_CONNECTION_EVENT *Event);
 
 static void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
                                           QUIC_CONNECTION_EVENT *Event);
@@ -290,8 +291,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
-  {
-    enif_release_resource(c_ctx);
+    {
       destroy_c_ctx(c_ctx);
     }
   return QUIC_STATUS_SUCCESS;
@@ -337,11 +337,6 @@ ServerConnectionCallback(HQUIC Connection,
         }
 
       assert(acc);
-
-      if (!acc->fast_conn)
-        {
-          enif_release_resource(c_ctx);
-        }
 
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
@@ -483,7 +478,7 @@ ServerConnectionCallback(HQUIC Connection,
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
-  {
+    {
       destroy_c_ctx(c_ctx);
     }
 
@@ -587,16 +582,12 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  // On behavior of Callback
-  enif_keep_resource(c_ctx);
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
                                                    c_ctx->Configuration,
                                                    QUIC_ADDRESS_FAMILY_UNSPEC,
                                                    host,
                                                    port)))
     {
-      // On behavior of Callback
-      enif_release_resource(c_ctx);
       destroy_c_ctx(c_ctx);
       return ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
     }
@@ -650,17 +641,22 @@ async_accept2(ErlNifEnv *env,
   return SUCCESS(listenHandler);
 }
 
-//@todo,  shutdown with error
 ERL_NIF_TERM
-close_connection3(ErlNifEnv *env,
-                  __unused_parm__ int argc,
-                  const ERL_NIF_TERM argv[])
+shutdown_connection3(ErlNifEnv *env,
+                     __unused_parm__ int argc,
+                     const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
   uint32_t app_errcode = 0, flags = 0;
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!c_ctx->Connection)
+    {
+      // already closed
+      return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
   if (!enif_get_uint(env, argv[1], &flags))
@@ -674,6 +670,26 @@ close_connection3(ErlNifEnv *env,
     }
 
   MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
+  return ATOM_OK;
+}
+
+ERL_NIF_TERM
+close_connection1(ErlNifEnv *env,
+                  __unused_parm__ int argc,
+                  const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(c_ctx->lock);
+  c_ctx->Connection = NULL;
+  enif_mutex_unlock(c_ctx->lock);
+
+  // void return
+  MsQuic->ConnectionClose(c_ctx->Connection);
   return ATOM_OK;
 }
 

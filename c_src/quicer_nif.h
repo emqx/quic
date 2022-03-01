@@ -26,10 +26,10 @@ limitations under the License.
 #include "quicer_config.h"
 #include "quicer_connection.h"
 #include "quicer_ctx.h"
+#include "quicer_dgram.h"
 #include "quicer_eterms.h"
 #include "quicer_queue.h"
 #include "quicer_stream.h"
-#include "quicer_dgram.h"
 #include "quicer_tp.h"
 
 // @todo is 16 enough?

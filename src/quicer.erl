@@ -39,8 +39,12 @@
         , accept/2
         , accept/3
         , async_accept/2
+        , shutdown_connection/1
+        , shutdown_connection/2
+        , shutdown_connection/3
+        , shutdown_connection/4
+        , async_shutdown_connection/3
         , close_connection/1
-        , close_connection/2
         , close_connection/3
         , close_connection/4
         , async_close_connection/1
@@ -145,7 +149,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
           {error, transport_down, Reason}
       after Timeout ->
           %% @TODO caller should provide the method to handle timeout
-          async_close_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
+          async_shutdown_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
           {error, timeout}
       end;
     {error, _} = Err ->
@@ -202,44 +206,79 @@ async_accept(Listener, Opts) ->
   NewOpts = maps:merge(default_conn_opts(), Opts),
   quicer_nif:async_accept(Listener, NewOpts).
 
--spec close_connection(connection_handler()) -> ok.
-close_connection(Conn) ->
-  close_connection(Conn, 5000).
+-spec shutdown_connection(connection_handler()) -> ok | {error, timeout | closed}.
+shutdown_connection(Conn) ->
+  shutdown_connection(Conn, 5000).
 
--spec close_connection(connection_handler(), timer:timeout()) -> ok.
-close_connection(Conn, Timeout) ->
-  close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
+-spec shutdown_connection(connection_handler(), timer:timeout()) ->
+        ok | {error, timeout | badarg}.
+shutdown_connection(Conn, Timeout) ->
+  shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
+
+-spec shutdown_connection(connection_handler(),
+                       conn_close_flag(),
+                       app_errno()
+                      ) -> ok | {error, timeout | badarg}.
+shutdown_connection(Conn, Flags, ErrorCode) ->
+  shutdown_connection(Conn, Flags, ErrorCode, 5000).
+
+-spec shutdown_connection(connection_handler(),
+                       conn_close_flag(),
+                       app_errno(),
+                       timer:timeout()) -> ok | {error, timeout | badarg}.
+shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
+  %% @todo make_ref
+  case async_shutdown_connection(Conn, Flags, ErrorCode) of
+    ok ->
+      receive
+        {quic, closed, Conn} ->
+          ok
+      after Timeout ->
+          {error, timeout}
+      end;
+    {error, _} = Err ->
+      Err
+  end.
+
+-spec async_shutdown_connection(connection_handler(),
+                                conn_close_flag(),
+                                app_errno()) -> ok | {error, badarg | closed}.
+async_shutdown_connection(Conn, Flags, ErrorCode) ->
+  quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode).
+
+-spec close_connection(connection_handler()) -> ok | {error, badarg}.
+close_connection(Conn) ->
+  close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, 5000).
 
 -spec close_connection(connection_handler(),
                        conn_close_flag(),
                        app_errno()
-                      ) -> ok.
+                      ) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode) ->
   close_connection(Conn, Flags, ErrorCode, 5000).
 
 -spec close_connection(connection_handler(),
                        conn_close_flag(),
                        app_errno(),
-                       timer:timeout()) -> ok.
+                       timer:timeout()) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
-  ok = async_close_connection(Conn, Flags, ErrorCode),
-  %% @todo make_ref
-  receive
-    {quic, closed, Conn} ->
-      ok
-  after Timeout ->
-      {error, timeout}
+  case shutdown_connection(Conn, Flags, ErrorCode, Timeout) of
+    {error, _} = Err ->
+      Err;
+    ok ->
+      async_close_connection(Conn)
   end.
 
 -spec async_close_connection(connection_handler()) -> ok.
 async_close_connection(Conn) ->
-  quicer_nif:async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
+  quicer_nif:async_close_connection(Conn).
 
 -spec async_close_connection(connection_handler(),
                              conn_close_flag(),
                              app_errno()) -> ok.
 async_close_connection(Conn, Flags, ErrorCode) ->
-  quicer_nif:async_close_connection(Conn, Flags, ErrorCode).
+  _ = quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode),
+  quicer_nif:async_close_connection(Conn).
 
 -spec accept_stream(connection_handler(), stream_opts()) ->
         {ok, stream_handler()} |
