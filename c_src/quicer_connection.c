@@ -189,6 +189,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
         }
+      else
+        {
+          enif_keep_resource(s_ctx->c_ctx);
+        }
       s_ctx->owner = acc;
 
       enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon);

@@ -316,9 +316,6 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  // note, release resource in destroy_s_ctx
-  enif_keep_resource(c_ctx);
-
   //
   // note, s_ctx is not shared yet, thus no locking is needed.
   //
@@ -326,14 +323,13 @@ async_start_stream2(ErlNifEnv *env,
 
   if (!s_ctx)
     {
-      enif_release_resource(c_ctx);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  // keep resource for stream callback
-  enif_keep_resource(s_ctx);
-
   s_ctx->c_ctx = c_ctx;
+
+  // note, will be released in destroy_s_ctx
+  enif_keep_resource(s_ctx->c_ctx);
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -643,9 +639,9 @@ Exit:
 }
 
 ERL_NIF_TERM
-close_stream3(ErlNifEnv *env,
-              __unused_parm__ int argc,
-              const ERL_NIF_TERM argv[])
+shutdown_stream3(ErlNifEnv *env,
+                 __unused_parm__ int argc,
+                 const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
@@ -674,6 +670,27 @@ close_stream3(ErlNifEnv *env,
     }
 
   return ret;
+}
+
+ERL_NIF_TERM
+close_stream1(ErlNifEnv *env,
+              __unused_parm__ int argc,
+              const ERL_NIF_TERM argv[])
+
+{
+  QuicerStreamCTX *s_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(s_ctx->lock);
+  s_ctx->Stream = NULL;
+  enif_mutex_unlock(s_ctx->lock);
+
+  // void return
+  MsQuic->StreamClose(s_ctx->Stream);
+  return ATOM_OK;
 }
 
 static uint64_t

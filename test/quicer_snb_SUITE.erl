@@ -94,6 +94,7 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
+  snabbkaffe:cleanup(),
   ok.
 
 %%--------------------------------------------------------------------
@@ -453,18 +454,18 @@ tc_conn_close_flag_1(Config) ->
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  quicer:recv(Stm, 4),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
-                 ?block_until(
-                    #{ ?snk_kind := debug
-                     , context := "callback"
-                     , function := "ServerConnectionCallback"
-                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                     , tag := "event"}, 1000, 3000),
-                 ?block_until(
-                    #{ ?snk_kind := debug
-                     , context := "callback"
-                     , function := "ClientConnectionCallback"
-                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                     , tag := "event"}, 1000, 3000),
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "ServerConnectionCallback"
+                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                               , tag := "event"}, 1000, 3000),
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "ClientConnectionCallback"
+                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                               , tag := "event"}, 1000, 3000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -510,12 +511,12 @@ tc_conn_close_flag_2(Config) ->
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  quicer:recv(Stm, 4),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 111),
-                 ?block_until(
-                    #{?snk_kind := debug
-                     , context := "callback"
-                     , function := "ServerConnectionCallback"
-                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                     , tag := "event"}, 3000, 3000), %% assume idle_timeout_is 5s
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug
+                               , context := "callback"
+                               , function := "ClientConnectionCallback"
+                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                               , tag := "event"}, 3000, 3000), %% assume idle_timeout_is 5s
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,

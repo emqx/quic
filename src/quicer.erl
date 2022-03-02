@@ -57,11 +57,15 @@
         , async_send/2
         , recv/2
         , send_dgram/2
+        , shutdown_stream/1
+        , shutdown_stream/2
+        , shutdown_stream/4
+        , async_shutdown_stream/3
+        , async_shutdown_stream/1
         , close_stream/1
         , close_stream/2
         , close_stream/4
         , async_close_stream/1
-        , async_close_stream/3
         , sockname/1
         , getopt/2
         , getopt/3
@@ -216,14 +220,14 @@ shutdown_connection(Conn, Timeout) ->
   shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
 
 -spec shutdown_connection(connection_handler(),
-                       conn_close_flag(),
+                       conn_shutdown_flag(),
                        app_errno()
                       ) -> ok | {error, timeout | badarg}.
 shutdown_connection(Conn, Flags, ErrorCode) ->
   shutdown_connection(Conn, Flags, ErrorCode, 5000).
 
 -spec shutdown_connection(connection_handler(),
-                       conn_close_flag(),
+                       conn_shutdown_flag(),
                        app_errno(),
                        timer:timeout()) -> ok | {error, timeout | badarg}.
 shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
@@ -241,7 +245,7 @@ shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
   end.
 
 -spec async_shutdown_connection(connection_handler(),
-                                conn_close_flag(),
+                                conn_shutdown_flag(),
                                 app_errno()) -> ok | {error, badarg | closed}.
 async_shutdown_connection(Conn, Flags, ErrorCode) ->
   quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode).
@@ -251,14 +255,14 @@ close_connection(Conn) ->
   close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, 5000).
 
 -spec close_connection(connection_handler(),
-                       conn_close_flag(),
+                       conn_shutdown_flag(),
                        app_errno()
                       ) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode) ->
   close_connection(Conn, Flags, ErrorCode, 5000).
 
 -spec close_connection(connection_handler(),
-                       conn_close_flag(),
+                       conn_shutdown_flag(),
                        app_errno(),
                        timer:timeout()) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
@@ -274,7 +278,7 @@ async_close_connection(Conn) ->
   quicer_nif:async_close_connection(Conn).
 
 -spec async_close_connection(connection_handler(),
-                             conn_close_flag(),
+                             conn_shutdown_flag(),
                              app_errno()) -> ok.
 async_close_connection(Conn, Flags, ErrorCode) ->
   _ = quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode),
@@ -396,25 +400,26 @@ send_dgram(Conn, Data) ->
       E
   end.
 
--spec close_stream(stream_handler()) -> ok | {error, any()}.
-close_stream(Stream) ->
-  close_stream(Stream, infinity).
+-spec shutdown_stream(stream_handler()) -> ok | {error, badarg}.
+shutdown_stream(Stream) ->
+  shutdown_stream(Stream, infinity).
 
--spec close_stream(stream_handler(), timer:timeout()) ->
+-spec shutdown_stream(stream_handler(), timer:timeout()) ->
         ok |
-        {error, badarg | atom_reason()} |
+        {error, badarg} |
         {error, timeout}.
-close_stream(Stream, Timeout) ->
-  close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
+shutdown_stream(Stream, Timeout) ->
+  shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
 
--spec close_stream(stream_handler(),
-                   stream_close_flags(),
+-spec shutdown_stream(stream_handler(),
+                   stream_shutdown_flags(),
                    app_errno(),
                    time:timeout()) ->
-        {error, badarg | atom_reason()} |
+        ok |
+        {error, badarg} |
         {error, timeout}.
-close_stream(Stream, Flags, ErrorCode, Timeout) ->
-  case async_close_stream(Stream, Flags, ErrorCode) of
+shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
+  case async_shutdown_stream(Stream, Flags, ErrorCode) of
     ok ->
       receive
         {quic, closed, Stream, _IsGraceful} ->
@@ -426,18 +431,52 @@ close_stream(Stream, Flags, ErrorCode, Timeout) ->
       Err
   end.
 
--spec async_close_stream(stream_handler()) ->
+-spec async_shutdown_stream(stream_handler()) ->
         ok |
         {error, badarg | atom_reason()}.
-async_close_stream(Stream) ->
-  quicer_nif:async_close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
+async_shutdown_stream(Stream) ->
+  quicer_nif:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
 
--spec async_close_stream(stream_handler(),
-                         stream_close_flags(),
+-spec async_shutdown_stream(stream_handler(),
+                         stream_shutdown_flags(),
                          app_errno())
-                        -> ok | {error, badarg | atom_reason()}.
-async_close_stream(Stream, Flags, Reason) ->
-  quicer_nif:async_close_stream(Stream, Flags, Reason).
+                        -> ok | {error, badarg}.
+async_shutdown_stream(Stream, Flags, Reason) ->
+  quicer_nif:async_shutdown_stream(Stream, Flags, Reason).
+
+-spec close_stream(stream_handler()) -> ok | {error, badarg | timeout}.
+close_stream(Stream) ->
+  case shutdown_stream(Stream, infinity) of
+    ok ->
+      async_close_stream(Stream);
+    {error, _} = E ->
+      E
+  end.
+
+-spec close_stream(stream_handler(), timer:timeout())
+                  -> ok | {error, badarg | timeout}.
+close_stream(Stream, Timeout) ->
+  case shutdown_stream(Stream, Timeout) of
+    ok ->
+      async_close_stream(Stream);
+    {error, _} = E ->
+      E
+  end.
+
+-spec close_stream(stream_handler(), stream_shutdown_flags(),
+                   app_errno(), timer:timeout())
+                  -> ok | {error, badarg | timeout}.
+close_stream(Stream, Flags, ErrorCode, Timeout) ->
+  case shutdown_stream(Stream, Flags, ErrorCode, Timeout) of
+    ok ->
+      async_close_stream(Stream);
+    {error, _} = E ->
+      E
+  end.
+
+-spec async_close_stream(stream_handler()) -> ok | {error, badarg}.
+async_close_stream(Stream) ->
+  quicer_nif:async_close_stream(Stream).
 
 -spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
