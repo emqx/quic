@@ -130,8 +130,8 @@ all() ->
   , tc_conn_close_flag_2
   , tc_conn_idle_close
   , tc_stream_close_errno
-  , tc_conn_gc
   , tc_conn_no_gc
+  , tc_conn_gc
   ].
 
 %%--------------------------------------------------------------------
@@ -550,10 +550,14 @@ tc_stream_close_errno(Config) ->
                  quicer:recv(Stm, 4),
                  quicer:close_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND, Errno, 5000),
                  quicer:close_connection(Conn),
-                 ?block_until(
-                    #{?snk_kind := debug, context := "callback",
-                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
-                      tag := "event"}, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -804,12 +808,11 @@ tc_conn_no_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 ok
+                 {ok, CRid}
 
                end,
-               fun(Result, Trace) ->
+               fun({ok, CRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertEqual(ok, Result),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , context := "callback"
@@ -826,7 +829,9 @@ tc_conn_no_gc(Config) ->
                                               , tag := "event"},
                                              Trace)),
                    %% Check that there is no GC
-                   ?assertEqual(0, length([ E || #{function := "resource_conn_dealloc_callback" } = E <- Trace]))
+                   ?assertEqual(0, length([ E || #{ function := "resource_conn_dealloc_callback"
+                                                  , resource_id := Rid
+                                                  } = E <- Trace, Rid == CRid]))
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
