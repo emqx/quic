@@ -23,13 +23,15 @@
         , async_connect/3
         , async_accept/2
         , async_handshake/1
-        , async_close_connection/3
+        , async_shutdown_connection/3
+        , async_close_connection/1
         , async_accept_stream/2
         , start_stream/2
         , send/3
         , recv/2
         , send_dgram/3
-        , async_close_stream/3
+        , async_shutdown_stream/3
+        , async_close_stream/1
         , sockname/1
         , getopt/3
         , setopt/4
@@ -111,9 +113,14 @@ async_accept(_Listener, _Opts) ->
 async_handshake(_Connection) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_close_connection(connection_handler(), conn_close_flag(), app_errno()) ->
+-spec async_shutdown_connection(connection_handler(), conn_shutdown_flag(), app_errno()) ->
         ok | {error, badarg}.
-async_close_connection(_Conn, _Flags, _ErrorCode) ->
+async_shutdown_connection(_Conn, _Flags, _ErrorCode) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec async_close_connection(connection_handler()) ->
+        ok | {error, badarg}.
+async_close_connection(_Conn) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec async_accept_stream(connection_handler(), stream_opts()) ->
@@ -151,10 +158,16 @@ recv(_Stream, _Len) ->
 send_dgram(_Conn, _Data, _Flags) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_close_stream(stream_handler(), stream_close_flags(), app_errno()) ->
+-spec async_shutdown_stream(stream_handler(), stream_shutdown_flags(), app_errno()) ->
         ok |
         {error, badarg | atom_reason()}.
-async_close_stream(_Stream, _Flags, _ErrorCode) ->
+async_shutdown_stream(_Stream, _Flags, _ErrorCode) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec async_close_stream(stream_handler()) ->
+        ok |
+        {error, badarg | atom_reason()}.
+async_close_stream(_Stream) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec sockname(connection_handler() | stream_handler()) ->

@@ -54,7 +54,6 @@ typedef struct QuicerConnCTX
   ErlNifMutex *lock;
   // Connection handler closed flag
   // false means the handler is invalid
-  BOOLEAN is_closed;
   CXPLAT_TLS_SECRETS *TlsSecrets;
   char *ssl_keylogfile;
   void *reserved1;
@@ -71,9 +70,6 @@ typedef struct QuicerStreamCTX
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
-  // Stream handler closed flag
-  // false means the handler is invalid
-  BOOLEAN is_closed;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint32_t BufferCount;

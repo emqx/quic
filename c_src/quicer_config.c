@@ -330,9 +330,7 @@ load_alpn(ErlNifEnv *env,
 }
 
 bool
-get_uint16(ErlNifEnv *env,
-           const ERL_NIF_TERM term,
-           uint16_t *value)
+get_uint16(ErlNifEnv *env, const ERL_NIF_TERM term, uint16_t *value)
 {
   unsigned int value0 = 0;
   if (!enif_get_uint(env, term, &value0))
@@ -348,7 +346,6 @@ get_uint16(ErlNifEnv *env,
   *value = (uint16_t)value0;
   return true;
 }
-
 
 bool
 get_uint8_from_map(ErlNifEnv *env,
@@ -1075,15 +1072,6 @@ get_stream_opt(ErlNifEnv *env,
   QUIC_PARAM_LEVEL Level;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
-  enif_mutex_lock(s_ctx->lock);
-  if (s_ctx->is_closed)
-    {
-      enif_mutex_unlock(s_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
-    }
-  enif_keep_resource(s_ctx);
-  enif_mutex_unlock(s_ctx->lock);
-
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
       res = get_level_param(env, s_ctx->Stream, optname, elevel);
@@ -1145,7 +1133,6 @@ get_stream_opt(ErlNifEnv *env,
     }
 
 Exit:
-  enif_release_resource(s_ctx);
   return res;
 }
 
@@ -1184,16 +1171,6 @@ set_stream_opt(ErlNifEnv *env,
       enif_mutex_unlock(s_ctx->lock);
       return ATOM_OK;
     }
-
-  // Msquic Opts ...
-  enif_mutex_lock(s_ctx->lock);
-  if (s_ctx->is_closed)
-    {
-      enif_mutex_unlock(s_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
-    }
-  enif_keep_resource(s_ctx);
-  enif_mutex_unlock(s_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1271,7 +1248,6 @@ set_stream_opt(ErlNifEnv *env,
     }
 
 Exit:
-  enif_release_resource(s_ctx);
   return res;
 }
 
@@ -1288,15 +1264,6 @@ get_connection_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   QUIC_PARAM_LEVEL Level;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-
-  enif_mutex_lock(c_ctx->lock);
-  if (c_ctx->is_closed)
-    {
-      enif_mutex_unlock(c_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
-    }
-  enif_keep_resource(c_ctx);
-  enif_mutex_unlock(c_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1490,7 +1457,6 @@ get_connection_opt(ErlNifEnv *env,
     }
 
 Exit:
-  enif_release_resource(c_ctx);
   return res;
 }
 
@@ -1508,15 +1474,6 @@ set_connection_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   QUIC_PARAM_LEVEL Level;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-
-  enif_mutex_lock(c_ctx->lock);
-  if (c_ctx->is_closed)
-    {
-      enif_mutex_unlock(c_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
-    }
-  enif_keep_resource(c_ctx);
-  enif_mutex_unlock(c_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1721,7 +1678,6 @@ set_connection_opt(ErlNifEnv *env,
     }
 
 Exit:
-  enif_release_resource(c_ctx);
   return res;
 }
 

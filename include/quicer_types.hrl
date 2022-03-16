@@ -67,17 +67,17 @@
 -type listen_opts() :: map(). %% @TODO expand
 
 -type conn_opts() :: map(). %% @TODO expand
--type conn_close_flag() :: ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE |
-                           ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
+-type conn_shutdown_flag() :: ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE |
+                              ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
 -type acceptor_opts() :: map(). %% @TODO expand
 
 -type stream_opts() :: map(). %% @TODO expand
--type stream_close_flags() :: ?QUIC_STREAM_SHUTDOWN_FLAG_NONE |
-                              ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL |
-                              ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND |
-                              ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE |
-                              ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT |
-                              ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE. %% @TODO add xor
+-type stream_shutdown_flags() :: ?QUIC_STREAM_SHUTDOWN_FLAG_NONE |
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL |
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND |
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE |
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT |
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE. %% @TODO add xor
 
 -type send_flags() :: non_neg_integer(). %% is sync send or not
 

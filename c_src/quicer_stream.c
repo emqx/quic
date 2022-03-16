@@ -139,7 +139,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
 
-      s_ctx->is_closed = TRUE;
       is_destroy = TRUE;
       break;
     default:
@@ -155,7 +154,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
   if (is_destroy)
     {
-      MsQuic->StreamClose(Stream);
       // must be called after mutex unlock
       destroy_s_ctx(s_ctx);
     }
@@ -269,8 +267,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
-      // Invalidate the handler now
-      s_ctx->is_closed = TRUE;
       // Then we destroy the ctx without holding lock.
       is_destroy = TRUE;
       break;
@@ -293,8 +289,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
   if (is_destroy)
     {
-
-      MsQuic->StreamClose(Stream);
       // must be called after mutex unlock,
       destroy_s_ctx(s_ctx);
     }
@@ -322,16 +316,6 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(c_ctx->lock);
-  if (c_ctx->is_closed)
-    {
-      enif_mutex_unlock(c_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CTX_INIT_FAILED);
-    }
-  // note, release resource in destroy_s_ctx
-  enif_keep_resource(c_ctx);
-  enif_mutex_unlock(c_ctx->lock);
-
   //
   // note, s_ctx is not shared yet, thus no locking is needed.
   //
@@ -343,6 +327,9 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   s_ctx->c_ctx = c_ctx;
+
+  // note, will be released in destroy_s_ctx
+  enif_keep_resource(s_ctx->c_ctx);
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -468,7 +455,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-
   ErlNifBinary *bin = &send_ctx->bin;
 
   if (enif_get_uint(env, eFlags, &sendflags))
@@ -491,7 +477,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   ebin = enif_make_copy(send_ctx->env, ebin);
-  if (!(enif_inspect_iolist_as_binary(env, ebin, bin) || enif_inspect_binary(env, ebin, bin))
+  if (!(enif_inspect_iolist_as_binary(env, ebin, bin)
+        || enif_inspect_binary(env, ebin, bin))
       || bin->size > UINT32_MAX)
     {
       destroy_send_ctx(send_ctx);
@@ -502,12 +489,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   enif_mutex_lock(s_ctx->lock);
 
   send_ctx->s_ctx = s_ctx;
-
-  if (s_ctx->is_closed || s_ctx->c_ctx->is_closed)
-    {
-      res = ERROR_TUPLE_2(ATOM_CLOSED);
-      goto ErrorExit;
-    }
 
   HQUIC Stream = s_ctx->Stream;
 
@@ -527,7 +508,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
               Stream, &send_ctx->Buffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
     {
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
-      MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
       goto ErrorExit;
     }
 
@@ -573,11 +553,6 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       goto Exit;
     }
 
-  if (s_ctx->is_closed)
-    {
-      res = ERROR_TUPLE_2(ATOM_CLOSED);
-      goto Exit;
-    }
   // We have checked that the Stream is not closed/closing
   // it is safe to use the s_ctx->Stream in following MsQuic API calls
 
@@ -664,9 +639,9 @@ Exit:
 }
 
 ERL_NIF_TERM
-close_stream3(ErlNifEnv *env,
-              __unused_parm__ int argc,
-              const ERL_NIF_TERM argv[])
+shutdown_stream3(ErlNifEnv *env,
+                 __unused_parm__ int argc,
+                 const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
@@ -680,28 +655,42 @@ close_stream3(ErlNifEnv *env,
   // only check type, actual flag will be validated by msquic
   if (!enif_get_uint(env, argv[1], &flags))
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
   if (!enif_get_uint(env, argv[2], &app_errcode))
     {
+      ret = ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (QUIC_FAILED(Status
+                  = MsQuic->StreamShutdown(s_ctx->Stream, flags, app_errcode)))
+    {
+      ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
+    }
+
+  return ret;
+}
+
+ERL_NIF_TERM
+close_stream1(ErlNifEnv *env,
+              __unused_parm__ int argc,
+              const ERL_NIF_TERM argv[])
+
+{
+  QuicerStreamCTX *s_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  // we don't use trylock since we are in NIF call.
   enif_mutex_lock(s_ctx->lock);
-  if (!s_ctx->is_closed)
-    {
-      if (QUIC_FAILED(Status = MsQuic->StreamShutdown(
-                          s_ctx->Stream, flags, app_errcode)))
-        {
-          ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
-        }
-      s_ctx->is_closed = TRUE;
-    }
+  s_ctx->Stream = NULL;
   enif_mutex_unlock(s_ctx->lock);
 
-  return ret;
+  // void return
+  MsQuic->StreamClose(s_ctx->Stream);
+  return ATOM_OK;
 }
 
 static uint64_t

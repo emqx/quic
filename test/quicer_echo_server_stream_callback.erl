@@ -18,7 +18,8 @@
 -export([ new_stream/2
         , handle_stream_data/4
         , shutdown/1
-         ]
+        , peer_send_aborted/3
+        ]
        ).
 
 new_stream(_,_) ->
@@ -31,3 +32,7 @@ handle_stream_data(Stream, Bin, _Opts, #{sent_bytes := Cnt} = State) ->
 
 shutdown(Stream) ->
     ok = quicer:close_stream(Stream).
+
+peer_send_aborted(Stream, State, _Reason)->
+    quicer:close_stream(Stream),
+    State.

@@ -55,6 +55,7 @@ Same as in C NIF code, if the handler is one of the input arguments, it is safe 
 ** Thread Safety with ref counting.
 
 In C code, the resource object is not deallocated (become *invalid**) until the last handle term is garbage collected by the VM and the resource is released with enif_release_resource (not necessarily in that order).
+note, The refcounting is very expensive call.
 
 Access a *invalid* resource object via the pointer could cause SEGFAULT.
 
@@ -64,11 +65,9 @@ a. The MsQuic worker thread is accessing *_ctx in the callback function
 b. VM scheduler is executing a NIF function such as quicer:send/2
 c. VM scheduler thread is doing GC of the handler object
 
-For safety, we need to ref count the usage by calling a pair of function: enif_keep_resource and enif_release_resource.
+After the context object is created, the refcnt is 1
 
-note, The refcounting is very expensive call.
-
-1. Ensure the c) happens last.
+1. VM ensures the c) happens last when refcnt is 0.
 
 2. In the nif function that needs to access the resource object:
 
@@ -82,20 +81,21 @@ note, The refcounting is very expensive call.
 
    Note @TODO, unsure this is still true for the NIF that runs on dirty scheduler.
 
-3. In the nif function that calls the MsQuic API which can cause later accessing resource object in the callback context in the msquic worker thread:
+3. In the nif function that calls the MsQuic API which can cause later accessing resource object in the callback context in the msquic worker thread.
 
-   After checking that the resource is not in the closing/closed state with mutex lock.
-   call enif_keep_resource before calling the MsQuic API
+   It is unnecessary to keep/release the resources.
 
-   In MsQuic callback function, call enif_release_resource when the async task is done.
+4. In MsQuic callback function when handling the event of 'SHUTDOWN COMPLETE'
 
-4. In MsQuic callback function when the corresponding handler(HQUIC) of MsQuic will be closed.
+   'SHUTDOWN COMPLETE' means resource is no longer active and there will be no more callbacks
+   (Connection->ClientCallbackHandler = NULL)
 
-   call enif_release_resource
+   Callback should decrease the refcnt.
 
-   also, ensure the is_closed is set to *TRUE* with mutex lock.
-
-   This prevents others to access the closing/closed HQUIC that could cause runtime error in msquic.
+   In callback,
+     Call enif_release_resource
+     Set msquic Handler to NULL within locking context.
+     Msquic API could deal with NULL handler.
 
 5. In MsQuic callback function and NIF function
 
@@ -112,26 +112,49 @@ note, The refcounting is very expensive call.
    Everything contained in the resource object becomes invalid and it will be impossible to access the destructed
    resource obj from a) and b). But for accessing from c) it is out of our control.
 
-7. When shutdown the connection via quicer_nif:close_connection3
+   Close the msquic handler.
 
-   Mark ctx.is_closed = True if it is unset.
+7. When close the connection via quicer_nif:close_connection3
 
-8. Close msquic handler (HQUIC) only in msquic callback handler function, never do it in NIF ctx
+   Set Connection Handler to NULL within locked context
 
-   Close the msquic handler when shutdown_complete event is received.
+8. MsQuic callback signaling
 
-9. @TODO: MsQuic callback signaling
+   NO-OP
 
-   This needs to be double-checked, we need to add a new test case for it, if callback fun could signal the resource owner to let it access the c_ctx?
-
-   We need put some assertions:
-
-   1. Callback won't get called for a closed HQUIC.
-   2. enif_make_resource should return the same object if already presents.
-
-   If so, GC will be a problem because the receiver could die and not be able to dec the refcnt.
-
-10. @TODO: Catch runtime error signals from msquic
+9. @TODO: Catch runtime error signals from msquic
     To not 'crash' the erlang VM. we need some signal handling to handle the runtime error signals from msquic such as runtime assertions and raise an alarm for 'need maintaince'.
 
     If the resource that links to the error is identical, we could try to mark it blacklisted and deny further access.
+
+*** Connection Client
+
+The connection ctx resource is *created* in NIF quicer:async_connect.
+
+enif_release_resource is called in 'destroy_c_ctx'.
+
+*** Connection Server
+
+The connection ctx resource is *created* in 'ServerListenerCallback'.
+
+enif_release_resource is called in 'destroy_c_ctx'.
+
+*** Stream Client
+
+For the stream init from client
+The stream ctx resource is *created* in 'async_start_stream2'.
+Client call enif_keep_resource on the connection ctx which it belongs to.
+
+For the stream init from server
+The stream ctx resource is *created* in 'ClientConnectionCallback'.
+Client call enif_keep_resource on the connection ctx which it belongs to.
+
+enif_release_resource is called in 'destroy_s_ctx'.
+enif_release_resource of connection ctx is called in 'destroy_c_ctx'.
+
+*** Stream Server
+The stream ctx resource is *created* in 'ServerConnectionCallback'.
+Then call enif_keep_resource on the connection ctx which it belongs to.
+
+enif_release_resource is called in 'destroy_s_ctx'.
+enif_release_resource of connection ctx is called in 'destroy_c_ctx'.

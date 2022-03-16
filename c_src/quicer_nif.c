@@ -318,7 +318,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_STREAM_OPEN_ERROR, stm_open_error);                               \
   ATOM(ATOM_STREAM_START_ERROR, stm_start_error);                             \
   ATOM(ATOM_STREAM_SEND_ERROR, stm_send_error);                               \
-  ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                               \
+  ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                              \
   ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
   ATOM(ATOM_NOT_OWNER, not_owner);                                            \
                                                                               \
@@ -520,7 +520,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC, quic);                                                      \
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
   ATOM(ATOM_DGRAM, dgram);                                                    \
-  ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                                    \
+  ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                    \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \
@@ -571,6 +571,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, 0);
+  MsQuic->ConnectionClose(c_ctx->Connection);
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
@@ -606,6 +607,7 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
   TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
   enif_mutex_lock(s_ctx->lock);
+  MsQuic->StreamClose(s_ctx->Stream);
   enif_free_env(s_ctx->env);
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_destroy(s_ctx->lock);
@@ -907,29 +909,14 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
       enif_mutex_lock(s_ctx->lock);
-      if (s_ctx->is_closed)
-        {
-          res = ERROR_TUPLE_2(ATOM_CLOSED);
-        }
-      else
-        {
-          res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
-        }
+      res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
       enif_mutex_unlock(s_ctx->lock);
     }
   else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
 
       enif_mutex_lock(c_ctx->lock);
-      if (c_ctx->is_closed)
-        {
-          res = ERROR_TUPLE_2(ATOM_CLOSED);
-        }
-      else
-        {
-          res = connection_controlling_process(
-              env, c_ctx, &caller, &new_owner);
-        }
+      res = connection_controlling_process(env, c_ctx, &caller, &new_owner);
       enif_mutex_unlock(c_ctx->lock);
     }
   else
@@ -1017,13 +1004,15 @@ static ErlNifFunc nif_funcs[] = {
   { "async_connect", 3, async_connect3, 0},
   { "async_accept", 2, async_accept2, 0},
   { "async_handshake", 1, async_handshake_1, 0},
-  { "async_close_connection", 3, close_connection3, 0},
+  { "async_shutdown_connection", 3, shutdown_connection3, 0},
+  { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 3, send3, 0},
   { "recv", 2, recv2, 0},
   { "send_dgram", 3, send_dgram, 0},
-  { "async_close_stream", 3, close_stream3, 0},
+  { "async_shutdown_stream", 3, shutdown_stream3, 0},
+  { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
   { "setopt", 4, setopt4, 0},

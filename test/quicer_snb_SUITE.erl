@@ -94,6 +94,7 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
+  snabbkaffe:cleanup(),
   ok.
 
 %%--------------------------------------------------------------------
@@ -129,8 +130,8 @@ all() ->
   , tc_conn_close_flag_2
   , tc_conn_idle_close
   , tc_stream_close_errno
-  , tc_conn_gc
   , tc_conn_no_gc
+  , tc_conn_gc
   ].
 
 %%--------------------------------------------------------------------
@@ -151,7 +152,7 @@ all() ->
 %% @end
 %%--------------------------------------------------------------------
 tc_app_echo_server(Config) ->
-  Port = 8888,
+  Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -194,7 +195,7 @@ tc_app_echo_server(Config) ->
   ok = quicer:stop_listener(mqtt).
 
 tc_slow_conn(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -238,7 +239,7 @@ tc_slow_conn(Config) ->
   ok.
 
 tc_stream_owner_down(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -322,7 +323,7 @@ tc_stream_owner_down(Config) ->
 
 
 tc_conn_owner_down(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -435,7 +436,7 @@ tc_conn_owner_down(Config) ->
 
 
 tc_conn_close_flag_1(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -453,18 +454,18 @@ tc_conn_close_flag_1(Config) ->
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  quicer:recv(Stm, 4),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
-                 ?block_until(
-                    #{ ?snk_kind := debug
-                     , context := "callback"
-                     , function := "ServerConnectionCallback"
-                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                     , tag := "event"}, 1000, 3000),
-                 ?block_until(
-                    #{ ?snk_kind := debug
-                     , context := "callback"
-                     , function := "ClientConnectionCallback"
-                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                     , tag := "event"}, 1000, 3000),
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "ServerConnectionCallback"
+                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                               , tag := "event"}, 1000, 3000),
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "ClientConnectionCallback"
+                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                               , tag := "event"}, 1000, 3000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -492,7 +493,7 @@ tc_conn_close_flag_1(Config) ->
   ok.
 
 tc_conn_close_flag_2(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -510,12 +511,12 @@ tc_conn_close_flag_2(Config) ->
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  quicer:recv(Stm, 4),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 111),
-                 ?block_until(
-                    #{?snk_kind := debug
-                     , context := "callback"
-                     , function := "ServerConnectionCallback"
-                     , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                     , tag := "event"}, 3000, 3000), %% assume idle_timeout_is 5s
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug
+                               , context := "callback"
+                               , function := "ClientConnectionCallback"
+                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                               , tag := "event"}, 3000, 3000), %% assume idle_timeout_is 5s
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -530,7 +531,7 @@ tc_conn_close_flag_2(Config) ->
 
 tc_stream_close_errno(Config) ->
   Errno = 1234,
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -549,10 +550,14 @@ tc_stream_close_errno(Config) ->
                  quicer:recv(Stm, 4),
                  quicer:close_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND, Errno, 5000),
                  quicer:close_connection(Conn),
-                 ?block_until(
-                    #{?snk_kind := debug, context := "callback",
-                      function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
-                      tag := "event"}, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -589,7 +594,7 @@ tc_stream_close_errno(Config) ->
 
 
 tc_conn_idle_close(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -615,12 +620,12 @@ tc_conn_idle_close(Config) ->
                    {quic, transport_shutdown, _Conn, Status} ->
                      ct:pal("conn trans_shutdown status ~p~n", [Status])
                  end,
-                 {error, closed} = quicer:async_send(Stm, <<"ping2">>),
+                 {error, stm_send_error, invalid_state} = quicer:async_send(Stm, <<"ping2">>),
 
                  ?block_until(
                     #{?snk_kind := debug, context := "callback",
                       function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
-                      tag := "event"}, 1000),
+                      tag := "event"}, 2000, 1000),
                  ok
                end,
                fun(Result, Trace) ->
@@ -661,7 +666,7 @@ tc_conn_idle_close(Config) ->
   ok.
 
 tc_conn_gc(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -752,7 +757,7 @@ tc_conn_gc(Config) ->
 
 
 tc_conn_no_gc(Config) ->
-  Port = 8888,
+  Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {fast_conn, false}
@@ -776,7 +781,7 @@ tc_conn_no_gc(Config) ->
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
-                                         quicer:async_close_connection(Conn)
+                                         quicer:shutdown_connection(Conn, 0, 0)
                                      end),
                  %% Server Process
                  {ok, #{resource_id := _SRid}}
@@ -803,12 +808,11 @@ tc_conn_no_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 ok
+                 {ok, CRid}
 
                end,
-               fun(Result, Trace) ->
+               fun({ok, CRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertEqual(ok, Result),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , context := "callback"
@@ -825,7 +829,9 @@ tc_conn_no_gc(Config) ->
                                               , tag := "event"},
                                              Trace)),
                    %% Check that there is no GC
-                   ?assertEqual(0, length([ E || #{function := "resource_conn_dealloc_callback" } = E <- Trace]))
+                   ?assertEqual(0, length([ E || #{ function := "resource_conn_dealloc_callback"
+                                                  , resource_id := Rid
+                                                  } = E <- Trace, Rid == CRid]))
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
@@ -852,6 +858,12 @@ default_listen_opts(Config) ->
   , {peer_bidi_stream_count, 10}
   ].
 
+%% OS picks the available port
+select_port()->
+  {ok, S} = gen_udp:open(0),
+  {ok, {_, Port}} = inet:sockname(S),
+  gen_udp:close(S),
+  Port.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t
