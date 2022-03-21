@@ -214,7 +214,7 @@ controlling_process(_H, _P) ->
 -spec locate_lib(file:name(), file:name()) ->
         {ok, file:filename()} | {error, not_found}.
 locate_lib(PrivDir, LibName) ->
-  case file:read_file_info(PrivDir) of
+  case prim_file:read_file_info(PrivDir) of
     {ok, #file_info{type = directory}} ->
       {ok, filename:join(PrivDir, LibName)};
     {error, enotdir} -> %% maybe escript,
