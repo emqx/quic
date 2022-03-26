@@ -728,7 +728,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   //
   // Open a handle to the library and get the API function table.
   //
-  if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
+  if (QUIC_FAILED(status = MsQuicOpen2(&MsQuic)))
     {
       isLibOpened = false;
       return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));

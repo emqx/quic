@@ -34,7 +34,7 @@ static void handle_dgram_recv_event(QuicerConnCTX *c_ctx,
 
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
-                   _In_ CXPLAT_TLS_SECRETS TlsSecrets)
+                   _In_ QUIC_TLS_SECRETS TlsSecrets)
 {
   FILE *File = NULL;
 #ifdef _WIN32
@@ -56,10 +56,11 @@ dump_sslkeylogfile(_In_z_ const char *FileName,
     {
       fprintf(File, "# TLS 1.3 secrets log file\n");
     }
-  char ClientRandomBuffer
-      [(2 * sizeof(((CXPLAT_TLS_SECRETS *)NULL)->ClientRandom)) + 1]
+  char
+      ClientRandomBuffer[(2 * sizeof(((QUIC_TLS_SECRETS *)NULL)->ClientRandom))
+                         + 1]
       = { 0 };
-  char TempHexBuffer[(2 * CXPLAT_TLS_SECRETS_MAX_SECRET_LEN) + 1] = { 0 };
+  char TempHexBuffer[(2 * QUIC_TLS_SECRETS_MAX_SECRET_LEN) + 1] = { 0 };
   if (TlsSecrets.IsSet.ClientRandom)
     {
       EncodeHexBuffer(TlsSecrets.ClientRandom,
@@ -515,9 +516,9 @@ async_connect3(ErlNifEnv *env,
 
   QuicerConnCTX *c_ctx = init_c_ctx();
   if ((c_ctx->owner = AcceptorAlloc()) == NULL)
-  {
-    return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-  }
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
 
   if (!enif_self(env, &(c_ctx->owner->Pid)))
     {
@@ -548,14 +549,13 @@ async_connect3(ErlNifEnv *env,
       if (enif_get_string(
               env, essl_keylogfile, keylogfile, PATH_MAX, ERL_NIF_LATIN1))
         {
-          CXPLAT_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
-              sizeof(CXPLAT_TLS_SECRETS), QUICER_TLS_SECRETS);
+          QUIC_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_TLS_SECRETS), QUICER_TLS_SECRETS);
 
-          CxPlatZeroMemory(TlsSecrets, sizeof(CXPLAT_TLS_SECRETS));
+          CxPlatZeroMemory(TlsSecrets, sizeof(QUIC_TLS_SECRETS));
           Status = MsQuic->SetParam(c_ctx->Connection,
-                                    QUIC_PARAM_LEVEL_CONNECTION,
                                     QUIC_PARAM_CONN_TLS_SECRETS,
-                                    sizeof(CXPLAT_TLS_SECRETS),
+                                    sizeof(QUIC_TLS_SECRETS),
                                     TlsSecrets);
           if (QUIC_FAILED(Status))
             {
@@ -706,26 +706,22 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   void *q_ctx;
   HQUIC Handle = NULL;
   uint32_t Param;
-  QUIC_PARAM_LEVEL Level;
 
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
       enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
       enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
       Handle = (((QuicerConnCTX *)q_ctx))->Connection;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
     }
   else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx))
     {
       Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
-      Level = QUIC_PARAM_LEVEL_LISTENER;
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
     }
   else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
     {
       Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
     }
   else
@@ -737,8 +733,7 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   QUIC_ADDR addr;
   uint32_t addrSize = sizeof(addr);
 
-  if (QUIC_FAILED(status
-                  = MsQuic->GetParam(Handle, Level, Param, &addrSize, &addr)))
+  if (QUIC_FAILED(status = MsQuic->GetParam(Handle, Param, &addrSize, &addr)))
     {
       return ERROR_TUPLE_2(ATOM_SOCKNAME_ERROR); // @TODO is this err useful?
                                                  // use ATOM_STATUS instead?
@@ -814,7 +809,6 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 
   // Apply connection owners' option overrides
   if (QUIC_FAILED(Status = MsQuic->SetParam(c_ctx->Connection,
-                                            QUIC_PARAM_LEVEL_CONNECTION,
                                             QUIC_PARAM_CONN_SETTINGS,
                                             sizeof(QUIC_SETTINGS),
                                             &c_ctx->owner->Settings)))

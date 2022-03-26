@@ -54,7 +54,7 @@ typedef struct QuicerConnCTX
   ErlNifMutex *lock;
   // Connection handler closed flag
   // false means the handler is invalid
-  CXPLAT_TLS_SECRETS *TlsSecrets;
+  QUIC_TLS_SECRETS *TlsSecrets;
   char *ssl_keylogfile;
   void *reserved1;
   void *reserved2;
