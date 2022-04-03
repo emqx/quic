@@ -138,8 +138,6 @@ set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM term)
         {
           owner->active = ACCEPTOR_RECV_MODE_MULTI;
           owner->active_count += i;
-          if (owner->active_count < 0)
-            owner->active_count = 0;
           if (owner->active_count == 0)
             owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
         }

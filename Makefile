@@ -3,6 +3,14 @@ REBAR := rebar3
 .PHONY: all
 all: compile
 
+.PHONY: default
+default: build-nif
+
+build-nif:
+	./get-msquic.sh v2.0.1
+	cmake -B c_build
+	make -j `nproc` -C c_build
+
 compile:
 	$(REBAR) compile
 
