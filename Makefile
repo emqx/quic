@@ -1,15 +1,26 @@
 REBAR := rebar3
 
+UNAME := $(shell uname -s)
+
+ifeq ($(UNAME), Darwin)
+JOBS := $(shell sysctl -n hw.ncpu)
+endif
+
+ifeq ($(UNAME), Linux)
+JOBS := $(shell nproc)
+endif
+
 .PHONY: all
 all: compile
 
 .PHONY: default
 default: build-nif
 
+.PHONY: default
 build-nif:
-	./get-msquic.sh v2.0.1
+	./get-msquic.sh v1.8.0
 	cmake -B c_build
-	make -j `nproc` -C c_build
+	make -j $(JOBS) -C c_build
 
 compile:
 	$(REBAR) compile
