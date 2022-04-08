@@ -514,7 +514,10 @@ async_connect3(ErlNifEnv *env,
     }
 
   QuicerConnCTX *c_ctx = init_c_ctx();
-  c_ctx->owner = AcceptorAlloc();
+  if ((c_ctx->owner = AcceptorAlloc()) == NULL)
+  {
+    return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+  }
 
   if (!enif_self(env, &(c_ctx->owner->Pid)))
     {
