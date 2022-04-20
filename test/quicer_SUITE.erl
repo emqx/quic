@@ -300,12 +300,18 @@ tc_get_listener(Config) ->
             end, Listeners),
 
   lists:foreach(fun({Name, _} = NameListenON) ->
-                    LPid = quicer:listener(Name),
-                    LPid = quicer:listener(NameListenON),
+                    {ok, LPid} = quicer:listener(Name),
+                    {ok, LPid} = quicer:listener(NameListenON),
                     true = is_process_alive(LPid)
                 end, Listeners),
 
-  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
+  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners),
+  
+  lists:foreach(fun({Name, _} = NameListenON) ->
+                    ?assertEqual({error, not_found}, quicer:listener(Name)),
+                    ?assertEqual({error, not_found}, quicer:listener(NameListenON))
+                end, Listeners),
+  ?assertEqual({error, not_found}, quicer:listener(bad_listen_name)).
 
 tc_conn_basic(Config)->
   Port = select_port(),

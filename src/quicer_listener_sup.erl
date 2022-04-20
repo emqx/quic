@@ -68,16 +68,19 @@ listeners() ->
               end
       end, supervisor:which_children(?MODULE)).
 
--spec listener(atom() | {atom(), integer()|string()}) -> pid().
+-spec listener(atom() | {atom(), integer()|string()}) -> {ok, pid()}|{error, not_found}.
 listener({Name, _ListenOn}) when is_atom(Name) ->
     listener(Name);
 listener(Name) when is_atom(Name) ->
-    [Target] = lists:filtermap(
+    Targets = lists:filtermap(
                  fun({?CHILD_ID(Id), Child, _Type, _Modules}) when Id =:= Name ->
                          {true, Child};
                     (_) -> false
                  end, supervisor:which_children(?MODULE)),
-    Target.
+    case Targets of
+      [Pid] -> {ok, Pid};
+      [] -> {error, not_found}
+   end.
 
 %%%===================================================================
 %%% Supervisor callbacks

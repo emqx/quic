@@ -551,7 +551,7 @@ listeners() ->
 
 -spec listener(quicer_listener:listener_name()
               | {quicer_listener:listener_name(),
-                 quicer_listener:listen_on()}) -> pid().
+                 quicer_listener:listen_on()}) -> {ok, pid()} | {error, not_found}.
 listener(Name) ->
   quicer_listener_sup:listener(Name).
 
