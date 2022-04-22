@@ -176,4 +176,10 @@
         desired_versions_list              |
         desired_versions_list_length.
 
+-type execution_profile() ::
+        quic_execution_profile_low_latency |
+        quic_execution_profile_type_max_throughput |
+        quic_execution_profile_type_scavenger |
+        quic_execution_profile_type_realtime.
+
 -endif. %% QUICER_TYPES_HRL

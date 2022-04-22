@@ -109,6 +109,14 @@ extern ERL_NIF_TERM ATOM_CERT;
 extern ERL_NIF_TERM ATOM_KEY;
 extern ERL_NIF_TERM ATOM_ALPN;
 
+/*-------------------------------------------------------*/
+/*         msquic  execution profile for registration    */
+/*-------------------------------------------------------*/
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY; // Default
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+
 /*-----------------------------------------*/
 /*         msquic parms starts             */
 /*-----------------------------------------*/

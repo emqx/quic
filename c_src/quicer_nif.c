@@ -125,6 +125,14 @@ ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
 ERL_NIF_TERM ATOM_ALPN;
 
+/*-------------------------------------------------------*/
+/*         msquic  execution profile for registration    */
+/*-------------------------------------------------------*/
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY; // Default
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+
 /*-----------------------------------------*/
 /*         msquic parms starts             */
 /*-----------------------------------------*/
@@ -384,6 +392,17 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, atom_quic_status_cert_expired);         \
   ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
        atom_quic_status_cert_untrusted_root);                                 \
+  /*-------------------------------------------------------*/                 \
+  /*         msquic  execution profile for reg             */                 \
+  /*-------------------------------------------------------*/                 \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY,                               \
+       quic_execution_profile_low_latency);                                   \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT,                       \
+       quic_execution_profile_type_max_throughput);                           \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER,                            \
+       quic_execution_profile_type_scavenger);                                \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME,                            \
+       quic_execution_profile_type_real_time);                                \
   /*-----------------------------------------*/                               \
   /*         msquic parms starts             */                               \
   /*-----------------------------------------*/                               \
@@ -543,7 +562,7 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
   ATOM(ATOM_FAST_CONN, fast_conn);
 
-HQUIC Registration;
+HQUIC Registration = NULL;
 const QUIC_API_TABLE *MsQuic;
 
 // @todo, these flags are not threads safe, wrap it in a context
@@ -554,7 +573,7 @@ ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
 ErlNifResourceType *ctx_stream_t = NULL;
 
-const QUIC_REGISTRATION_CONFIG RegConfig
+QUIC_REGISTRATION_CONFIG RegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
 void
@@ -769,11 +788,38 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 }
 
 static ERL_NIF_TERM
-registration(ErlNifEnv *env,
-             __unused_parm__ int argc,
-             __unused_parm__ const ERL_NIF_TERM argv[])
+registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM profile = argv[0];
+  if (argc == 1)
+    {
+      if (IS_SAME_TERM(profile, ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY))
+        {
+          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
+        }
+      else if (IS_SAME_TERM(profile,
+                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
+        {
+          RegConfig.ExecutionProfile
+              = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+        }
+      else if (IS_SAME_TERM(profile,
+                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
+        {
+          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+        }
+      else if (IS_SAME_TERM(profile,
+                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
+        {
+          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+        }
+      else
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+
   if (QUIC_FAILED(status
                   = MsQuic->RegistrationOpen(&RegConfig, &Registration)))
     {
@@ -998,6 +1044,7 @@ static ErlNifFunc nif_funcs[] = {
   { "open_lib", 1, openLib, 0 },
   { "close_lib", 0, closeLib, 0 },
   { "reg_open", 0, registration, 0 },
+  { "reg_open", 1, registration, 0 },
   { "reg_close", 0, deregistration, 0 },
   { "listen", 2, listen2, 0},
   { "close_listener", 1, close_listener1, 0},

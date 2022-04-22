@@ -60,6 +60,8 @@ Currently only support one application.
 
 -spec reg_open() -> ok.
 
+-spec reg_open(execution_profile()) -> ok | {error, badarg}.
+
 #+end_src
 
 ** Close Registraion

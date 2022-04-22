@@ -35,6 +35,7 @@
         , tc_open_lib_test/1
         , tc_close_lib_test/1
         , tc_lib_registration/1
+        , tc_lib_registration_1/1
         , tc_lib_re_registration/1
 
         , tc_open_listener/1
@@ -206,6 +207,14 @@ tc_close_lib_test(_Config) ->
 
 tc_lib_registration(_Config) ->
   ok = quicer:reg_open(),
+  ok = quicer:reg_close().
+
+tc_lib_registration_1(_Config) ->
+  {error, badarg} = quicer:reg_open(foo),
+  ok = quicer:reg_open(quic_execution_profile_low_latency),
+  ok = quicer:reg_open(quic_execution_profile_type_real_time),
+  ok = quicer:reg_open(quic_execution_profile_type_max_throughput),
+  ok = quicer:reg_open(quic_execution_profile_type_scavenger),
   ok = quicer:reg_close().
 
 tc_open_listener_neg_1(Config) ->

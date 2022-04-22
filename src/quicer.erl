@@ -25,6 +25,7 @@
 -export([ open_lib/0
         , close_lib/0
         , reg_open/0
+        , reg_open/1
         , reg_close/0
         ]
        ).
@@ -105,6 +106,10 @@ close_lib() ->
 -spec reg_open() -> ok.
 reg_open() ->
   quicer_nif:reg_open().
+
+-spec reg_open(execution_profile()) -> ok | {error, badarg}.
+reg_open(Profile) ->
+  quicer_nif:reg_open(Profile).
 
 -spec reg_close() -> ok.
 reg_close() ->
