@@ -37,6 +37,7 @@ typedef struct
   // Listener handler closed flag
   // false means the handler is invalid
   BOOLEAN is_closed;
+  BOOLEAN allow_insecure;
   void *reserved1;
   void *reserved2;
   void *reserved3;

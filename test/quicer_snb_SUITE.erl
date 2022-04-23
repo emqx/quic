@@ -169,7 +169,15 @@ tc_app_echo_server(Config) ->
   ?check_trace(#{timetrap => 1000},
                begin
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                 quicer:recv(Stm, 4)
+                 Resp = quicer:recv(Stm, 4),
+                 ?assert(timeout =/=
+                           ?block_until(
+                              #{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "ServerStreamCallback"
+                               , mark := ?QUIC_STREAM_EVENT_SEND_COMPLETE
+                               , tag := "event"}, 1000, 1000)),
+                 Resp
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),

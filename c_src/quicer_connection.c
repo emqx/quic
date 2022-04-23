@@ -589,6 +589,24 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
+  if (enif_get_map_value(env,
+                         eoptions,
+                         ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                         &evalue))
+    {
+      if (!IS_SAME_TERM(
+              ATOM_OK,
+              set_connection_opt(env,
+                                 c_ctx,
+                                 ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                                 evalue,
+                                 ATOM_FALSE)))
+        {
+          destroy_c_ctx(c_ctx);
+          return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+        }
+    }
+
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
                                                    c_ctx->Configuration,
                                                    QUIC_ADDRESS_FAMILY_UNSPEC,

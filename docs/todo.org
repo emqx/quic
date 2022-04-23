@@ -5,6 +5,7 @@
 * Features List
 
 Feature todo list, priority descending
+** Stream recv FIN flag
 
 ** Stream send flags
 

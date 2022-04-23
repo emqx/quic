@@ -17,7 +17,7 @@ limitations under the License.
 #ifndef __QUICER_NIF_H_
 #define __QUICER_NIF_H_
 #define QUIC_API_ENABLE_PREVIEW_FEATURES 1
-
+#define QUIC_API_ENABLE_INSECURE_FEATURES 1
 #include "quicer_internal.h"
 #include <assert.h>
 #include <erl_nif.h>

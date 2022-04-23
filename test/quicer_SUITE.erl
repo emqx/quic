@@ -102,6 +102,9 @@
 
         , tc_get_conn_rid/1
         , tc_get_stream_rid/1
+
+        %% insecure, msquic only
+        , tc_insecure_traffic/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -869,6 +872,7 @@ tc_getopt(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stats} = quicer:getopt(Conn, Parm, false),
+      {ok, false} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
       0 = proplists:get_value("Recv.DroppedPackets", Stats),
       [true = proplists:is_defined(SKey, Stats)
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
@@ -1439,6 +1443,32 @@ tc_conn_opt_sslkeylogfile(Config) ->
   quicer:close_connection(Conn),
   timer:sleep(100),
   {ok, #file_info{type=regular}} = file:read_file_info("SSLKEYLOGFILE").
+
+tc_insecure_traffic(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              [{param_conn_disable_1rtt_encryption, true} |
+                               default_conn_opts()], 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm,  _, _, _} ->
+      {ok, true} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
+      ok
+  end,
+  quicer:close_connection(Conn),
+  ok.
 
 %%% ====================
 %%% Internal helpers

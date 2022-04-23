@@ -227,6 +227,12 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_ServerResumptionLevel;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MinimumMtu;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaximumMtu;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 
 /*----------------------------------------------------------*/
 /* QUIC_SETTINGS ends                                       */
@@ -285,6 +291,7 @@ extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 extern ERL_NIF_TERM ATOM_FAST_CONN;
+extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */

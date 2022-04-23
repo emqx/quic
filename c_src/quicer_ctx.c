@@ -32,6 +32,7 @@ init_l_ctx()
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
   l_ctx->is_closed = FALSE;
+  l_ctx->allow_insecure = FALSE;
   return l_ctx;
 }
 

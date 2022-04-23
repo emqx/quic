@@ -243,6 +243,12 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_ServerResumptionLevel;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MinimumMtu;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaximumMtu;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 
 /*----------------------------------------------------------*/
 /* QUIC_SETTINGS ends      */
@@ -298,6 +304,7 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 ERL_NIF_TERM ATOM_FAST_CONN;
+ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -521,6 +528,16 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsList, desired_versions_list);        \
   ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsListLength,                          \
        desired_versions_list_length);                                         \
+  ATOM(ATOM_QUIC_SETTINGS_MinimumMtu, minimum_mtu);                           \
+  ATOM(ATOM_QUIC_SETTINGS_MaximumMtu, maximum_mtu);                           \
+  ATOM(ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs,                \
+       mtu_discovery_search_complete_timeout_us);                             \
+  ATOM(ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount,                      \
+       mtu_discovery_missing_probe_count);                                    \
+  ATOM(ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations,                      \
+       max_binding_stateless_operations);                                     \
+  ATOM(ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs,                     \
+       stateless_operation_expiration_ms);                                    \
   /*                  QUIC_SETTINGS end                        */             \
   /*                  QUIC_STREAM_OPTS start                        */        \
   ATOM(ATOM_QUIC_STREAM_OPTS_ACTIVE, active)                                  \
@@ -560,7 +577,8 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_FUNCTION, function);                                              \
   ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
-  ATOM(ATOM_FAST_CONN, fast_conn);
+  ATOM(ATOM_FAST_CONN, fast_conn);                                            \
+  ATOM(ATOM_ALLOW_INSECURE, allow_insecure);
 
 HQUIC Registration = NULL;
 const QUIC_API_TABLE *MsQuic;

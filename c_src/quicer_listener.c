@@ -68,6 +68,16 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
 
+      if (l_ctx->allow_insecure)
+        {
+          BOOLEAN value = TRUE;
+          MsQuic->SetParam(Event->NEW_CONNECTION.Connection,
+                           // 0x0500000F,
+                           QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                           sizeof(value),
+                           &value);
+        }
+
       if (conn_owner->fast_conn)
         {
           TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 1);
@@ -187,12 +197,21 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
+  // Allow insecure
+  ERL_NIF_TERM eisInsecure;
+  if (enif_get_map_value(env, options, ATOM_ALLOW_INSECURE, &eisInsecure)
+      && IS_SAME_TERM(eisInsecure, ATOM_TRUE))
+    {
+      l_ctx->allow_insecure = TRUE;
+    }
+
   if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_ALPN);
     }
 
+  // Start Listener
   if (QUIC_FAILED(
           Status = MsQuic->ListenerStart(
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))

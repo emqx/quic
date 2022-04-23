@@ -89,7 +89,7 @@ init([Name, ListenOn, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
 init([Name, ListenOn, { #{conn_acceptors :=  N, alpn := Alpn} = LOpts,
                         _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
-    {ok, L} = quicer:listen(ListenOn, LOpts),
+    {ok, L} = quicer:listen(ListenOn, maps:without([conn_acceptors], LOpts)),
     {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
     [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
     {ok, #state{ name = Name
