@@ -5,6 +5,13 @@
 * Features List
 
 Feature todo list, priority descending
+** Close configurations in resource destroy callback
+
+** Check shutdown connection wait for peer to close or not
+
+** Hibernate connection owner process since connection process is mostly idling
+
+** get Peer cert
 ** Stream recv FIN flag
 
 ** Stream send flags

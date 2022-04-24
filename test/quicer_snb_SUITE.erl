@@ -166,7 +166,7 @@ tc_app_echo_server(Config) ->
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 5000},
                begin
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  Resp = quicer:recv(Stm, 4),
@@ -176,7 +176,7 @@ tc_app_echo_server(Config) ->
                                , context := "callback"
                                , function := "ServerStreamCallback"
                                , mark := ?QUIC_STREAM_EVENT_SEND_COMPLETE
-                               , tag := "event"}, 1000, 1000)),
+                               , tag := "event"}, 3000, 3000)),
                  Resp
                end,
                fun(Result, Trace) ->
