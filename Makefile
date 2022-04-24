@@ -69,3 +69,7 @@ ci: test dialyzer
 .PHONY: tar
 tar:
 	$(REBAR) tar
+
+.PHONY: doc
+doc:
+	rebar3 as dev ex_doc
