@@ -580,8 +580,8 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_FAST_CONN, fast_conn);                                            \
   ATOM(ATOM_ALLOW_INSECURE, allow_insecure);
 
-HQUIC Registration = NULL;
-const QUIC_API_TABLE *MsQuic;
+HQUIC GRegistration = NULL;
+const QUIC_API_TABLE *MsQuic = NULL;
 
 // @todo, these flags are not threads safe, wrap it in a context
 BOOLEAN isRegistered = false;
@@ -591,7 +591,7 @@ ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
 ErlNifResourceType *ctx_stream_t = NULL;
 
-QUIC_REGISTRATION_CONFIG RegConfig
+QUIC_REGISTRATION_CONFIG GRegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
 void
@@ -810,27 +810,33 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM profile = argv[0];
+
+  if(isRegistered || !isLibOpened)
+  {
+    return ERROR_TUPLE_2(ATOM_BADARG);
+  }
+
   if (argc == 1)
     {
       if (IS_SAME_TERM(profile, ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY))
         {
-          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
+          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
         }
       else if (IS_SAME_TERM(profile,
                             ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
         {
-          RegConfig.ExecutionProfile
+          GRegConfig.ExecutionProfile
               = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
         }
       else if (IS_SAME_TERM(profile,
                             ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
         {
-          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
         }
       else if (IS_SAME_TERM(profile,
                             ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
         {
-          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
         }
       else
         {
@@ -839,7 +845,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   if (QUIC_FAILED(status
-                  = MsQuic->RegistrationOpen(&RegConfig, &Registration)))
+                  = MsQuic->RegistrationOpen(&GRegConfig, &GRegistration)))
     {
       isRegistered = false;
       TP_NIF_3(fail, 0, status);
@@ -855,9 +861,9 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  if (isRegistered && Registration)
+  if (isRegistered && GRegistration)
     {
-      MsQuic->RegistrationClose(Registration);
+      MsQuic->RegistrationClose(GRegistration);
       isRegistered = false;
     }
   return ATOM_OK;

@@ -532,7 +532,7 @@ async_connect3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration,
+  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
                                                   ClientConnectionCallback,
                                                   c_ctx,
                                                   &(c_ctx->Connection))))

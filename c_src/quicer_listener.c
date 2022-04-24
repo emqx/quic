@@ -188,7 +188,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (QUIC_FAILED(
           Status = MsQuic->ListenerOpen(
-              Registration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
+              GRegistration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
@@ -240,7 +240,9 @@ close_listener1(ErlNifEnv *env,
   // calling ListenerStop is optional
   // MsQuic->ListenerStop(l_ctx->Listener);
   l_ctx->is_closed = TRUE;
+
   MsQuic->ListenerClose(l_ctx->Listener);
+  //MsQuic->ConfigurationClose(l_ctx->Configuration);
   enif_release_resource(l_ctx);
   return ATOM_OK;
 }

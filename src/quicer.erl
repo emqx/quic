@@ -105,7 +105,7 @@ close_lib() ->
 
 -spec reg_open() -> ok.
 reg_open() ->
-  quicer_nif:reg_open().
+  quicer_nif:reg_open(application:get_env(quicer, profile, quic_execution_profile_low_latency)).
 
 -spec reg_open(execution_profile()) -> ok | {error, badarg}.
 reg_open(Profile) ->

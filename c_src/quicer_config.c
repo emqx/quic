@@ -179,7 +179,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,
@@ -252,7 +252,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,

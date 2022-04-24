@@ -39,9 +39,9 @@ limitations under the License.
 
 // Global registration
 // @todo avoid use globals
-extern HQUIC Registration;
+extern HQUIC GRegistration;
 extern const QUIC_API_TABLE *MsQuic;
-extern QUIC_REGISTRATION_CONFIG RegConfig;
+extern QUIC_REGISTRATION_CONFIG GRegConfig;
 
 // Context Types
 extern ErlNifResourceType *ctx_listener_t;

@@ -37,7 +37,7 @@
         , tc_lib_registration/1
         , tc_lib_registration_1/1
         , tc_lib_re_registration/1
-
+        , tc_lib_registration_neg/1
         , tc_open_listener/1
         , tc_open_listener_bind/1
         , tc_open_listener_bind_v6/1
@@ -208,15 +208,25 @@ tc_close_lib_test(_Config) ->
   {ok, Res0} = quicer:open_lib(),
   ?assert(Res0 == true orelse Res0 == debug).
 
+tc_lib_registration_neg(_Config) ->
+  ok = quicer:close_lib(),
+  {error, badarg} = quicer:reg_open(),
+  ok = quicer:reg_close().
+
 tc_lib_registration(_Config) ->
+  quicer:open_lib(),
   ok = quicer:reg_open(),
   ok = quicer:reg_close().
 
 tc_lib_registration_1(_Config) ->
+  ok =quicer:reg_close(),
   {error, badarg} = quicer:reg_open(foo),
   ok = quicer:reg_open(quic_execution_profile_low_latency),
+  ok =quicer:reg_close(),
   ok = quicer:reg_open(quic_execution_profile_type_real_time),
+  ok = quicer:reg_close(),
   ok = quicer:reg_open(quic_execution_profile_type_max_throughput),
+  ok = quicer:reg_close(),
   ok = quicer:reg_open(quic_execution_profile_type_scavenger),
   ok = quicer:reg_close().
 
@@ -234,8 +244,14 @@ tc_open_listener_neg_2(Config) ->
   ok.
 
 tc_lib_re_registration(_Config) ->
-  ok = quicer:reg_open(),
-  ok = quicer:reg_open(),
+  case quicer:reg_open() of
+    ok ->
+      ok;
+    {error, _} ->
+      ok = quicer:reg_close(),
+      ok = quicer:reg_open()
+  end,
+  {error, badarg} = quicer:reg_open(),
   ok = quicer:reg_close(),
   ok = quicer:reg_close().
 
