@@ -114,7 +114,7 @@ Calling Process becomes the owner of the connection.
           {error, badarg | param_error | not_enough_mem | badpid}.
 
 %% accept connection with timeout specified.
--spec accept(listener_handler(), acceptor_opts(), timer:timeout()) ->
+-spec accept(listener_handler(), acceptor_opts(), timeout()) ->
           {ok, connection_handler()} |
           {error, badarg | param_error | not_enough_mem | badpid} |
           {error, timeout}.
@@ -134,7 +134,7 @@ Complete TLS handshake after accepted a Connection.
 #+begin_src erlang
 
 %% Continue TLS handshake
--spec handshake(connection_handler(), timer:timeout()) ->
+-spec handshake(connection_handler(), timeout()) ->
           ok |
           {error, badarg} |
           {error, atom_reason()}.
@@ -184,7 +184,7 @@ Close connection with flag specified and application reason code.
 -spec close_connection(connection_handler(),
                        conn_close_flag(),
                        app_errno(),
-                       timer:timeout().
+                       timeout().
                       ) -> ok.
 
 %% Same as above with 5s timeout.
@@ -194,7 +194,7 @@ Close connection with flag specified and application reason code.
                       ) -> ok.
 
 %% Same as above but close with flag: QUIC_CONNECTION_SHUTDOWN_FLAG_NONE and application error code 0
--spec close_connection(connection_handler(), timer:timeout()) -> ok.
+-spec close_connection(connection_handler(), timeout()) -> ok.
 
 #+end_src
 
@@ -318,14 +318,14 @@ See ...
 -spec close_stream(stream_handler(),
                    stream_close_flags(),
                    app_errno(),
-                   time:timeout()) ->
+                   timeout()) ->
         ok |
         {error, badarg | atom_reason()}.
         {error, timeout}.
 
 %% Close stream gracefully, with app_errno 0
 %% returns when both endpoints closed the stream
--spec close_stream(stream_handler(), timer:timeout()) ->
+-spec close_stream(stream_handler(), timeout()) ->
         ok |
         {error, badarg | atom_reason()} |
         {error, timeout}.

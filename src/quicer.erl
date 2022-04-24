@@ -169,7 +169,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
 handshake(Conn) ->
   handshake(Conn, 1000).
 
--spec handshake(connection_handler(), timer:timeout()) -> ok | {error, any()}.
+-spec handshake(connection_handler(), timeout()) -> ok | {error, any()}.
 handshake(Conn, Timeout) ->
   case async_handshake(Conn) of
     {error, _} = E -> E;
@@ -190,7 +190,7 @@ async_handshake(Conn) ->
 accept(LSock, Opts) ->
   accept(LSock, Opts, infinity).
 
--spec accept(listener_handler(), acceptor_opts(), timer:timeout()) ->
+-spec accept(listener_handler(), acceptor_opts(), timeout()) ->
         {ok, connection_handler()} |
         {error, badarg | param_error | not_enough_mem | badpid} |
         {error, timeout}.
@@ -219,7 +219,7 @@ async_accept(Listener, Opts) ->
 shutdown_connection(Conn) ->
   shutdown_connection(Conn, 5000).
 
--spec shutdown_connection(connection_handler(), timer:timeout()) ->
+-spec shutdown_connection(connection_handler(), timeout()) ->
         ok | {error, timeout | badarg}.
 shutdown_connection(Conn, Timeout) ->
   shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
@@ -234,7 +234,7 @@ shutdown_connection(Conn, Flags, ErrorCode) ->
 -spec shutdown_connection(connection_handler(),
                        conn_shutdown_flag(),
                        app_errno(),
-                       timer:timeout()) -> ok | {error, timeout | badarg}.
+                       timeout()) -> ok | {error, timeout | badarg}.
 shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
   %% @todo make_ref
   case async_shutdown_connection(Conn, Flags, ErrorCode) of
@@ -269,7 +269,7 @@ close_connection(Conn, Flags, ErrorCode) ->
 -spec close_connection(connection_handler(),
                        conn_shutdown_flag(),
                        app_errno(),
-                       timer:timeout()) -> ok | {error, badarg | timeout}.
+                       timeout()) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
   case shutdown_connection(Conn, Flags, ErrorCode, Timeout) of
     {error, _} = Err ->
@@ -409,7 +409,7 @@ send_dgram(Conn, Data) ->
 shutdown_stream(Stream) ->
   shutdown_stream(Stream, infinity).
 
--spec shutdown_stream(stream_handler(), timer:timeout()) ->
+-spec shutdown_stream(stream_handler(), timeout()) ->
         ok |
         {error, badarg} |
         {error, timeout}.
@@ -419,7 +419,7 @@ shutdown_stream(Stream, Timeout) ->
 -spec shutdown_stream(stream_handler(),
                    stream_shutdown_flags(),
                    app_errno(),
-                   time:timeout()) ->
+                   timeout()) ->
         ok |
         {error, badarg} |
         {error, timeout}.
@@ -458,7 +458,7 @@ close_stream(Stream) ->
       E
   end.
 
--spec close_stream(stream_handler(), timer:timeout())
+-spec close_stream(stream_handler(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Timeout) ->
   case shutdown_stream(Stream, Timeout) of
@@ -469,7 +469,7 @@ close_stream(Stream, Timeout) ->
   end.
 
 -spec close_stream(stream_handler(), stream_shutdown_flags(),
-                   app_errno(), timer:timeout())
+                   app_errno(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Flags, ErrorCode, Timeout) ->
   case shutdown_stream(Stream, Flags, ErrorCode, Timeout) of
