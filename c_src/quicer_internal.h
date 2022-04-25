@@ -31,6 +31,5 @@ limitations under the License.
 #define CX_PLATFORM_DARWIN 1
 #endif
 
-#endif // QUICER_INTERNAL_H_
-
 typedef struct QuicerConnCTX QuicerConnCTX;
+#endif // QUICER_INTERNAL_H_

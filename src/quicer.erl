@@ -486,7 +486,7 @@ send(Stream, Data) ->
 
 %% @doc async variant of {@link send/2}
 %% Caller should expect to receive
-%% ```{quic, send_completed, Stream, _}''''
+%% ```{quic, send_completed, Stream, _}'''
 -spec async_send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
@@ -613,7 +613,7 @@ async_shutdown_stream(Stream) ->
 
 %% @doc async variant of {@link shutdown_stream/4}
 %% Caller should expect to receive
-%% ```{quic, closed, Stream, _IsGraceful}''''
+%% ```{quic, closed, Stream, _IsGraceful}'''
 %%
 -spec async_shutdown_stream(stream_handler(),
                          stream_shutdown_flags(),

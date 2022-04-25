@@ -123,6 +123,7 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
 // option keys
 ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
+ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
 
 /*-------------------------------------------------------*/
@@ -544,6 +545,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   /*                  QUIC_STREAM_OPTS end                        */          \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key);                                                        \
+  ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_CLOSED, closed);                                                  \
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
@@ -811,10 +813,10 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM profile = argv[0];
 
-  if(isRegistered || !isLibOpened)
-  {
-    return ERROR_TUPLE_2(ATOM_BADARG);
-  }
+  if (isRegistered || !isLibOpened)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   if (argc == 1)
     {

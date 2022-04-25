@@ -21,15 +21,14 @@ limitations under the License.
 #include "quicer_nif.h"
 #include <msquichelper.h>
 
-bool ReloadCertConfig(HQUIC Configuration,
-                      QUIC_CREDENTIAL_CONFIG_HELPER *Config);
-QUIC_CREDENTIAL_CONFIG_HELPER *NewCredConfig(ErlNifEnv *env,
-                                             const ERL_NIF_TERM *option);
-void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *);
+bool ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *Config);
+QUIC_CREDENTIAL_CONFIG *NewCredConfig(ErlNifEnv *env,
+                                      const ERL_NIF_TERM *option);
+void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *);
 ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
                                      HQUIC *Configuration,
-                                     QUIC_CREDENTIAL_CONFIG_HELPER *Config);
+                                     QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
                                      HQUIC *Configuration,

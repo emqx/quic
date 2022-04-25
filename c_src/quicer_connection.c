@@ -509,7 +509,7 @@ async_connect3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!enif_get_string(env, ehost, host, 256, ERL_NIF_LATIN1))
+  if (enif_get_string(env, ehost, host, 256, ERL_NIF_LATIN1) <= 0)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -547,7 +547,8 @@ async_connect3(ErlNifEnv *env,
     {
       char *keylogfile = CXPLAT_ALLOC_NONPAGED(PATH_MAX, QUICER_TRACE);
       if (enif_get_string(
-              env, essl_keylogfile, keylogfile, PATH_MAX, ERL_NIF_LATIN1))
+              env, essl_keylogfile, keylogfile, PATH_MAX, ERL_NIF_LATIN1)
+          > 0)
         {
           QUIC_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
               sizeof(QUIC_TLS_SECRETS), QUICER_TLS_SECRETS);

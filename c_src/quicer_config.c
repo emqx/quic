@@ -78,11 +78,11 @@ static ERL_NIF_TERM set_level_param(ErlNifEnv *env,
                                     ERL_NIF_TERM optval);
 
 bool
-ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
-                      Configuration, &Config->CredConfig)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(Configuration,
+                                                               CredConfig)))
     {
       return false;
     }
@@ -90,61 +90,134 @@ ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
 }
 
 // @todo return status instead
-QUIC_CREDENTIAL_CONFIG_HELPER *
+QUIC_CREDENTIAL_CONFIG *
 NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
 {
   ERL_NIF_TERM cert;
   ERL_NIF_TERM key;
-  QUIC_CREDENTIAL_CONFIG_HELPER *Config;
+  ERL_NIF_TERM password;
+  QUIC_CREDENTIAL_CONFIG *CredConfig
+      = (QUIC_CREDENTIAL_CONFIG *)CXPLAT_ALLOC_NONPAGED(
+        sizeof(QUIC_CREDENTIAL_CONFIG), QUICER_CREDENTIAL_CONFIG);
 
-  char *cert_path = malloc(PATH_MAX);
-  char *key_path = malloc(PATH_MAX);
+  if (!CredConfig)
+    {
+      return NULL;
+    }
+
+  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+
+  // Server default
+  // @TODO set more flags
+  CredConfig->Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
   if (!enif_get_map_value(env, *option, ATOM_CERT, &cert))
     {
-      return NULL;
+      goto error1;
     }
 
   if (!enif_get_map_value(env, *option, ATOM_KEY, &key))
     {
-      return NULL;
+      goto error1;
     }
 
-  if (!enif_get_string(env, cert, cert_path, PATH_MAX, ERL_NIF_LATIN1))
+  char *cert_path = malloc(PATH_MAX);
+  char *key_path = malloc(PATH_MAX);
+
+  if (enif_get_string(env, cert, cert_path, PATH_MAX, ERL_NIF_LATIN1) <= 0)
     {
-      return NULL;
+      goto error2;
     }
 
-  if (!enif_get_string(env, key, key_path, PATH_MAX, ERL_NIF_LATIN1))
+  if (enif_get_string(env, key, key_path, PATH_MAX, ERL_NIF_LATIN1) <= 0)
     {
-      return NULL;
+      goto error2;
     }
 
-  Config = (QUIC_CREDENTIAL_CONFIG_HELPER *)CXPLAT_ALLOC_NONPAGED(
-      sizeof(QUIC_CREDENTIAL_CONFIG_HELPER), QUICER_CREDENTIAL_CONFIG_HELPER);
+  if (enif_get_map_value(env, *option, ATOM_PASSWORD, &password))
+    { // password protected
+      //
+      // Loads the server's certificate from the file.
+      //
+      char *password_str = malloc(PATH_MAX); // not sure if this is enough
 
-  CxPlatZeroMemory(Config, sizeof(QUIC_CREDENTIAL_CONFIG_HELPER));
-  Config->CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
+      if (enif_get_string(
+              env, password, password_str, PATH_MAX, ERL_NIF_LATIN1)
+          <= 0)
+        {
+          return NULL;
+        }
 
-  //
-  // Loads the server's certificate from the file.
-  //
-  Config->CertFile.CertificateFile = cert_path;
-  Config->CertFile.PrivateKeyFile = key_path;
-  Config->CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-  Config->CredConfig.CertificateFile = &Config->CertFile;
-  // @todo set flag
+      QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
+          = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
+              QUICER_CERTIFICATE_FILE_PROTECTED);
+
+      if (!CertFile)
+        {
+          free(password_str);
+          goto error1;
+        }
+
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
+      CredConfig->CertificateFileProtected = CertFile;
+      CredConfig->CertificateFileProtected->PrivateKeyPassword = password_str;
+      CredConfig->CertificateFileProtected->CertificateFile = cert_path;
+      CredConfig->CertificateFileProtected->PrivateKeyFile = key_path;
+    }
+  else
+    {
+      // non-password protected
+      QUIC_CERTIFICATE_FILE *CertFile
+          = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
+      if (!CertFile)
+        {
+          goto error1;
+        }
+
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+      CredConfig->CertificateFile = CertFile;
+      CredConfig->CertificateFile->CertificateFile = cert_path;
+      CredConfig->CertificateFile->PrivateKeyFile = key_path;
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+    }
+
+  // @TODO set flag and async handler to save memory?
   // Config->CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS;
   // Config->CredConfig.AsyncHandler = DestroyCredConfig;
-  return Config;
+  return CredConfig;
+
+error2:
+  free(cert_path);
+  free(key_path);
+error1:
+  CxPlatFree(CredConfig, QUICER_CREDENTIAL_CONFIG);
+  return NULL;
 }
 
 void
-DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *Config)
 {
-  free((char *)Config->CertFile.CertificateFile);
-  free((char *)Config->CertFile.PrivateKeyFile);
-  CXPLAT_FREE(Config, QUICER_CREDENTIAL_CONFIG_HELPER);
+  switch (Config->Type)
+    {
+    case QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE:
+      free((char *)Config->CertificateFile->CertificateFile);
+      free((char *)Config->CertificateFile->PrivateKeyFile);
+      CXPLAT_FREE(Config->CertificateFile, QUICER_CERTIFICATE_FILE);
+      break;
+
+    case QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED:
+      free((char *)Config->CertificateFileProtected->CertificateFile);
+      free((char *)Config->CertificateFileProtected->PrivateKeyFile);
+      CXPLAT_FREE(Config->CertificateFileProtected,
+                  QUICER_CERTIFICATE_FILE_PROTECTED);
+      break;
+
+    default:
+      break;
+    }
+  CXPLAT_FREE(Config, QUICER_CREDENTIAL_CONFIG);
 }
 
 // @todo support per registration.
@@ -152,7 +225,7 @@ ERL_NIF_TERM
 ServerLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option,
                         HQUIC *Configuration,
-                        QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+                        QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_SETTINGS Settings = { 0 };
 
@@ -193,8 +266,8 @@ ServerLoadConfiguration(ErlNifEnv *env,
   //
   // Loads the TLS credential part of the configuration.
   //
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
-                      *Configuration, &Config->CredConfig)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
+                                                               CredConfig)))
     {
       return ATOM_STATUS(Status);
     }
@@ -304,7 +377,7 @@ load_alpn(ErlNifEnv *env,
     {
       // @todo check if PATH_MAX is the correct length
       char str[PATH_MAX];
-      if (!enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1))
+      if (enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1) <= 0)
         {
           return false;
         }

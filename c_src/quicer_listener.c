@@ -155,7 +155,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  QUIC_CREDENTIAL_CONFIG_HELPER *Config = NewCredConfig(env, &options);
+  QUIC_CREDENTIAL_CONFIG *Config = NewCredConfig(env, &options);
 
   if (!Config)
     {
@@ -242,7 +242,8 @@ close_listener1(ErlNifEnv *env,
   l_ctx->is_closed = TRUE;
 
   MsQuic->ListenerClose(l_ctx->Listener);
-  //MsQuic->ConfigurationClose(l_ctx->Configuration);
+  // @TODO maybe we need a safe method to close the configuration
+  // MsQuic->ConfigurationClose(l_ctx->Configuration);
   enif_release_resource(l_ctx);
   return ATOM_OK;
 }
