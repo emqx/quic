@@ -109,6 +109,7 @@ extern ERL_NIF_TERM ATOM_CERT;
 extern ERL_NIF_TERM ATOM_KEY;
 extern ERL_NIF_TERM ATOM_PASSWORD;
 extern ERL_NIF_TERM ATOM_ALPN;
+extern ERL_NIF_TERM ATOM_HANDLER;
 
 /*-------------------------------------------------------*/
 /*         msquic  execution profile for registration    */

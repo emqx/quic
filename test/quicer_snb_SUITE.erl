@@ -132,6 +132,7 @@ all() ->
   , tc_stream_close_errno
   , tc_conn_no_gc
   , tc_conn_gc
+  , tc_conn_resume
   ].
 
 %%--------------------------------------------------------------------
@@ -845,6 +846,71 @@ tc_conn_no_gc(Config) ->
   ok = quicer:stop_listener(mqtt),
   ok.
 
+tc_conn_resume(Config) ->
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {fast_conn, false}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 1000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
+
+                 {ok, ConnResumed} = quicer:connect("localhost", Port, [{handler, Conn} | default_conn_opts()], 5000),
+                 {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm2, <<"ping">>),
+                 quicer:recv(Stm2, 4),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% 1. verify that for each success connect we send a resumption ticket
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , resource_id := _CRid1
+                                              },
+                                             Trace)),
+                   %% 2. verify that resumption ticket is recevied on client side
+                   %%    and client use it to resume success
+                     ?assert(?causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMED
+                                              , resource_id := _SRid1
+                                              },
+                                             Trace))
+               end),
+  ok.
 
 %%% Internal Helpers
 default_stream_opts() ->

@@ -125,6 +125,7 @@ ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
 ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
+ERL_NIF_TERM ATOM_HANDLER;
 
 /*-------------------------------------------------------*/
 /*         msquic  execution profile for registration    */
@@ -547,6 +548,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
+  ATOM(ATOM_HANDLER, handler);                                                \
   ATOM(ATOM_CLOSED, closed);                                                  \
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
@@ -615,6 +617,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   enif_free_env(c_ctx->env);
   enif_mutex_destroy(c_ctx->lock);
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
+  CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
   CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
   AcceptorDestroy(c_ctx->owner);
   TP_CB_3(end, (uintptr_t)c_ctx->Connection, 0);

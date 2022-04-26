@@ -56,6 +56,7 @@ typedef struct QuicerConnCTX
   // Connection handler closed flag
   // false means the handler is invalid
   QUIC_TLS_SECRETS *TlsSecrets;
+  QUIC_BUFFER *ResumptionTicket;
   char *ssl_keylogfile;
   void *reserved1;
   void *reserved2;

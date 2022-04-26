@@ -274,7 +274,26 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // received from the server.
       //
       //
-      // @todo
+      if (c_ctx->ResumptionTicket)
+        {
+          CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
+        }
+      c_ctx->ResumptionTicket = (QUIC_BUFFER *)CXPLAT_ALLOC_NONPAGED(
+          sizeof(QUIC_BUFFER)
+              + Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
+          QUICER_RESUME_TICKET);
+
+      if (c_ctx->ResumptionTicket)
+        {
+          c_ctx->ResumptionTicket->Buffer
+              = (uint8_t *)(c_ctx->ResumptionTicket + 1);
+          c_ctx->ResumptionTicket->Length
+              = Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
+          CxPlatCopyMemory(
+              c_ctx->ResumptionTicket->Buffer,
+              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
+              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+        }
       break;
     case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
       // @TODO
@@ -500,6 +519,11 @@ async_connect3(ErlNifEnv *env,
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
+  ERL_NIF_TERM Handler;
+  // Usually we should not get this error
+  // If we get it is internal logic error
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+  BOOLEAN is_resume = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -515,21 +539,25 @@ async_connect3(ErlNifEnv *env,
     }
 
   QuicerConnCTX *c_ctx = init_c_ctx();
+
   if ((c_ctx->owner = AcceptorAlloc()) == NULL)
     {
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto Error;
     }
 
   if (!enif_self(env, &(c_ctx->owner->Pid)))
     {
-      return ERROR_TUPLE_2(ATOM_BAD_PID);
+      res = ERROR_TUPLE_2(ATOM_BAD_PID);
+      goto Error;
     }
 
   ERL_NIF_TERM estatus
       = ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true);
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
-      return ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
+      res = ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
+      goto Error;
     }
 
   if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
@@ -537,8 +565,8 @@ async_connect3(ErlNifEnv *env,
                                                   c_ctx,
                                                   &(c_ctx->Connection))))
     {
-      destroy_c_ctx(c_ctx);
-      return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+      res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+      goto Error;
     }
 
   ERL_NIF_TERM essl_keylogfile;
@@ -585,8 +613,8 @@ async_connect3(ErlNifEnv *env,
                                            evalue,
                                            ATOM_FALSE)))
         {
-          destroy_c_ctx(c_ctx);
-          return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+          res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+          goto Error;
         }
     }
 
@@ -603,8 +631,37 @@ async_connect3(ErlNifEnv *env,
                                  evalue,
                                  ATOM_FALSE)))
         {
-          destroy_c_ctx(c_ctx);
-          return ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+          res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+          goto Error;
+        }
+    }
+
+  if (enif_get_map_value(env, eoptions, ATOM_HANDLER, &Handler))
+    {
+      // Resume connection, try resume
+      //
+      QuicerConnCTX *old_c_ctx = NULL;
+      if (!enif_get_resource(
+              env, Handler, ctx_connection_t, (void **)&old_c_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+        }
+      else
+        {
+          // lock it, we need go to Error incase of Error to release the lock
+          enif_mutex_lock(old_c_ctx->lock);
+          QUIC_BUFFER *ticket = old_c_ctx->ResumptionTicket;
+          if (QUIC_FAILED(Status
+                          = MsQuic->SetParam(c_ctx->Connection,
+                                             QUIC_PARAM_CONN_RESUMPTION_TICKET,
+                                             ticket->Length,
+                                             ticket->Buffer)))
+            {
+              res = ERROR_TUPLE_3(ATOM_ERROR_NOT_FOUND, ATOM_STATUS(Status));
+              enif_mutex_unlock(old_c_ctx->lock);
+              goto Error;
+            }
+          enif_mutex_unlock(old_c_ctx->lock);
         }
     }
 
@@ -614,13 +671,27 @@ async_connect3(ErlNifEnv *env,
                                                    host,
                                                    port)))
     {
-      destroy_c_ctx(c_ctx);
-      return ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
+      res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
+      goto Error;
     }
 
   ERL_NIF_TERM eHandler = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandler);
+
+Error:
+  if (is_resume)
+    {
+      enif_mutex_unlock(c_ctx->lock);
+    }
+  else
+    {
+      destroy_c_ctx(c_ctx);
+
+      // @TODO Check if we need to call this
+      // MsQuic->ConnectionClose(c_ctx->connection)
+    }
+  return res;
 }
 
 ERL_NIF_TERM
