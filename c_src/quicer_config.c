@@ -77,6 +77,16 @@ static ERL_NIF_TERM set_level_param(ErlNifEnv *env,
                                     ERL_NIF_TERM eopt,
                                     ERL_NIF_TERM optval);
 
+// Prepare for Async CredConfig loading
+/* static void CompleteCredconfigLoadHook(HQUIC Configuration, */
+/*                                        void *Context, */
+/*                                        QUIC_STATUS Status); */
+
+static char *get_str_from_map(ErlNifEnv *env,
+                              ERL_NIF_TERM key,
+                              const ERL_NIF_TERM *map,
+                              unsigned max_len);
+
 bool
 ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
@@ -89,65 +99,48 @@ ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *CredConfig)
   return true;
 }
 
-// @todo return status instead
-QUIC_CREDENTIAL_CONFIG *
-NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
+QUIC_STATUS
+UpdateCredConfig(ErlNifEnv *env,
+                 QUIC_CREDENTIAL_CONFIG *CredConfig,
+                 const ERL_NIF_TERM *option,
+                 BOOLEAN is_server)
 {
-  ERL_NIF_TERM cert;
-  ERL_NIF_TERM key;
-  ERL_NIF_TERM password;
-  QUIC_CREDENTIAL_CONFIG *CredConfig
-      = (QUIC_CREDENTIAL_CONFIG *)CXPLAT_ALLOC_NONPAGED(
-        sizeof(QUIC_CREDENTIAL_CONFIG), QUICER_CREDENTIAL_CONFIG);
-
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   if (!CredConfig)
     {
-      return NULL;
+      return QUIC_STATUS_INVALID_PARAMETER;
     }
-
-  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
 
   // Server default
   // @TODO set more flags
   CredConfig->Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
-  if (!enif_get_map_value(env, *option, ATOM_CERT, &cert))
+  char *cert_path = get_str_from_map(env, ATOM_CERT, option, PATH_MAX);
+  if (!cert_path && is_server)
     {
+      Status = QUIC_STATUS_REQUIRED_CERTIFICATE;
+      goto error1;
+    }
+  char *key_path = get_str_from_map(env, ATOM_KEY, option, PATH_MAX);
+  if (!key_path && is_server)
+    {
+      free(cert_path);
+      Status = QUIC_STATUS_REQUIRED_CERTIFICATE;
       goto error1;
     }
 
-  if (!enif_get_map_value(env, *option, ATOM_KEY, &key))
-    {
-      goto error1;
-    }
-
-  char *cert_path = malloc(PATH_MAX);
-  char *key_path = malloc(PATH_MAX);
-
-  if (enif_get_string(env, cert, cert_path, PATH_MAX, ERL_NIF_LATIN1) <= 0)
-    {
-      goto error2;
-    }
-
-  if (enif_get_string(env, key, key_path, PATH_MAX, ERL_NIF_LATIN1) <= 0)
-    {
-      goto error2;
-    }
-
-  if (enif_get_map_value(env, *option, ATOM_PASSWORD, &password))
+  char *password_str = get_str_from_map(env, ATOM_PASSWORD, option, 256);
+  if (password_str)
     { // password protected
       //
       // Loads the server's certificate from the file.
       //
-      char *password_str = malloc(PATH_MAX); // not sure if this is enough
-
-      if (enif_get_string(
-              env, password, password_str, PATH_MAX, ERL_NIF_LATIN1)
-          <= 0)
+      //
+      if (!cert_path || !key_path)
         {
-          return NULL;
+          Status = QUIC_STATUS_REQUIRED_CERTIFICATE;
+          goto error2;
         }
-
       QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
           = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
               sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
@@ -156,46 +149,62 @@ NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
       if (!CertFile)
         {
           free(password_str);
-          goto error1;
+          Status = QUIC_STATUS_OUT_OF_MEMORY;
+          goto error2;
         }
-
+      CertFile->PrivateKeyPassword = password_str;
+      CertFile->CertificateFile = cert_path;
+      CertFile->PrivateKeyFile = key_path;
       CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
       CredConfig->CertificateFileProtected = CertFile;
-      CredConfig->CertificateFileProtected->PrivateKeyPassword = password_str;
-      CredConfig->CertificateFileProtected->CertificateFile = cert_path;
-      CredConfig->CertificateFileProtected->PrivateKeyFile = key_path;
     }
   else
     {
       // non-password protected
+      //
+      // Loads the server's certificate from the file.
+      //
       QUIC_CERTIFICATE_FILE *CertFile
           = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
               sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
       if (!CertFile)
         {
-          goto error1;
+          goto error2;
         }
 
-      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+      CertFile->CertificateFile = cert_path;
+      CertFile->PrivateKeyFile = key_path;
       CredConfig->CertificateFile = CertFile;
-      CredConfig->CertificateFile->CertificateFile = cert_path;
-      CredConfig->CertificateFile->PrivateKeyFile = key_path;
       CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
     }
 
-  // @TODO set flag and async handler to save memory?
-  // Config->CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS;
-  // Config->CredConfig.AsyncHandler = DestroyCredConfig;
-  return CredConfig;
+  // @TODO Support Async credential load, we may not need it on Server side
+  // CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS;
+  // CredConfig->AsyncHandler = CompleteCredconfigLoadHook;
+  return Status;
 
 error2:
   free(cert_path);
   free(key_path);
 error1:
-  CxPlatFree(CredConfig, QUICER_CREDENTIAL_CONFIG);
-  return NULL;
+  return Status;
 }
 
+/*
+void
+CompleteCredconfigLoadHook(HQUIC Configuration,
+                           void *Context,
+                           QUIC_STATUS Status)
+{
+
+  if (!Configuration || QUIC_FAILED(Status))
+    {
+      fprintf(stderr, "async load of configuration error!\n");
+    }
+
+  DestroyCredConfig((QUIC_CREDENTIAL_CONFIG *)Context);
+}
+*/
 void
 DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *Config)
 {
@@ -257,7 +266,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
                                                      alpn_buffer_length,
                                                      &Settings,
                                                      sizeof(Settings),
-                                                     NULL,
+                                                     CredConfig, // Context
                                                      Configuration)))
     {
       return ATOM_STATUS(Status);
@@ -2098,4 +2107,37 @@ set_config_opt(ErlNifEnv *env,
     }
 Exit:
   return res;
+}
+
+static char *
+get_str_from_map(ErlNifEnv *env,
+                 ERL_NIF_TERM key,
+                 const ERL_NIF_TERM *map,
+                 unsigned max_len)
+{
+
+  ERL_NIF_TERM tmp_term;
+  char *buff = NULL;
+  unsigned tmp_len = 0;
+  if (!enif_get_map_value(env, *map, key, &tmp_term))
+    {
+      return NULL;
+    }
+
+  if (!enif_get_list_length(env, tmp_term, &tmp_len) || tmp_len > max_len)
+    {
+      return NULL;
+    }
+
+  if (!(buff = malloc(sizeof(char) * (tmp_len + 1))))
+    {
+      return NULL;
+    }
+
+  if (enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1) <= 0)
+    {
+      free(buff);
+      return NULL;
+    }
+  return buff;
 }

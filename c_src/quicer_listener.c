@@ -155,26 +155,20 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  QUIC_CREDENTIAL_CONFIG *Config = NewCredConfig(env, &options);
-
-  if (!Config)
+  QUIC_CREDENTIAL_CONFIG CredConfig;
+  CxPlatZeroMemory(&CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+  if (QUIC_FAILED(Status = UpdateCredConfig(env, &CredConfig, &options, TRUE)))
     {
-      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+      return ATOM_STATUS(Status);
     }
 
-  ERL_NIF_TERM estatus
-      = ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config);
+  ERL_NIF_TERM estatus = ServerLoadConfiguration(
+      env, &options, &l_ctx->Configuration, &CredConfig);
 
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
-    }
-
-  if (!ReloadCertConfig(l_ctx->Configuration, Config))
-    {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_CERT_ERROR);
     }
 
   // mon will be removed when triggered or when l_ctx is dealloc.
@@ -220,8 +214,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
-
-  DestroyCredConfig(Config);
 
   ERL_NIF_TERM listenHandler = enif_make_resource(env, l_ctx);
   return OK_TUPLE_2(listenHandler);
