@@ -64,7 +64,28 @@
 -define(QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE     , 8).
 
 
-%% CONNECTED SHUTDOWN FLAGS
+%% CONNECTION SHUTDOWN FLAGS
 -define(QUIC_CONNECTION_SHUTDOWN_FLAG_NONE      , 0).
 -define(QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT    , 1).
+
+
+
+%% QUIC_CREDENTIAL_FLAGS
+-define(QUIC_CREDENTIAL_FLAG_NONE                                   , 0x00000000).
+-define(QUIC_CREDENTIAL_FLAG_CLIENT                                 , 0x00000001). %% Lack of client flag indicates server.
+-define(QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS                      , 0x00000002).
+-define(QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION              , 0x00000004).
+-define(QUIC_CREDENTIAL_FLAG_ENABLE_OCSP                            , 0x00000008). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED          , 0x00000010).
+-define(QUIC_CREDENTIAL_FLAG_DEFER_CERTIFICATE_VALIDATION           , 0x00000020). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION          , 0x00000040). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION , 0x00000080). %% OpenSSL only currently
+-define(QUIC_CREDENTIAL_FLAG_REVOCATION_CHECK_END_CERT              , 0x00000100). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_REVOCATION_CHECK_CHAIN                 , 0x00000200). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT    , 0x00000400). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_IGNORE_NO_REVOCATION_CHECK             , 0x00000800). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_IGNORE_REVOCATION_OFFLINE              , 0x00001000). %% Schannel only currently
+-define(QUIC_CREDENTIAL_FLAG_SET_ALLOWED_CIPHER_SUITES              , 0x00002000).
+-define(QUIC_CREDENTIAL_FLAG_USE_PORTABLE_CERTIFICATES              , 0x00004000). %% OpenSSL only currently
+
 -endif. %% QUICER_HRL
