@@ -48,7 +48,7 @@ jobs:
           retention-days: 1
 
       - name: build rel tar file
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           export PATH="/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
           make tar
