@@ -21,5 +21,5 @@
             , quicer_nif]},
 
   {licenses, ["Apache 2.0"]},
-  {links, []}
+  {links, [{"Github", "https://github.com/emqx/quic"}]}
  ]}.
