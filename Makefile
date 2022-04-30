@@ -72,4 +72,8 @@ tar:
 
 .PHONY: doc
 doc:
-	rebar3 as dev ex_doc
+	rebar3 as doc ex_doc
+
+.PHONY: publish
+publish:
+	rebar3 as doc hex publish

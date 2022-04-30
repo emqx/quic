@@ -21,5 +21,12 @@
             , quicer_nif]},
 
   {licenses, ["Apache 2.0"]},
-  {links, [{"Github", "https://github.com/emqx/quic"}]}
+  {links, [{"Github", "https://github.com/emqx/quic"}]},
+  {include_files, [ "CMakeLists.txt"
+                  , "Makefile"
+                  , "get-msquic.sh"
+                  , "c_build"
+                  ]},
+  {exclude_regexps, ["priv/.*.so"]}
+
  ]}.
