@@ -30,6 +30,12 @@ if (DEFINED ENV{QUICER_USE_SNK})
   add_compile_options(-DQUICER_USE_SNK)
 endif()
 
+if (DEFINED ENV{QUICER_USE_SANITIZERS})
+  set(QUIC_ENABLE_SANITIZERS "ON")
+  add_compile_options(-O1 -fno-omit-frame-pointer -fsanitize=address,leak,undefined)
+  add_link_options(-O1 -fno-omit-frame-pointer -fsanitize=address,leak,undefined)
+endif()
+
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
 set(QUIC_BUILD_PERF "OFF")
