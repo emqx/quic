@@ -1746,6 +1746,13 @@ select_port()->
   {ok, S} = gen_udp:open(0),
   {ok, {_, Port}} = inet:sockname(S),
   gen_udp:close(S),
+  case os:type() of
+    {unix,darwin} ->
+      %% in MacOS, still get address_in_use after close port
+      timer:sleep(500);
+    _ ->
+      skip
+  end,
   Port.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
