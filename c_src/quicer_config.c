@@ -1030,6 +1030,14 @@ create_settings(ErlNifEnv *env,
       Settings->IsSet.StatelessOperationExpirationMs = TRUE;
     }
 
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_PeerBidiStreamCount,
+                          &Settings->PeerBidiStreamCount))
+    {
+      Settings->IsSet.PeerBidiStreamCount = TRUE;
+    }
+
   return true;
 }
 
@@ -1062,6 +1070,8 @@ get_stream_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
+  uint64_t BuffUint64 = 0;
+
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
       res = get_level_param(env, s_ctx->Stream, optname, elevel);
@@ -1069,10 +1079,9 @@ get_stream_opt(ErlNifEnv *env,
     }
   else if (ATOM_QUIC_PARAM_STREAM_ID == optname)
     {
-      uint64_t stream_id = 0;
       Param = QUIC_PARAM_STREAM_ID;
       BufferLength = sizeof(uint64_t);
-      Buffer = &stream_id;
+      Buffer = &BuffUint64;
     }
   else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
     {
@@ -1137,6 +1146,9 @@ set_stream_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
+  uint16_t BuffUint16 = 0;
+  uint64_t BuffUint64 = 0;
+
   // Non Msquic Opts
   if (IS_SAME_TERM(optname, ATOM_QUIC_STREAM_OPTS_ACTIVE))
     {
@@ -1167,10 +1179,9 @@ set_stream_opt(ErlNifEnv *env,
 
   else if (ATOM_QUIC_PARAM_STREAM_ID == optname)
     {
-      uint64_t stream_id = 0;
       Param = QUIC_PARAM_STREAM_ID;
       BufferLength = sizeof(uint64_t);
-      Buffer = &stream_id;
+      Buffer = &BuffUint64;
     }
   else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
     {
@@ -1199,11 +1210,10 @@ set_stream_opt(ErlNifEnv *env,
   else if (ATOM_QUIC_PARAM_STREAM_PRIORITY == optname)
     {
       Param = QUIC_PARAM_STREAM_PRIORITY;
-      uint16_t priority;
-      if (get_uint16(env, optval, &priority))
+      Buffer = &BuffUint16;
+      if (get_uint16(env, optval, Buffer))
         {
           BufferLength = sizeof(uint16_t);
-          Buffer = &priority;
         }
       else
         {
@@ -1262,18 +1272,14 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
     {
-      QUIC_ADDR addr;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
-      Buffer = &addr;
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
     {
-      QUIC_ADDR addr;
       Param = QUIC_PARAM_CONN_REMOTE_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
-      Buffer = &addr;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
     {
@@ -1362,8 +1368,6 @@ get_connection_opt(ErlNifEnv *env,
     {
       Param = QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
       BufferLength = sizeof(BOOLEAN);
-      BOOLEAN BoolVal = FALSE;
-      Buffer = &BoolVal;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET))
     {
@@ -1440,6 +1444,7 @@ set_connection_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  QUIC_ADDR addr;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1454,7 +1459,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
     {
-      QUIC_ADDR addr;
       if (!parse_listen_on(env, optval, &addr))
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
@@ -1466,7 +1470,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
     {
-      QUIC_ADDR addr;
       Param = QUIC_PARAM_CONN_REMOTE_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
       Buffer = &addr;
@@ -1482,13 +1485,13 @@ set_connection_opt(ErlNifEnv *env,
     {
       Param = QUIC_PARAM_CONN_SETTINGS;
       BufferLength = sizeof(QUIC_SETTINGS);
-      QUIC_SETTINGS Settings = { 0 };
-      if (!create_settings(env, &optval, &Settings))
+      Buffer = malloc(sizeof(QUIC_SETTINGS));
+      isMalloc = TRUE;
+      if (!create_settings(env, &optval, Buffer))
         {
           res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Exit;
         }
-      Buffer = &Settings;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS))
     {
@@ -1649,6 +1652,10 @@ set_connection_opt(ErlNifEnv *env,
     }
 
 Exit:
+  if(isMalloc && Buffer)
+  {
+    CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
+  }
   return res;
 }
 
