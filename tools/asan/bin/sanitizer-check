@@ -1,0 +1,5 @@
+#!/bin/bash
+lib_dir=$(dirname "$(realpath "$0")")
+
+export ESCRIPT_EMULATOR="${lib_dir}/erl-asan"
+escript "$(command -v rebar3)" ct

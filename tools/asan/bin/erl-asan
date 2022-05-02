@@ -1,0 +1,4 @@
+#!/bin/bash
+
+CERL=`command -v cerl`
+$CERL -asan "$@"
