@@ -1,4 +1,14 @@
 #!/bin/bash
+#
+
+die() {
+    echo "error: $1";
+    exit 1;
+}
 
 CERL=`command -v cerl`
+
+if [ -z "$CERL" ];then
+    die "cerl is missing, see https://www.erlang.org/doc/installation_guide/install"
+fi
 $CERL -asan "$@"
