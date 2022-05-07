@@ -2,4 +2,23 @@
 lib_dir=$(dirname "$(realpath "$0")")
 
 export ESCRIPT_EMULATOR="${lib_dir}/erl-asan"
-escript "$(command -v rebar3)" ct
+
+# Since cerl returns different code:root_dir(), we need to override it here
+# Erlang_OTP_ROOT_DIR will be picked up by CMakeLists.txt
+export Erlang_OTP_ROOT_DIR=$(dirname $(dirname $(which erl)))
+
+# set ERL_TOP for Suppressions list
+export ERL_TOP=$(cerl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt)
+REBAR3=$(command -v rebar3)
+
+if [ $# -eq 0 ]; then
+    AllTCs=$(erl -pa _build/test/lib/quicer/test/  -noshell \
+        -eval 'io:format("~p", [lists:flatten( string:join(lists:map(fun erlang:atom_to_list/1, quicer_SUITE:all()), " ") )]), halt()')
+    for tc in ${AllTCs};
+    do
+        echo "running tc $tc";
+        escript "$REBAR3" ct --suite=test/quicer_SUITE --case="$tc";
+    done
+else
+    escript "$REBAR3" ct $@
+fi

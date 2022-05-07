@@ -5,10 +5,14 @@ project(quicer)
 SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
 
+if (DEFINED ENV{Erlang_OTP_ROOT_DIR})
+  SET(Erlang_OTP_ROOT_DIR $ENV{Erlang_OTP_ROOT_DIR})
+else()
 EXECUTE_PROCESS(
         COMMAND         erl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt
         OUTPUT_VARIABLE Erlang_OTP_ROOT_DIR
         )
+endif()
 
 if (DEFINED ENV{CMAKE_BUILD_TYPE})
   set(CMAKE_BUILD_TYPE $ENV{CMAKE_BUILD_TYPE})
