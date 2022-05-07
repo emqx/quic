@@ -39,9 +39,6 @@ init_l_ctx()
 void
 destroy_l_ctx(QuicerListenerCTX *l_ctx)
 {
-  AcceptorQueueDestroy(l_ctx->acceptor_queue);
-  enif_free_env(l_ctx->env);
-  enif_mutex_destroy(l_ctx->lock);
   enif_release_resource(l_ctx);
 }
 

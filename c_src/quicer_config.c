@@ -82,12 +82,7 @@ static ERL_NIF_TERM set_level_param(ErlNifEnv *env,
 /*                                        void *Context, */
 /*                                        QUIC_STATUS Status); */
 
-static char *get_str_from_map(ErlNifEnv *env,
-                              ERL_NIF_TERM key,
-                              const ERL_NIF_TERM *map,
-                              unsigned max_len);
-
-bool
+BOOLEAN
 ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
@@ -97,97 +92,6 @@ ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *CredConfig)
       return false;
     }
   return true;
-}
-
-QUIC_STATUS
-UpdateCredConfig(ErlNifEnv *env,
-                 QUIC_CREDENTIAL_CONFIG *CredConfig,
-                 const ERL_NIF_TERM *option,
-                 BOOLEAN is_server)
-{
-  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (!CredConfig)
-    {
-      return QUIC_STATUS_INVALID_PARAMETER;
-    }
-
-  // Server default
-  // @TODO set more flags
-  CredConfig->Flags = QUIC_CREDENTIAL_FLAG_NONE;
-
-  char *cert_path = get_str_from_map(env, ATOM_CERT, option, PATH_MAX);
-  if (!cert_path && is_server)
-    {
-      Status = QUIC_STATUS_REQUIRED_CERTIFICATE;
-      goto error1;
-    }
-  char *key_path = get_str_from_map(env, ATOM_KEY, option, PATH_MAX);
-  if (!key_path && is_server)
-    {
-      free(cert_path);
-      Status = QUIC_STATUS_REQUIRED_CERTIFICATE;
-      goto error1;
-    }
-
-  char *password_str = get_str_from_map(env, ATOM_PASSWORD, option, 256);
-  if (password_str)
-    { // password protected
-      //
-      // Loads the server's certificate from the file.
-      //
-      //
-      if (!cert_path || !key_path)
-        {
-          Status = QUIC_STATUS_REQUIRED_CERTIFICATE;
-          goto error2;
-        }
-      QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
-          = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
-              sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
-              QUICER_CERTIFICATE_FILE_PROTECTED);
-
-      if (!CertFile)
-        {
-          free(password_str);
-          Status = QUIC_STATUS_OUT_OF_MEMORY;
-          goto error2;
-        }
-      CertFile->PrivateKeyPassword = password_str;
-      CertFile->CertificateFile = cert_path;
-      CertFile->PrivateKeyFile = key_path;
-      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
-      CredConfig->CertificateFileProtected = CertFile;
-    }
-  else
-    {
-      // non-password protected
-      //
-      // Loads the server's certificate from the file.
-      //
-      QUIC_CERTIFICATE_FILE *CertFile
-          = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
-              sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
-      if (!CertFile)
-        {
-          goto error2;
-        }
-
-      CertFile->CertificateFile = cert_path;
-      CertFile->PrivateKeyFile = key_path;
-      CredConfig->CertificateFile = CertFile;
-      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-    }
-
-  // @TODO Support Async credential load, we may not need it on Server side
-  // CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS;
-  // CredConfig->AsyncHandler = CompleteCredconfigLoadHook;
-  return Status;
-
-error2:
-  free(cert_path);
-  free(key_path);
-error1:
-  return Status;
 }
 
 /*
@@ -1652,10 +1556,10 @@ set_connection_opt(ErlNifEnv *env,
     }
 
 Exit:
-  if(isMalloc && Buffer)
-  {
-    CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
-  }
+  if (isMalloc && Buffer)
+    {
+      CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
+    }
   return res;
 }
 
@@ -2116,35 +2020,29 @@ Exit:
   return res;
 }
 
-static char *
+int
 get_str_from_map(ErlNifEnv *env,
                  ERL_NIF_TERM key,
                  const ERL_NIF_TERM *map,
+                 char *buff,
                  unsigned max_len)
 {
 
   ERL_NIF_TERM tmp_term;
-  char *buff = NULL;
+  if (!buff)
+    {
+      return 0;
+    }
   unsigned tmp_len = 0;
   if (!enif_get_map_value(env, *map, key, &tmp_term))
     {
-      return NULL;
+      return 0;
     }
 
   if (!enif_get_list_length(env, tmp_term, &tmp_len) || tmp_len > max_len)
     {
-      return NULL;
+      return 0;
     }
 
-  if (!(buff = malloc(sizeof(char) * (tmp_len + 1))))
-    {
-      return NULL;
-    }
-
-  if (enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1) <= 0)
-    {
-      free(buff);
-      return NULL;
-    }
-  return buff;
+  return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
 }

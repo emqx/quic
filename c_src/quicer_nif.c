@@ -604,7 +604,26 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
                                 __unused_parm__ ErlNifPid *pid,
                                 __unused_parm__ ErlNifMonitor *mon)
 {
-  // todo
+  // @TODO
+}
+
+void
+resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
+{
+  QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)obj;
+
+  TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
+  if (l_ctx->Listener)
+    {
+      assert(l_ctx->is_closed == TRUE);
+      MsQuic->ListenerClose(l_ctx->Listener);
+      MsQuic->ConfigurationClose(l_ctx->Configuration);
+      AcceptorQueueDestroy(l_ctx->acceptor_queue);
+      enif_free_env(l_ctx->env);
+      enif_mutex_destroy(l_ctx->lock);
+    }
+  // @TODO notify acceptors that the listener is closed
+  TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
 }
 
 void
@@ -711,9 +730,10 @@ on_load(ErlNifEnv *env,
   ErlNifResourceTypeInit connInit = { .dtor = resource_conn_dealloc_callback,
                                       .down = resource_conn_down_callback,
                                       .stop = NULL };
-  ErlNifResourceTypeInit listenerInit = {
-    .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
-  };
+  ErlNifResourceTypeInit listenerInit
+      = { .dtor = resource_listener_dealloc_callback,
+          .down = resource_listener_down_callback,
+          .stop = NULL };
   ctx_listener_t = enif_open_resource_type_x(env,
                                              "listener_context_resource",
                                              &listenerInit, // init callbacks

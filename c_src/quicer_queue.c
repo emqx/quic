@@ -51,6 +51,7 @@ AcceptorQueueDestroy(QUICER_ACCEPTOR_QUEUE *q)
       CxPlatListRemoveHead(&q->List);
     }
   enif_mutex_unlock(q->Lock);
+  enif_mutex_destroy(q->Lock);
   CXPLAT_FREE(q, QUICER_ACCEPTOR);
 }
 
