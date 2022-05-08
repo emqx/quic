@@ -63,8 +63,8 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   ebin = enif_make_copy(dgram_send_ctx->env, ebin);
-  if (!(enif_inspect_iolist_as_binary(env, ebin, bin)
-        || enif_inspect_binary(env, ebin, bin))
+  if (!(enif_inspect_iolist_as_binary(dgram_send_ctx->env, ebin, bin)
+        || enif_inspect_binary(dgram_send_ctx->env, ebin, bin))
       || bin->size > UINT32_MAX)
     {
       destroy_dgram_send_ctx(dgram_send_ctx);

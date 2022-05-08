@@ -477,8 +477,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   ebin = enif_make_copy(send_ctx->env, ebin);
-  if (!(enif_inspect_iolist_as_binary(env, ebin, bin)
-        || enif_inspect_binary(env, ebin, bin))
+  if (!(enif_inspect_iolist_as_binary(send_ctx->env, ebin, bin)
+        || enif_inspect_binary(send_ctx->env, ebin, bin))
       || bin->size > UINT32_MAX)
     {
       destroy_send_ctx(send_ctx);
