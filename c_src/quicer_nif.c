@@ -672,6 +672,7 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   enif_free_env(s_ctx->env);
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_destroy(s_ctx->lock);
+  AcceptorDestroy(s_ctx->owner);
   TP_CB_3(end, (uintptr_t)s_ctx->Stream, 0);
 }
 
