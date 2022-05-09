@@ -5,6 +5,7 @@ project(quicer)
 SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
 
+# For cerl picking up the OTP_ROOT
 if (DEFINED ENV{Erlang_OTP_ROOT_DIR})
   SET(Erlang_OTP_ROOT_DIR $ENV{Erlang_OTP_ROOT_DIR})
 else()

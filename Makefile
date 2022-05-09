@@ -16,7 +16,7 @@ all: compile
 .PHONY: default
 default: build-nif
 
-.PHONY: default
+.PHONY: build-nif
 build-nif:
 	./get-msquic.sh v2.0.1
 	cmake -B c_build
