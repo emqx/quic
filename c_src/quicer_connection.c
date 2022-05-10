@@ -257,6 +257,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
       is_destroy = TRUE;
+      c_ctx->is_closed = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
       // @TODO
@@ -427,6 +428,7 @@ ServerConnectionCallback(HQUIC Connection,
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+      c_ctx->is_closed = TRUE;
       is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -453,6 +455,7 @@ ServerConnectionCallback(HQUIC Connection,
       acc_pid = &(acc->Pid);
 
       s_ctx->owner = acc;
+      s_ctx->is_closed = FALSE;
 
       // @todo add monitor here.
       if (!enif_send(NULL,
@@ -674,7 +677,7 @@ async_connect3(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
       goto Error;
     }
-
+  c_ctx->is_closed = FALSE;
   ERL_NIF_TERM eHandler = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandler);

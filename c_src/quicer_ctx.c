@@ -31,9 +31,17 @@ init_l_ctx()
   l_ctx->env = enif_alloc_env();
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
-  l_ctx->is_closed = FALSE;
+  l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   return l_ctx;
+}
+
+void
+deinit_l_ctx(QuicerListenerCTX *l_ctx)
+{
+  AcceptorQueueDestroy(l_ctx->acceptor_queue);
+  enif_mutex_destroy(l_ctx->lock);
+  enif_free_env(l_ctx->env);
 }
 
 void
@@ -60,7 +68,16 @@ init_c_ctx()
   c_ctx->ResumptionTicket = NULL;
   c_ctx->ssl_keylogfile = NULL;
   c_ctx->l_ctx = NULL;
+  c_ctx->is_closed = TRUE;
   return c_ctx;
+}
+
+void
+deinit_c_ctx(QuicerConnCTX *c_ctx)
+{
+  enif_free_env(c_ctx->env);
+  AcceptorQueueDestroy(c_ctx->acceptor_queue);
+  enif_mutex_destroy(c_ctx->lock);
 }
 
 void
@@ -92,7 +109,15 @@ init_s_ctx()
   s_ctx->Buffers[1].Length = 0;
   s_ctx->TotalBufferLength = 0;
   s_ctx->is_buff_ready = FALSE;
+  s_ctx->is_closed = TRUE;
   return s_ctx;
+}
+
+void
+deinit_s_ctx(QuicerStreamCTX *s_ctx)
+{
+  enif_mutex_destroy(s_ctx->lock);
+  enif_free_env(s_ctx->env);
 }
 
 void

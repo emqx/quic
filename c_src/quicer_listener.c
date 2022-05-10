@@ -102,6 +102,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
               return QUIC_STATUS_INTERNAL_ERROR;
             }
         }
+      c_ctx->is_closed = FALSE;
       enif_clear_env(env);
       break;
     default:
@@ -148,7 +149,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   QuicerListenerCTX *l_ctx = init_l_ctx();
-  l_ctx->is_closed = TRUE;
 
   // @todo is listenerPid useless?
   if (!enif_self(env, &(l_ctx->listenerPid)))

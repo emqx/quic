@@ -149,6 +149,10 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
     {
       enif_clear_env(env);
     }
+  else
+    {
+      s_ctx->is_closed = TRUE;
+    }
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_unlock(s_ctx->c_ctx->lock);
 
@@ -283,6 +287,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     {
       enif_clear_env(env);
     }
+  else
+    {
+      s_ctx->is_closed = TRUE;
+    }
 
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_unlock(s_ctx->c_ctx->lock);
@@ -376,6 +384,7 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
 
+  s_ctx->is_closed = FALSE;
   return SUCCESS(enif_make_resource(env, s_ctx));
 
 ErrorExit:

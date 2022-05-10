@@ -613,15 +613,13 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)obj;
 
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
+  assert(l_ctx->is_closed == TRUE);
   if (l_ctx->Listener)
     {
-      assert(l_ctx->is_closed == TRUE);
       MsQuic->ListenerClose(l_ctx->Listener);
       MsQuic->ConfigurationClose(l_ctx->Configuration);
-      AcceptorQueueDestroy(l_ctx->acceptor_queue);
-      enif_free_env(l_ctx->env);
-      enif_mutex_destroy(l_ctx->lock);
     }
+  deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
 }
@@ -630,16 +628,18 @@ void
 resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
-  TP_CB_3(start, (uintptr_t)c_ctx->Connection, 0);
-  MsQuic->ConnectionClose(c_ctx->Connection);
-  AcceptorQueueDestroy(c_ctx->acceptor_queue);
-  enif_free_env(c_ctx->env);
-  enif_mutex_destroy(c_ctx->lock);
+  TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
+  assert(c_ctx->is_closed == TRUE);
+  if (c_ctx->Connection)
+    {
+      MsQuic->ConnectionClose(c_ctx->Connection);
+    }
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
   CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
   CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
   AcceptorDestroy(c_ctx->owner);
-  TP_CB_3(end, (uintptr_t)c_ctx->Connection, 0);
+  deinit_c_ctx(c_ctx);
+  TP_CB_3(end, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
 }
 
 void
@@ -666,14 +666,15 @@ void
 resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
-  TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
-  enif_mutex_lock(s_ctx->lock);
-  MsQuic->StreamClose(s_ctx->Stream);
-  enif_free_env(s_ctx->env);
-  enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_destroy(s_ctx->lock);
+  TP_CB_3(start, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
+  assert(s_ctx->is_closed == TRUE);
+  if (s_ctx->Stream)
+    {
+      MsQuic->StreamClose(s_ctx->Stream);
+    }
   AcceptorDestroy(s_ctx->owner);
-  TP_CB_3(end, (uintptr_t)s_ctx->Stream, 0);
+  deinit_s_ctx(s_ctx);
+  TP_CB_3(end, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
 }
 
 void
