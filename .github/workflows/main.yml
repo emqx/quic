@@ -115,6 +115,18 @@ jobs:
           fi
 
           make ci
+
+      - name: gdb bt
+        if: failure()
+        run: |
+          which gdb || sudo apt install gdb
+          corefile=$(find _build/test -name core)
+          if [ -n $corefile ]; then
+            gdb -ex bt $(erl -noshell -eval 'io:format(code:root_dir()),halt()')/erts-*/bin/beam.smp "${corefile}"
+          else
+            echo "No coredump found"
+          fi
+
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2
         if: failure()
