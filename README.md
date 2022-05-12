@@ -70,9 +70,10 @@ Port = 4567,
 LOptions = [ {cert, "cert.pem"}
            , {key,  "key.pem"}
            , {alpn, ["sample"]}
+           , {peer_bidi_stream_count, 1}
              ],
 {ok, L} = quicer:listen(Port, LOptions),
-{ok, Conn} = quicer:accept(L, [], 5000),
+{ok, Conn} = quicer:accept(L, [], 120000),
 {ok, Conn} = quicer:handshake(Conn),
 {ok, Stm} = quicer:accept_stream(Conn, []),
 receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
