@@ -18,7 +18,7 @@ default: build-nif
 
 .PHONY: build-nif
 build-nif:
-	./get-msquic.sh v2.0.1
+	./get-msquic.sh v2.0.2
 	cmake -B c_build
 	make -j $(JOBS) -C c_build
 
