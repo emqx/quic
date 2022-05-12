@@ -133,4 +133,11 @@ The process becomes the connection owner.
 To complete the TLS handshake, quicer:handshake/1,2 should be called.
 
 
+### Listener Stopped
 
+```erlang
+{quic, listener_stopped, listener_handler()}
+```
+
+This message is sent to the listener owner process, indicating the listener
+is stopped and closed. 

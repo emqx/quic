@@ -889,6 +889,7 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
+  // @TODO remove l_ctx by support handshake with a configuration
   if (!c_ctx || !(c_ctx->l_ctx))
     {
       return QUIC_STATUS_INTERNAL_ERROR;

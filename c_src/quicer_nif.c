@@ -265,6 +265,7 @@ ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
 /*----------------------------------------------------------*/
 
 ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_LISTENER_STOPPED;
 ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
@@ -550,6 +551,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_HANDLER, handler);                                                \
   ATOM(ATOM_CLOSED, closed);                                                  \
+  ATOM(ATOM_LISTENER_STOPPED, listener_stopped);                              \
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
@@ -614,9 +616,9 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
   assert(l_ctx->is_closed == TRUE);
+  assert(l_ctx->Listener == NULL);
   if (l_ctx->Listener)
     {
-      MsQuic->ListenerClose(l_ctx->Listener);
       MsQuic->ConfigurationClose(l_ctx->Configuration);
     }
   deinit_l_ctx(l_ctx);

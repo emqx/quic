@@ -258,8 +258,8 @@ tc_lib_re_registration(_Config) ->
 tc_open_listener(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(Port),
+  {ok, {_, Port}} = quicer:sockname(L),
+  {error, eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
   {ok, P} = gen_udp:open(Port),
   ok = gen_udp:close(P),

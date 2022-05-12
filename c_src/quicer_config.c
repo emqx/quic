@@ -1649,13 +1649,12 @@ set_listener_opt(ErlNifEnv *env,
     }
 
   enif_mutex_lock(l_ctx->lock);
+
   if (l_ctx->is_closed)
     {
-      enif_mutex_unlock(l_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto Exit;
     }
-  enif_keep_resource(l_ctx);
-  enif_mutex_unlock(l_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1694,7 +1693,7 @@ set_listener_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
     }
 Exit:
-  enif_release_resource(l_ctx);
+  enif_mutex_unlock(l_ctx->lock);
   return res;
 }
 
