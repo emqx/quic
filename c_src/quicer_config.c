@@ -1870,11 +1870,11 @@ set_global_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  uint32_t percent = 0;
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
       Param = QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
-      uint32_t percent = 0;
       BufferLength = sizeof(uint32_t);
       if (!enif_get_uint(env, optval, &percent) || percent > UINT16_MAX)
         {
@@ -1987,11 +1987,11 @@ set_config_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  QUIC_SETTINGS Settings = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS))
     {
       Param = QUIC_PARAM_CONFIGURATION_SETTINGS;
-      QUIC_SETTINGS Settings = { 0 };
       if (!create_settings(env, &optval, &Settings))
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
