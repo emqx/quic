@@ -123,7 +123,17 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
 // option keys
 ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
+ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
+ERL_NIF_TERM ATOM_HANDLER;
+
+/*-------------------------------------------------------*/
+/*         msquic  execution profile for registration    */
+/*-------------------------------------------------------*/
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY; // Default
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
 
 /*-----------------------------------------*/
 /*         msquic parms starts             */
@@ -235,6 +245,12 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_ServerResumptionLevel;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MinimumMtu;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaximumMtu;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 
 /*----------------------------------------------------------*/
 /* QUIC_SETTINGS ends      */
@@ -290,6 +306,7 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 ERL_NIF_TERM ATOM_FAST_CONN;
+ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -384,6 +401,17 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, atom_quic_status_cert_expired);         \
   ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
        atom_quic_status_cert_untrusted_root);                                 \
+  /*-------------------------------------------------------*/                 \
+  /*         msquic  execution profile for reg             */                 \
+  /*-------------------------------------------------------*/                 \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY,                               \
+       quic_execution_profile_low_latency);                                   \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT,                       \
+       quic_execution_profile_type_max_throughput);                           \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER,                            \
+       quic_execution_profile_type_scavenger);                                \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME,                            \
+       quic_execution_profile_type_real_time);                                \
   /*-----------------------------------------*/                               \
   /*         msquic parms starts             */                               \
   /*-----------------------------------------*/                               \
@@ -502,13 +530,25 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsList, desired_versions_list);        \
   ATOM(ATOM_QUIC_SETTINGS_DesiredVersionsListLength,                          \
        desired_versions_list_length);                                         \
+  ATOM(ATOM_QUIC_SETTINGS_MinimumMtu, minimum_mtu);                           \
+  ATOM(ATOM_QUIC_SETTINGS_MaximumMtu, maximum_mtu);                           \
+  ATOM(ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs,                \
+       mtu_discovery_search_complete_timeout_us);                             \
+  ATOM(ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount,                      \
+       mtu_discovery_missing_probe_count);                                    \
+  ATOM(ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations,                      \
+       max_binding_stateless_operations);                                     \
+  ATOM(ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs,                     \
+       stateless_operation_expiration_ms);                                    \
   /*                  QUIC_SETTINGS end                        */             \
   /*                  QUIC_STREAM_OPTS start                        */        \
   ATOM(ATOM_QUIC_STREAM_OPTS_ACTIVE, active)                                  \
   /*                  QUIC_STREAM_OPTS end                        */          \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key);                                                        \
+  ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
+  ATOM(ATOM_HANDLER, handler);                                                \
   ATOM(ATOM_CLOSED, closed);                                                  \
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
@@ -541,10 +581,11 @@ ERL_NIF_TERM ATOM_FAST_CONN;
   ATOM(ATOM_FUNCTION, function);                                              \
   ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
-  ATOM(ATOM_FAST_CONN, fast_conn);
+  ATOM(ATOM_FAST_CONN, fast_conn);                                            \
+  ATOM(ATOM_ALLOW_INSECURE, allow_insecure);
 
-HQUIC Registration;
-const QUIC_API_TABLE *MsQuic;
+HQUIC GRegistration = NULL;
+const QUIC_API_TABLE *MsQuic = NULL;
 
 // @todo, these flags are not threads safe, wrap it in a context
 BOOLEAN isRegistered = false;
@@ -554,7 +595,7 @@ ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
 ErlNifResourceType *ctx_stream_t = NULL;
 
-const QUIC_REGISTRATION_CONFIG RegConfig
+QUIC_REGISTRATION_CONFIG GRegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
 void
@@ -563,22 +604,42 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
                                 __unused_parm__ ErlNifPid *pid,
                                 __unused_parm__ ErlNifMonitor *mon)
 {
-  // todo
+  // @TODO
+}
+
+void
+resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
+{
+  QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)obj;
+
+  TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
+  assert(l_ctx->is_closed == TRUE);
+  if (l_ctx->Listener)
+    {
+      MsQuic->ListenerClose(l_ctx->Listener);
+      MsQuic->ConfigurationClose(l_ctx->Configuration);
+    }
+  deinit_l_ctx(l_ctx);
+  // @TODO notify acceptors that the listener is closed
+  TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
 }
 
 void
 resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
-  TP_CB_3(start, (uintptr_t)c_ctx->Connection, 0);
-  MsQuic->ConnectionClose(c_ctx->Connection);
-  AcceptorQueueDestroy(c_ctx->acceptor_queue);
-  enif_free_env(c_ctx->env);
-  enif_mutex_destroy(c_ctx->lock);
+  TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
+  assert(c_ctx->is_closed == TRUE);
+  if (c_ctx->Connection)
+    {
+      MsQuic->ConnectionClose(c_ctx->Connection);
+    }
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
+  CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
   CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
   AcceptorDestroy(c_ctx->owner);
-  TP_CB_3(end, (uintptr_t)c_ctx->Connection, 0);
+  deinit_c_ctx(c_ctx);
+  TP_CB_3(end, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
 }
 
 void
@@ -605,13 +666,15 @@ void
 resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
-  TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
-  enif_mutex_lock(s_ctx->lock);
-  MsQuic->StreamClose(s_ctx->Stream);
-  enif_free_env(s_ctx->env);
-  enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_destroy(s_ctx->lock);
-  TP_CB_3(end, (uintptr_t)s_ctx->Stream, 0);
+  TP_CB_3(start, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
+  assert(s_ctx->is_closed == TRUE);
+  if (s_ctx->Stream)
+    {
+      MsQuic->StreamClose(s_ctx->Stream);
+    }
+  AcceptorDestroy(s_ctx->owner);
+  deinit_s_ctx(s_ctx);
+  TP_CB_3(end, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
 }
 
 void
@@ -669,9 +732,10 @@ on_load(ErlNifEnv *env,
   ErlNifResourceTypeInit connInit = { .dtor = resource_conn_dealloc_callback,
                                       .down = resource_conn_down_callback,
                                       .stop = NULL };
-  ErlNifResourceTypeInit listenerInit = {
-    .dtor = NULL, .down = resource_listener_down_callback, .stop = NULL
-  };
+  ErlNifResourceTypeInit listenerInit
+      = { .dtor = resource_listener_dealloc_callback,
+          .down = resource_listener_down_callback,
+          .stop = NULL };
   ctx_listener_t = enif_open_resource_type_x(env,
                                              "listener_context_resource",
                                              &listenerInit, // init callbacks
@@ -728,7 +792,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   //
   // Open a handle to the library and get the API function table.
   //
-  if (QUIC_FAILED(status = MsQuicOpen(&MsQuic)))
+  if (QUIC_FAILED(status = MsQuicOpen2(&MsQuic)))
     {
       isLibOpened = false;
       return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
@@ -769,13 +833,46 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 }
 
 static ERL_NIF_TERM
-registration(ErlNifEnv *env,
-             __unused_parm__ int argc,
-             __unused_parm__ const ERL_NIF_TERM argv[])
+registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM profile = argv[0];
+
+  if (isRegistered || !isLibOpened)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (argc == 1)
+    {
+      if (IS_SAME_TERM(profile, ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY))
+        {
+          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
+        }
+      else if (IS_SAME_TERM(profile,
+                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
+        {
+          GRegConfig.ExecutionProfile
+              = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+        }
+      else if (IS_SAME_TERM(profile,
+                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
+        {
+          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+        }
+      else if (IS_SAME_TERM(profile,
+                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
+        {
+          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+        }
+      else
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+
   if (QUIC_FAILED(status
-                  = MsQuic->RegistrationOpen(&RegConfig, &Registration)))
+                  = MsQuic->RegistrationOpen(&GRegConfig, &GRegistration)))
     {
       isRegistered = false;
       TP_NIF_3(fail, 0, status);
@@ -791,9 +888,9 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  if (isRegistered && Registration)
+  if (isRegistered && GRegistration)
     {
-      MsQuic->RegistrationClose(Registration);
+      MsQuic->RegistrationClose(GRegistration);
       isRegistered = false;
     }
   return ATOM_OK;
@@ -998,6 +1095,7 @@ static ErlNifFunc nif_funcs[] = {
   { "open_lib", 1, openLib, 0 },
   { "close_lib", 0, closeLib, 0 },
   { "reg_open", 0, registration, 0 },
+  { "reg_open", 1, registration, 0 },
   { "reg_close", 0, deregistration, 0 },
   { "listen", 2, listen2, 0},
   { "close_listener", 1, close_listener1, 0},

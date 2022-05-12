@@ -16,9 +16,9 @@ all: compile
 .PHONY: default
 default: build-nif
 
-.PHONY: default
+.PHONY: build-nif
 build-nif:
-	./get-msquic.sh v1.8.0
+	./get-msquic.sh v2.0.2
 	cmake -B c_build
 	make -j $(JOBS) -C c_build
 
@@ -61,7 +61,7 @@ check: clang-format
 
 .PHONY: clang-format
 clang-format:
-	clang-format-10 --Werror --dry-run c_src/*
+	clang-format-11 --Werror --dry-run c_src/*
 
 .PHONY: ci
 ci: test dialyzer
@@ -69,3 +69,11 @@ ci: test dialyzer
 .PHONY: tar
 tar:
 	$(REBAR) tar
+
+.PHONY: doc
+doc:
+	rebar3 as doc ex_doc
+
+.PHONY: publish
+publish:
+	rebar3 as doc hex publish

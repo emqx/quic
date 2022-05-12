@@ -37,6 +37,7 @@ typedef struct
   // Listener handler closed flag
   // false means the handler is invalid
   BOOLEAN is_closed;
+  BOOLEAN allow_insecure;
   void *reserved1;
   void *reserved2;
   void *reserved3;
@@ -54,7 +55,9 @@ typedef struct QuicerConnCTX
   ErlNifMutex *lock;
   // Connection handler closed flag
   // false means the handler is invalid
-  CXPLAT_TLS_SECRETS *TlsSecrets;
+  QUIC_TLS_SECRETS *TlsSecrets;
+  QUIC_BUFFER *ResumptionTicket;
+  BOOLEAN is_closed;
   char *ssl_keylogfile;
   void *reserved1;
   void *reserved2;
@@ -75,6 +78,7 @@ typedef struct QuicerStreamCTX
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint32_t BufferCount;
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
   _CTX_CALLBACK_WRITE_ BOOLEAN is_buff_ready;
+  BOOLEAN is_closed;
   void *reserved1;
   void *reserved2;
   void *reserved3;
@@ -93,12 +97,15 @@ typedef struct QuicerStreamSendCTX
 typedef struct QuicerStreamSendCTX QuicerDgramSendCTX;
 
 QuicerListenerCTX *init_l_ctx();
+void deinit_l_ctx(QuicerListenerCTX *l_ctx);
 void destroy_l_ctx(QuicerListenerCTX *l_ctx);
 
 QuicerConnCTX *init_c_ctx();
+void deinit_c_ctx(QuicerConnCTX *c_ctx);
 void destroy_c_ctx(QuicerConnCTX *c_ctx);
 
 QuicerStreamCTX *init_s_ctx();
+void deinit_s_ctx(QuicerStreamCTX *s_ctx);
 void destroy_s_ctx(QuicerStreamCTX *s_ctx);
 
 QuicerStreamSendCTX *init_send_ctx();

@@ -68,6 +68,16 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
 
+      if (l_ctx->allow_insecure)
+        {
+          BOOLEAN value = TRUE;
+          MsQuic->SetParam(Event->NEW_CONNECTION.Connection,
+                           // 0x0500000F,
+                           QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                           sizeof(value),
+                           &value);
+        }
+
       if (conn_owner->fast_conn)
         {
           TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 1);
@@ -92,6 +102,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
               return QUIC_STATUS_INTERNAL_ERROR;
             }
         }
+      c_ctx->is_closed = FALSE;
       enif_clear_env(env);
       break;
     default:
@@ -145,26 +156,71 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  QUIC_CREDENTIAL_CONFIG_HELPER *Config = NewCredConfig(env, &options);
+  // Build CredConfig
+  QUIC_CREDENTIAL_CONFIG CredConfig;
+  CxPlatZeroMemory(&CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+  char password[256] = { 0 };
+  char cert_path[PATH_MAX + 1] = { 0 };
+  char key_path[PATH_MAX + 1] = { 0 };
+  ERL_NIF_TERM tmp_term;
 
-  if (!Config)
+  if (get_str_from_map(env, ATOM_CERT, &options, cert_path, PATH_MAX + 1) <= 0)
     {
-      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+      return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  ERL_NIF_TERM estatus
-      = ServerLoadConfiguration(env, &options, &l_ctx->Configuration, Config);
+  if (get_str_from_map(env, ATOM_KEY, &options, key_path, PATH_MAX + 1) <= 0)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
+    {
+      if (get_str_from_map(env, ATOM_KEY, &options, password, 256) <= 0)
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+
+      QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
+          = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
+              QUICER_CERTIFICATE_FILE);
+
+      CertFile->CertificateFile = cert_path;
+      CertFile->PrivateKeyFile = key_path;
+      CertFile->PrivateKeyPassword = password;
+      CredConfig.CertificateFileProtected = CertFile;
+      CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
+    }
+  else
+    {
+      QUIC_CERTIFICATE_FILE *CertFile
+          = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
+      CertFile->CertificateFile = cert_path;
+      CertFile->PrivateKeyFile = key_path;
+      CredConfig.CertificateFile = CertFile;
+      CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+    }
+
+  ERL_NIF_TERM estatus = ServerLoadConfiguration(
+      env, &options, &l_ctx->Configuration, &CredConfig);
+
+  // Cleanup CredConfig
+  if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
+    {
+      CxPlatFree(CredConfig.CertificateFile, QUICER_CERTIFICATE_FILE);
+    }
+  else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == CredConfig.Type)
+    {
+      CxPlatFree(CredConfig.CertificateFile,
+                 QUICER_CERTIFICATE_FILE_PROTECTED);
+    }
 
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
-    }
-
-  if (!ReloadCertConfig(l_ctx->Configuration, Config))
-    {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_CERT_ERROR);
     }
 
   // mon will be removed when triggered or when l_ctx is dealloc.
@@ -178,14 +234,23 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (QUIC_FAILED(
           Status = MsQuic->ListenerOpen(
-              Registration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
+              GRegistration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
     }
+  l_ctx->is_closed = FALSE;
 
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
+
+  // Allow insecure
+  ERL_NIF_TERM eisInsecure;
+  if (enif_get_map_value(env, options, ATOM_ALLOW_INSECURE, &eisInsecure)
+      && IS_SAME_TERM(eisInsecure, ATOM_TRUE))
+    {
+      l_ctx->allow_insecure = TRUE;
+    }
 
   if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
     {
@@ -193,6 +258,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ALPN);
     }
 
+  // Start Listener
   if (QUIC_FAILED(
           Status = MsQuic->ListenerStart(
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
@@ -201,9 +267,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
-
-  DestroyCredConfig(Config);
-
   ERL_NIF_TERM listenHandler = enif_make_resource(env, l_ctx);
   return OK_TUPLE_2(listenHandler);
 }
@@ -219,9 +282,10 @@ close_listener1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
   // calling ListenerStop is optional
-  // MsQuic->ListenerStop(l_ctx->Listener);
+  enif_mutex_lock(l_ctx->lock);
+  MsQuic->ListenerStop(l_ctx->Listener);
   l_ctx->is_closed = TRUE;
-  MsQuic->ListenerClose(l_ctx->Listener);
+  enif_mutex_unlock(l_ctx->lock);
   enif_release_resource(l_ctx);
   return ATOM_OK;
 }

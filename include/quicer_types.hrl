@@ -19,6 +19,9 @@
 
 -include("quicer.hrl").
 
+-define(BIT(Bits), (1 bsl (Bits))).
+-define(MASK(Bits), (?BIT(Bits) - 1)).
+
 %% Msquic Status Code Translation
 -type atom_reason() ::
         success             |
@@ -64,7 +67,56 @@
         reg_handler().
 
 -type listen_on() :: inet:port_number() | string().
--type listen_opts() :: map(). %% @TODO expand
+-type listen_opts() :: listen_security_opts() | quic_settings().
+-type listen_security_opts() :: #{ alpn := [alpn()]
+                                 , cert := file:filename()
+                                 , key := file:filename()
+                                 , allow_insecure => boolean()
+                                 }.
+
+-type uint64() :: 0..?MASK(64).
+-type uint32() :: 0..?MASK(32).
+-type uint16() :: 0..?MASK(16).
+-type uint8() :: 0..?MASK(8).
+
+-type quic_settings() :: #{ max_bytes_per_key => uint64()
+                          , handshake_idle_timeout_ms => uint64()
+                          , idle_timeout_ms => uint64()
+                            %% for client only
+                          , tls_client_max_send_buffer => uint32()
+                            %% for server only
+                          , tls_server_max_send_buffer => uint32()
+                          , stream_recv_window_default => uint32()
+                          , stream_recv_buffer_default => uint32()
+                          , conn_flow_control_window => uint32()
+                          %, max_worker_queue_delay_us => uint32()
+                          , max_stateless_operations => uint32()
+                          , initial_window_packets => uint32()
+                          , send_idle_timeout_ms => uint32()
+                          , initial_rtt_ms => uint32()
+                          , max_ack_delay_ms => uint32()
+                          , disconnect_timeout_ms => uint32()
+                          , keep_alive_interval_ms => uint32()
+                          , peer_bidi_stream_count => uint16()
+                          , peer_unidi_stream_count => uint16()
+                          , retry_memory_limit => uint16()
+                          , load_balancing_mode => uint16()
+                          , max_operations_per_drain => uint8()
+                          , send_buffering_enabled => uint8()
+                          , pacing_enabled => uint8()
+                          , migration_enabled => uint8()
+                          , datagram_receive_enabled => uint8()
+                          , server_resumption_level => uint8()
+                          %  internal, not exposed
+                          %, version_negotiation_ext_enabled => uint8()
+                          , minimum_mtu => uint16()
+                          , maximum_mtu => uint16()
+                          , mtu_discovery_search_complete_timeout_us => uint64()
+                          , mtu_discovery_missing_probe_count => uint8()
+                          , max_binding_stateless_operations => uint16()
+                          , stateless_operation_expiration_ms => uint16()
+                          }.
+-type alpn() :: string().
 
 -type conn_opts() :: map(). %% @TODO expand
 -type conn_shutdown_flag() :: ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE |
@@ -112,7 +164,7 @@
         param_conn_stream_scheduling_scheme       |           %% |  X  |  X | @TODO
         param_conn_datagram_receive_enabled       |           %% |  X  |  X | @TODO
         param_conn_datagram_send_enabled          |           %% |  X  |    | @TODO
-        param_conn_disable_1rtt_encryption        |           %% |  X  |  X | @TODO
+        param_conn_disable_1rtt_encryption        |           %% |  X  |  X |
         param_conn_resumption_ticket              |           %% |     |  X | @TODO
         param_conn_peer_certificate_valid         |           %% |     |  X | @TODO
         param_conn_local_interface.                           %% |     |  X | @TODO
@@ -175,5 +227,11 @@
         version_negotiation_ext_enabled    |
         desired_versions_list              |
         desired_versions_list_length.
+
+-type execution_profile() ::
+        quic_execution_profile_low_latency |
+        quic_execution_profile_type_max_throughput |
+        quic_execution_profile_type_scavenger |
+        quic_execution_profile_type_realtime.
 
 -endif. %% QUICER_TYPES_HRL

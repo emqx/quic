@@ -5,6 +5,23 @@
 * Features List
 
 Feature todo list, priority descending
+** Impl ConfigurationLoadCredential
+Load QUIC_CREDENTIAL_CONFIG to configuration
+
+** Close configurations in resource destroy callback
+
+** Check shutdown connection wait for peer to close or not
+
+** Hibernate connection owner process since connection process is mostly idling
+
+** get Peer cert
+
+** Get/Set Context
+with lock protection set/get the callback context.
+
+** RegistrationShutdown
+API for registrationshutdown, shutdown all connections under registration
+** Stream recv FIN flag
 
 ** Stream send flags
 

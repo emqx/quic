@@ -2,7 +2,6 @@
 #define TRACEPOINT_DEFINE
 #include "quicer_tp.h"
 
-//#if defined(QUICER_USE_SNK)
 void
 tp_snk(ErlNifEnv *env,
        const char *ctx,
@@ -18,8 +17,6 @@ tp_snk(ErlNifEnv *env,
       ERL_NIF_TERM snk_event_key_array[7]
           = { ATOM_SNK_KIND,    ATOM_CONTEXT, ATOM_FUNCTION, ATOM_TAG,
               ATOM_RESOURCE_ID, ATOM_MARK,    ATOM_SNK_META };
-
-      // ERL_NIF_TERM snk_event_key_array[] = { ATOM_SNK_KIND, ATOM_SNK_META };
 
       ERL_NIF_TERM snk_event_val_array[7] = {
         ATOM_DEBUG,                                 // snk_kind
@@ -39,4 +36,3 @@ tp_snk(ErlNifEnv *env,
       enif_send(NULL, &pid, NULL, report);
     }
 }
-//#endif /* QUICER_USE_SNK */

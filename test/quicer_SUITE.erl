@@ -35,8 +35,9 @@
         , tc_open_lib_test/1
         , tc_close_lib_test/1
         , tc_lib_registration/1
+        , tc_lib_registration_1/1
         , tc_lib_re_registration/1
-
+        , tc_lib_registration_neg/1
         , tc_open_listener/1
         , tc_open_listener_bind/1
         , tc_open_listener_bind_v6/1
@@ -101,6 +102,9 @@
 
         , tc_get_conn_rid/1
         , tc_get_stream_rid/1
+
+        %% insecure, msquic only
+        , tc_insecure_traffic/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -204,8 +208,26 @@ tc_close_lib_test(_Config) ->
   {ok, Res0} = quicer:open_lib(),
   ?assert(Res0 == true orelse Res0 == debug).
 
+tc_lib_registration_neg(_Config) ->
+  ok = quicer:close_lib(),
+  {error, badarg} = quicer:reg_open(),
+  ok = quicer:reg_close().
+
 tc_lib_registration(_Config) ->
+  quicer:open_lib(),
   ok = quicer:reg_open(),
+  ok = quicer:reg_close().
+
+tc_lib_registration_1(_Config) ->
+  ok =quicer:reg_close(),
+  {error, badarg} = quicer:reg_open(foo),
+  ok = quicer:reg_open(quic_execution_profile_low_latency),
+  ok =quicer:reg_close(),
+  ok = quicer:reg_open(quic_execution_profile_type_real_time),
+  ok = quicer:reg_close(),
+  ok = quicer:reg_open(quic_execution_profile_type_max_throughput),
+  ok = quicer:reg_close(),
+  ok = quicer:reg_open(quic_execution_profile_type_scavenger),
   ok = quicer:reg_close().
 
 tc_open_listener_neg_1(Config) ->
@@ -222,8 +244,14 @@ tc_open_listener_neg_2(Config) ->
   ok.
 
 tc_lib_re_registration(_Config) ->
-  ok = quicer:reg_open(),
-  ok = quicer:reg_open(),
+  case quicer:reg_open() of
+    ok ->
+      ok;
+    {error, _} ->
+      ok = quicer:reg_close(),
+      ok = quicer:reg_open()
+  end,
+  {error, badarg} = quicer:reg_open(),
   ok = quicer:reg_close(),
   ok = quicer:reg_close().
 
@@ -711,7 +739,7 @@ tc_stream_send_after_conn_close(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, {_, _}} = quicer:sockname(Stm),
       ok = quicer:close_connection(Conn),
-      {error, stm_send_error, invalid_state} = quicer:send(Stm, <<"ping2">>),
+      {error, stm_send_error, aborted} = quicer:send(Stm, <<"ping2">>),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -860,6 +888,7 @@ tc_getopt(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stats} = quicer:getopt(Conn, Parm, false),
+      {ok, false} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
       0 = proplists:get_value("Recv.DroppedPackets", Stats),
       [true = proplists:is_defined(SKey, Stats)
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
@@ -1431,6 +1460,32 @@ tc_conn_opt_sslkeylogfile(Config) ->
   timer:sleep(100),
   {ok, #file_info{type=regular}} = file:read_file_info("SSLKEYLOGFILE").
 
+tc_insecure_traffic(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              [{param_conn_disable_1rtt_encryption, true} |
+                               default_conn_opts()], 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm,  _, _, _} ->
+      {ok, true} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
+      ok
+  end,
+  quicer:close_connection(Conn),
+  ok.
+
 %%% ====================
 %%% Internal helpers
 %%% ====================
@@ -1691,6 +1746,13 @@ select_port()->
   {ok, S} = gen_udp:open(0),
   {ok, {_, Port}} = inet:sockname(S),
   gen_udp:close(S),
+  case os:type() of
+    {unix,darwin} ->
+      %% in MacOS, still get address_in_use after close port
+      timer:sleep(500);
+    _ ->
+      skip
+  end,
   Port.
 %%%_* Emacs ====================================================================
 %%% Local Variables:

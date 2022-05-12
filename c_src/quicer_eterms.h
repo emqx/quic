@@ -107,7 +107,17 @@ extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
 // option keys
 extern ERL_NIF_TERM ATOM_CERT;
 extern ERL_NIF_TERM ATOM_KEY;
+extern ERL_NIF_TERM ATOM_PASSWORD;
 extern ERL_NIF_TERM ATOM_ALPN;
+extern ERL_NIF_TERM ATOM_HANDLER;
+
+/*-------------------------------------------------------*/
+/*         msquic  execution profile for registration    */
+/*-------------------------------------------------------*/
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY; // Default
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
 
 /*-----------------------------------------*/
 /*         msquic parms starts             */
@@ -219,6 +229,12 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_ServerResumptionLevel;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_VersionNegotiationExtEnabled;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsList;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DesiredVersionsListLength;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MinimumMtu;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaximumMtu;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 
 /*----------------------------------------------------------*/
 /* QUIC_SETTINGS ends                                       */
@@ -277,6 +293,7 @@ extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 extern ERL_NIF_TERM ATOM_FAST_CONN;
+extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */

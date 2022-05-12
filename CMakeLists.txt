@@ -5,10 +5,15 @@ project(quicer)
 SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
 
+# For cerl picking up the OTP_ROOT
+if (DEFINED ENV{Erlang_OTP_ROOT_DIR})
+  SET(Erlang_OTP_ROOT_DIR $ENV{Erlang_OTP_ROOT_DIR})
+else()
 EXECUTE_PROCESS(
         COMMAND         erl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt
         OUTPUT_VARIABLE Erlang_OTP_ROOT_DIR
         )
+endif()
 
 if (DEFINED ENV{CMAKE_BUILD_TYPE})
   set(CMAKE_BUILD_TYPE $ENV{CMAKE_BUILD_TYPE})
@@ -28,6 +33,12 @@ endif()
 
 if (DEFINED ENV{QUICER_USE_SNK})
   add_compile_options(-DQUICER_USE_SNK)
+endif()
+
+if (DEFINED ENV{QUICER_USE_SANITIZERS})
+  set(QUIC_ENABLE_SANITIZERS "ON")
+  add_compile_options(-O1 -fno-omit-frame-pointer -fsanitize=address,leak,undefined)
+  add_link_options(-O1 -fno-omit-frame-pointer -fsanitize=address,leak,undefined)
 endif()
 
 set(QUIC_BUILD_TEST "OFF")

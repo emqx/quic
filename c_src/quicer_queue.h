@@ -24,18 +24,22 @@ limitations under the License.
 #include <stdbool.h>
 
 // for allocator tagging. @todo move to common header
-#define QUICER_ACCEPTOR '00rQ'  // Qr00 - QUICER ACCEPTOR
-#define QUICER_SND_BUFF '10rQ'  // Qr01 - QUICER SEND BUFFER
-#define QUICER_OWNER_MON '20rQ' // Qr02 - QUICER OWNER MON
-#define QUICER_CREDENTIAL_CONFIG_HELPER                                       \
-  '30rQ'                       // Qr03 QUICER_CREDENTIAL_CONFIG_HELPER
-#define QUICER_OPT_BUFF '40rQ' // Qr04 - QUICER OPT
-#define QUICER_SETTINGS '50rQ' // Qr05 - QUICER CONNECTION SETTINGS
+#define QUICER_ACCEPTOR '00rQ'          // Qr00 - QUICER ACCEPTOR
+#define QUICER_SND_BUFF '10rQ'          // Qr01 - QUICER SEND BUFFER
+#define QUICER_OWNER_MON '20rQ'         // Qr02 - QUICER OWNER MON
+#define QUICER_CREDENTIAL_CONFIG '30rQ' // Qr03 QUICER_CREDENTIAL_CONFIG_HELPER
+#define QUICER_OPT_BUFF '40rQ'          // Qr04 - QUICER OPT
+#define QUICER_SETTINGS '50rQ'          // Qr05 - QUICER CONNECTION SETTINGS
 #define QUICER_TLS_SECRETS                                                    \
   '60rQ'                       // Qr06 - QUICER TLS SECRETS for SSLKeyLogFile
 #define QUICER_TRACE '70rQ'    // Qr07 - QUICER TRACE, unimportant
 #define QUICER_SEND_CTX '80rQ' // Qr08 - QUICER STREAM SEND CONTEXT
-#define QUICER_DGRAM_SEND_CTX '90rQ' // Qr09 - QUICER DGRAM SEND CONTEXT
+#define QUICER_DGRAM_SEND_CTX '90rQ'   // Qr09 - QUICER DGRAM SEND CONTEXT
+#define QUICER_CERTIFICATE_FILE 'A0rQ' // Qr0a QUICER_CERTIFICATE_FILE
+#define QUICER_CERTIFICATE_FILE_PROTECTED                                     \
+  'B0rQ' // 'Qr0b'  QUICER_CERTIFICATE_FILE_PROTECTED
+#define QUICER_RESUME_TICKET 'C0rQ' // 'Qr0c'  QUICER_RESUME_TICKET
+
 typedef enum ACCEPTOR_RECV_MODE
 {
   ACCEPTOR_RECV_MODE_PASSIVE,

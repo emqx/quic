@@ -19,7 +19,6 @@ limitations under the License.
 
 #include "quicer_internal.h"
 #include "quicer_nif.h"
-//#include "quicer_config.h"
 
 QUIC_STATUS ServerListenerCallback(HQUIC Listener,
                                    void *Context,

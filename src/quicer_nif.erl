@@ -17,6 +17,7 @@
 -export([ open_lib/0
         , close_lib/0
         , reg_open/0
+        , reg_open/1
         , reg_close/0
         , listen/2
         , close_listener/1
@@ -79,6 +80,10 @@ close_lib() ->
 
 -spec reg_open() -> ok.
 reg_open() ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec reg_open(execution_profile()) -> ok | {error, badarg}.
+reg_open(_) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec reg_close() -> ok.

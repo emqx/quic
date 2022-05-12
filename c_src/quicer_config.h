@@ -21,15 +21,16 @@ limitations under the License.
 #include "quicer_nif.h"
 #include <msquichelper.h>
 
-bool ReloadCertConfig(HQUIC Configuration,
-                      QUIC_CREDENTIAL_CONFIG_HELPER *Config);
-QUIC_CREDENTIAL_CONFIG_HELPER *NewCredConfig(ErlNifEnv *env,
-                                             const ERL_NIF_TERM *option);
-void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *);
+BOOLEAN ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *Config);
+QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
+                             QUIC_CREDENTIAL_CONFIG *config,
+                             const ERL_NIF_TERM *option,
+                             BOOLEAN is_server);
+void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *);
 ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
                                      HQUIC *Configuration,
-                                     QUIC_CREDENTIAL_CONFIG_HELPER *Config);
+                                     QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
                                      HQUIC *Configuration,
@@ -54,6 +55,11 @@ bool get_uint64_from_map(ErlNifEnv *env,
                          const ERL_NIF_TERM map,
                          ERL_NIF_TERM key,
                          uint64_t *value);
+int get_str_from_map(ErlNifEnv *env,
+                     ERL_NIF_TERM key,
+                     const ERL_NIF_TERM *map,
+                     char *buff,
+                     unsigned max_len);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);

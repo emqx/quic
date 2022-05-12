@@ -149,6 +149,10 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
     {
       enif_clear_env(env);
     }
+  else
+    {
+      s_ctx->is_closed = TRUE;
+    }
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_unlock(s_ctx->c_ctx->lock);
 
@@ -283,6 +287,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     {
       enif_clear_env(env);
     }
+  else
+    {
+      s_ctx->is_closed = TRUE;
+    }
 
   enif_mutex_unlock(s_ctx->lock);
   enif_mutex_unlock(s_ctx->c_ctx->lock);
@@ -376,6 +384,7 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
 
+  s_ctx->is_closed = FALSE;
   return SUCCESS(enif_make_resource(env, s_ctx));
 
 ErrorExit:
@@ -477,8 +486,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   ebin = enif_make_copy(send_ctx->env, ebin);
-  if (!(enif_inspect_iolist_as_binary(env, ebin, bin)
-        || enif_inspect_binary(env, ebin, bin))
+  if (!(enif_inspect_iolist_as_binary(send_ctx->env, ebin, bin)
+        || enif_inspect_binary(send_ctx->env, ebin, bin))
       || bin->size > UINT32_MAX)
     {
       destroy_send_ctx(send_ctx);
@@ -563,23 +572,13 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
       s_ctx->is_wait_for_data = FALSE;
 
-      if (QUIC_FAILED(status = MsQuic->StreamReceiveComplete(s_ctx->Stream,
-                                                             size_consumed)))
-        {
-          res = ERROR_TUPLE_2(ATOM_STATUS(status));
-          goto Exit;
-        }
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
 
       if (size_consumed != s_ctx->TotalBufferLength)
         {
           // explicit enable recv since we have some data left unconusmed
           //
-          if (QUIC_FAILED(status = MsQuic->StreamReceiveSetEnabled(
-                              s_ctx->Stream, true)))
-            {
-              res = ERROR_TUPLE_2(ATOM_STATUS(status));
-              goto Exit;
-            }
+          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
         }
 
       if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
@@ -614,12 +613,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
       // let msquic buffer more and explicit enable recv
       //
-      if (QUIC_FAILED(status = MsQuic->StreamReceiveComplete(s_ctx->Stream, 0))
-          && QUIC_STATUS_INVALID_STATE != status)
-        {
-          res = ERROR_TUPLE_2(ATOM_STATUS(status));
-          goto Exit;
-        }
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
 
       if (QUIC_FAILED(status
                       = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))

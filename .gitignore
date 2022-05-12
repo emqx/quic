@@ -19,6 +19,7 @@ _checkouts/
 
 # nif dynamic linked lib
 priv/*.so
+priv/*lttng.*
 priv/*.dylib
 
 # language server caches

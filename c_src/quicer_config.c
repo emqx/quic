@@ -54,13 +54,6 @@ static ERL_NIF_TERM set_config_opt(ErlNifEnv *env,
                                    ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
-get_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
-static ERL_NIF_TERM set_reg_opt(ErlNifEnv *env,
-                                HQUIC Hanlder,
-                                ERL_NIF_TERM optname,
-                                ERL_NIF_TERM optval);
-
-static ERL_NIF_TERM
 get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_tls_opt(ErlNifEnv *env,
                                 HQUIC Hanlder,
@@ -84,74 +77,60 @@ static ERL_NIF_TERM set_level_param(ErlNifEnv *env,
                                     ERL_NIF_TERM eopt,
                                     ERL_NIF_TERM optval);
 
-bool
-ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+// Prepare for Async CredConfig loading
+/* static void CompleteCredconfigLoadHook(HQUIC Configuration, */
+/*                                        void *Context, */
+/*                                        QUIC_STATUS Status); */
+
+BOOLEAN
+ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
-                      Configuration, &Config->CredConfig)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(Configuration,
+                                                               CredConfig)))
     {
       return false;
     }
   return true;
 }
 
-// @todo return status instead
-QUIC_CREDENTIAL_CONFIG_HELPER *
-NewCredConfig(ErlNifEnv *env, const ERL_NIF_TERM *option)
-{
-  ERL_NIF_TERM cert;
-  ERL_NIF_TERM key;
-  QUIC_CREDENTIAL_CONFIG_HELPER *Config;
-
-  char *cert_path = malloc(PATH_MAX);
-  char *key_path = malloc(PATH_MAX);
-
-  if (!enif_get_map_value(env, *option, ATOM_CERT, &cert))
-    {
-      return NULL;
-    }
-
-  if (!enif_get_map_value(env, *option, ATOM_KEY, &key))
-    {
-      return NULL;
-    }
-
-  if (!enif_get_string(env, cert, cert_path, PATH_MAX, ERL_NIF_LATIN1))
-    {
-      return NULL;
-    }
-
-  if (!enif_get_string(env, key, key_path, PATH_MAX, ERL_NIF_LATIN1))
-    {
-      return NULL;
-    }
-
-  Config = (QUIC_CREDENTIAL_CONFIG_HELPER *)CXPLAT_ALLOC_NONPAGED(
-      sizeof(QUIC_CREDENTIAL_CONFIG_HELPER), QUICER_CREDENTIAL_CONFIG_HELPER);
-
-  CxPlatZeroMemory(Config, sizeof(QUIC_CREDENTIAL_CONFIG_HELPER));
-  Config->CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
-
-  //
-  // Loads the server's certificate from the file.
-  //
-  Config->CertFile.CertificateFile = cert_path;
-  Config->CertFile.PrivateKeyFile = key_path;
-  Config->CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-  Config->CredConfig.CertificateFile = &Config->CertFile;
-  // @todo set flag
-  // Config->CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_LOAD_ASYNCHRONOUS;
-  // Config->CredConfig.AsyncHandler = DestroyCredConfig;
-  return Config;
-}
-
+/*
 void
-DestroyCredConfig(QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+CompleteCredconfigLoadHook(HQUIC Configuration,
+                           void *Context,
+                           QUIC_STATUS Status)
 {
-  free((char *)Config->CertFile.CertificateFile);
-  free((char *)Config->CertFile.PrivateKeyFile);
-  CXPLAT_FREE(Config, QUICER_CREDENTIAL_CONFIG_HELPER);
+
+  if (!Configuration || QUIC_FAILED(Status))
+    {
+      fprintf(stderr, "async load of configuration error!\n");
+    }
+
+  DestroyCredConfig((QUIC_CREDENTIAL_CONFIG *)Context);
+}
+*/
+void
+DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *Config)
+{
+  switch (Config->Type)
+    {
+    case QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE:
+      free((char *)Config->CertificateFile->CertificateFile);
+      free((char *)Config->CertificateFile->PrivateKeyFile);
+      CXPLAT_FREE(Config->CertificateFile, QUICER_CERTIFICATE_FILE);
+      break;
+
+    case QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED:
+      free((char *)Config->CertificateFileProtected->CertificateFile);
+      free((char *)Config->CertificateFileProtected->PrivateKeyFile);
+      CXPLAT_FREE(Config->CertificateFileProtected,
+                  QUICER_CERTIFICATE_FILE_PROTECTED);
+      break;
+
+    default:
+      break;
+    }
+  CXPLAT_FREE(Config, QUICER_CREDENTIAL_CONFIG);
 }
 
 // @todo support per registration.
@@ -159,7 +138,7 @@ ERL_NIF_TERM
 ServerLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option,
                         HQUIC *Configuration,
-                        QUIC_CREDENTIAL_CONFIG_HELPER *Config)
+                        QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_SETTINGS Settings = { 0 };
 
@@ -186,12 +165,12 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,
                                                      sizeof(Settings),
-                                                     NULL,
+                                                     CredConfig, // Context
                                                      Configuration)))
     {
       return ATOM_STATUS(Status);
@@ -200,8 +179,8 @@ ServerLoadConfiguration(ErlNifEnv *env,
   //
   // Loads the TLS credential part of the configuration.
   //
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
-                      *Configuration, &Config->CredConfig)))
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
+                                                               CredConfig)))
     {
       return ATOM_STATUS(Status);
     }
@@ -259,7 +238,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,
@@ -311,7 +290,7 @@ load_alpn(ErlNifEnv *env,
     {
       // @todo check if PATH_MAX is the correct length
       char str[PATH_MAX];
-      if (!enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1))
+      if (enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1) <= 0)
         {
           return false;
         }
@@ -439,14 +418,12 @@ get_uint64_from_map(ErlNifEnv *env,
 
 ERL_NIF_TERM
 encode_parm_to_eterm(ErlNifEnv *env,
-                     QUIC_PARAM_LEVEL Level,
                      uint32_t Param,
                      uint32_t BufferLength,
                      void *Buffer)
 {
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   if (QUIC_PARAM_CONN_STATISTICS == Param
-      && QUIC_PARAM_LEVEL_CONNECTION == Level
       && sizeof(QUIC_STATISTICS) == BufferLength)
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
@@ -520,13 +497,12 @@ encode_parm_to_eterm(ErlNifEnv *env,
               statics->Recv.ValidAckFrames) // Count of receive ACK frames.
           ));
     }
-  else if (QUIC_PARAM_CONN_SETTINGS == Param
-           && QUIC_PARAM_LEVEL_CONNECTION == Level)
+  else if (QUIC_PARAM_CONN_SETTINGS == Param)
     {
       QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
       res = SUCCESS(enif_make_list(
           env,
-          26,
+          24,
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxBytesPerKey,
                            Settings->MaxBytesPerKey),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_HandshakeIdleTimeoutMs,
@@ -563,10 +539,6 @@ encode_parm_to_eterm(ErlNifEnv *env,
                            Settings->PeerBidiStreamCount),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount,
                            Settings->PeerBidiStreamCount),
-          PropTupleAtomInt(ATOM_QUIC_SETTINGS_RetryMemoryLimit,
-                           Settings->RetryMemoryLimit),
-          PropTupleAtomInt(ATOM_QUIC_SETTINGS_LoadBalancingMode,
-                           Settings->LoadBalancingMode),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxOperationsPerDrain,
                            Settings->MaxOperationsPerDrain),
           PropTupleAtomBool(ATOM_QUIC_SETTINGS_SendBufferingEnabled,
@@ -580,14 +552,17 @@ encode_parm_to_eterm(ErlNifEnv *env,
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel,
                            Settings->ServerResumptionLevel)));
     }
-  else if (QUIC_PARAM_STREAM_ID == Param && QUIC_PARAM_LEVEL_STREAM == Level)
+  else if (QUIC_PARAM_STREAM_ID == Param)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
-           && QUIC_PARAM_LEVEL_CONNECTION == Level)
+  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param)
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
+    }
+  else if (QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param)
+    {
+      res = SUCCESS(ETERM_BOOL(*(BOOLEAN *)Buffer));
     }
 
   return res;
@@ -638,14 +613,10 @@ getopt3(ErlNifEnv *env,
 ERL_NIF_TERM
 get_level_param(ErlNifEnv *env,
                 HQUIC Handle,
-                ERL_NIF_TERM level,
-                ERL_NIF_TERM eopt)
+                ERL_NIF_TERM eopt,
+                ERL_NIF_TERM level)
 {
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-  if (IS_SAME_TERM(ATOM_QUIC_REGISTRATION, level))
-    {
-      res = get_reg_opt(env, Handle, eopt);
-    }
   if (IS_SAME_TERM(ATOM_QUIC_CONFIGURATION, level))
     {
       res = get_config_opt(env, Handle, eopt);
@@ -666,10 +637,6 @@ set_level_param(ErlNifEnv *env,
                 ERL_NIF_TERM eval)
 {
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-  if (IS_SAME_TERM(ATOM_QUIC_REGISTRATION, level))
-    {
-      res = set_reg_opt(env, Handle, eopt, eval);
-    }
   if (IS_SAME_TERM(ATOM_QUIC_CONFIGURATION, level))
     {
       res = set_config_opt(env, Handle, eopt, eval);
@@ -692,9 +659,6 @@ setopt4(ErlNifEnv *env,
   ERL_NIF_TERM evalue = argv[2];
   ERL_NIF_TERM elevel = argv[3];
 
-  HQUIC Handle = NULL;
-  QUIC_PARAM_LEVEL Level;
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   void *q_ctx = NULL;
 
@@ -727,104 +691,7 @@ setopt4(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  // old start
   return res;
-  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
-    {
-      Handle = ((QuicerStreamCTX *)q_ctx)->Stream;
-      Level = QUIC_PARAM_LEVEL_STREAM;
-    }
-  else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
-    {
-      Handle = ((QuicerConnCTX *)q_ctx)->Connection;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
-    }
-  else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
-    {
-      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
-      Level = QUIC_PARAM_LEVEL_LISTENER;
-    }
-  else
-    { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_SETTINGS))
-    {
-      if (q_ctx && Level == QUIC_PARAM_LEVEL_STREAM)
-        {
-          Level = QUIC_PARAM_LEVEL_CONNECTION;
-          Handle = ((QuicerStreamCTX *)q_ctx)->Stream;
-        }
-
-      if (Level != QUIC_PARAM_LEVEL_CONNECTION)
-        {
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-
-      QUIC_SETTINGS Settings = { 0 };
-      if (!create_settings(env, &evalue, &Settings))
-        {
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-
-      if (QUIC_FAILED(MsQuic->SetParam(Handle,
-                                       QUIC_PARAM_LEVEL_CONNECTION,
-                                       QUIC_PARAM_CONN_SETTINGS,
-                                       sizeof(Settings),
-                                       &Settings)))
-        {
-          return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
-        }
-      return ATOM_OK;
-    }
-  else if (IS_SAME_TERM(eopt, ATOM_QUIC_STREAM_OPTS_ACTIVE)
-           && Level == QUIC_PARAM_LEVEL_STREAM)
-    {
-      QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)q_ctx;
-      enif_mutex_lock(s_ctx->lock);
-
-      if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
-          && s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0)
-        {
-          // trigger callback of event recv.
-          MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
-        }
-      if (!set_owner_recv_mode(s_ctx->owner, env, evalue))
-        {
-          enif_mutex_unlock(s_ctx->lock);
-          return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-        }
-
-      enif_mutex_unlock(s_ctx->lock);
-      return ATOM_OK;
-    }
-  else if (IS_SAME_TERM(eopt, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
-    {
-      QUIC_ADDR Address;
-      if (!parse_listen_on(env, evalue, &Address))
-        {
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-
-      if (QUIC_FAILED(status = MsQuic->SetParam(Handle,
-                                                QUIC_PARAM_LEVEL_CONNECTION,
-                                                QUIC_PARAM_CONN_LOCAL_ADDRESS,
-                                                sizeof(QUIC_ADDR),
-                                                &Address)))
-        {
-          return ERROR_TUPLE_2(ATOM_STATUS(status));
-        }
-      else
-        {
-          return ATOM_OK;
-        }
-    }
-  else
-    { //@todo support more param
-      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-    }
 }
 
 bool
@@ -972,20 +839,6 @@ create_settings(ErlNifEnv *env,
     {
       Settings->IsSet.PeerUnidiStreamCount = TRUE;
     }
-  if (get_uint16_from_map(env,
-                          *emap,
-                          ATOM_QUIC_SETTINGS_RetryMemoryLimit,
-                          &Settings->RetryMemoryLimit))
-    {
-      Settings->IsSet.RetryMemoryLimit = TRUE;
-    }
-  if (get_uint16_from_map(env,
-                          *emap,
-                          ATOM_QUIC_SETTINGS_LoadBalancingMode,
-                          &Settings->LoadBalancingMode))
-    {
-      Settings->IsSet.LoadBalancingMode = TRUE;
-    }
 
   // bit fields
   uint8_t MaxOperationsPerDrain = 0;
@@ -1038,6 +891,56 @@ create_settings(ErlNifEnv *env,
       Settings->ServerResumptionLevel = ServerResumptionLevel;
       Settings->IsSet.ServerResumptionLevel = TRUE;
     }
+  if (get_uint16_from_map(
+          env, *emap, ATOM_QUIC_SETTINGS_MinimumMtu, &Settings->MinimumMtu))
+    {
+      Settings->IsSet.MinimumMtu = TRUE;
+    }
+  if (get_uint16_from_map(
+          env, *emap, ATOM_QUIC_SETTINGS_MaximumMtu, &Settings->MaximumMtu))
+    {
+      Settings->IsSet.MaximumMtu = TRUE;
+    }
+  if (get_uint64_from_map(
+          env,
+          *emap,
+          ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs,
+          &Settings->MtuDiscoverySearchCompleteTimeoutUs))
+    {
+      Settings->IsSet.MtuDiscoverySearchCompleteTimeoutUs = TRUE;
+    }
+
+  if (get_uint8_from_map(env,
+                         *emap,
+                         ATOM_QUIC_SETTINGS_MtuDiscoveryMissingProbeCount,
+                         &Settings->MtuDiscoveryMissingProbeCount))
+    {
+      Settings->IsSet.MtuDiscoveryMissingProbeCount = TRUE;
+    }
+
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_MaxBindingStatelessOperations,
+                          &Settings->MaxBindingStatelessOperations))
+    {
+      Settings->IsSet.MaxBindingStatelessOperations = TRUE;
+    }
+
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs,
+                          &Settings->StatelessOperationExpirationMs))
+    {
+      Settings->IsSet.StatelessOperationExpirationMs = TRUE;
+    }
+
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_PeerBidiStreamCount,
+                          &Settings->PeerBidiStreamCount))
+    {
+      Settings->IsSet.PeerBidiStreamCount = TRUE;
+    }
 
   return true;
 }
@@ -1069,8 +972,9 @@ get_stream_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  QUIC_PARAM_LEVEL Level;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+
+  uint64_t BuffUint64 = 0;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1079,11 +983,9 @@ get_stream_opt(ErlNifEnv *env,
     }
   else if (ATOM_QUIC_PARAM_STREAM_ID == optname)
     {
-      uint64_t stream_id = 0;
       Param = QUIC_PARAM_STREAM_ID;
-      Level = QUIC_PARAM_LEVEL_STREAM;
       BufferLength = sizeof(uint64_t);
-      Buffer = &stream_id;
+      Buffer = &BuffUint64;
     }
   else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
     {
@@ -1120,12 +1022,11 @@ get_stream_opt(ErlNifEnv *env,
       goto Exit;
     }
 
-  status
-      = MsQuic->GetParam(s_ctx->Stream, Level, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(s_ctx->Stream, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Level, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1147,8 +1048,10 @@ set_stream_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  QUIC_PARAM_LEVEL Level = QUIC_PARAM_LEVEL_STREAM;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+
+  uint16_t BuffUint16 = 0;
+  uint64_t BuffUint64 = 0;
 
   // Non Msquic Opts
   if (IS_SAME_TERM(optname, ATOM_QUIC_STREAM_OPTS_ACTIVE))
@@ -1180,11 +1083,9 @@ set_stream_opt(ErlNifEnv *env,
 
   else if (ATOM_QUIC_PARAM_STREAM_ID == optname)
     {
-      uint64_t stream_id = 0;
       Param = QUIC_PARAM_STREAM_ID;
-      Level = QUIC_PARAM_LEVEL_STREAM;
       BufferLength = sizeof(uint64_t);
-      Buffer = &stream_id;
+      Buffer = &BuffUint64;
     }
   else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
     {
@@ -1213,12 +1114,10 @@ set_stream_opt(ErlNifEnv *env,
   else if (ATOM_QUIC_PARAM_STREAM_PRIORITY == optname)
     {
       Param = QUIC_PARAM_STREAM_PRIORITY;
-      Level = QUIC_PARAM_LEVEL_STREAM;
-      uint16_t priority;
-      if (get_uint16(env, optval, &priority))
+      Buffer = &BuffUint16;
+      if (get_uint16(env, optval, Buffer))
         {
           BufferLength = sizeof(uint16_t);
-          Buffer = &priority;
         }
       else
         {
@@ -1236,7 +1135,7 @@ set_stream_opt(ErlNifEnv *env,
       goto Exit;
     }
 
-  status = MsQuic->SetParam(s_ctx->Stream, Level, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(s_ctx->Stream, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1262,7 +1161,6 @@ get_connection_opt(ErlNifEnv *env,
   bool isMalloc = FALSE;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  QUIC_PARAM_LEVEL Level;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
@@ -1273,30 +1171,22 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
     {
       Param = QUIC_PARAM_CONN_QUIC_VERSION;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       // QUIC_CONNECTION.stats.QuicVersion
       BufferLength = sizeof(u_int32_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
     {
-      QUIC_ADDR addr;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
-      Buffer = &addr;
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
     {
-      QUIC_ADDR addr;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_REMOTE_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
-      Buffer = &addr;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_IDEAL_PROCESSOR;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1304,19 +1194,16 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SETTINGS))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_SETTINGS;
       BufferLength = sizeof(QUIC_SETTINGS);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STATISTICS;
       BufferLength = sizeof(QUIC_STATISTICS);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STATISTICS_PLAT;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1324,7 +1211,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_SHARE_UDP_BINDING;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1332,7 +1218,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1341,7 +1226,6 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1349,7 +1233,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_MAX_STREAM_IDS;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1357,7 +1240,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_CLOSE_REASON_PHRASE;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1366,7 +1248,6 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1374,7 +1255,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1383,25 +1263,18 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  /*
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
-      Param = QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Param = QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
+      BufferLength = sizeof(BOOLEAN);
     }
-  */
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_RESUMPTION_TICKET;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1409,7 +1282,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1417,7 +1289,6 @@ get_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_INTERFACE;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1444,16 +1315,20 @@ get_connection_opt(ErlNifEnv *env,
       isMalloc = TRUE;
     }
 
-  status = MsQuic->GetParam(
-      c_ctx->Connection, Level, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(c_ctx->Connection, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Level, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
     }
   else
     {
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
+    }
+
+  if (isMalloc == TRUE)
+    {
+      free(Buffer);
     }
 
 Exit:
@@ -1472,8 +1347,8 @@ set_connection_opt(ErlNifEnv *env,
   bool isMalloc = FALSE;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  QUIC_PARAM_LEVEL Level;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  QUIC_ADDR addr;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1483,34 +1358,28 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
     {
       Param = QUIC_PARAM_CONN_QUIC_VERSION;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       // QUIC_CONNECTION.stats.QuicVersion
       BufferLength = sizeof(u_int32_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
     {
-      QUIC_ADDR addr;
       if (!parse_listen_on(env, optval, &addr))
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
 
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
       Buffer = &addr;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
     {
-      QUIC_ADDR addr;
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_REMOTE_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
       Buffer = &addr;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_IDEAL_PROCESSOR;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1518,26 +1387,23 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SETTINGS))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_SETTINGS;
       BufferLength = sizeof(QUIC_SETTINGS);
-      QUIC_SETTINGS Settings = { 0 };
-      if (!create_settings(env, &optval, &Settings))
+      Buffer = malloc(sizeof(QUIC_SETTINGS));
+      isMalloc = TRUE;
+      if (!create_settings(env, &optval, Buffer))
         {
           res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Exit;
         }
-      Buffer = &Settings;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STATISTICS;
       BufferLength = sizeof(QUIC_STATISTICS);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STATISTICS_PLAT;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1545,7 +1411,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_SHARE_UDP_BINDING;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1553,7 +1418,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1562,7 +1426,6 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1570,7 +1433,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_MAX_STREAM_IDS;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1578,7 +1440,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_CLOSE_REASON_PHRASE;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1587,7 +1448,6 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1595,7 +1455,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1604,25 +1463,47 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  /*
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
-      Param = QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Param = QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION;
+      BOOLEAN value = TRUE;
+
+      if (IS_SAME_TERM(ATOM_TRUE, optval))
+        {
+          value = TRUE;
+        }
+      else if (IS_SAME_TERM(ATOM_FALSE, optval))
+        {
+          value = FALSE;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+
+      if (QUIC_SUCCEEDED(
+              MsQuic->SetParam(c_ctx->Connection,
+                               QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                               sizeof(value),
+                               &value)))
+        {
+          res = ATOM_OK;
+          goto Exit;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
     }
-  */
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_RESUMPTION_TICKET;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1630,7 +1511,6 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
@@ -1638,14 +1518,13 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE))
     {
-      Level = QUIC_PARAM_LEVEL_CONNECTION;
       Param = QUIC_PARAM_CONN_LOCAL_INTERFACE;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
   else if (c_ctx->l_ctx)
-    {
+    { // Server
       res = set_listener_opt(env, c_ctx->l_ctx, optname, optval, elevel);
       goto Exit;
     }
@@ -1665,8 +1544,7 @@ set_connection_opt(ErlNifEnv *env,
       isMalloc = TRUE;
     }
 
-  status = MsQuic->SetParam(
-      c_ctx->Connection, Level, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(c_ctx->Connection, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1678,6 +1556,10 @@ set_connection_opt(ErlNifEnv *env,
     }
 
 Exit:
+  if (isMalloc && Buffer)
+    {
+      CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
+    }
   return res;
 }
 
@@ -1733,16 +1615,11 @@ get_listener_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->GetParam(l_ctx->Listener,
-                            QUIC_PARAM_LEVEL_LISTENER,
-                            Param,
-                            &BufferLength,
-                            Buffer);
+  status = MsQuic->GetParam(l_ctx->Listener, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(
-          env, QUIC_PARAM_LEVEL_LISTENER, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1806,8 +1683,7 @@ set_listener_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(
-      l_ctx->Listener, QUIC_PARAM_LEVEL_LISTENER, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(l_ctx->Listener, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1852,12 +1728,10 @@ get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(
-      Hanlder, QUIC_PARAM_LEVEL_TLS, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Hanlder, Param, &BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(
-          env, QUIC_PARAM_LEVEL_TLS, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1900,8 +1774,7 @@ set_tls_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(
-      Hanlder, QUIC_PARAM_LEVEL_TLS, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Hanlder, Param, BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
       res = ATOM_OK;
@@ -1961,7 +1834,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_VERSION))
     {
       // @TODO
-      Param = QUIC_PARAM_GLOBAL_VERSION;
+      Param = QUIC_PARAM_GLOBAL_VERSION_SETTINGS;
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
@@ -1972,13 +1845,11 @@ get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(
-      Hanlder, QUIC_PARAM_LEVEL_GLOBAL, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Hanlder, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(
-          env, QUIC_PARAM_LEVEL_GLOBAL, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1999,11 +1870,11 @@ set_global_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  uint32_t percent = 0;
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
       Param = QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
-      uint32_t percent = 0;
       BufferLength = sizeof(uint32_t);
       if (!enif_get_uint(env, optval, &percent) || percent > UINT16_MAX)
         {
@@ -2043,7 +1914,7 @@ set_global_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_VERSION))
     {
       // @TODO
-      Param = QUIC_PARAM_GLOBAL_VERSION;
+      Param = QUIC_PARAM_GLOBAL_VERSION_SETTINGS;
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
@@ -2054,8 +1925,7 @@ set_global_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(
-      Hanlder, QUIC_PARAM_LEVEL_GLOBAL, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Hanlder, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -2092,13 +1962,11 @@ get_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(
-      Hanlder, QUIC_PARAM_LEVEL_CONFIGURATION, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Hanlder, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(
-          env, QUIC_PARAM_LEVEL_CONFIGURATION, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
     }
   else
     {
@@ -2119,11 +1987,11 @@ set_config_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  QUIC_SETTINGS Settings = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS))
     {
       Param = QUIC_PARAM_CONFIGURATION_SETTINGS;
-      QUIC_SETTINGS Settings = { 0 };
       if (!create_settings(env, &optval, &Settings))
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
@@ -2138,8 +2006,7 @@ set_config_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(
-      Hanlder, QUIC_PARAM_LEVEL_CONFIGURATION, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Hanlder, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -2153,82 +2020,29 @@ Exit:
   return res;
 }
 
-static ERL_NIF_TERM
-get_reg_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
+int
+get_str_from_map(ErlNifEnv *env,
+                 ERL_NIF_TERM key,
+                 const ERL_NIF_TERM *map,
+                 char *buff,
+                 unsigned max_len)
 {
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
-  void *Buffer = NULL;
-  uint32_t BufferLength = 0;
-  uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
-  if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX))
+  ERL_NIF_TERM tmp_term;
+  if (!buff)
     {
-      // @TODO
-      Param = QUIC_PARAM_REGISTRATION_CID_PREFIX;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      return 0;
     }
-  else
+  unsigned tmp_len = 0;
+  if (!enif_get_map_value(env, *map, key, &tmp_term))
     {
-      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-      goto Exit;
+      return 0;
     }
 
-  assert(Param);
-  status = MsQuic->GetParam(
-      Hanlder, QUIC_PARAM_LEVEL_REGISTRATION, Param, &BufferLength, Buffer);
-  if (QUIC_SUCCEEDED(status))
+  if (!enif_get_list_length(env, tmp_term, &tmp_len) || tmp_len > max_len)
     {
-      res = encode_parm_to_eterm(
-          env, QUIC_PARAM_LEVEL_REGISTRATION, Param, BufferLength, Buffer);
-    }
-  else
-    {
-      res = ERROR_TUPLE_2(ATOM_STATUS(status));
-    }
-Exit:
-  return res;
-}
-
-static ERL_NIF_TERM
-set_reg_opt(ErlNifEnv *env,
-            HQUIC Hanlder,
-            ERL_NIF_TERM optname,
-            ERL_NIF_TERM optval)
-{
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
-  void *Buffer = NULL;
-  uint32_t BufferLength = 0;
-  uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-
-  if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX))
-    {
-      Param = QUIC_PARAM_REGISTRATION_CID_PREFIX;
-      if (!enif_get_string(env, optval, Buffer, BufferLength, ERL_NIF_LATIN1))
-        {
-          res = ERROR_TUPLE_2(ATOM_BADARG);
-          goto Exit;
-        }
-    }
-  else
-    {
-      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-      goto Exit;
+      return 0;
     }
 
-  assert(Param);
-  status = MsQuic->SetParam(
-      Hanlder, QUIC_PARAM_LEVEL_REGISTRATION, Param, BufferLength, Buffer);
-  if (QUIC_SUCCEEDED(status))
-    {
-      res = ATOM_OK;
-    }
-  else
-    {
-      res = ERROR_TUPLE_2(ATOM_STATUS(status));
-    }
-Exit:
-  return res;
+  return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
 }

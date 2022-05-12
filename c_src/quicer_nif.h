@@ -16,6 +16,8 @@ limitations under the License.
 
 #ifndef __QUICER_NIF_H_
 #define __QUICER_NIF_H_
+#define QUIC_API_ENABLE_PREVIEW_FEATURES 1
+#define QUIC_API_ENABLE_INSECURE_FEATURES 1
 #include "quicer_internal.h"
 #include <assert.h>
 #include <erl_nif.h>
@@ -37,9 +39,9 @@ limitations under the License.
 
 // Global registration
 // @todo avoid use globals
-extern HQUIC Registration;
+extern HQUIC GRegistration;
 extern const QUIC_API_TABLE *MsQuic;
-extern const QUIC_REGISTRATION_CONFIG RegConfig;
+extern QUIC_REGISTRATION_CONFIG GRegConfig;
 
 // Context Types
 extern ErlNifResourceType *ctx_listener_t;
