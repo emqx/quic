@@ -99,7 +99,6 @@ AcceptorAlloc()
   CxPlatZeroMemory(acc, sizeof(ACCEPTOR));
   acc->active = ACCEPTOR_RECV_MODE_ACTIVE;
   acc->active_count = 0;
-  acc->fast_conn = FALSE;
   return acc;
 }
 

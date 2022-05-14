@@ -35,7 +35,6 @@
                           quicer_steam:stream_opts()}
                , callback :: module()
                , callback_state :: map()
-               , slow_start :: boolean()
                }).
 
 -type conn_opts() :: map().
@@ -82,7 +81,6 @@ init([Listener, {_, #{conn_callback := CallbackModule} = COpts, SOpts} = Opts, S
                , callback = CallbackModule
                , callback_state = CallbackModule:init(COpts#{stream_opts => SOpts})
                , opts = Opts
-               , slow_start = not maps:get(fast_conn, COpts, false)
                , sup = Sup}}.
 
 %%--------------------------------------------------------------------
@@ -135,25 +133,13 @@ handle_info({quic, new_conn, C},
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
     {ok, NewCBState} = M:new_conn(C, CBState),
-    {noreply, State#state{conn = C, slow_start = true, callback_state = NewCBState} };
-
-handle_info({quic, connected, C}, #state{ slow_start = false
-                                        , callback = M
-                                        , sup = Sup
-                                        , callback_state = CbState
-                                        } = State) ->
-    ?tp(quic_connected, #{module=>?MODULE, conn=>C}),
-    %% I become the connection owner, I should start an new acceptor.
-    supervisor:start_child(Sup, [Sup]),
-    NewCBState = M:connected(C, CbState#{slow_start => false}),
     {noreply, State#state{conn = C, callback_state = NewCBState} };
 
-handle_info({quic, connected, C}, #state{ slow_start = true
-                                        , conn = C
+handle_info({quic, connected, C}, #state{ conn = C
                                         , callback = M
                                         , callback_state = CbState} = State) ->
     ?tp(quic_connected_slow, #{module=>?MODULE, conn=>C}),
-    {ok, NewCBState} = M:connected(C, CbState#{slow_start => true} ),
+    {ok, NewCBState} = M:connected(C, CbState),
     {noreply, State#state{ callback_state = NewCBState }};
 
 handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->

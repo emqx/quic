@@ -346,22 +346,8 @@ ServerConnectionCallback(HQUIC Connection,
       assert(c_ctx->Connection == Connection);
       c_ctx->Connection = Connection;
       acc = c_ctx->owner;
-      acc_pid = &(acc->Pid);
-
-      // for fast connect:
-      if (!(acc && enif_is_process_alive(c_ctx->env, acc_pid)))
-        {
-          acc = AcceptorDequeue(
-              c_ctx->l_ctx->acceptor_queue); // dequeue from listener queue!
-          acc_pid = &(acc->Pid);
-          if (!(acc && acc_pid && enif_is_process_alive(c_ctx->env, acc_pid)))
-            {
-              enif_mutex_unlock(c_ctx->lock);
-              return QUIC_STATUS_UNREACHABLE;
-            }
-        }
-
       assert(acc);
+      acc_pid = &(acc->Pid);
 
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
@@ -419,8 +405,7 @@ ServerConnectionCallback(HQUIC Connection,
               (uintptr_t)Connection,
               Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
 
-      if (!c_ctx->owner->fast_conn
-          && !Event->SHUTDOWN_COMPLETE.HandshakeCompleted)
+      if (!Event->SHUTDOWN_COMPLETE.HandshakeCompleted)
         {
           enif_release_resource(c_ctx);
         }
@@ -725,12 +710,6 @@ async_accept2(ErlNifEnv *env,
     {
       AcceptorDestroy(acceptor);
       return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-    }
-
-  ERL_NIF_TERM IsFastConn;
-  if (enif_get_map_value(env, conn_opts, ATOM_FAST_CONN, &IsFastConn))
-    {
-      acceptor->fast_conn = IS_SAME_TERM(IsFastConn, ATOM_TRUE);
     }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);

@@ -1276,7 +1276,6 @@ tc_app_echo_server(Config) ->
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
-                   , {fast_conn, false}
                    , {stream_acceptors, 32}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
@@ -1637,7 +1636,7 @@ simple_conn_server(Owner, Config, Port) ->
 simple_slow_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
-  {ok, Conn} = quicer:accept(L, [{fast_conn, false}], 5000),
+  {ok, Conn} = quicer:accept(L, [], 5000),
   {ok, Conn} = quicer:handshake(Conn),
   %% test what happens if handshake twice
   {error, invalid_state} = quicer:handshake(Conn),
@@ -1753,6 +1752,7 @@ select_port()->
     _ ->
       skip
   end,
+  ct:pal("select port: ~p", [Port]),
   Port.
 %%%_* Emacs ====================================================================
 %%% Local Variables:

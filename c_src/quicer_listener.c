@@ -59,6 +59,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           Status = QUIC_STATUS_UNREACHABLE;
           goto Error;
         }
+      TP_CB_3(acceptor_hit, (uintptr_t)c_ctx->Connection, 0);
       c_ctx->owner = conn_owner;
 
       //
@@ -80,30 +81,18 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                            &value);
         }
 
-      if (conn_owner->fast_conn)
-        {
-          TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 1);
-          if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
-            {
-              destroy_c_ctx(c_ctx);
-              goto Error;
-            }
-        }
-      else
-        {
-          TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 0);
-          if (!enif_send(NULL,
-                         &(c_ctx->owner->Pid),
-                         NULL,
-                         enif_make_tuple3(env,
-                                          ATOM_QUIC,
-                                          ATOM_NEW_CONN,
-                                          enif_make_resource(env, c_ctx))))
-            {
-              Status = QUIC_STATUS_INTERNAL_ERROR;
-              goto Error;
-            }
-        }
+      if (!enif_send(NULL,
+                     &(c_ctx->owner->Pid),
+                     NULL,
+                     enif_make_tuple3(env,
+                                      ATOM_QUIC,
+                                      ATOM_NEW_CONN,
+                                      enif_make_resource(env, c_ctx))))
+      {
+        Status = QUIC_STATUS_INTERNAL_ERROR;
+        goto Error;
+      }
+
       c_ctx->is_closed = FALSE;
       enif_clear_env(env);
       break;

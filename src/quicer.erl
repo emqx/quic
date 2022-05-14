@@ -213,7 +213,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   end.
 
 
-%% @doc Complete TLS handshake after accepted a 'Slow Start' Connection with option {fast_conn, false}.
+%% @doc Complete TLS handshake after accepted a Connection
 %%      with 5s timeout
 %% @end
 %% @see accept/3
@@ -222,7 +222,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
 handshake(Conn) ->
   handshake(Conn, 5000).
 
-%% @doc Complete TLS handshake after accepted a 'Slow Start' Connection with option {fast_conn, false}.
+%% @doc Complete TLS handshake after accepted a Connection
 %% @see handshake/2
 %% @see async_handshake/1
 -spec handshake(connection_handler(), timeout()) -> ok | {error, any()}.
@@ -237,7 +237,7 @@ handshake(Conn, Timeout) ->
       end
   end.
 
-%% @doc Complete TLS handshake after accepted a 'Slow Start' Connection with option {fast_conn, false}.
+%% @doc Complete TLS handshake after accepted a Connection.
 %% Caller should expect to receive ```{quic, connected, connection_handler()}'''
 %%
 %% @see handshake/2
