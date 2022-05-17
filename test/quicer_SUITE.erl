@@ -341,7 +341,16 @@ tc_get_listener(Config) ->
                 end, Listeners),
   ?assertEqual({error, not_found}, quicer:listener(bad_listen_name)).
 
-tc_conn_basic(Config)->
+tc_conn_basic(Config) ->
+  {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_basic(Config) end),
+  receive
+    {'DOWN', Ref, process, Pid, normal} ->
+      ok;
+    {'DOWN', Ref, process, Pid, Error} ->
+      ct:fail({run_error, Error})
+  end.
+
+run_tc_conn_basic(Config)->
   Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(

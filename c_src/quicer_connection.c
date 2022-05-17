@@ -527,6 +527,10 @@ async_connect3(ErlNifEnv *env,
 
   QuicerConnCTX *c_ctx = init_c_ctx();
 
+  // allocate config_resource for client connection
+  c_ctx->config_resource
+      = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
+
   if ((c_ctx->owner = AcceptorAlloc()) == NULL)
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
@@ -539,8 +543,9 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-  ERL_NIF_TERM estatus
-      = ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true);
+  // convert eoptions to Configuration
+  ERL_NIF_TERM estatus = ClientLoadConfiguration(
+      env, &eoptions, &(c_ctx->config_resource->Configuration), true);
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
@@ -652,13 +657,18 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
-                                                   c_ctx->Configuration,
-                                                   QUIC_ADDRESS_FAMILY_UNSPEC,
-                                                   host,
-                                                   port)))
+  // @TODO client async_connect_3 should able to take a config_resource as
+  // input ERL TERM so that we don't need to call ClientLoadConfiguration
+  //
+  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
+                      c_ctx->Connection,
+                      c_ctx->config_resource->Configuration,
+                      QUIC_ADDRESS_FAMILY_UNSPEC,
+                      host,
+                      port)))
     {
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
+      enif_release_resource(c_ctx->config_resource);
       goto Error;
     }
   c_ctx->is_closed = FALSE;
@@ -872,8 +882,9 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
       return QUIC_STATUS_INTERNAL_ERROR;
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
-                      c_ctx->Connection, c_ctx->Configuration)))
+  if (QUIC_FAILED(
+          Status = MsQuic->ConnectionSetConfiguration(
+              c_ctx->Connection, c_ctx->config_resource->Configuration)))
     {
       return Status;
     }

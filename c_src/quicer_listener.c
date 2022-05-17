@@ -47,8 +47,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
-      // @TODO use double Configuration pointer
-      c_ctx->Configuration = l_ctx->Configuration;
+      assert(l_ctx->config_resource);
+      // Keep resource for c_ctx
+      enif_keep_resource(l_ctx->config_resource);
+      c_ctx->config_resource = l_ctx->config_resource;
 
       ACCEPTOR *conn_owner = AcceptorDequeue(l_ctx->acceptor_queue);
 
@@ -221,7 +223,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   ERL_NIF_TERM estatus = ServerLoadConfiguration(
-      env, &options, &l_ctx->Configuration, &CredConfig);
+      env, &options, &l_ctx->config_resource->Configuration, &CredConfig);
 
   // Cleanup CredConfig
   if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
@@ -239,6 +241,9 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
     }
+
+  // we are not going to call enif_make_resource for config_resource
+  // so we need to bump the ref here
 
   // mon will be removed when triggered or when l_ctx is dealloc.
   ErlNifMonitor mon;

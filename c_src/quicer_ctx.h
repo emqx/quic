@@ -26,9 +26,19 @@ limitations under the License.
 #define _CTX_NIF_WRITE_
 #define _CTX_NIF_READ_
 
+/*
+ * Configuration
+ */
+typedef struct QuicerConfigCTX
+{
+  ErlNifEnv *env;
+  HQUIC Configuration;
+} QuicerConfigCTX;
+
 typedef struct
 {
-  HQUIC Configuration;
+  // config_resource is allocated in 'init_l_ctx'
+  QuicerConfigCTX *config_resource;
   HQUIC Listener;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
@@ -45,7 +55,10 @@ typedef struct
 
 typedef struct QuicerConnCTX
 {
-  HQUIC Configuration;
+  // config_resource
+  // for server, inherit from l_ctx
+  // for client, alloc on its own
+  QuicerConfigCTX *config_resource;
   HQUIC Connection;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;
@@ -102,6 +115,10 @@ void destroy_l_ctx(QuicerListenerCTX *l_ctx);
 QuicerConnCTX *init_c_ctx();
 void deinit_c_ctx(QuicerConnCTX *c_ctx);
 void destroy_c_ctx(QuicerConnCTX *c_ctx);
+
+QuicerConfigCTX *init_config_ctx();
+void deinit_config_ctx(QuicerConfigCTX *config_ctx);
+void destroy_config_ctx(QuicerConfigCTX *config_ctx);
 
 QuicerStreamCTX *init_s_ctx();
 void deinit_s_ctx(QuicerStreamCTX *s_ctx);

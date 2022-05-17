@@ -29,6 +29,8 @@ init_l_ctx()
     }
   CxPlatZeroMemory(l_ctx, sizeof(QuicerListenerCTX));
   l_ctx->env = enif_alloc_env();
+  l_ctx->config_resource
+      = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
   l_ctx->is_closed = TRUE;
@@ -40,6 +42,10 @@ void
 deinit_l_ctx(QuicerListenerCTX *l_ctx)
 {
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
+  if (l_ctx->config_resource)
+    {
+      enif_release_resource(l_ctx->config_resource);
+    }
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);
 }
@@ -68,6 +74,7 @@ init_c_ctx()
   c_ctx->ResumptionTicket = NULL;
   c_ctx->ssl_keylogfile = NULL;
   c_ctx->is_closed = TRUE;
+  c_ctx->config_resource = NULL;
   return c_ctx;
 }
 
@@ -75,6 +82,10 @@ void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
   enif_free_env(c_ctx->env);
+  if (c_ctx->config_resource)
+    {
+      enif_release_resource(c_ctx->config_resource);
+    }
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
   enif_mutex_destroy(c_ctx->lock);
 }
@@ -86,6 +97,33 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
   // we should demon the owner now!
   enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   enif_release_resource(c_ctx);
+}
+
+QuicerConfigCTX *
+init_config_ctx()
+{
+  QuicerConfigCTX *config_ctx
+      = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
+  if (!config_ctx)
+    {
+      return NULL;
+    }
+  CxPlatZeroMemory(config_ctx, sizeof(QuicerConfigCTX));
+  config_ctx->env = enif_alloc_env();
+  config_ctx->Configuration = NULL;
+  return config_ctx;
+}
+
+void
+deinit_config_ctx(QuicerConfigCTX *config_ctx)
+{
+  enif_free_env(config_ctx->env);
+}
+
+void
+destroy_config_ctx(QuicerConfigCTX *config_ctx)
+{
+  enif_release_resource(config_ctx);
 }
 
 QuicerStreamCTX *

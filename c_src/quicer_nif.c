@@ -614,12 +614,21 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)obj;
 
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
-  assert(l_ctx->is_closed == TRUE);
-  assert(l_ctx->Listener == NULL);
-  if (l_ctx->Listener)
+
+  // Unlike other resources, it is safe to close listener here
+  // because MsQuic will stop the listener if it is not and wait for
+  // all ongoing listener callback to finish.
+  // We should not assert l_ctx->is_closed to be true because it could happen
+  // when the listener process is terminated and there is no any acceptors on
+  // it.
+  //
+  if (!l_ctx->is_closed && l_ctx->Listener)
     {
-      MsQuic->ConfigurationClose(l_ctx->Configuration);
+      // We must close listener since there is no chance that any erlang
+      // process is able to access the listener via any l_ctx
+      MsQuic->ListenerClose(l_ctx->Listener);
     }
+
   deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
@@ -708,6 +717,16 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
     }
 }
 
+void
+resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
+                                 __unused_parm__ void *obj)
+{
+  TP_CB_3(start, (uintptr_t)obj, 0);
+  QuicerConfigCTX *config_ctx = (QuicerConfigCTX *)obj;
+  MsQuic->ConfigurationClose(config_ctx->Configuration);
+  TP_CB_3(end, (uintptr_t)obj, 0);
+}
+
 static int
 on_load(ErlNifEnv *env,
         __unused_parm__ void **priv_data,
@@ -737,6 +756,17 @@ on_load(ErlNifEnv *env,
       = { .dtor = resource_listener_dealloc_callback,
           .down = resource_listener_down_callback,
           .stop = NULL };
+
+  ErlNifResourceTypeInit configInit = {
+    .dtor = resource_config_dealloc_callback, .down = NULL, .stop = NULL
+  };
+
+  ctx_config_t = enif_open_resource_type_x(env,
+                                           "config_context_resource",
+                                           &configInit, // init callbacks
+                                           flags,
+                                           NULL);
+
   ctx_listener_t = enif_open_resource_type_x(env,
                                              "listener_context_resource",
                                              &listenerInit, // init callbacks
@@ -892,6 +922,7 @@ deregistration(__unused_parm__ ErlNifEnv *env,
   if (isRegistered && GRegistration)
     {
       MsQuic->RegistrationClose(GRegistration);
+      GRegistration = NULL;
       isRegistered = false;
     }
   return ATOM_OK;
