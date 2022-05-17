@@ -427,7 +427,6 @@ ServerConnectionCallback(HQUIC Connection,
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
       s_ctx->c_ctx = c_ctx;
-      s_ctx->l_ctx = c_ctx->l_ctx;
 
       acc = AcceptorDequeue(c_ctx->acceptor_queue);
 
@@ -868,14 +867,13 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
-  // @TODO remove l_ctx by support handshake with a configuration
-  if (!c_ctx || !(c_ctx->l_ctx))
+  if (!c_ctx)
     {
       return QUIC_STATUS_INTERNAL_ERROR;
     }
 
   if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
-                      c_ctx->Connection, c_ctx->l_ctx->Configuration)))
+                      c_ctx->Connection, c_ctx->Configuration)))
     {
       return Status;
     }

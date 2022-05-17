@@ -47,6 +47,7 @@ extern QUIC_REGISTRATION_CONFIG GRegConfig;
 extern ErlNifResourceType *ctx_listener_t;
 extern ErlNifResourceType *ctx_connection_t;
 extern ErlNifResourceType *ctx_stream_t;
+extern ErlNifResourceType *ctx_config_t;
 
 // Externals from msquic obj.
 extern void CxPlatSystemLoad(void);

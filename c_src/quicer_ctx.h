@@ -47,7 +47,6 @@ typedef struct QuicerConnCTX
 {
   HQUIC Configuration;
   HQUIC Connection;
-  QuicerListenerCTX *l_ctx;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;

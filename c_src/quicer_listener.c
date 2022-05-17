@@ -47,7 +47,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
-      c_ctx->l_ctx = l_ctx;
+      // @TODO use double Configuration pointer
+      c_ctx->Configuration = l_ctx->Configuration;
 
       ACCEPTOR *conn_owner = AcceptorDequeue(l_ctx->acceptor_queue);
 
@@ -88,10 +89,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                       ATOM_QUIC,
                                       ATOM_NEW_CONN,
                                       enif_make_resource(env, c_ctx))))
-      {
-        Status = QUIC_STATUS_INTERNAL_ERROR;
-        goto Error;
-      }
+        {
+          Status = QUIC_STATUS_INTERNAL_ERROR;
+          goto Error;
+        }
 
       c_ctx->is_closed = FALSE;
       enif_clear_env(env);

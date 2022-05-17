@@ -67,7 +67,6 @@ init_c_ctx()
   c_ctx->TlsSecrets = NULL;
   c_ctx->ResumptionTicket = NULL;
   c_ctx->ssl_keylogfile = NULL;
-  c_ctx->l_ctx = NULL;
   c_ctx->is_closed = TRUE;
   return c_ctx;
 }

@@ -1294,11 +1294,6 @@ get_connection_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  else if (c_ctx->l_ctx)
-    {
-      res = get_listener_opt(env, c_ctx->l_ctx, optname, elevel);
-      goto Exit;
-    }
   else
     {
       res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
@@ -1521,11 +1516,6 @@ set_connection_opt(ErlNifEnv *env,
       Param = QUIC_PARAM_CONN_LOCAL_INTERFACE;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
-    }
-  else if (c_ctx->l_ctx)
-    { // Server
-      res = set_listener_opt(env, c_ctx->l_ctx, optname, optval, elevel);
       goto Exit;
     }
   else

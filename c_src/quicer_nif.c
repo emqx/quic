@@ -594,6 +594,7 @@ BOOLEAN isLibOpened = false;
 ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
 ErlNifResourceType *ctx_stream_t = NULL;
+ErlNifResourceType *ctx_config_t = NULL;
 
 QUIC_REGISTRATION_CONFIG GRegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
