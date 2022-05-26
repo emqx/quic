@@ -1137,7 +1137,7 @@ tc_setopt(Config) ->
         {quic, <<"ping1">>, Stm1, _, _, _} ->
           ok
       after 1000 ->
-          ct:fail("sending is still bloked", [])
+          ct:fail("sending is still blocked", [])
       end,
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -1541,7 +1541,7 @@ echo_server_stm_loop(L, Conn, Stm) ->
       From ! {peer_addr, quicer:peername(Conn)},
       echo_server_stm_loop(L, Conn, Stm);
     done ->
-      ct:pal("echo server shuting down", []),
+      ct:pal("echo server shutting down", []),
       quicer:async_close_connection(Conn),
       quicer:close_listener(L)
   end.
@@ -1693,7 +1693,7 @@ ensure_server_exit_normal(MonRef, Timeout) ->
     {'DOWN', MonRef, process, _, normal} ->
       ok;
     {'DOWN', MonRef, process, _, Other} ->
-      ct:fail("server exits abnormaly ~p ", [Other])
+      ct:fail("server exits abnormally ~p ", [Other])
   after Timeout ->
       ct:fail("server still running", [])
   end.

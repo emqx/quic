@@ -136,7 +136,7 @@ ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
 ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
 
 /*-----------------------------------------*/
-/*         msquic parms starts             */
+/*         msquic params starts             */
 /*-----------------------------------------*/
 
 // Parameters for QUIC_PARAM_LEVEL_GLOBAL.
@@ -209,7 +209,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_PRIORITY;
 
 /*-----------------------*/
-/* msquic parms ends     */
+/* msquic params ends     */
 /*-----------------------*/
 
 /*----------------------------------------------------------*/
@@ -413,7 +413,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME,                            \
        quic_execution_profile_type_real_time);                                \
   /*-----------------------------------------*/                               \
-  /*         msquic parms starts             */                               \
+  /*         msquic params starts             */                               \
   /*-----------------------------------------*/                               \
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
@@ -491,7 +491,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_QUIC_PARAM_STREAM_PRIORITY, param_stream_priority);               \
                                                                               \
   /*-----------------------*/                                                 \
-  /* msquic parms ends     */                                                 \
+  /* msquic params ends     */                                                 \
   /*-----------------------*/                                                 \
                                                                               \
   /*                 QUIC_SETTINGS start                      */              \

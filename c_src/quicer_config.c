@@ -47,23 +47,23 @@ static ERL_NIF_TERM set_listener_opt(ErlNifEnv *env,
                                      ERL_NIF_TERM elevel);
 
 static ERL_NIF_TERM
-get_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
+get_config_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_config_opt(ErlNifEnv *env,
-                                   HQUIC Hanlder,
+                                   HQUIC Handler,
                                    ERL_NIF_TERM optname,
                                    ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
-get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
+get_tls_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_tls_opt(ErlNifEnv *env,
-                                HQUIC Hanlder,
+                                HQUIC Handler,
                                 ERL_NIF_TERM optname,
                                 ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
-get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname);
+get_global_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_global_opt(ErlNifEnv *env,
-                                   HQUIC Hanlder,
+                                   HQUIC Handler,
                                    ERL_NIF_TERM optname,
                                    ERL_NIF_TERM optval);
 
@@ -1699,7 +1699,7 @@ Exit:
 }
 
 static ERL_NIF_TERM
-get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
+get_tls_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1728,7 +1728,7 @@ get_tls_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(Hanlder, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Handler, Param, &BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
       res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
@@ -1743,7 +1743,7 @@ Exit:
 
 static ERL_NIF_TERM
 set_tls_opt(ErlNifEnv *env,
-            HQUIC Hanlder,
+            HQUIC Handler,
             ERL_NIF_TERM optname,
             __unused_parm__ ERL_NIF_TERM optval)
 {
@@ -1774,7 +1774,7 @@ set_tls_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(Hanlder, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Handler, Param, BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
       res = ATOM_OK;
@@ -1788,7 +1788,7 @@ Exit:
 }
 
 static ERL_NIF_TERM
-get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
+get_global_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1845,7 +1845,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(Hanlder, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Handler, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1861,7 +1861,7 @@ Exit:
 
 static ERL_NIF_TERM
 set_global_opt(ErlNifEnv *env,
-               HQUIC Hanlder,
+               HQUIC Handler,
                ERL_NIF_TERM optname,
                ERL_NIF_TERM optval)
 {
@@ -1925,7 +1925,7 @@ set_global_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(Hanlder, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Handler, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1940,7 +1940,7 @@ Exit:
 }
 
 static ERL_NIF_TERM
-get_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
+get_config_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1962,7 +1962,7 @@ get_config_opt(ErlNifEnv *env, HQUIC Hanlder, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(Hanlder, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Handler, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1978,7 +1978,7 @@ Exit:
 
 static ERL_NIF_TERM
 set_config_opt(ErlNifEnv *env,
-               HQUIC Hanlder,
+               HQUIC Handler,
                ERL_NIF_TERM optname,
                ERL_NIF_TERM optval)
 {
@@ -2006,7 +2006,7 @@ set_config_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(Hanlder, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Handler, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {

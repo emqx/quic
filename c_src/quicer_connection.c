@@ -651,7 +651,7 @@ async_connect3(ErlNifEnv *env,
         }
       else
         {
-          // lock it, we need go to Error incase of Error to release the lock
+          // lock it, we need go to Error in case of Error to release the lock
           enif_mutex_lock(old_c_ctx->lock);
           QUIC_BUFFER *ticket = old_c_ctx->ResumptionTicket;
           if (QUIC_FAILED(Status

@@ -690,7 +690,7 @@ close_stream1(ErlNifEnv *env,
 static uint64_t
 recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 {
-  // note, make sure ownership of bin should be transfered, after call
+  // note, make sure ownership of bin should be transferred, after call
   uint64_t size = 0;
   assert(req_len <= s_ctx->TotalBufferLength);
 
@@ -762,7 +762,7 @@ handle_stream_recv_event(HQUIC Stream,
       /* important:
          for passive receive, it is not ok to call
          MsQuic->StreamReceiveSetEnabled to enable receiving
-         becasue it can casue busy spinning:
+         because it can cause busy spinning:
          trigger event and handle event in a loop
       */
       s_ctx->is_buff_ready = TRUE;
@@ -809,7 +809,7 @@ handle_stream_recv_event(HQUIC Stream,
           return status;
         }
 
-      // report pasive
+      // report passive
       if (ACCEPTOR_RECV_MODE_ONCE == s_ctx->owner->active)
         {
           s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
