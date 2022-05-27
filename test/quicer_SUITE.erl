@@ -32,6 +32,8 @@
 
 %% test cases
 -export([ tc_nif_module_load/1
+        , tc_nif_module_unload/1
+        , tc_nif_module_reload/1
         , tc_open_lib_test/1
         , tc_close_lib_test/1
         , tc_lib_registration/1
@@ -193,6 +195,20 @@ end_per_testcase(_TestCase, _Config) ->
 
 tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
+
+tc_nif_module_unload(_Config) ->
+  M = quicer_nif,
+  case code:delete(M) of
+    false -> code:purge(M);
+    true -> ok
+  end,
+  true = code:delete(M).
+
+tc_nif_module_reload(_Config) ->
+  M = quicer_nif,
+  c:l(M),
+  {module, M} = c:l(M),
+  ok.
 
 tc_open_lib_test(_Config) ->
   {ok, false} = quicer:open_lib(),

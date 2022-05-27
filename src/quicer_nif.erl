@@ -53,8 +53,21 @@
 init() ->
   NifName = "libquicer_nif",
   {ok, Niflib} = locate_lib(code:priv_dir(quicer), NifName),
-  ok = erlang:load_nif(Niflib, 0).
-
+  ok = erlang:load_nif(Niflib, 0),
+  %% It could cause segfault if MsQuic library is not opened nor registered.
+  %% here we have added dummy calls, and it should cover most of cases
+  %% unless caller wants to call erlang:load_nif/1 and then call quicer_nif
+  %% without opened library to suicide.
+  %%
+  %% Note, we could do same dummy calls in nif instead but it might mess up the reference counts.
+  {ok, _} = open_lib(),
+  %% dummy reg open
+  case reg_open() of
+    ok -> ok;
+    {error, badarg} ->
+      %% already opened
+      ok
+  end.
 
 -spec open_lib() ->
         {ok, true}  | %% opened
@@ -78,7 +91,7 @@ close_lib() ->
   erlang:nif_error(nif_library_not_loaded).
 
 
--spec reg_open() -> ok.
+-spec reg_open() -> ok | {error, badarg}.
 reg_open() ->
   erlang:nif_error(nif_library_not_loaded).
 

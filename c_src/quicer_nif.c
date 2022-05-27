@@ -727,6 +727,10 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
+/*
+** on_load is called when the NIF library is loaded and no previously loaded
+*library exists for this module.
+*/
 static int
 on_load(ErlNifEnv *env,
         __unused_parm__ void **priv_data,
@@ -786,18 +790,38 @@ on_load(ErlNifEnv *env,
   return ret_val;
 }
 
+/*
+** on_upgrade is called when the NIF library is loaded and there is old code of
+*this module with a loaded NIF library.
+*/
 static int
-on_upgrade(__unused_parm__ ErlNifEnv *env,
-           __unused_parm__ void **priv_data,
+on_upgrade(ErlNifEnv *env,
+           void **priv_data,
            __unused_parm__ void **old_priv_data,
-           __unused_parm__ ERL_NIF_TERM load_info)
+           ERL_NIF_TERM load_info)
 {
-  return 0;
+  return on_load(env, *priv_data, load_info);
 }
 
+/*
+** unload is called when the module code that the NIF library belongs to is
+*purged as old. New code of the same module may or may not exist.
+*/
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
+  // @TODO We want registration context and APIs for it
+  if (isRegistered)
+    {
+      MsQuic->RegistrationClose(GRegistration);
+      isRegistered = FALSE;
+    }
+
+  if (isLibOpened)
+    {
+      MsQuicClose(MsQuic);
+      isLibOpened = FALSE;
+    }
 }
 
 static ERL_NIF_TERM
