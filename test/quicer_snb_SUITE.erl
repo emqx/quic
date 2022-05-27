@@ -163,7 +163,7 @@ tc_app_echo_server(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
   ?check_trace(#{timetrap => 5000},
@@ -214,7 +214,7 @@ tc_slow_conn(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 1000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -257,7 +257,7 @@ tc_stream_owner_down(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -340,7 +340,7 @@ tc_conn_owner_down(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:send(Stm, <<"ping">>),
@@ -452,7 +452,7 @@ tc_conn_close_flag_1(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 1000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -509,7 +509,7 @@ tc_conn_close_flag_2(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -546,7 +546,7 @@ tc_stream_close_errno(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -609,7 +609,7 @@ tc_conn_idle_close(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -683,7 +683,7 @@ tc_conn_gc(Config) ->
                  %% Spawn a process that will die without handler cleanups
                  %% The dead process should trigger a connection close
                  %% The dead process should trigger a GC
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  _Child = spawn_link(fun() ->
                                          %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
                                          {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
@@ -774,7 +774,7 @@ tc_conn_no_gc(Config) ->
                  %% The dead client process should trigger a connection close at server end.
                  %% The dead client process should not trigger a GC of 'Conn' because the parent process
                  %% still holds the 'Conn' var ref.
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  %% We hold a ref the Conn in this process, so Conn won't be gc-ed.
                  {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
                  _Child = spawn_link(fun() ->
@@ -849,7 +849,7 @@ tc_conn_resume(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 1000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -928,6 +928,23 @@ select_port()->
   {ok, {_, Port}} = inet:sockname(S),
   gen_udp:close(S),
   Port.
+
+%% start quicer listener with retries
+%% Mostly for MacOS where address reuse has different impl. than Linux
+quicer_start_listener(Name, Port, Options)->
+  quicer_start_listener(Name, Port, Options, 10).
+quicer_start_listener(Name, Port, Options, N) ->
+  case quicer:start_listener(mqtt, Port, Options) of
+    {ok, QuicApp} -> {ok, QuicApp};
+    {error, listener_start_error, address_in_use} when N > 0 ->
+      %% addr in use, retry....
+      timer:sleep(200),
+      quicer_start_listener(Name, Port, Options, N-1);
+    Error ->
+      Error
+  end.
+
+
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t
