@@ -924,7 +924,7 @@ default_listen_opts(Config) ->
 
 %% OS picks the available port
 select_port()->
-  {ok, S} = gen_udp:open(0),
+  {ok, S} = gen_udp:open(0, [{reuseaddr, true}]),
   {ok, {_, Port}} = inet:sockname(S),
   gen_udp:close(S),
   Port.

@@ -1751,7 +1751,7 @@ retry_with(Fun, Retry, ErrorInfo) ->
 
 %% select a random port picked by OS
 select_port()->
-  {ok, S} = gen_udp:open(0),
+  {ok, S} = gen_udp:open(0, [{reuseaddr, true}]),
   {ok, {_, Port}} = inet:sockname(S),
   gen_udp:close(S),
   case os:type() of
