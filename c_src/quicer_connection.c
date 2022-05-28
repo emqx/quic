@@ -190,10 +190,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
         }
-      else
-        {
-          enif_keep_resource(s_ctx->c_ctx);
-        }
       s_ctx->owner = acc;
 
       enif_monitor_process(NULL, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon);
@@ -426,7 +422,6 @@ ServerConnectionCallback(HQUIC Connection,
       QuicerStreamCTX *s_ctx = init_s_ctx();
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
-      s_ctx->c_ctx = c_ctx;
 
       acc = AcceptorDequeue(c_ctx->acceptor_queue);
 
@@ -450,10 +445,7 @@ ServerConnectionCallback(HQUIC Connection,
                                       ATOM_NEW_STREAM,
                                       enif_make_resource(env, s_ctx))))
         {
-          // @todo log and step counter
-          // @todo, maybe we should just return error code and let msquic
-          // shutdown the connection gracefully.
-          // @todo, check rfc for the error code
+          // @TODO: check RFC for the error code
           MsQuic->ConnectionShutdown(
               Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
           enif_mutex_unlock(s_ctx->lock);
@@ -464,7 +456,6 @@ ServerConnectionCallback(HQUIC Connection,
           MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
                                      (void *)ServerStreamCallback,
                                      s_ctx);
-          enif_keep_resource(c_ctx);
         }
       break;
     case QUIC_CONNECTION_EVENT_RESUMED:
@@ -684,9 +675,6 @@ Error:
   else
     {
       destroy_c_ctx(c_ctx);
-
-      // @TODO Check if we need to call this
-      // MsQuic->ConnectionClose(c_ctx->connection)
     }
   return res;
 }
@@ -776,8 +764,6 @@ close_connection1(ErlNifEnv *env,
   c_ctx->Connection = NULL;
   enif_mutex_unlock(c_ctx->lock);
 
-  // void return
-  MsQuic->ConnectionClose(c_ctx->Connection);
   return ATOM_OK;
 }
 
@@ -799,11 +785,6 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
     {
       Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
-    }
-  else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
-    {
-      Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
-      Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
     }
   else
     {

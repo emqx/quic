@@ -57,7 +57,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       if (!conn_owner)
         {
           TP_CB_3(missing_acceptor, (uintptr_t)c_ctx->Connection, 0);
-          destroy_c_ctx(c_ctx);
+          destroy_c_ctx(c_ctx); // no avail conn owner
           // make msquic close the connection.
           Status = QUIC_STATUS_UNREACHABLE;
           goto Error;

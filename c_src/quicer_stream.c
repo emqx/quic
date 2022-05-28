@@ -37,7 +37,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   QuicerStreamSendCTX *send_ctx = NULL;
   BOOLEAN is_destroy = FALSE;
 
-  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
   TP_CB_3(event, (uintptr_t)Stream, Event->Type);
@@ -154,7 +153,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       s_ctx->is_closed = TRUE;
     }
   enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
 
   if (is_destroy)
     {
@@ -177,7 +175,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
   QuicerStreamSendCTX *send_ctx = NULL;
   ERL_NIF_TERM report;
-  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
   env = s_ctx->env;
   BOOLEAN is_destroy = FALSE;
@@ -293,7 +290,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     }
 
   enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
 
   if (is_destroy)
     {
@@ -333,11 +329,6 @@ async_start_stream2(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
-
-  s_ctx->c_ctx = c_ctx;
-
-  // note, will be released in destroy_s_ctx
-  enif_keep_resource(s_ctx->c_ctx);
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -494,7 +485,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
   send_ctx->s_ctx = s_ctx;
@@ -529,7 +519,6 @@ ErrorExit:
   destroy_send_ctx(send_ctx);
 Exit:
   enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
   return res;
 }
 

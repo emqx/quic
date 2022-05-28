@@ -1011,11 +1011,6 @@ get_stream_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  else if (s_ctx->c_ctx)
-    {
-      res = get_connection_opt(env, s_ctx->c_ctx, optname, elevel);
-      goto Exit;
-    }
   else
     {
       res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
@@ -1123,11 +1118,6 @@ set_stream_opt(ErlNifEnv *env,
         {
           return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
-    }
-  else if (s_ctx->c_ctx)
-    {
-      res = set_connection_opt(env, s_ctx->c_ctx, optname, optval, elevel);
-      goto Exit;
     }
   else
     {

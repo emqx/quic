@@ -66,6 +66,7 @@ init_c_ctx()
       return NULL;
     }
   CxPlatZeroMemory(c_ctx, sizeof(QuicerConnCTX));
+  c_ctx->magic = 0xcfcfcfcf;
   c_ctx->env = enif_alloc_env();
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
@@ -136,7 +137,7 @@ init_s_ctx()
       return NULL;
     }
   CxPlatZeroMemory(s_ctx, sizeof(QuicerStreamCTX));
-
+  s_ctx->magic = 0xefefefef; // 4025479151
   s_ctx->env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->is_wait_for_data = FALSE;
@@ -163,7 +164,6 @@ destroy_s_ctx(QuicerStreamCTX *s_ctx)
   // Since enif_release_resource is async call,
   // we should demon the owner now!
   enif_demonitor_process(s_ctx->env, s_ctx, &s_ctx->owner_mon);
-  enif_release_resource(s_ctx->c_ctx);
   enif_release_resource(s_ctx);
 }
 

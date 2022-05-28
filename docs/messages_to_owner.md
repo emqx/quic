@@ -15,11 +15,16 @@ Data received in binary format
 
 ### peer_send_shutdown
 
+Peer has sent all the data and wants to shutdown
+
 ```erlang
 {quic, peer_send_shutdown, stream_handler(), ErrorCode}
 ```
 
 ### peer_send_aborted
+
+Peer is no longer interested in receiving thus want 
+abort the receiving. 
 
 ```erlang
 {quic, peer_send_aborted, stream_handler(), ErrorCode}

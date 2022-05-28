@@ -55,6 +55,7 @@ typedef struct
 
 typedef struct QuicerConnCTX
 {
+  uint32_t magic;
   // config_resource
   // for server, inherit from l_ctx
   // for client, alloc on its own
@@ -78,8 +79,7 @@ typedef struct QuicerConnCTX
 
 typedef struct QuicerStreamCTX
 {
-  QuicerListenerCTX *l_ctx;
-  QuicerConnCTX *c_ctx;
+  uint32_t magic;
   HQUIC Stream;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;
