@@ -687,6 +687,8 @@ getopt(Handle, Opt, Optlevel) ->
         {error, atom_reason()}.
 setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
   setopt(Handle, param_conn_settings, maps:from_list(Value));
+setopt({_Conn, Stream}, active, Value) ->
+  setopt(Stream, active, Value);
 setopt(Handle, Opt, Value) ->
   quicer_nif:setopt(Handle, Opt, Value, false).
 
