@@ -232,7 +232,7 @@ typedef struct QUIC_API_TABLE {
 *** ConnectionShutdown;
 *** ConnectionStart;
 *** ConnectionSetConfiguration;
-*** ConnectionSendResumptionTicket [Not Used];
+*** ConnectionSendResumptionTicket;
 
 *** StreamOpen;
 *** StreamClose;

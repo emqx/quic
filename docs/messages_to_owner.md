@@ -1,4 +1,4 @@
-# Messages to Owner Processes
+# Messages to the owner process
 
 Since most of API calls are asynchronous, the API caller or the stream/connection owner can receive
 async messages as following
@@ -15,16 +15,17 @@ Data received in binary format
 
 ### peer_send_shutdown
 
-Peer has sent all the data and wants to shutdown
+Peer has sent all the data and wants to shutdown gracefully.
 
 ```erlang
 {quic, peer_send_shutdown, stream_handler(), ErrorCode}
 ```
 
 ### peer_send_aborted
+Received a RESET_STREAM Frame.
 
-Peer is no longer interested in receiving thus want 
-abort the receiving. 
+Peer terminate the sending part of the stream abruptly.
+A receiver can discard any data that it already received on the stream.
 
 ```erlang
 {quic, peer_send_aborted, stream_handler(), ErrorCode}
