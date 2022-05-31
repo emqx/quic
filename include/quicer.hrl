@@ -33,6 +33,8 @@
 -define(QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE    , 8).
 
 
+-define(QUIC_SEND_COMPLETE_SUCCESS                  , 0).
+-define(QUIC_SEND_COMPLETE_CANCELLED                , 1).
 %% QUIC_LISTENER_EVENT_TYPE
 -define(QUIC_LISTENER_EVENT_NEW_CONNECTION          , 0).
 -define(QUIC_LISTENER_EVENT_STOP_COMPLETE           , 1).

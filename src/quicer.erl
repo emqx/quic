@@ -468,8 +468,10 @@ start_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 %% @doc Send binary data over stream, blocking until send request is handled by the transport worker.
+%% either succeeded or cancelled
 -spec send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
+        {error, cancelled}                        |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 send(Stream, Data) ->
@@ -477,8 +479,10 @@ send(Stream, Data) ->
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
-        {quic, send_completed, Stream, _} ->
-          OK
+        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_SUCCESS} ->
+          OK;
+        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_CANCELLED} ->
+          {error, cancelled}
       end;
     E ->
       E
@@ -486,7 +490,8 @@ send(Stream, Data) ->
 
 %% @doc async variant of {@link send/2}
 %% Caller should expect to receive
-%% ```{quic, send_completed, Stream, _}'''
+%% ```{quic, send_completed, Stream, send_complete_flag()}'''
+%% note, check send_complete_flag() to ensure it is delivered or not.
 -spec async_send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
