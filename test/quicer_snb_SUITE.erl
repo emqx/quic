@@ -856,8 +856,8 @@ tc_conn_no_gc_2(Config) ->
                begin
                  %% Spawn a client process that will close the connection explicitly before die.
                  %% The dead client process should trigger a connection close at server end.
-                 %% The dead client process should not trigger a GC of 'Conn' because the parent process
-                 %% still holds the 'Conn' var ref.
+                 %% The dead client process should not trigger a GC of 'ClientConn' because the parent process
+                 %% still holds the 'ClientConn' var ref.
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  Parent = self(),
                  PRef = erlang:make_ref(),
@@ -888,9 +888,10 @@ tc_conn_no_gc_2(Config) ->
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                    , tag := "event" },
                                   5000, 1000),
-                 %% Give it time for gc that should not happen on var 'Conn', could be the source of flakiness.
+                 %% Give it time for GC of `Conn' that caused by dead client process.
+                 %% But the resource dealloc callback should not be called since
+                 %% we still have a ref in current process with Var: `ClientConn'
                  %% We are rather testing the OTP behavior here but proves our understandings are correct.
-                 %% OTP GC callback, should not happen
                  timeout = ?block_until(#{ ?snk_kind := debug
                                          , context := "callback"
                                          , function := "resource_conn_dealloc_callback"
@@ -898,6 +899,7 @@ tc_conn_no_gc_2(Config) ->
                                          , tag := "end"},
                                         5000, 1000),
                  timer:sleep(10000),
+                 %% We can get segfault here if it is use-after-free
                  quicer:getstat(ClientConn, [send_cnt, recv_oct, send_pend]),
                  {ok, CRid}
 

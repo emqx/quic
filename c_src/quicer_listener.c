@@ -103,9 +103,11 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
       env = l_ctx->env;
 
-      // Close listener in NIF CTX leads to invalid Listener HQUIC
+      // Close listener in NIF CTX leads to NULL Listener HQUIC
       assert(l_ctx->Listener == NULL);
 
+      // Dummy call to prevent leakage if handler is not NULL
+      // @TODO they should be removed when we support ListenerStop call
       MsQuic->ListenerClose(l_ctx->Listener);
       l_ctx->Listener = NULL;
 
