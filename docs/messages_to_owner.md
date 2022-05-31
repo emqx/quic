@@ -24,8 +24,8 @@ Peer has sent all the data and wants to shutdown gracefully.
 ### peer_send_aborted
 Received a RESET_STREAM Frame.
 
-Peer terminate the sending part of the stream abruptly.
-A receiver can discard any data that it already received on the stream.
+Peer terminated the sending part of the stream abruptly.
+The receiver can discard any data that it already received on the stream.
 
 ```erlang
 {quic, peer_send_aborted, stream_handler(), ErrorCode}
