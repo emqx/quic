@@ -723,7 +723,11 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
 {
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerConfigCTX *config_ctx = (QuicerConfigCTX *)obj;
-  MsQuic->ConfigurationClose(config_ctx->Configuration);
+  // Check if Registration is closed or not
+  if (GRegistration && config_ctx->Configuration)
+    {
+      MsQuic->ConfigurationClose(config_ctx->Configuration);
+    }
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
