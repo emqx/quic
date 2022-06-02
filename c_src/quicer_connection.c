@@ -750,24 +750,6 @@ shutdown_connection3(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-close_connection1(ErlNifEnv *env,
-                  __unused_parm__ int argc,
-                  const ERL_NIF_TERM argv[])
-{
-  QuicerConnCTX *c_ctx;
-  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  enif_mutex_lock(c_ctx->lock);
-  c_ctx->Connection = NULL;
-  enif_mutex_unlock(c_ctx->lock);
-
-  return ATOM_OK;
-}
-
-ERL_NIF_TERM
 sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
 {
   void *q_ctx;

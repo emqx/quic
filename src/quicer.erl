@@ -346,6 +346,7 @@ close_connection(Conn) ->
   close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, 5000).
 
 %% @doc Close connection with flag specified and application reason code.
+%% @see shutdown_connection/3
 -spec close_connection(connection_handler(),
                        conn_shutdown_flag(),
                        app_errno()
@@ -354,29 +355,25 @@ close_connection(Conn, Flags, ErrorCode) ->
   close_connection(Conn, Flags, ErrorCode, 5000).
 
 %% @doc Close connection with flag specified and application reason code with timeout
+%% @see shutdown_connection/4
 -spec close_connection(connection_handler(),
                        conn_shutdown_flag(),
                        app_errno(),
                        timeout()) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
-  case shutdown_connection(Conn, Flags, ErrorCode, Timeout) of
-    {error, _} = Err ->
-      Err;
-    ok ->
-      async_close_connection(Conn)
-  end.
+  shutdown_connection(Conn, Flags, ErrorCode, Timeout).
 
-%% @doc Async variant of {@link close_connection/4}
 -spec async_close_connection(connection_handler()) -> ok.
 async_close_connection(Conn) ->
-  quicer_nif:async_close_connection(Conn).
+  async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
 
+%% @doc Async variant of {@link close_connection/4}
+%% @see async_close_connection/3
 -spec async_close_connection(connection_handler(),
                              conn_shutdown_flag(),
                              app_errno()) -> ok.
 async_close_connection(Conn, Flags, ErrorCode) ->
-  _ = quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode),
-  quicer_nif:async_close_connection(Conn).
+  async_shutdown_connection(Conn, Flags, ErrorCode).
 
 %% @doc Accept new stream on a existing connection with stream opts
 %%

@@ -765,6 +765,9 @@ tc_stream_send_after_conn_close(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, {_, _}} = quicer:sockname(Conn),
+      %% Next close_connection call has two scenarios:
+      %% a) Just close connection, stream is not created in QUIC
+      %% b) Close the connection after the stream is created in QUIC
       ok = quicer:close_connection(Conn),
       {error, stm_send_error, aborted} = quicer:send(Stm, <<"ping2">>),
       SPid ! done,
@@ -782,6 +785,8 @@ tc_stream_send_after_async_conn_close(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, {_, _}} = quicer:sockname(Conn),
+      %% Send some data otherwise stream will never get started.
+      quicer:send(Stm, <<"ping1">>),
       ok = quicer:async_close_connection(Conn),
       %% we created a race here, the send can success or fail
       %% but it should not crash
@@ -1011,7 +1016,10 @@ tc_getstat_closed(Config) ->
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
-        {error, closed} -> ok
+        {error, closed} -> ok;
+        {ok, [_|_]} ->
+          %% We still hold a ref in Var Conn, and the Conn is not closed in MsQuic
+          ok
       end,
       %ok = quicer:close_connection(Conn),
       SPid ! done
@@ -1689,7 +1697,10 @@ simple_stream_server(Owner, Config, Port) ->
           quicer:close_stream(Stream);
         done ->
           exit(normal)
-      end
+      end;
+   {quic, shutdown, Conn} ->
+      ct:pal("Received Conn close for ~p", [Conn]),
+      quicer:close_connection(Conn)
   end,
   receive
     {quic, shutdown, Conn} ->
