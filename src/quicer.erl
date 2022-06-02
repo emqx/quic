@@ -573,14 +573,15 @@ shutdown_stream(Stream, Timeout) ->
 
 %% @doc Start shutdown Stream process with flags and application specified error code.
 %%
-%% returns when stream closing is confirmed in the stack.
+%% returns when stream closing is confirmed in the stack (Blocking).
 %%
 %% Flags could be used to control the behavior like half-close.
 %% @end
+%% @see async_shutdown_stream/4
 -spec shutdown_stream(stream_handler(),
-                   stream_shutdown_flags(),
-                   app_errno(),
-                   timeout()) ->
+                      stream_shutdown_flags(),
+                      app_errno(),
+                      timeout()) ->
         ok |
         {error, badarg} |
         {error, timeout}.
@@ -599,6 +600,7 @@ shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
 
 
 %% @doc async variant of {@link shutdown_stream/2}
+%% @see async_shutdown_stream/3
 -spec async_shutdown_stream(stream_handler()) ->
         ok |
         {error, badarg | atom_reason()}.
@@ -617,45 +619,34 @@ async_shutdown_stream(Stream) ->
 async_shutdown_stream(Stream, Flags, Reason) ->
   quicer_nif:async_shutdown_stream(Stream, Flags, Reason).
 
-%% @doc close stream handler.
+%% @doc Normal shutdown stream with infinity timeout.
+%% @see close_stream/2
 -spec close_stream(stream_handler()) -> ok | {error, badarg | timeout}.
 close_stream(Stream) ->
-  case shutdown_stream(Stream, infinity) of
-    ok ->
-      async_close_stream(Stream);
-    {error, _} = E ->
-      E
-  end.
+  close_stream(Stream, infinity).
 
+%% @doc Normal shutdown (App errno=0) Stream gracefully with timeout.
 %% @see close_stream/4
 -spec close_stream(stream_handler(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Timeout) ->
-  case shutdown_stream(Stream, Timeout) of
-    ok ->
-      async_close_stream(Stream);
-    {error, _} = E ->
-      E
-  end.
+  close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
 
-%% @doc shutdown stream and then close stream handler.
+%% @doc Another name of shutdown stream for migration from tcp/ssl.
 %% @see close_stream/1
 %% @see shutdown_stream/4
 -spec close_stream(stream_handler(), stream_shutdown_flags(),
                    app_errno(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Flags, ErrorCode, Timeout) ->
-  case shutdown_stream(Stream, Flags, ErrorCode, Timeout) of
-    ok ->
-      async_close_stream(Stream);
-    {error, _} = E ->
-      E
-  end.
+  shutdown_stream(Stream, Flags, ErrorCode, Timeout).
 
-%% @doc async variant of {@link close_stream/4}
+%% @doc async variant of {@link close_stream/1}, prefer to use async_shutdown_stream/4
+%% @see close_stream/4
+%% @see async_shutdown_stream/4
 -spec async_close_stream(stream_handler()) -> ok | {error, badarg}.
 async_close_stream(Stream) ->
-  quicer_nif:async_close_stream(Stream).
+  async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
 
 %% @doc Get socket name
 %% mimic {@link ssl:sockname/1}

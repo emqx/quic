@@ -376,7 +376,11 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   s_ctx->is_closed = FALSE;
-  return SUCCESS(enif_make_resource(env, s_ctx));
+  // @TODO it is not so nice to let the connection owner holds the life time of
+  // s_ctx
+  res = enif_make_resource(env, s_ctx);
+
+  return SUCCESS(res);
 
 ErrorExit:
   destroy_s_ctx(s_ctx);
@@ -653,27 +657,6 @@ shutdown_stream3(ErlNifEnv *env,
     }
 
   return ret;
-}
-
-ERL_NIF_TERM
-close_stream1(ErlNifEnv *env,
-              __unused_parm__ int argc,
-              const ERL_NIF_TERM argv[])
-
-{
-  QuicerStreamCTX *s_ctx;
-  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  enif_mutex_lock(s_ctx->lock);
-  s_ctx->Stream = NULL;
-  enif_mutex_unlock(s_ctx->lock);
-
-  // void return
-  MsQuic->StreamClose(s_ctx->Stream);
-  return ATOM_OK;
 }
 
 static uint64_t

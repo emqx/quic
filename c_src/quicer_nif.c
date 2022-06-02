@@ -1170,7 +1170,6 @@ static ErlNifFunc nif_funcs[] = {
   { "recv", 2, recv2, 0},
   { "send_dgram", 3, send_dgram, 0},
   { "async_shutdown_stream", 3, shutdown_stream3, 0},
-  { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
   { "setopt", 4, setopt4, 0},

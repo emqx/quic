@@ -32,7 +32,6 @@
         , recv/2
         , send_dgram/3
         , async_shutdown_stream/3
-        , async_close_stream/1
         , sockname/1
         , getopt/3
         , setopt/4
@@ -180,12 +179,6 @@ send_dgram(_Conn, _Data, _Flags) ->
         ok |
         {error, badarg | atom_reason()}.
 async_shutdown_stream(_Stream, _Flags, _ErrorCode) ->
-  erlang:nif_error(nif_library_not_loaded).
-
--spec async_close_stream(stream_handler()) ->
-        ok |
-        {error, badarg | atom_reason()}.
-async_close_stream(_Stream) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec sockname(connection_handler() | stream_handler()) ->
