@@ -247,13 +247,19 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      report = enif_make_tuple3(
-          env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
+      // This is special case for client,
+      // it could happen that the connection is opened but never get started.
+      // @see async_connect3
+      // in this case, we don't need to report closed to the owner
+      if (!c_ctx->is_closed) // owner doesn't know it is closed
+        {
+          report = enif_make_tuple3(
+              env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
-      enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-
+          enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+        }
       is_destroy = TRUE;
-      c_ctx->is_closed = TRUE;
+      c_ctx->is_closed = TRUE; // client shutdown completed
       break;
     case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
       // @TODO
@@ -438,7 +444,7 @@ ServerConnectionCallback(HQUIC Connection,
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-      c_ctx->is_closed = TRUE;
+      c_ctx->is_closed = TRUE; // server shutdown_complete
       is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -530,7 +536,6 @@ async_connect3(ErlNifEnv *env,
   // Usually we should not get this error
   // If we get it is internal logic error
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
-  BOOLEAN is_resume = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -562,6 +567,8 @@ async_connect3(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_BAD_PID);
       goto Error;
     }
+
+  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
 
   // convert eoptions to Configuration
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
@@ -717,19 +724,57 @@ async_connect3(ErlNifEnv *env,
       enif_release_resource(c_ctx->config_resource);
       goto Error;
     }
-  c_ctx->is_closed = FALSE;
+  c_ctx->is_closed = FALSE; // connection started
   ERL_NIF_TERM eHandler = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandler);
 
 Error:
-  if (is_resume)
-    {
-      enif_mutex_unlock(c_ctx->lock);
-    }
-  else
-    {
-      destroy_c_ctx(c_ctx);
+  // Error exit, it must not be started!
+  assert(c_ctx->is_closed);
+
+  if (c_ctx->Connection)
+    { // when is opened
+
+      /*
+       We should not call *destroy_c_ctx* from here.
+       becasue it could cause race cond:
+
+       MsQuic Worker:
+
+         Connection close job will trigger ClientConnectionCallback with event:
+         QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+
+       Beam Schedler:
+         release c_ctx by calling *destroy_c_ctx* will trigger
+       *resource_conn_dealloc_callback*
+
+       The c_ctx could be freed (unprotectable) by beam while
+       ClientConnectionCallback can still access it.
+
+       So the side effect chain will be:
+
+       'MsQuic->ConnectionClose' triggers 'ClientConnectionCallback' triggers
+       'release c_ctx resource' triggers resource_conn_dealloc_callback' and
+       then 'free c_ctx'. At this point both resources in beam and MsQuic is
+        released.
+
+       note 1:
+
+       If we only call *destroy_c_ctx* triggers
+       *resource_conn_dealloc_callback* triggers  'MsQuic->ConnectionClose'
+       triggers ClientConnectionCallback here it can casue race cond. since
+       c_ctx has been freed by beam already after
+       resource_conn_dealloc_callback is finished.
+
+       note 2:
+       We could not call MsQuic->SetCallbackHandler to set callback to NULL
+       becasue this function is async, not thread safe.
+
+       */
+      MsQuic->ConnectionClose(c_ctx->Connection);
+      // prevent double ConnectionClose
+      c_ctx->Connection = NULL;
     }
   return res;
 }

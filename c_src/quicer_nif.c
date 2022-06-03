@@ -645,9 +645,11 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
-  assert(c_ctx->is_closed == TRUE);
+  // must be closed otherwise will trigger callback and casue race cond.
+  assert(c_ctx->is_closed == TRUE); // in dealloc
   if (c_ctx->Connection)
     {
+      TP_CB_3(close, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
       MsQuic->ConnectionClose(c_ctx->Connection);
     }
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);

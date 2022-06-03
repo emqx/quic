@@ -75,7 +75,7 @@ init_c_ctx()
   c_ctx->ResumptionTicket = NULL;
   c_ctx->event_mask = 0;
   c_ctx->ssl_keylogfile = NULL;
-  c_ctx->is_closed = TRUE;
+  c_ctx->is_closed = TRUE; // init
   c_ctx->config_resource = NULL;
   return c_ctx;
 }
@@ -148,7 +148,7 @@ init_s_ctx()
   s_ctx->Buffers[1].Length = 0;
   s_ctx->TotalBufferLength = 0;
   s_ctx->is_buff_ready = FALSE;
-  s_ctx->is_closed = TRUE;
+  s_ctx->is_closed = TRUE; // init
   return s_ctx;
 }
 

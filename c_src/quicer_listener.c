@@ -96,7 +96,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           goto Error;
         }
 
-      c_ctx->is_closed = FALSE;
+      c_ctx->is_closed = FALSE; // new connection
       enif_clear_env(env);
       break;
 
