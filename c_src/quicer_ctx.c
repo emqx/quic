@@ -73,6 +73,7 @@ init_c_ctx()
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
   c_ctx->TlsSecrets = NULL;
   c_ctx->ResumptionTicket = NULL;
+  c_ctx->event_mask = 0;
   c_ctx->ssl_keylogfile = NULL;
   c_ctx->is_closed = TRUE;
   c_ctx->config_resource = NULL;

@@ -271,25 +271,54 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // received from the server.
       //
       //
-      if (c_ctx->ResumptionTicket)
+      // The client wants to recv new session ticket in the mailbox
+      if (c_ctx->event_mask & QUICER_CONNECTION_EVENT_MASK_NST)
         {
-          CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
-        }
-      c_ctx->ResumptionTicket = (QUIC_BUFFER *)CXPLAT_ALLOC_NONPAGED(
-          sizeof(QUIC_BUFFER)
-              + Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
-          QUICER_RESUME_TICKET);
+          ERL_NIF_TERM ticket;
+          unsigned char *ticket_buff = enif_make_new_binary(
+              env,
+              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
+              &ticket);
+          if (ticket_buff && ticket)
+            {
 
-      if (c_ctx->ResumptionTicket)
+              CxPlatCopyMemory(
+                  ticket_buff,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+
+              report = enif_make_tuple4(env,
+                                        ATOM_QUIC,
+                                        ATOM_NST_RECEIVED,
+                                        enif_make_resource(env, c_ctx),
+                                        ticket);
+
+              enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+            }
+        }
+      else // if QUICER_CONNECTION_EVENT_MASK_NST is unset in event_mask, we
+           // just store it in the c_ctx
         {
-          c_ctx->ResumptionTicket->Buffer
-              = (uint8_t *)(c_ctx->ResumptionTicket + 1);
-          c_ctx->ResumptionTicket->Length
-              = Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
-          CxPlatCopyMemory(
-              c_ctx->ResumptionTicket->Buffer,
-              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
-              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+          if (c_ctx->ResumptionTicket)
+            {
+              CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
+            }
+          c_ctx->ResumptionTicket = (QUIC_BUFFER *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_BUFFER)
+                  + Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
+              QUICER_RESUME_TICKET);
+
+          if (c_ctx->ResumptionTicket)
+            {
+              c_ctx->ResumptionTicket->Buffer
+                  = (uint8_t *)(c_ctx->ResumptionTicket + 1);
+              c_ctx->ResumptionTicket->Length
+                  = Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
+              CxPlatCopyMemory(
+                  c_ctx->ResumptionTicket->Buffer,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+            }
         }
       break;
     case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
@@ -497,7 +526,7 @@ async_connect3(ErlNifEnv *env,
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
-  ERL_NIF_TERM Handler;
+  ERL_NIF_TERM NST; // New Session Ticket
   // Usually we should not get this error
   // If we get it is internal logic error
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
@@ -619,13 +648,12 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  if (enif_get_map_value(env, eoptions, ATOM_HANDLER, &Handler))
+  if (enif_get_map_value(env, eoptions, ATOM_HANDLER, &NST))
     {
-      // Resume connection, try resume
+      // Resume connection with Old Connection Handler
       //
       QuicerConnCTX *old_c_ctx = NULL;
-      if (!enif_get_resource(
-              env, Handler, ctx_connection_t, (void **)&old_c_ctx))
+      if (!enif_get_resource(env, NST, ctx_connection_t, (void **)&old_c_ctx))
         {
           return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
@@ -647,6 +675,33 @@ async_connect3(ErlNifEnv *env,
           enif_mutex_unlock(old_c_ctx->lock);
         }
     }
+  else if (enif_get_map_value(env, eoptions, ATOM_NST, &NST))
+    {
+      // Resume connection with NST binary
+      //
+      //
+      ErlNifBinary ticket;
+      if (!enif_inspect_binary(env, NST, &ticket) || ticket.size > UINT32_MAX)
+        {
+          res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+          goto Error;
+        }
+      else
+        {
+          if (QUIC_FAILED(Status
+                          = MsQuic->SetParam(c_ctx->Connection,
+                                             QUIC_PARAM_CONN_RESUMPTION_TICKET,
+                                             ticket.size,
+                                             ticket.data)))
+            {
+              res = ERROR_TUPLE_3(ATOM_ERROR_NOT_FOUND, ATOM_STATUS(Status));
+              goto Error;
+            }
+        }
+    }
+
+  // This is optional
+  get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &c_ctx->event_mask);
 
   // @TODO client async_connect_3 should able to take a config_resource as
   // input ERL TERM so that we don't need to call ClientLoadConfiguration

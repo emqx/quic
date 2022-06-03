@@ -71,6 +71,7 @@ typedef struct QuicerConnCTX
   QUIC_TLS_SECRETS *TlsSecrets;
   QUIC_BUFFER *ResumptionTicket;
   BOOLEAN is_closed;
+  uint32_t event_mask;
   char *ssl_keylogfile;
   void *reserved1;
   void *reserved2;

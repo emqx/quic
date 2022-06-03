@@ -275,6 +275,9 @@ ERL_NIF_TERM ATOM_SEND_DGRAM_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
 ERL_NIF_TERM ATOM_QUIC_PASSIVE;
+ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
+ERL_NIF_TERM ATOM_NST_RECEIVED;
+ERL_NIF_TERM ATOM_NST;
 ERL_NIF_TERM ATOM_DGRAM;
 ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
 ERL_NIF_TERM ATOM_DEBUG;
@@ -560,6 +563,9 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
+  ATOM(ATOM_QUIC_EVENT_MASK, quic_event_mask);                                \
+  ATOM(ATOM_NST_RECEIVED, nst_received);                                      \
+  ATOM(ATOM_NST, nst);                                                        \
   ATOM(ATOM_DGRAM, dgram);                                                    \
   ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                    \
   ATOM(ATOM_DEBUG, debug);                                                    \

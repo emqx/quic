@@ -124,6 +124,16 @@ safely cleaned up.
 {quic, closed, connection_handler()}
 ```
 
+### New Session Ticket
+The client received the NST (new session ticket) from the server if `QUICER_CONNECTION_EVENT_MASK_NST` had been 
+set in connection opt `quic_event_mask` when client start the connection.
+
+The NST could be used by Client for 0-RTT handshake with connection opt '{nst, Ticket :: binary()}'.
+
+``` erlang
+{quic, nst_received, connection_handler(), Ticket::binary()}
+```
+
 ## Messages to Listener Owner
 
 ### New connection
