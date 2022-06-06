@@ -216,7 +216,9 @@ typedef struct QUIC_API_TABLE {
 *** GetContext [Not Used]
 *** SetCallbackHandler
 *** SetParam
+SYNC call in non-callback-context
 *** GetParam
+SYNC call in non-callback-context
 *** RegistrationOpen;
 *** RegistrationClose;
 *** RegistrationShutdown; [Not Used]
@@ -229,6 +231,7 @@ typedef struct QUIC_API_TABLE {
 *** ListenerStop;
 *** ConnectionOpen;
 *** ConnectionClose;
+SYNC call in non-callback-context
 *** ConnectionShutdown;
 *** ConnectionStart;
 *** ConnectionSetConfiguration;
@@ -236,6 +239,7 @@ typedef struct QUIC_API_TABLE {
 
 *** StreamOpen;
 *** StreamClose;
+SYNC call in non-callback-context
 *** StreamStart;
 *** StreamShutdown;
 *** StreamSend;
