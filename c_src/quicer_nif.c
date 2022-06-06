@@ -690,6 +690,9 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
     {
       MsQuic->StreamClose(s_ctx->Stream);
     }
+
+  // ensure it is called *After* StreamClose
+  enif_release_resource(s_ctx->c_ctx);
   AcceptorDestroy(s_ctx->owner);
   deinit_s_ctx(s_ctx);
   TP_CB_3(end, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);

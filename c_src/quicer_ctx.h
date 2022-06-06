@@ -81,6 +81,7 @@ typedef struct QuicerConnCTX
 typedef struct QuicerStreamCTX
 {
   uint32_t magic;
+  QuicerConnCTX *c_ctx;
   HQUIC Stream;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;

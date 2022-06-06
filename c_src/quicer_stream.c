@@ -324,6 +324,8 @@ async_start_stream2(ErlNifEnv *env,
   // note, s_ctx is not shared yet, thus no locking is needed.
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
+  enif_keep_resource(c_ctx);
+  s_ctx->c_ctx = c_ctx;
 
   if (!s_ctx)
     {

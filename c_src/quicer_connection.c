@@ -179,8 +179,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // maybe alloc later
       s_ctx = init_s_ctx();
-
-      // @fixit Stream context shouldn't be shared.
+      enif_keep_resource(c_ctx);
+      s_ctx->c_ctx = c_ctx;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
       ACCEPTOR *acc = AcceptorDequeue(c_ctx->acceptor_queue);
 
@@ -455,6 +455,9 @@ ServerConnectionCallback(HQUIC Connection,
         // maybe alloc later
         ;
       QuicerStreamCTX *s_ctx = init_s_ctx();
+      enif_keep_resource(c_ctx);
+      s_ctx->c_ctx = c_ctx;
+
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
 
