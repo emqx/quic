@@ -1,16 +1,39 @@
 #!/bin/bash
+#
+# Usage:
+# # run all test cases
+# sanitizer-check
+#
+# # run one testcase at a time
+# sanitizer-check one_by_one
+#
+# # run with ct options
+# sanitizer-check --case=Case0 --repeat 100
+#
+#
 lib_dir=$(dirname "$(realpath "$0")")
 
+# for compiler flag
 export QUICER_USE_SANITIZERS=1
+
+# for using asan emulator
 export ESCRIPT_EMULATOR="${lib_dir}/erl-asan"
 
 # Since cerl returns different code:root_dir(), we need to override it here
 # Erlang_OTP_ROOT_DIR will be picked up by CMakeLists.txt
 export Erlang_OTP_ROOT_DIR=$(dirname $(dirname $(which erl)))
 
-# set ERL_TOP for Suppressions list
+# Set ERL_TOP for Suppressions list
 export ERL_TOP=$(cerl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt)
-#export ASAN_OPTIONS="log_path=asan.log"
+
+export QUICER_USE_SNK=1
+
+# For asan log output
+if [ -z "${ASAN_LOG_DIR}" ]; then
+    export ASAN_LOG_DIR=${PWD}/asan_logs
+fi
+
+mkdir -p "${ASAN_LOG_DIR}"
 
 REBAR3=$(command -v rebar3)
 
@@ -28,8 +51,6 @@ if [ $# -eq 1 ]; then
                 escript "$REBAR3" do ct --suite=test/quicer_SUITE --case="$tc";
             done
             ;;
-        *)
-            escript "$REBAR3" do ct --suite=test/quicer_SUITE --case="$1";
     esac
 else
     escript "$REBAR3" do ct $@
