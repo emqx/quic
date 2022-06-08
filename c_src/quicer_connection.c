@@ -755,7 +755,7 @@ Error:
 
       /*
        We should not call *destroy_c_ctx* from here.
-       becasue it could cause race cond:
+       because it could cause race cond:
 
        MsQuic Worker:
 

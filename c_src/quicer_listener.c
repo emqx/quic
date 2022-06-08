@@ -244,9 +244,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
     }
 
-  // we are not going to call enif_make_resource for config_resource
-  // so we need to bump the ref here
-
   // mon will be removed when triggered or when l_ctx is dealloc.
   ErlNifMonitor mon;
 
