@@ -86,7 +86,7 @@ elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
 endif()
 
-# @todo clean complier warnings in the code
+# @todo clean compiler warnings in the code
 target_compile_options(quicer_static PUBLIC "-ggdb3" "-Wno-unused-variable")
 
 add_library(quicer_nif SHARED ${SOURCES})

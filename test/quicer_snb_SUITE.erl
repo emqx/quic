@@ -638,7 +638,7 @@ tc_conn_idle_close(Config) ->
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    ?assertEqual(ok, Result),
-                   %% check that transport shutdown due to idle timeout is triggerd at client side
+                   %% check that transport shutdown due to idle timeout is triggered at client side
                    %% check that shutdown_complete is triggered after idle timeout
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , context := "callback"
@@ -1049,7 +1049,7 @@ tc_conn_resume_nst(Config) ->
                                               , resource_id := _CRid1
                                               },
                                              Trace)),
-                   %% 2. verify that resumption ticket is recevied on client side
+                   %% 2. verify that resumption ticket is received on client side
                    %%    and client use it to resume success
                      ?assert(?causality(#{ ?snk_kind := debug
                                               , context := "callback"

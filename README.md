@@ -32,7 +32,7 @@ API: is not stable, might be changed in the future.
 
 ## With DEBUG
 
-Debug build depedency: [CLOG](https://github.com/microsoft/CLOG) 
+Debug build dependency: [CLOG](https://github.com/microsoft/CLOG) 
 
 ``` sh
 $ rebar3 compile 

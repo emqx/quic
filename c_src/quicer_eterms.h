@@ -120,7 +120,7 @@ extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
 extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
 
 /*-----------------------------------------*/
-/*         msquic parms starts             */
+/*         msquic params starts             */
 /*-----------------------------------------*/
 
 // Parameters for QUIC_PARAM_LEVEL_GLOBAL.
@@ -193,7 +193,7 @@ extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
 extern ERL_NIF_TERM ATOM_QUIC_PARAM_STREAM_PRIORITY;
 
 /*-----------------------*/
-/* msquic parms ends     */
+/* msquic params ends     */
 /*-----------------------*/
 
 /*----------------------------------------------------------*/
