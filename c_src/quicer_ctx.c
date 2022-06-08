@@ -140,6 +140,7 @@ init_s_ctx()
   CxPlatZeroMemory(s_ctx, sizeof(QuicerStreamCTX));
   s_ctx->magic = 0xefefefef; // 4025479151
   s_ctx->env = enif_alloc_env();
+  s_ctx->imm_env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->is_wait_for_data = FALSE;
   s_ctx->Buffers[0].Buffer = NULL;
@@ -162,6 +163,7 @@ deinit_s_ctx(QuicerStreamCTX *s_ctx)
 void
 destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
+  enif_free_env(s_ctx->imm_env);
   // Since enif_release_resource is async call,
   // we should demon the owner now!
   enif_demonitor_process(s_ctx->env, s_ctx, &s_ctx->owner_mon);

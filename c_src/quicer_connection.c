@@ -182,6 +182,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       enif_keep_resource(c_ctx);
       s_ctx->c_ctx = c_ctx;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
+
+      // init eHandler, set once
+      s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+
       ACCEPTOR *acc = AcceptorDequeue(c_ctx->acceptor_queue);
 
       if (!acc)
@@ -457,6 +461,7 @@ ServerConnectionCallback(HQUIC Connection,
       QuicerStreamCTX *s_ctx = init_s_ctx();
       enif_keep_resource(c_ctx);
       s_ctx->c_ctx = c_ctx;
+      s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
 
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;

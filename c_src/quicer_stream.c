@@ -62,7 +62,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
               env,
               ATOM_QUIC,
               ATOM_SEND_COMPLETE,
-              enif_make_resource(env, s_ctx),
+              enif_make_copy(env, s_ctx->eHandler),
               enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
           // note, report to caller instead of stream owner
@@ -91,7 +91,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       report = enif_make_tuple3(env,
                                 ATOM_QUIC,
                                 ATOM_PEER_SEND_SHUTDOWN,
-                                enif_make_resource(env, s_ctx));
+                                enif_make_copy(env, s_ctx->eHandler));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
@@ -111,7 +111,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           env,
           ATOM_QUIC,
           ATOM_PEER_SEND_ABORTED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
@@ -133,7 +133,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           env,
           ATOM_QUIC,
           ATOM_CLOSED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
@@ -144,14 +144,13 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       break;
     }
 
-  if (!is_destroy)
-    {
-      enif_clear_env(env);
-    }
-  else
+  enif_clear_env(env);
+
+  if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
     }
+
   enif_mutex_unlock(s_ctx->lock);
 
   if (is_destroy)
@@ -199,7 +198,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
               env,
               ATOM_QUIC,
               ATOM_SEND_COMPLETE,
-              enif_make_resource(env, s_ctx),
+              enif_make_copy(env, s_ctx->eHandler),
               enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
           // note, report to caller instead of stream owner
@@ -229,7 +228,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           env,
           ATOM_QUIC,
           ATOM_PEER_SEND_ABORTED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
@@ -247,7 +246,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       report = enif_make_tuple3(env,
                                 ATOM_QUIC,
                                 ATOM_PEER_SEND_SHUTDOWN,
-                                enif_make_resource(env, s_ctx));
+                                enif_make_copy(env, s_ctx->eHandler));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
@@ -264,7 +263,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           env,
           ATOM_QUIC,
           ATOM_CLOSED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
@@ -280,11 +279,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       break;
     }
 
-  if (!is_destroy)
-    {
-      enif_clear_env(env);
-    }
-  else
+  enif_clear_env(env);
+
+  if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
     }
@@ -364,6 +361,9 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
+  // Now we have Stream handler
+  s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+
   //
   // Starts the bidirectional stream. By default, the peer is not notified of
   // the stream being started until data is sent on the stream.
@@ -378,9 +378,7 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   s_ctx->is_closed = FALSE;
-  // @TODO it is not so nice to let the connection owner holds the life time of
-  // s_ctx
-  res = enif_make_resource(env, s_ctx);
+  res = enif_make_copy(env, s_ctx->eHandler);
 
   return SUCCESS(res);
 
@@ -747,10 +745,10 @@ handle_stream_recv_event(HQUIC Stream,
           // notify owner to trigger async recv
           if (!enif_send(NULL,
                          &(s_ctx->owner->Pid),
-                         NULL,
+                         s_ctx->env,
                          enif_make_tuple3(env,
                                           ATOM_QUIC,
-                                          enif_make_resource(env, s_ctx),
+                                          enif_make_copy(env, s_ctx->eHandler),
                                           ATOM_QUIC_STATUS_CONTINUE)))
             {
               // App down, shutdown stream
@@ -763,18 +761,18 @@ handle_stream_recv_event(HQUIC Stream,
   else
     { // active receive
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
-
+      ERL_NIF_TERM eHandler = enif_make_copy(env, s_ctx->eHandler);
       ERL_NIF_TERM report_active = enif_make_tuple6(
           env,
           ATOM_QUIC,
           enif_make_binary(env, &bin),
-          enif_make_resource(env, s_ctx),
+          eHandler,
           enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
           enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
           enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
       );
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_active))
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_active))
         {
           // App down, shutdown stream
           MsQuic->StreamShutdown(Stream,
@@ -798,10 +796,11 @@ handle_stream_recv_event(HQUIC Stream,
             {
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
 
-              ERL_NIF_TERM report_passive = enif_make_tuple2(
-                  env, ATOM_QUIC_PASSIVE, enif_make_resource(env, s_ctx));
+              ERL_NIF_TERM report_passive
+                  = enif_make_tuple2(env, ATOM_QUIC_PASSIVE, eHandler);
 
-              if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_passive))
+              if (!enif_send(
+                      NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive))
                 {
                   MsQuic->StreamShutdown(Stream,
                                          QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,

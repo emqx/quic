@@ -86,6 +86,13 @@ typedef struct QuicerStreamCTX
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
+  // Immutable env,
+  // eTerms in imm_env should never be changed once set
+  // eTerms in imm_env survives after each callback
+  // imm_env should be freed in ctx destroy fun.
+  ErlNifEnv *imm_env;
+  // Set once
+  ERL_NIF_TERM eHandler;
   ErlNifMutex *lock;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
