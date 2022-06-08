@@ -25,14 +25,12 @@
         , async_accept/2
         , async_handshake/1
         , async_shutdown_connection/3
-        , async_close_connection/1
         , async_accept_stream/2
         , start_stream/2
         , send/3
         , recv/2
         , send_dgram/3
         , async_shutdown_stream/3
-        , async_close_stream/1
         , sockname/1
         , getopt/3
         , setopt/4
@@ -53,8 +51,21 @@
 init() ->
   NifName = "libquicer_nif",
   {ok, Niflib} = locate_lib(code:priv_dir(quicer), NifName),
-  ok = erlang:load_nif(Niflib, 0).
-
+  ok = erlang:load_nif(Niflib, 0),
+  %% It could cause segfault if MsQuic library is not opened nor registered.
+  %% here we have added dummy calls, and it should cover most of cases
+  %% unless caller wants to call erlang:load_nif/1 and then call quicer_nif
+  %% without opened library to suicide.
+  %%
+  %% Note, we could do same dummy calls in nif instead but it might mess up the reference counts.
+  {ok, _} = open_lib(),
+  %% dummy reg open
+  case reg_open() of
+    ok -> ok;
+    {error, badarg} ->
+      %% already opened
+      ok
+  end.
 
 -spec open_lib() ->
         {ok, true}  | %% opened
@@ -78,7 +89,7 @@ close_lib() ->
   erlang:nif_error(nif_library_not_loaded).
 
 
--spec reg_open() -> ok.
+-spec reg_open() -> ok | {error, badarg}.
 reg_open() ->
   erlang:nif_error(nif_library_not_loaded).
 
@@ -123,11 +134,6 @@ async_handshake(_Connection) ->
 async_shutdown_connection(_Conn, _Flags, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_close_connection(connection_handler()) ->
-        ok | {error, badarg}.
-async_close_connection(_Conn) ->
-  erlang:nif_error(nif_library_not_loaded).
-
 -spec async_accept_stream(connection_handler(), stream_opts()) ->
         {ok, connection_handler()} |
         {error, badarg | internal_error | bad_pid | owner_dead}.
@@ -167,12 +173,6 @@ send_dgram(_Conn, _Data, _Flags) ->
         ok |
         {error, badarg | atom_reason()}.
 async_shutdown_stream(_Stream, _Flags, _ErrorCode) ->
-  erlang:nif_error(nif_library_not_loaded).
-
--spec async_close_stream(stream_handler()) ->
-        ok |
-        {error, badarg | atom_reason()}.
-async_close_stream(_Stream) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec sockname(connection_handler() | stream_handler()) ->

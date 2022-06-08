@@ -26,9 +26,19 @@ limitations under the License.
 #define _CTX_NIF_WRITE_
 #define _CTX_NIF_READ_
 
+/*
+ * Configuration
+ */
+typedef struct QuicerConfigCTX
+{
+  ErlNifEnv *env;
+  HQUIC Configuration;
+} QuicerConfigCTX;
+
 typedef struct
 {
-  HQUIC Configuration;
+  // config_resource is allocated in 'init_l_ctx'
+  QuicerConfigCTX *config_resource;
   HQUIC Listener;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
@@ -45,9 +55,12 @@ typedef struct
 
 typedef struct QuicerConnCTX
 {
-  HQUIC Configuration;
+  uint32_t magic;
+  // config_resource
+  // for server, inherit from l_ctx
+  // for client, alloc on its own
+  QuicerConfigCTX *config_resource;
   HQUIC Connection;
-  QuicerListenerCTX *l_ctx;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;
@@ -58,6 +71,7 @@ typedef struct QuicerConnCTX
   QUIC_TLS_SECRETS *TlsSecrets;
   QUIC_BUFFER *ResumptionTicket;
   BOOLEAN is_closed;
+  uint32_t event_mask;
   char *ssl_keylogfile;
   void *reserved1;
   void *reserved2;
@@ -66,12 +80,19 @@ typedef struct QuicerConnCTX
 
 typedef struct QuicerStreamCTX
 {
-  QuicerListenerCTX *l_ctx;
+  uint32_t magic;
   QuicerConnCTX *c_ctx;
   HQUIC Stream;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
+  // Immutable env,
+  // eTerms in imm_env should never be changed once set
+  // eTerms in imm_env survives after each callback
+  // imm_env should be freed in ctx destroy fun.
+  ErlNifEnv *imm_env;
+  // Set once
+  ERL_NIF_TERM eHandler;
   ErlNifMutex *lock;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
@@ -103,6 +124,10 @@ void destroy_l_ctx(QuicerListenerCTX *l_ctx);
 QuicerConnCTX *init_c_ctx();
 void deinit_c_ctx(QuicerConnCTX *c_ctx);
 void destroy_c_ctx(QuicerConnCTX *c_ctx);
+
+QuicerConfigCTX *init_config_ctx();
+void deinit_config_ctx(QuicerConfigCTX *config_ctx);
+void destroy_config_ctx(QuicerConfigCTX *config_ctx);
 
 QuicerStreamCTX *init_s_ctx();
 void deinit_s_ctx(QuicerStreamCTX *s_ctx);

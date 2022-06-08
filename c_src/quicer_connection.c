@@ -179,9 +179,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       //
       // maybe alloc later
       s_ctx = init_s_ctx();
-
-      // @fixit Stream context shouldn't be shared.
+      enif_keep_resource(c_ctx);
+      s_ctx->c_ctx = c_ctx;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
+
+      // init eHandler, set once
+      s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+
       ACCEPTOR *acc = AcceptorDequeue(c_ctx->acceptor_queue);
 
       if (!acc)
@@ -189,10 +193,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           destroy_s_ctx(s_ctx);
           enif_mutex_unlock(c_ctx->lock);
           return QUIC_STATUS_UNREACHABLE;
-        }
-      else
-        {
-          enif_keep_resource(s_ctx->c_ctx);
         }
       s_ctx->owner = acc;
 
@@ -251,13 +251,19 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      report = enif_make_tuple3(
-          env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
+      // This is special case for client,
+      // it could happen that the connection is opened but never get started.
+      // @see async_connect3
+      // in this case, we don't need to report closed to the owner
+      if (!c_ctx->is_closed) // owner doesn't know it is closed
+        {
+          report = enif_make_tuple3(
+              env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
-      enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-
+          enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+        }
       is_destroy = TRUE;
-      c_ctx->is_closed = TRUE;
+      c_ctx->is_closed = TRUE; // client shutdown completed
       break;
     case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
       // @TODO
@@ -275,25 +281,54 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // received from the server.
       //
       //
-      if (c_ctx->ResumptionTicket)
+      // The client wants to recv new session ticket in the mailbox
+      if (c_ctx->event_mask & QUICER_CONNECTION_EVENT_MASK_NST)
         {
-          CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
-        }
-      c_ctx->ResumptionTicket = (QUIC_BUFFER *)CXPLAT_ALLOC_NONPAGED(
-          sizeof(QUIC_BUFFER)
-              + Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
-          QUICER_RESUME_TICKET);
+          ERL_NIF_TERM ticket;
+          unsigned char *ticket_buff = enif_make_new_binary(
+              env,
+              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
+              &ticket);
+          if (ticket_buff && ticket)
+            {
 
-      if (c_ctx->ResumptionTicket)
+              CxPlatCopyMemory(
+                  ticket_buff,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+
+              report = enif_make_tuple4(env,
+                                        ATOM_QUIC,
+                                        ATOM_NST_RECEIVED,
+                                        enif_make_resource(env, c_ctx),
+                                        ticket);
+
+              enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+            }
+        }
+      else // if QUICER_CONNECTION_EVENT_MASK_NST is unset in event_mask, we
+           // just store it in the c_ctx
         {
-          c_ctx->ResumptionTicket->Buffer
-              = (uint8_t *)(c_ctx->ResumptionTicket + 1);
-          c_ctx->ResumptionTicket->Length
-              = Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
-          CxPlatCopyMemory(
-              c_ctx->ResumptionTicket->Buffer,
-              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
-              Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+          if (c_ctx->ResumptionTicket)
+            {
+              CXPLAT_FREE(c_ctx->ResumptionTicket, QUICER_RESUME_TICKET);
+            }
+          c_ctx->ResumptionTicket = (QUIC_BUFFER *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_BUFFER)
+                  + Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength,
+              QUICER_RESUME_TICKET);
+
+          if (c_ctx->ResumptionTicket)
+            {
+              c_ctx->ResumptionTicket->Buffer
+                  = (uint8_t *)(c_ctx->ResumptionTicket + 1);
+              c_ctx->ResumptionTicket->Length
+                  = Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength;
+              CxPlatCopyMemory(
+                  c_ctx->ResumptionTicket->Buffer,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
+                  Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+            }
         }
       break;
     case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
@@ -346,22 +381,8 @@ ServerConnectionCallback(HQUIC Connection,
       assert(c_ctx->Connection == Connection);
       c_ctx->Connection = Connection;
       acc = c_ctx->owner;
-      acc_pid = &(acc->Pid);
-
-      // for fast connect:
-      if (!(acc && enif_is_process_alive(c_ctx->env, acc_pid)))
-        {
-          acc = AcceptorDequeue(
-              c_ctx->l_ctx->acceptor_queue); // dequeue from listener queue!
-          acc_pid = &(acc->Pid);
-          if (!(acc && acc_pid && enif_is_process_alive(c_ctx->env, acc_pid)))
-            {
-              enif_mutex_unlock(c_ctx->lock);
-              return QUIC_STATUS_UNREACHABLE;
-            }
-        }
-
       assert(acc);
+      acc_pid = &(acc->Pid);
 
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
@@ -419,8 +440,7 @@ ServerConnectionCallback(HQUIC Connection,
               (uintptr_t)Connection,
               Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
 
-      if (!c_ctx->owner->fast_conn
-          && !Event->SHUTDOWN_COMPLETE.HandshakeCompleted)
+      if (!Event->SHUTDOWN_COMPLETE.HandshakeCompleted)
         {
           enif_release_resource(c_ctx);
         }
@@ -428,7 +448,7 @@ ServerConnectionCallback(HQUIC Connection,
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
       enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-      c_ctx->is_closed = TRUE;
+      c_ctx->is_closed = TRUE; // server shutdown_complete
       is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -439,16 +459,27 @@ ServerConnectionCallback(HQUIC Connection,
         // maybe alloc later
         ;
       QuicerStreamCTX *s_ctx = init_s_ctx();
+      enif_keep_resource(c_ctx);
+      s_ctx->c_ctx = c_ctx;
+      s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+
       ErlNifEnv *env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
-      s_ctx->c_ctx = c_ctx;
-      s_ctx->l_ctx = c_ctx->l_ctx;
 
       acc = AcceptorDequeue(c_ctx->acceptor_queue);
 
       if (!acc)
         {
-          acc = c_ctx->owner;
+          // If we don't have available process
+          // fallback to the connection owner
+          acc = AcceptorAlloc();
+          if (!acc)
+            {
+              return QUIC_STATUS_UNREACHABLE;
+            }
+          // We must copy here, otherwise it will become double free
+          // in resource dealloc callbacks (for Stream and Connection)
+          memcpy(acc, c_ctx->owner, sizeof(ACCEPTOR));
         }
 
       assert(acc);
@@ -466,10 +497,7 @@ ServerConnectionCallback(HQUIC Connection,
                                       ATOM_NEW_STREAM,
                                       enif_make_resource(env, s_ctx))))
         {
-          // @todo log and step counter
-          // @todo, maybe we should just return error code and let msquic
-          // shutdown the connection gracefully.
-          // @todo, check rfc for the error code
+          // @TODO: check RFC for the error code
           MsQuic->ConnectionShutdown(
               Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
           enif_mutex_unlock(s_ctx->lock);
@@ -480,7 +508,6 @@ ServerConnectionCallback(HQUIC Connection,
           MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
                                      (void *)ServerStreamCallback,
                                      s_ctx);
-          enif_keep_resource(c_ctx);
         }
       break;
     case QUIC_CONNECTION_EVENT_RESUMED:
@@ -522,11 +549,10 @@ async_connect3(ErlNifEnv *env,
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
-  ERL_NIF_TERM Handler;
+  ERL_NIF_TERM NST; // New Session Ticket
   // Usually we should not get this error
   // If we get it is internal logic error
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
-  BOOLEAN is_resume = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -543,6 +569,10 @@ async_connect3(ErlNifEnv *env,
 
   QuicerConnCTX *c_ctx = init_c_ctx();
 
+  // allocate config_resource for client connection
+  c_ctx->config_resource
+      = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
+
   if ((c_ctx->owner = AcceptorAlloc()) == NULL)
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
@@ -555,8 +585,11 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-  ERL_NIF_TERM estatus
-      = ClientLoadConfiguration(env, &eoptions, &(c_ctx->Configuration), true);
+  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
+
+  // convert eoptions to Configuration
+  ERL_NIF_TERM estatus = ClientLoadConfiguration(
+      env, &eoptions, &(c_ctx->config_resource->Configuration), true);
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
@@ -639,13 +672,12 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  if (enif_get_map_value(env, eoptions, ATOM_HANDLER, &Handler))
+  if (enif_get_map_value(env, eoptions, ATOM_HANDLER, &NST))
     {
-      // Resume connection, try resume
+      // Resume connection with Old Connection Handler
       //
       QuicerConnCTX *old_c_ctx = NULL;
-      if (!enif_get_resource(
-              env, Handler, ctx_connection_t, (void **)&old_c_ctx))
+      if (!enif_get_resource(env, NST, ctx_connection_t, (void **)&old_c_ctx))
         {
           return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
@@ -667,32 +699,99 @@ async_connect3(ErlNifEnv *env,
           enif_mutex_unlock(old_c_ctx->lock);
         }
     }
+  else if (enif_get_map_value(env, eoptions, ATOM_NST, &NST))
+    {
+      // Resume connection with NST binary
+      //
+      //
+      ErlNifBinary ticket;
+      if (!enif_inspect_binary(env, NST, &ticket) || ticket.size > UINT32_MAX)
+        {
+          res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+          goto Error;
+        }
+      else
+        {
+          if (QUIC_FAILED(Status
+                          = MsQuic->SetParam(c_ctx->Connection,
+                                             QUIC_PARAM_CONN_RESUMPTION_TICKET,
+                                             ticket.size,
+                                             ticket.data)))
+            {
+              res = ERROR_TUPLE_3(ATOM_ERROR_NOT_FOUND, ATOM_STATUS(Status));
+              goto Error;
+            }
+        }
+    }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(c_ctx->Connection,
-                                                   c_ctx->Configuration,
-                                                   QUIC_ADDRESS_FAMILY_UNSPEC,
-                                                   host,
-                                                   port)))
+  // This is optional
+  get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &c_ctx->event_mask);
+
+  // @TODO client async_connect_3 should able to take a config_resource as
+  // input ERL TERM so that we don't need to call ClientLoadConfiguration
+  //
+  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
+                      c_ctx->Connection,
+                      c_ctx->config_resource->Configuration,
+                      QUIC_ADDRESS_FAMILY_UNSPEC,
+                      host,
+                      port)))
     {
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
+      enif_release_resource(c_ctx->config_resource);
       goto Error;
     }
-  c_ctx->is_closed = FALSE;
+  c_ctx->is_closed = FALSE; // connection started
   ERL_NIF_TERM eHandler = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandler);
 
 Error:
-  if (is_resume)
-    {
-      enif_mutex_unlock(c_ctx->lock);
-    }
-  else
-    {
-      destroy_c_ctx(c_ctx);
+  // Error exit, it must not be started!
+  assert(c_ctx->is_closed);
 
-      // @TODO Check if we need to call this
-      // MsQuic->ConnectionClose(c_ctx->connection)
+  if (c_ctx->Connection)
+    { // when is opened
+
+      /*
+       We should not call *destroy_c_ctx* from here.
+       because it could cause race cond:
+
+       MsQuic Worker:
+
+         Connection close job will trigger ClientConnectionCallback with event:
+         QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+
+       Beam Schedler:
+         release c_ctx by calling *destroy_c_ctx* will trigger
+       *resource_conn_dealloc_callback*
+
+       The c_ctx could be freed (unprotectable) by beam while
+       ClientConnectionCallback can still access it.
+
+       So the side effect chain will be:
+
+       'MsQuic->ConnectionClose' triggers 'ClientConnectionCallback' triggers
+       'release c_ctx resource' triggers resource_conn_dealloc_callback' and
+       then 'free c_ctx'. At this point both resources in beam and MsQuic is
+        released.
+
+       note 1:
+
+       If we only call *destroy_c_ctx* triggers
+       *resource_conn_dealloc_callback* triggers  'MsQuic->ConnectionClose'
+       triggers ClientConnectionCallback here it can casue race cond. since
+       c_ctx has been freed by beam already after
+       resource_conn_dealloc_callback is finished.
+
+       note 2:
+       We could not call MsQuic->SetCallbackHandler to set callback to NULL
+       becasue this function is async, not thread safe.
+
+       */
+      MsQuic->ConnectionClose(c_ctx->Connection);
+      // prevent double ConnectionClose
+      c_ctx->Connection = NULL;
     }
   return res;
 }
@@ -725,12 +824,6 @@ async_accept2(ErlNifEnv *env,
     {
       AcceptorDestroy(acceptor);
       return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-    }
-
-  ERL_NIF_TERM IsFastConn;
-  if (enif_get_map_value(env, conn_opts, ATOM_FAST_CONN, &IsFastConn))
-    {
-      acceptor->fast_conn = IS_SAME_TERM(IsFastConn, ATOM_TRUE);
     }
 
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
@@ -774,26 +867,6 @@ shutdown_connection3(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-close_connection1(ErlNifEnv *env,
-                  __unused_parm__ int argc,
-                  const ERL_NIF_TERM argv[])
-{
-  QuicerConnCTX *c_ctx;
-  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  enif_mutex_lock(c_ctx->lock);
-  c_ctx->Connection = NULL;
-  enif_mutex_unlock(c_ctx->lock);
-
-  // void return
-  MsQuic->ConnectionClose(c_ctx->Connection);
-  return ATOM_OK;
-}
-
-ERL_NIF_TERM
 sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
 {
   void *q_ctx;
@@ -811,11 +884,6 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
     {
       Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
-    }
-  else if (enif_get_resource(env, argv[0], ctx_stream_t, &q_ctx))
-    {
-      Handle = ((QuicerStreamCTX *)q_ctx)->c_ctx->Connection;
-      Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
     }
   else
     {
@@ -889,13 +957,14 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
-  if (!c_ctx || !(c_ctx->l_ctx))
+  if (!c_ctx)
     {
       return QUIC_STATUS_INTERNAL_ERROR;
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
-                      c_ctx->Connection, c_ctx->l_ctx->Configuration)))
+  if (QUIC_FAILED(
+          Status = MsQuic->ConnectionSetConfiguration(
+              c_ctx->Connection, c_ctx->config_resource->Configuration)))
     {
       return Status;
     }

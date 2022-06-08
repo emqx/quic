@@ -1011,11 +1011,6 @@ get_stream_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  else if (s_ctx->c_ctx)
-    {
-      res = get_connection_opt(env, s_ctx->c_ctx, optname, elevel);
-      goto Exit;
-    }
   else
     {
       res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
@@ -1123,11 +1118,6 @@ set_stream_opt(ErlNifEnv *env,
         {
           return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
-    }
-  else if (s_ctx->c_ctx)
-    {
-      res = set_connection_opt(env, s_ctx->c_ctx, optname, optval, elevel);
-      goto Exit;
     }
   else
     {
@@ -1292,11 +1282,6 @@ get_connection_opt(ErlNifEnv *env,
       Param = QUIC_PARAM_CONN_LOCAL_INTERFACE;
       // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
-    }
-  else if (c_ctx->l_ctx)
-    {
-      res = get_listener_opt(env, c_ctx->l_ctx, optname, elevel);
       goto Exit;
     }
   else
@@ -1523,11 +1508,6 @@ set_connection_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  else if (c_ctx->l_ctx)
-    { // Server
-      res = set_listener_opt(env, c_ctx->l_ctx, optname, optval, elevel);
-      goto Exit;
-    }
   else
     {
       res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
@@ -1649,13 +1629,12 @@ set_listener_opt(ErlNifEnv *env,
     }
 
   enif_mutex_lock(l_ctx->lock);
+
   if (l_ctx->is_closed)
     {
-      enif_mutex_unlock(l_ctx->lock);
-      return ERROR_TUPLE_2(ATOM_CLOSED);
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto Exit;
     }
-  enif_keep_resource(l_ctx);
-  enif_mutex_unlock(l_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1694,7 +1673,7 @@ set_listener_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
     }
 Exit:
-  enif_release_resource(l_ctx);
+  enif_mutex_unlock(l_ctx->lock);
   return res;
 }
 

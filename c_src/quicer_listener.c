@@ -27,12 +27,12 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
   QuicerConnCTX *c_ctx = NULL;
+  BOOLEAN is_destroy = FALSE;
 
+  enif_mutex_lock(l_ctx->lock);
   switch (Event->Type)
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-        // printf("new connection\n");
-        ;
       //
       // Note, c_ctx is newly init here, don't grab lock.
       //
@@ -41,22 +41,28 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!c_ctx)
         {
-          return QUIC_STATUS_OUT_OF_MEMORY;
+          Status = QUIC_STATUS_OUT_OF_MEMORY;
+          goto Error;
         }
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
-      c_ctx->l_ctx = l_ctx;
+      assert(l_ctx->config_resource);
+      // Keep resource for c_ctx
+      enif_keep_resource(l_ctx->config_resource);
+      c_ctx->config_resource = l_ctx->config_resource;
 
       ACCEPTOR *conn_owner = AcceptorDequeue(l_ctx->acceptor_queue);
 
       if (!conn_owner)
         {
           TP_CB_3(missing_acceptor, (uintptr_t)c_ctx->Connection, 0);
-          destroy_c_ctx(c_ctx);
+          destroy_c_ctx(c_ctx); // no avail conn owner
           // make msquic close the connection.
-          return QUIC_STATUS_UNREACHABLE;
+          Status = QUIC_STATUS_UNREACHABLE;
+          goto Error;
         }
+      TP_CB_3(acceptor_hit, (uintptr_t)c_ctx->Connection, 0);
       c_ctx->owner = conn_owner;
 
       //
@@ -78,37 +84,53 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                            &value);
         }
 
-      if (conn_owner->fast_conn)
+      if (!enif_send(NULL,
+                     &(c_ctx->owner->Pid),
+                     NULL,
+                     enif_make_tuple3(env,
+                                      ATOM_QUIC,
+                                      ATOM_NEW_CONN,
+                                      enif_make_resource(env, c_ctx))))
         {
-          TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 1);
-          if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
-            {
-              destroy_c_ctx(c_ctx);
-              return Status;
-            }
+          Status = QUIC_STATUS_INTERNAL_ERROR;
+          goto Error;
         }
-      else
-        {
-          TP_CB_3(fast_conn, (uintptr_t)c_ctx->Connection, 0);
-          if (!enif_send(NULL,
-                         &(c_ctx->owner->Pid),
-                         NULL,
-                         enif_make_tuple3(env,
-                                          ATOM_QUIC,
-                                          ATOM_NEW_CONN,
-                                          enif_make_resource(env, c_ctx))))
-            {
-              enif_mutex_unlock(c_ctx->lock);
-              return QUIC_STATUS_INTERNAL_ERROR;
-            }
-        }
-      c_ctx->is_closed = FALSE;
+
+      c_ctx->is_closed = FALSE; // new connection
+      enif_clear_env(env);
+      break;
+
+    case QUIC_LISTENER_EVENT_STOP_COMPLETE:
+      env = l_ctx->env;
+
+      // Close listener in NIF CTX leads to NULL Listener HQUIC
+      assert(l_ctx->Listener == NULL);
+
+      // Dummy call to prevent leakage if handler is not NULL
+      // @TODO they should be removed when we support ListenerStop call
+      MsQuic->ListenerClose(l_ctx->Listener);
+      l_ctx->Listener = NULL;
+
+      enif_send(NULL,
+                &(l_ctx->listenerPid),
+                NULL,
+                enif_make_tuple3(env,
+                                 ATOM_QUIC,
+                                 ATOM_LISTENER_STOPPED,
+                                 enif_make_resource(env, l_ctx)));
+      is_destroy = TRUE;
       enif_clear_env(env);
       break;
     default:
       break;
     }
 
+Error:
+  enif_mutex_unlock(l_ctx->lock);
+  if (is_destroy)
+    {
+      destroy_l_ctx(l_ctx);
+    }
   return Status;
 }
 
@@ -150,7 +172,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   QuicerListenerCTX *l_ctx = init_l_ctx();
 
-  // @todo is listenerPid useless?
   if (!enif_self(env, &(l_ctx->listenerPid)))
     {
       return ERROR_TUPLE_2(ATOM_BAD_PID);
@@ -204,7 +225,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   ERL_NIF_TERM estatus = ServerLoadConfiguration(
-      env, &options, &l_ctx->Configuration, &CredConfig);
+      env, &options, &l_ctx->config_resource->Configuration, &CredConfig);
 
   // Cleanup CredConfig
   if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
@@ -263,7 +284,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           Status = MsQuic->ListenerStart(
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
-      MsQuic->ListenerClose(l_ctx->Listener);
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
@@ -281,11 +301,16 @@ close_listener1(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  // calling ListenerStop is optional
+
   enif_mutex_lock(l_ctx->lock);
-  MsQuic->ListenerStop(l_ctx->Listener);
+  HQUIC l = l_ctx->Listener;
+  l_ctx->Listener = NULL;
   l_ctx->is_closed = TRUE;
   enif_mutex_unlock(l_ctx->lock);
-  enif_release_resource(l_ctx);
+
+  // It is safe to close it without holding the lock
+  // This also ensures no ongoing listener callbacks
+  MsQuic->ListenerClose(l);
+
   return ATOM_OK;
 }

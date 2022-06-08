@@ -133,6 +133,9 @@
 
 -type send_flags() :: non_neg_integer(). %% is sync send or not
 
+-type send_complete_flag() :: ?QUIC_SEND_COMPLETE_SUCCESS |
+                              ?QUIC_SEND_COMPLETE_CANCELLED.
+
 -type optlevel() :: false | %% unspecified
                     quic_global |
                     quic_registration |

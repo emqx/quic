@@ -213,7 +213,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   end.
 
 
-%% @doc Complete TLS handshake after accepted a 'Slow Start' Connection with option {fast_conn, false}.
+%% @doc Complete TLS handshake after accepted a Connection
 %%      with 5s timeout
 %% @end
 %% @see accept/3
@@ -222,7 +222,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
 handshake(Conn) ->
   handshake(Conn, 5000).
 
-%% @doc Complete TLS handshake after accepted a 'Slow Start' Connection with option {fast_conn, false}.
+%% @doc Complete TLS handshake after accepted a Connection
 %% @see handshake/2
 %% @see async_handshake/1
 -spec handshake(connection_handler(), timeout()) -> ok | {error, any()}.
@@ -237,7 +237,7 @@ handshake(Conn, Timeout) ->
       end
   end.
 
-%% @doc Complete TLS handshake after accepted a 'Slow Start' Connection with option {fast_conn, false}.
+%% @doc Complete TLS handshake after accepted a Connection.
 %% Caller should expect to receive ```{quic, connected, connection_handler()}'''
 %%
 %% @see handshake/2
@@ -346,6 +346,7 @@ close_connection(Conn) ->
   close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, 5000).
 
 %% @doc Close connection with flag specified and application reason code.
+%% @see shutdown_connection/3
 -spec close_connection(connection_handler(),
                        conn_shutdown_flag(),
                        app_errno()
@@ -354,29 +355,25 @@ close_connection(Conn, Flags, ErrorCode) ->
   close_connection(Conn, Flags, ErrorCode, 5000).
 
 %% @doc Close connection with flag specified and application reason code with timeout
+%% @see shutdown_connection/4
 -spec close_connection(connection_handler(),
                        conn_shutdown_flag(),
                        app_errno(),
                        timeout()) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
-  case shutdown_connection(Conn, Flags, ErrorCode, Timeout) of
-    {error, _} = Err ->
-      Err;
-    ok ->
-      async_close_connection(Conn)
-  end.
+  shutdown_connection(Conn, Flags, ErrorCode, Timeout).
 
-%% @doc Async variant of {@link close_connection/4}
 -spec async_close_connection(connection_handler()) -> ok.
 async_close_connection(Conn) ->
-  quicer_nif:async_close_connection(Conn).
+  async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
 
+%% @doc Async variant of {@link close_connection/4}
+%% @see async_close_connection/3
 -spec async_close_connection(connection_handler(),
                              conn_shutdown_flag(),
                              app_errno()) -> ok.
 async_close_connection(Conn, Flags, ErrorCode) ->
-  _ = quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode),
-  quicer_nif:async_close_connection(Conn).
+  async_shutdown_connection(Conn, Flags, ErrorCode).
 
 %% @doc Accept new stream on a existing connection with stream opts
 %%
@@ -468,8 +465,10 @@ start_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
 %% @doc Send binary data over stream, blocking until send request is handled by the transport worker.
+%% either succeeded or cancelled
 -spec send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
+        {error, cancelled}                        |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 send(Stream, Data) ->
@@ -477,8 +476,10 @@ send(Stream, Data) ->
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
-        {quic, send_completed, Stream, _} ->
-          OK
+        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_SUCCESS} ->
+          OK;
+        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_CANCELLED} ->
+          {error, cancelled}
       end;
     E ->
       E
@@ -486,7 +487,8 @@ send(Stream, Data) ->
 
 %% @doc async variant of {@link send/2}
 %% Caller should expect to receive
-%% ```{quic, send_completed, Stream, _}'''
+%% ```{quic, send_completed, Stream, send_complete_flag()}'''
+%% note, check send_complete_flag() to ensure it is delivered or not.
 -spec async_send(stream_handler(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
@@ -504,22 +506,12 @@ async_send(Stream, Data) ->
 %%
 %% Suggested to use Len=0 if caller want to buffer or reassemble the data on its own.
 %%
-%% note, the requested Len cannot exceed the stream recv window size specified in connection opts
-%% otherwise ```{error, stream_recv_window_too_small}''' will be returned.
+%% note, the requested Len cannot exceed the 'stream_recv_window_default' specified in connection opts
+%% otherwise the function will never return
 -spec recv(stream_handler(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
 recv(Stream, Count) ->
-  case quicer:getopt(Stream, param_conn_settings, false) of
-  {ok, Settings} ->
-      case proplists:get_value(stream_recv_window_default, Settings, 0) of
-        X when X < Count ->
-          {error, stream_recv_window_too_small};
-        _ ->
-          do_recv(Stream, Count)
-      end;
-  {error, _} = Error ->
-      Error
-  end.
+  do_recv(Stream, Count).
 
 do_recv(Stream, Count) ->
   case quicer_nif:recv(Stream, Count) of
@@ -578,14 +570,15 @@ shutdown_stream(Stream, Timeout) ->
 
 %% @doc Start shutdown Stream process with flags and application specified error code.
 %%
-%% returns when stream closing is confirmed in the stack.
+%% returns when stream closing is confirmed in the stack (Blocking).
 %%
 %% Flags could be used to control the behavior like half-close.
 %% @end
+%% @see async_shutdown_stream/4
 -spec shutdown_stream(stream_handler(),
-                   stream_shutdown_flags(),
-                   app_errno(),
-                   timeout()) ->
+                      stream_shutdown_flags(),
+                      app_errno(),
+                      timeout()) ->
         ok |
         {error, badarg} |
         {error, timeout}.
@@ -604,6 +597,7 @@ shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
 
 
 %% @doc async variant of {@link shutdown_stream/2}
+%% @see async_shutdown_stream/3
 -spec async_shutdown_stream(stream_handler()) ->
         ok |
         {error, badarg | atom_reason()}.
@@ -622,45 +616,34 @@ async_shutdown_stream(Stream) ->
 async_shutdown_stream(Stream, Flags, Reason) ->
   quicer_nif:async_shutdown_stream(Stream, Flags, Reason).
 
-%% @doc close stream handler.
+%% @doc Normal shutdown stream with infinity timeout.
+%% @see close_stream/2
 -spec close_stream(stream_handler()) -> ok | {error, badarg | timeout}.
 close_stream(Stream) ->
-  case shutdown_stream(Stream, infinity) of
-    ok ->
-      async_close_stream(Stream);
-    {error, _} = E ->
-      E
-  end.
+  close_stream(Stream, infinity).
 
+%% @doc Normal shutdown (App errno=0) Stream gracefully with timeout.
 %% @see close_stream/4
 -spec close_stream(stream_handler(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Timeout) ->
-  case shutdown_stream(Stream, Timeout) of
-    ok ->
-      async_close_stream(Stream);
-    {error, _} = E ->
-      E
-  end.
+  close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
 
-%% @doc shutdown stream and then close stream handler.
+%% @doc Another name of shutdown stream for migration from tcp/ssl.
 %% @see close_stream/1
 %% @see shutdown_stream/4
 -spec close_stream(stream_handler(), stream_shutdown_flags(),
                    app_errno(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Flags, ErrorCode, Timeout) ->
-  case shutdown_stream(Stream, Flags, ErrorCode, Timeout) of
-    ok ->
-      async_close_stream(Stream);
-    {error, _} = E ->
-      E
-  end.
+  shutdown_stream(Stream, Flags, ErrorCode, Timeout).
 
-%% @doc async variant of {@link close_stream/4}
+%% @doc async variant of {@link close_stream/1}, prefer to use async_shutdown_stream/4
+%% @see close_stream/4
+%% @see async_shutdown_stream/4
 -spec async_close_stream(stream_handler()) -> ok | {error, badarg}.
 async_close_stream(Stream) ->
-  quicer_nif:async_close_stream(Stream).
+  async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
 
 %% @doc Get socket name
 %% mimic {@link ssl:sockname/1}
@@ -697,6 +680,8 @@ getopt(Handle, Opt, Optlevel) ->
         {error, atom_reason()}.
 setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
   setopt(Handle, param_conn_settings, maps:from_list(Value));
+setopt({_Conn, Stream}, active, Value) ->
+  setopt(Stream, active, Value);
 setopt(Handle, Opt, Value) ->
   quicer_nif:setopt(Handle, Opt, Value, false).
 

@@ -252,6 +252,7 @@ extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
 /* Terms for message sending                                */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_CLOSED;
+extern ERL_NIF_TERM ATOM_LISTENER_STOPPED;
 extern ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
@@ -263,6 +264,9 @@ extern ERL_NIF_TERM ATOM_QUIC;
 extern ERL_NIF_TERM ATOM_DGRAM;
 extern ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
 extern ERL_NIF_TERM ATOM_QUIC_PASSIVE;
+extern ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
+extern ERL_NIF_TERM ATOM_NST_RECEIVED;
+extern ERL_NIF_TERM ATOM_NST;
 extern ERL_NIF_TERM ATOM_DEBUG;
 extern ERL_NIF_TERM ATOM_ONCE;
 extern ERL_NIF_TERM ATOM_NEW_CONN;
@@ -292,7 +296,6 @@ extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /* Additional Connection Opt                                */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
-extern ERL_NIF_TERM ATOM_FAST_CONN;
 extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 /*----------------------------------------------------------*/

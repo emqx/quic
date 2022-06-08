@@ -37,7 +37,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   QuicerStreamSendCTX *send_ctx = NULL;
   BOOLEAN is_destroy = FALSE;
 
-  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
   TP_CB_3(event, (uintptr_t)Stream, Event->Type);
@@ -63,7 +62,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
               env,
               ATOM_QUIC,
               ATOM_SEND_COMPLETE,
-              enif_make_resource(env, s_ctx),
+              enif_make_copy(env, s_ctx->eHandler),
               enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
           // note, report to caller instead of stream owner
@@ -92,7 +91,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       report = enif_make_tuple3(env,
                                 ATOM_QUIC,
                                 ATOM_PEER_SEND_SHUTDOWN,
-                                enif_make_resource(env, s_ctx));
+                                enif_make_copy(env, s_ctx->eHandler));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
@@ -112,7 +111,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           env,
           ATOM_QUIC,
           ATOM_PEER_SEND_ABORTED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
@@ -134,7 +133,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           env,
           ATOM_QUIC,
           ATOM_CLOSED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
@@ -145,16 +144,14 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       break;
     }
 
-  if (!is_destroy)
-    {
-      enif_clear_env(env);
-    }
-  else
+  enif_clear_env(env);
+
+  if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
     }
+
   enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
 
   if (is_destroy)
     {
@@ -177,7 +174,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)Context;
   QuicerStreamSendCTX *send_ctx = NULL;
   ERL_NIF_TERM report;
-  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
   env = s_ctx->env;
   BOOLEAN is_destroy = FALSE;
@@ -202,7 +198,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
               env,
               ATOM_QUIC,
               ATOM_SEND_COMPLETE,
-              enif_make_resource(env, s_ctx),
+              enif_make_copy(env, s_ctx->eHandler),
               enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
 
           // note, report to caller instead of stream owner
@@ -232,7 +228,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           env,
           ATOM_QUIC,
           ATOM_PEER_SEND_ABORTED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
@@ -250,7 +246,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       report = enif_make_tuple3(env,
                                 ATOM_QUIC,
                                 ATOM_PEER_SEND_SHUTDOWN,
-                                enif_make_resource(env, s_ctx));
+                                enif_make_copy(env, s_ctx->eHandler));
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
         {
@@ -267,7 +263,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           env,
           ATOM_QUIC,
           ATOM_CLOSED,
-          enif_make_resource(env, s_ctx),
+          enif_make_copy(env, s_ctx->eHandler),
           enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
 
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
@@ -283,17 +279,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       break;
     }
 
-  if (!is_destroy)
-    {
-      enif_clear_env(env);
-    }
-  else
+  enif_clear_env(env);
+
+  if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
     }
 
   enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
 
   if (is_destroy)
     {
@@ -328,16 +321,13 @@ async_start_stream2(ErlNifEnv *env,
   // note, s_ctx is not shared yet, thus no locking is needed.
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
+  enif_keep_resource(c_ctx);
+  s_ctx->c_ctx = c_ctx;
 
   if (!s_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
-
-  s_ctx->c_ctx = c_ctx;
-
-  // note, will be released in destroy_s_ctx
-  enif_keep_resource(s_ctx->c_ctx);
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -371,6 +361,9 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
+  // Now we have Stream handler
+  s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+
   //
   // Starts the bidirectional stream. By default, the peer is not notified of
   // the stream being started until data is sent on the stream.
@@ -385,7 +378,9 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   s_ctx->is_closed = FALSE;
-  return SUCCESS(enif_make_resource(env, s_ctx));
+  res = enif_make_copy(env, s_ctx->eHandler);
+
+  return SUCCESS(res);
 
 ErrorExit:
   destroy_s_ctx(s_ctx);
@@ -494,7 +489,6 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(s_ctx->c_ctx->lock);
   enif_mutex_lock(s_ctx->lock);
 
   send_ctx->s_ctx = s_ctx;
@@ -529,7 +523,6 @@ ErrorExit:
   destroy_send_ctx(send_ctx);
 Exit:
   enif_mutex_unlock(s_ctx->lock);
-  enif_mutex_unlock(s_ctx->c_ctx->lock);
   return res;
 }
 
@@ -666,27 +659,6 @@ shutdown_stream3(ErlNifEnv *env,
   return ret;
 }
 
-ERL_NIF_TERM
-close_stream1(ErlNifEnv *env,
-              __unused_parm__ int argc,
-              const ERL_NIF_TERM argv[])
-
-{
-  QuicerStreamCTX *s_ctx;
-  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  enif_mutex_lock(s_ctx->lock);
-  s_ctx->Stream = NULL;
-  enif_mutex_unlock(s_ctx->lock);
-
-  // void return
-  MsQuic->StreamClose(s_ctx->Stream);
-  return ATOM_OK;
-}
-
 static uint64_t
 recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 {
@@ -773,10 +745,10 @@ handle_stream_recv_event(HQUIC Stream,
           // notify owner to trigger async recv
           if (!enif_send(NULL,
                          &(s_ctx->owner->Pid),
-                         NULL,
+                         s_ctx->env,
                          enif_make_tuple3(env,
                                           ATOM_QUIC,
-                                          enif_make_resource(env, s_ctx),
+                                          enif_make_copy(env, s_ctx->eHandler),
                                           ATOM_QUIC_STATUS_CONTINUE)))
             {
               // App down, shutdown stream
@@ -789,18 +761,18 @@ handle_stream_recv_event(HQUIC Stream,
   else
     { // active receive
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
-
+      ERL_NIF_TERM eHandler = enif_make_copy(env, s_ctx->eHandler);
       ERL_NIF_TERM report_active = enif_make_tuple6(
           env,
           ATOM_QUIC,
           enif_make_binary(env, &bin),
-          enif_make_resource(env, s_ctx),
+          eHandler,
           enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
           enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
           enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
       );
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_active))
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_active))
         {
           // App down, shutdown stream
           MsQuic->StreamShutdown(Stream,
@@ -824,10 +796,11 @@ handle_stream_recv_event(HQUIC Stream,
             {
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
 
-              ERL_NIF_TERM report_passive = enif_make_tuple2(
-                  env, ATOM_QUIC_PASSIVE, enif_make_resource(env, s_ctx));
+              ERL_NIF_TERM report_passive
+                  = enif_make_tuple2(env, ATOM_QUIC_PASSIVE, eHandler);
 
-              if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_passive))
+              if (!enif_send(
+                      NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive))
                 {
                   MsQuic->StreamShutdown(Stream,
                                          QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,

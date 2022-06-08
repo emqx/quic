@@ -1,4 +1,4 @@
-# Messages to Owner Processes
+# Messages to the owner process
 
 Since most of API calls are asynchronous, the API caller or the stream/connection owner can receive
 async messages as following
@@ -15,11 +15,17 @@ Data received in binary format
 
 ### peer_send_shutdown
 
+Peer has sent all the data and wants to shutdown gracefully.
+
 ```erlang
 {quic, peer_send_shutdown, stream_handler(), ErrorCode}
 ```
 
 ### peer_send_aborted
+Received a RESET_STREAM Frame.
+
+Peer terminated the sending part of the stream abruptly.
+The receiver can discard any data that it already received on the stream.
 
 ```erlang
 {quic, peer_send_aborted, stream_handler(), ErrorCode}
@@ -118,6 +124,16 @@ safely cleaned up.
 {quic, closed, connection_handler()}
 ```
 
+### New Session Ticket
+The client received the NST (new session ticket) from the server if `QUICER_CONNECTION_EVENT_MASK_NST` had been 
+set in connection opt `quic_event_mask` when client start the connection.
+
+The NST could be used by Client for 0-RTT handshake with connection opt '{nst, Ticket :: binary()}'.
+
+``` erlang
+{quic, nst_received, connection_handler(), Ticket::binary()}
+```
+
 ## Messages to Listener Owner
 
 ### New connection
@@ -133,4 +149,11 @@ The process becomes the connection owner.
 To complete the TLS handshake, quicer:handshake/1,2 should be called.
 
 
+### Listener Stopped
 
+```erlang
+{quic, listener_stopped, listener_handler()}
+```
+
+This message is sent to the listener owner process, indicating the listener
+is stopped and closed. 

@@ -265,6 +265,7 @@ ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
 /*----------------------------------------------------------*/
 
 ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_LISTENER_STOPPED;
 ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
@@ -274,6 +275,9 @@ ERL_NIF_TERM ATOM_SEND_DGRAM_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
 ERL_NIF_TERM ATOM_QUIC_PASSIVE;
+ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
+ERL_NIF_TERM ATOM_NST_RECEIVED;
+ERL_NIF_TERM ATOM_NST;
 ERL_NIF_TERM ATOM_DGRAM;
 ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
 ERL_NIF_TERM ATOM_DEBUG;
@@ -305,7 +309,6 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /* Additional Connection Opt                                */
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
-ERL_NIF_TERM ATOM_FAST_CONN;
 ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 // Mirror 'status' in msquic_linux.h
@@ -550,6 +553,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_HANDLER, handler);                                                \
   ATOM(ATOM_CLOSED, closed);                                                  \
+  ATOM(ATOM_LISTENER_STOPPED, listener_stopped);                              \
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
@@ -559,6 +563,9 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \
   ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
+  ATOM(ATOM_QUIC_EVENT_MASK, quic_event_mask);                                \
+  ATOM(ATOM_NST_RECEIVED, nst_received);                                      \
+  ATOM(ATOM_NST, nst);                                                        \
   ATOM(ATOM_DGRAM, dgram);                                                    \
   ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                    \
   ATOM(ATOM_DEBUG, debug);                                                    \
@@ -581,7 +588,6 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_FUNCTION, function);                                              \
   ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
-  ATOM(ATOM_FAST_CONN, fast_conn);                                            \
   ATOM(ATOM_ALLOW_INSECURE, allow_insecure);
 
 HQUIC GRegistration = NULL;
@@ -594,6 +600,7 @@ BOOLEAN isLibOpened = false;
 ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
 ErlNifResourceType *ctx_stream_t = NULL;
+ErlNifResourceType *ctx_config_t = NULL;
 
 QUIC_REGISTRATION_CONFIG GRegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
@@ -613,12 +620,21 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)obj;
 
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
-  assert(l_ctx->is_closed == TRUE);
-  if (l_ctx->Listener)
+
+  // Unlike other resources, it is safe to close listener here
+  // because MsQuic will stop the listener if it is not and wait for
+  // all ongoing listener callback to finish.
+  // We should not assert l_ctx->is_closed to be true because it could happen
+  // when the listener process is terminated and there is no any acceptors on
+  // it.
+  //
+  if (!l_ctx->is_closed && l_ctx->Listener)
     {
+      // We must close listener since there is no chance that any erlang
+      // process is able to access the listener via any l_ctx
       MsQuic->ListenerClose(l_ctx->Listener);
-      MsQuic->ConfigurationClose(l_ctx->Configuration);
     }
+
   deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
@@ -629,9 +645,11 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
-  assert(c_ctx->is_closed == TRUE);
+  // must be closed otherwise will trigger callback and casue race cond.
+  assert(c_ctx->is_closed == TRUE); // in dealloc
   if (c_ctx->Connection)
     {
+      TP_CB_3(close, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
       MsQuic->ConnectionClose(c_ctx->Connection);
     }
   CXPLAT_FREE(c_ctx->TlsSecrets, QUICER_TLS_SECRETS);
@@ -672,6 +690,9 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
     {
       MsQuic->StreamClose(s_ctx->Stream);
     }
+
+  // ensure it is called *After* StreamClose
+  enif_release_resource(s_ctx->c_ctx);
   AcceptorDestroy(s_ctx->owner);
   deinit_s_ctx(s_ctx);
   TP_CB_3(end, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
@@ -707,6 +728,24 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
     }
 }
 
+void
+resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
+                                 __unused_parm__ void *obj)
+{
+  TP_CB_3(start, (uintptr_t)obj, 0);
+  QuicerConfigCTX *config_ctx = (QuicerConfigCTX *)obj;
+  // Check if Registration is closed or not
+  if (GRegistration && config_ctx->Configuration)
+    {
+      MsQuic->ConfigurationClose(config_ctx->Configuration);
+    }
+  TP_CB_3(end, (uintptr_t)obj, 0);
+}
+
+/*
+** on_load is called when the NIF library is loaded and no previously loaded
+*library exists for this module.
+*/
 static int
 on_load(ErlNifEnv *env,
         __unused_parm__ void **priv_data,
@@ -736,6 +775,17 @@ on_load(ErlNifEnv *env,
       = { .dtor = resource_listener_dealloc_callback,
           .down = resource_listener_down_callback,
           .stop = NULL };
+
+  ErlNifResourceTypeInit configInit = {
+    .dtor = resource_config_dealloc_callback, .down = NULL, .stop = NULL
+  };
+
+  ctx_config_t = enif_open_resource_type_x(env,
+                                           "config_context_resource",
+                                           &configInit, // init callbacks
+                                           flags,
+                                           NULL);
+
   ctx_listener_t = enif_open_resource_type_x(env,
                                              "listener_context_resource",
                                              &listenerInit, // init callbacks
@@ -755,18 +805,38 @@ on_load(ErlNifEnv *env,
   return ret_val;
 }
 
+/*
+** on_upgrade is called when the NIF library is loaded and there is old code of
+*this module with a loaded NIF library.
+*/
 static int
-on_upgrade(__unused_parm__ ErlNifEnv *env,
-           __unused_parm__ void **priv_data,
+on_upgrade(ErlNifEnv *env,
+           void **priv_data,
            __unused_parm__ void **old_priv_data,
-           __unused_parm__ ERL_NIF_TERM load_info)
+           ERL_NIF_TERM load_info)
 {
-  return 0;
+  return on_load(env, *priv_data, load_info);
 }
 
+/*
+** unload is called when the module code that the NIF library belongs to is
+*purged as old. New code of the same module may or may not exist.
+*/
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
+  // @TODO We want registration context and APIs for it
+  if (isRegistered)
+    {
+      MsQuic->RegistrationClose(GRegistration);
+      isRegistered = FALSE;
+    }
+
+  if (isLibOpened)
+    {
+      MsQuicClose(MsQuic);
+      isLibOpened = FALSE;
+    }
 }
 
 static ERL_NIF_TERM
@@ -891,6 +961,7 @@ deregistration(__unused_parm__ ErlNifEnv *env,
   if (isRegistered && GRegistration)
     {
       MsQuic->RegistrationClose(GRegistration);
+      GRegistration = NULL;
       isRegistered = false;
     }
   return ATOM_OK;
@@ -1103,14 +1174,12 @@ static ErlNifFunc nif_funcs[] = {
   { "async_accept", 2, async_accept2, 0},
   { "async_handshake", 1, async_handshake_1, 0},
   { "async_shutdown_connection", 3, shutdown_connection3, 0},
-  { "async_close_connection", 1, close_connection1, 0},
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 3, send3, 0},
   { "recv", 2, recv2, 0},
   { "send_dgram", 3, send_dgram, 0},
   { "async_shutdown_stream", 3, shutdown_stream3, 0},
-  { "async_close_stream", 1, close_stream1, 0},
   { "sockname", 1, sockname1, 0},
   { "getopt", 3, getopt3, 0},
   { "setopt", 4, setopt4, 0},

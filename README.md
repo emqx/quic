@@ -102,9 +102,15 @@ $ make test
 
 # Documentation
 
-[API DOC](./docs/API.org)
+``` sh
+$ make doc
+```
 
-[TODO LIST](./docs/todo.org)
+Then check the doc in browser: 
+
+``` sh
+$ firefox doc/index.html
+```
 
 # License
 Apache License Version 2.0

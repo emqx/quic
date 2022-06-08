@@ -32,6 +32,8 @@
 
 %% test cases
 -export([ tc_nif_module_load/1
+        , tc_nif_module_unload/1
+        , tc_nif_module_reload/1
         , tc_open_lib_test/1
         , tc_close_lib_test/1
         , tc_lib_registration/1
@@ -66,7 +68,8 @@
         , tc_stream_send_after_conn_close/1
         , tc_stream_send_after_async_conn_close/1
         , tc_stream_sendrecv_large_data_passive/1
-        , tc_stream_sendrecv_large_data_passive_2/1
+        %% @deprecated
+        %%, tc_stream_sendrecv_large_data_passive_2/1
         , tc_stream_sendrecv_large_data_active/1
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
@@ -76,6 +79,7 @@
 
         % , tc_getopt_raw/1
         , tc_getopt/1
+        , tc_setopt_bad_opt/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
 
@@ -194,6 +198,20 @@ end_per_testcase(_TestCase, _Config) ->
 tc_nif_module_load(_Config) ->
   {module, quicer_nif} = c:l(quicer_nif).
 
+tc_nif_module_unload(_Config) ->
+  M = quicer_nif,
+  case code:delete(M) of
+    false -> code:purge(M);
+    true -> ok
+  end,
+  true = code:delete(M).
+
+tc_nif_module_reload(_Config) ->
+  M = quicer_nif,
+  c:l(M),
+  {module, M} = c:l(M),
+  ok.
+
 tc_open_lib_test(_Config) ->
   {ok, false} = quicer:open_lib(),
   %% verify that reopen lib success.
@@ -258,8 +276,8 @@ tc_lib_re_registration(_Config) ->
 tc_open_listener(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(Port),
+  {ok, {_, Port}} = quicer:sockname(L),
+  {error, eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
   {ok, P} = gen_udp:open(Port),
   ok = gen_udp:close(P),
@@ -341,7 +359,16 @@ tc_get_listener(Config) ->
                 end, Listeners),
   ?assertEqual({error, not_found}, quicer:listener(bad_listen_name)).
 
-tc_conn_basic(Config)->
+tc_conn_basic(Config) ->
+  {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_basic(Config) end),
+  receive
+    {'DOWN', Ref, process, Pid, normal} ->
+      ok;
+    {'DOWN', Ref, process, Pid, Error} ->
+      ct:fail({run_error, Error})
+  end.
+
+run_tc_conn_basic(Config)->
   Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
@@ -442,7 +469,7 @@ tc_stream_client_init(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      {ok, {_, _}} = quicer:sockname(Stm),
+      {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_stream(Stm),
       ok = quicer:close_connection(Conn),
       SPid ! done,
@@ -544,27 +571,28 @@ tc_stream_sendrecv_large_data_passive(Config) ->
       ct:fail("timeout")
   end.
 
-tc_stream_sendrecv_large_data_passive_2(Config) ->
-  %% test when stream_recv_window_default isn't large enough
-  Port = select_port(),
-  Owner = self(),
-  {SPid, Ref} = spawn_monitor(
-                  fun() ->
-                      echo_server(Owner, Config, Port)
-                  end),
-  receive
-    listener_ready ->
-      {ok, Conn} = quicer:connect("localhost", Port,
-                                  default_conn_opts(), 5000),
-      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-      TestData = crypto:strong_rand_bytes(1000000),
-      {ok, _} = quicer:async_send(Stm, TestData),
-      {error, stream_recv_window_too_small} = quicer:recv(Stm, byte_size(TestData)),
-      SPid ! done,
-      ensure_server_exit_normal(Ref)
-  after 6000 ->
-      ct:fail("timeout")
-  end.
+%% We decide not to check the default recv window since it is too expensive.
+%% tc_stream_sendrecv_large_data_passive_2(Config) ->
+%%   %% test when stream_recv_window_default isn't large enough
+%%   Port = select_port(),
+%%   Owner = self(),
+%%   {SPid, Ref} = spawn_monitor(
+%%                   fun() ->
+%%                       echo_server(Owner, Config, Port)
+%%                   end),
+%%   receive
+%%     listener_ready ->
+%%       {ok, Conn} = quicer:connect("localhost", Port,
+%%                                   default_conn_opts(), 5000),
+%%       {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+%%       TestData = crypto:strong_rand_bytes(1000000),
+%%       {ok, _} = quicer:async_send(Stm, TestData),
+%%       {error, stream_recv_window_too_small} = quicer:recv(Stm, byte_size(TestData)),
+%%       SPid ! done,
+%%       ensure_server_exit_normal(Ref)
+%%   after 6000 ->
+%%       ct:fail("timeout")
+%%   end.
 
 tc_stream_sendrecv_large_data_active(Config) ->
   %% test when stream_recv_window_default isn't large enough
@@ -737,7 +765,10 @@ tc_stream_send_after_conn_close(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      {ok, {_, _}} = quicer:sockname(Stm),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      %% Next close_connection call has two scenarios:
+      %% a) Just close connection, stream is not created in QUIC
+      %% b) Close the connection after the stream is created in QUIC
       ok = quicer:close_connection(Conn),
       {error, stm_send_error, aborted} = quicer:send(Stm, <<"ping2">>),
       SPid ! done,
@@ -754,7 +785,9 @@ tc_stream_send_after_async_conn_close(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
-      {ok, {_, _}} = quicer:sockname(Stm),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      %% Send some data otherwise stream will never get started.
+      quicer:send(Stm, <<"ping1">>),
       ok = quicer:async_close_connection(Conn),
       %% we created a race here, the send can success or fail
       %% but it should not crash
@@ -898,10 +931,6 @@ tc_getopt(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
-      %% test that op is fallbakced to connection
-      {ok, _} = quicer:getopt(Stm, Parm, false),
-      {ok, Settings0} = quicer:getopt(Stm, param_conn_settings, false),
-      5000 = proplists:get_value(idle_timeout_ms, Settings0),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -988,12 +1017,10 @@ tc_getstat_closed(Config) ->
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
         {error,invalid_parameter} -> ok;
         {error,invalid_state} -> ok;
-        {error, closed} -> ok
-      end,
-      case quicer:getstat(Stm, [send_cnt, recv_oct, send_pend]) of
-        {error,invalid_parameter} -> ok;
-        {error,invalid_state} -> ok;
-        {error, closed} -> ok
+        {error, closed} -> ok;
+        {ok, [_|_]} ->
+          %% We still hold a ref in Var Conn, and the Conn is not closed in MsQuic
+          ok
       end,
       %ok = quicer:close_connection(Conn),
       SPid ! done
@@ -1012,7 +1039,6 @@ tc_peername_v6(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {error, badarg} = quicer:peername(0),
       {ok, {Addr, RPort}} = quicer:peername(Conn),
-      {ok, {Addr, RPort}} = quicer:peername(Stm),
       %% checks
       true = is_integer(RPort),
       ct:pal("addr is ~p", [Addr]),
@@ -1034,7 +1060,6 @@ tc_peername_v4(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {error, badarg} = quicer:peername(0),
       {ok, {Addr, RPort}} = quicer:peername(Conn),
-      {ok, {Addr, RPort}} = quicer:peername(Stm),
       %% checks
       true = is_integer(RPort),
       ct:pal("addr is ~p", [Addr]),
@@ -1145,6 +1170,12 @@ tc_setopt(Config) ->
     ct:fail("listener_timeout")
   end.
 
+tc_setopt_bad_opt(Config)->
+  Port = select_port(),
+  {error, param_error} = quicer:connect("localhost", Port,
+                                        [{nst, foobar} %% BAD opt
+                                        | default_conn_opts()], 5000).
+
 
 tc_setopt_conn_local_addr(Config) ->
   Port = select_port(),
@@ -1167,12 +1198,12 @@ tc_setopt_conn_local_addr(Config) ->
   after 1000 ->
       ct:fail("recv ping1 timeout")
   end,
-  {ok, OldAddr} = quicer:sockname(Stm0),
+  {ok, OldAddr} = quicer:sockname(Conn),
   %% change local addr with a new random port (0)
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
   %% sleep is needed to finish migration at protocol level
   timer:sleep(100),
-  {ok, NewAddr} = quicer:sockname(Stm0),
+  {ok, NewAddr} = quicer:sockname(Conn),
   ?assertNotEqual(OldAddr, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, OldAddr),
@@ -1181,7 +1212,7 @@ tc_setopt_conn_local_addr(Config) ->
   %% sleep is needed to finish migration at protocol level
   retry_with(fun() ->
                  timer:sleep(100),
-                 case quicer:sockname(Stm0) of
+                 case quicer:sockname(Conn) of
                    {ok, {{127,0,0,1}, 50600}} -> true;
                    {ok, Other} -> {false, Other}
                  end
@@ -1219,12 +1250,12 @@ tc_setopt_conn_local_addr_in_use(Config) ->
   after 1000 ->
       ct:fail("recv ping1 timeout")
   end,
-  {ok, OldAddr} = quicer:sockname(Stm0),
+  {ok, OldAddr} = quicer:sockname(Conn),
   %% change local addr with a new random port (0)
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
   %% sleep is needed to finish migration at protocol level
   timer:sleep(50),
-  {ok, NewAddr} = quicer:sockname(Stm0),
+  {ok, NewAddr} = quicer:sockname(Conn),
   ?assertNotEqual(OldAddr, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, OldAddr),
@@ -1276,7 +1307,6 @@ tc_app_echo_server(Config) ->
   application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
-                   , {fast_conn, false}
                    , {stream_acceptors, 32}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
@@ -1637,7 +1667,7 @@ simple_conn_server(Owner, Config, Port) ->
 simple_slow_conn_server(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   Owner ! listener_ready,
-  {ok, Conn} = quicer:accept(L, [{fast_conn, false}], 5000),
+  {ok, Conn} = quicer:accept(L, [], 5000),
   {ok, Conn} = quicer:handshake(Conn),
   %% test what happens if handshake twice
   {error, invalid_state} = quicer:handshake(Conn),
@@ -1674,7 +1704,10 @@ simple_stream_server(Owner, Config, Port) ->
           quicer:close_stream(Stream);
         done ->
           exit(normal)
-      end
+      end;
+   {quic, shutdown, Conn} ->
+      ct:pal("Received Conn close for ~p", [Conn]),
+      quicer:close_connection(Conn)
   end,
   receive
     {quic, shutdown, Conn} ->
@@ -1743,7 +1776,7 @@ retry_with(Fun, Retry, ErrorInfo) ->
 
 %% select a random port picked by OS
 select_port()->
-  {ok, S} = gen_udp:open(0),
+  {ok, S} = gen_udp:open(0, [{reuseaddr, true}]),
   {ok, {_, Port}} = inet:sockname(S),
   gen_udp:close(S),
   case os:type() of
@@ -1753,6 +1786,7 @@ select_port()->
     _ ->
       skip
   end,
+  ct:pal("select port: ~p", [Port]),
   Port.
 %%%_* Emacs ====================================================================
 %%% Local Variables:
