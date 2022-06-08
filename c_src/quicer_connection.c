@@ -470,7 +470,16 @@ ServerConnectionCallback(HQUIC Connection,
 
       if (!acc)
         {
-          acc = c_ctx->owner;
+          // If we don't have available process
+          // fallback to the connection owner
+          acc = AcceptorAlloc();
+          if (!acc)
+            {
+              return QUIC_STATUS_UNREACHABLE;
+            }
+          // We must copy here, otherwise it will become double free
+          // in resource dealloc callbacks (for Stream and Connection)
+          memcpy(acc, c_ctx->owner, sizeof(ACCEPTOR));
         }
 
       assert(acc);
