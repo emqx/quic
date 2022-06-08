@@ -948,13 +948,13 @@ tc_conn_resume_old(Config) ->
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                 quicer:recv(Stm, 4),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
 
                  {ok, ConnResumed} = quicer:connect("localhost", Port, [{handler, Conn} | default_conn_opts()], 5000),
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
-                 {ok, 4} = quicer:async_send(Stm2, <<"ping">>),
-                 quicer:recv(Stm2, 4),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 {ok, <<"ping2">>} = quicer:recv(Stm2, 5),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -1014,7 +1014,7 @@ tc_conn_resume_nst(Config) ->
                  {ok, Conn} = quicer:connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                 quicer:recv(Stm, 4),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
                  NST = receive
                          {quic, nst_received, Conn, Ticket} ->
                            Ticket
@@ -1025,8 +1025,8 @@ tc_conn_resume_nst(Config) ->
 
                  {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST} | default_conn_opts()], 5000),
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
-                 {ok, 4} = quicer:async_send(Stm2, <<"ping">>),
-                 quicer:recv(Stm2, 4),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
+                 {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
