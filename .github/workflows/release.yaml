@@ -1,4 +1,4 @@
-name: build
+name: release
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
           - 23.3.4.9-4
           - 24.2.1-1
         elixir:
-          - 1.13.3
+          - 1.13.4
         arch:
           - amd64
           - arm64
