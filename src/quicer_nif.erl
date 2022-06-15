@@ -50,7 +50,7 @@
 -spec init() -> ok.
 init() ->
   NifName = "libquicer_nif",
-  {ok, Niflib} = locate_lib(code:priv_dir(quicer), NifName),
+  {ok, Niflib} = locate_lib(priv_dir(), NifName),
   ok = erlang:load_nif(Niflib, 0),
   %% It could cause segfault if MsQuic library is not opened nor registered.
   %% here we have added dummy calls, and it should cover most of cases
@@ -73,11 +73,11 @@ init() ->
         {ok, debug} | %% opened with lttng debug library loaded (if present)
         {error, open_failed, atom_reason()}.
 open_lib() ->
-  LibFile = case locate_lib(code:priv_dir(quicer), "libmsquic.lttng.so") of
+  LibFile = case locate_lib(priv_dir(), "libmsquic.lttng.so") of
               {ok, File} ->
                 File;
               {error, _} ->
-                code:priv_dir(quicer)
+                priv_dir()
             end,
   open_lib(LibFile).
 
@@ -232,3 +232,11 @@ locate_lib(PrivDir, LibName) ->
           {error, not_found}
       end
   end.
+
+priv_dir() ->
+    case code:priv_dir(quicer) of
+        {error, bad_name} ->
+            "priv";
+        Dir ->
+            Dir
+    end.
