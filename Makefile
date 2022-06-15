@@ -1,15 +1,5 @@
 REBAR := rebar3
 
-UNAME := $(shell uname -s)
-
-ifeq ($(UNAME), Darwin)
-JOBS := $(shell sysctl -n hw.ncpu)
-endif
-
-ifeq ($(UNAME), Linux)
-JOBS := $(shell nproc)
-endif
-
 .PHONY: all
 all: compile
 
@@ -18,9 +8,7 @@ default: build-nif
 
 .PHONY: build-nif
 build-nif:
-	./get-msquic.sh v2.0.2
-	cmake -B c_build
-	make -j $(JOBS) -C c_build
+	./build.sh 'v2.0.2'
 
 compile:
 	$(REBAR) compile
@@ -43,7 +31,7 @@ eunit: compile
 	$(REBAR) eunit verbose=truen
 
 .PHONY: ct
-ct: 
+ct:
 	QUICER_USE_SNK=1 $(REBAR) as test ct -v
 
 cover:

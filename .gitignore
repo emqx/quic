@@ -16,6 +16,7 @@ deps
 .rebar3
 _build/
 _checkouts/
+rebar.lock
 
 # nif dynamic linked lib
 priv/*.so
@@ -30,3 +31,7 @@ compile_commands.json
 # IDE
 /quic.iml
 /.idea/
+
+# downloaded code
+msquic/
+_packages/
