@@ -133,7 +133,7 @@ jobs:
           release_name: quicer ${{ github.ref }} Released
           body: quicer ${{ github.ref }} Released
           draft: false
-          prerelease: false
+          prerelease: true
       - uses: Rory-Z/upload-release-asset@v1
         with:
           repo: quic
