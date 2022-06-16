@@ -40,7 +40,7 @@ download() {
         fi
     fi
 
-    echo "$(cat "_packages/${PKGNAME}.sha256") _packages/${PKGNAME}" | sha256sum -c || exit 1
+    echo "$(cat "_packages/${PKGNAME}.sha256") _packages/${PKGNAME}" | sha256sum -c || return 1
 
     gzip -c -d "_packages/${PKGNAME}" > "$TARGET_SO"
     erlc -I include src/quicer_nif.erl
