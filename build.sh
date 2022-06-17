@@ -48,10 +48,10 @@ download() {
         res=0
     else
         # failed to load, build from source
+        rm -f $TARGET_SO
         res=1
     fi
     rm -f quicer_nif.beam
-    echo "QUICER: NOTE! nif library is downloaded from prebuilt releases, not compiled from source!"
     return $res
 }
 
@@ -79,6 +79,8 @@ else
         if ! download; then
             echo "QUICER: Failed to download pre-built binary, building from source"
             build
+        else
+            echo "QUICER: NOTE! nif library is downloaded from prebuilt releases, not compiled from source!"
         fi
     else
         build
