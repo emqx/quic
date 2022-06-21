@@ -135,6 +135,7 @@ all() ->
   , tc_conn_gc
   , tc_conn_resume_old
   , tc_conn_resume_nst
+  , tc_conn_resume_nst_async
   ].
 
 %%--------------------------------------------------------------------
@@ -1024,6 +1025,79 @@ tc_conn_resume_nst(Config) ->
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
 
                  {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST} | default_conn_opts()], 5000),
+                 {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
+                 {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% 1. verify that for each success connect we send a resumption ticket
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , resource_id := _CRid1
+                                              },
+                                             Trace)),
+                   %% 2. verify that resumption ticket is received on client side
+                   %%    and client use it to resume success
+                     ?assert(?causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMED
+                                              , resource_id := _SRid1
+                                              },
+                                             Trace))
+               end),
+  ok.
+
+
+%%% Non-blocking connecion resume, client could send app data without waiting for handshake done.
+tc_conn_resume_nst_async(Config) ->
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
+                 NST = receive
+                         {quic, nst_received, Conn, Ticket} ->
+                           Ticket
+                       after 1000 ->
+                           ct:fail("No ticket received")
+                       end,
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
+
+                 {ok, ConnResumed} = quicer:async_connect("localhost", Port, [{nst, NST} | default_conn_opts()]),
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
