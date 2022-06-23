@@ -34,6 +34,7 @@
 -export([ listen/2
         , close_listener/1
         , connect/4
+        , async_connect/3
         , handshake/1
         , handshake/2
         , async_handshake/1
@@ -181,9 +182,10 @@ close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
 %% @doc
-%% Initial New Connection (Client)
+%% Initiate New Connection (Client)
 %%
-%% Initial new connection to remote endpoint with connection opts specified.
+%% Initiate new connection to remote endpoint with connection opts specified.
+%% @see async_connect/3
 %% @end
 -spec connect(inet:hostname() | inet:ip_address(),
               inet:port_number(), conn_opts(), timeout()) ->
@@ -195,26 +197,52 @@ connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
   connect(inet:ntoa(Host), Port, Opts, Timeout);
 connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
-  NewOpts = maps:merge(default_conn_opts(), Opts),
+  do_connect(Host, Port, Opts, Timeout, 1).
+do_connect(_Host, _Port, _Opts, Timeout, _Retries) when Timeout =< 0 ->
+  {error, timeout};
+do_connect(Host, Port, Opts, Timeout, Retries) ->
+  HandshakeTOut = maps:get(handshake_idle_timeout_ms, Opts, 200),
+  RetryAfter = HandshakeTOut*Retries,
+  HandshakeTOut2 = min(Timeout, RetryAfter),
+  NewOpts = maps:merge(default_conn_opts(), Opts#{handshake_idle_timeout_ms => HandshakeTOut2}),
   case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, H} ->
       receive
         {quic, connected, Ctx} ->
           {ok, Ctx};
+        {quic, transport_shutdown, C, Reason} when Reason == connection_timeout
+                                                   orelse Reason == connection_idle ->
+          %% We must close the old one
+          quicer:shutdown_connection(C),
+          do_connect(Host, Port, Opts, Timeout - HandshakeTOut2, Retries * 2);
         {quic, transport_shutdown, _, Reason} ->
           {error, transport_down, Reason}
-      after Timeout ->
-          %% @TODO caller should provide the method to handle timeout
-          async_shutdown_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
-          {error, timeout}
       end;
     {error, _} = Err ->
       Err
   end.
 
+%% @doc
+%% Initiate New Connection (Client)
+%%
+%% Async variant of connect/4
+%% @see connect/4
+%% @end
+-spec async_connect(inet:hostname() | inet:ip_address(),
+              inet:port_number(), conn_opts()) ->
+          {ok, connection_handler()} |
+          {error, conn_open_error | config_error | conn_start_error}.
+async_connect(Host, Port, Opts) when is_list(Opts) ->
+  async_connect(Host, Port, maps:from_list(Opts));
+async_connect(Host, Port, Opts) when is_tuple(Host) ->
+  async_connect(inet:ntoa(Host), Port, Opts);
+async_connect(Host, Port, Opts) when is_map(Opts) ->
+  NewOpts = maps:merge(default_conn_opts(), Opts),
+  quicer_nif:async_connect(Host, Port, NewOpts).
+
 
 %% @doc Complete TLS handshake after accepted a Connection
-%%      with 5s timeout
+%%      with 5s timeout (Server)
 %% @end
 %% @see accept/3
 %% @see handshake/2

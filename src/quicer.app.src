@@ -26,6 +26,7 @@
                   , "Makefile"
                   , "get-msquic.sh"
                   , "c_build"
+                  , "build.sh"
                   ]},
   {exclude_regexps, ["priv/.*.so"]}
 
