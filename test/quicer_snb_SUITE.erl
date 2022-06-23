@@ -1071,13 +1071,13 @@ tc_conn_resume_nst(Config) ->
   ok.
 
 
-%%% Non-blocking connecion resume, client could send app data without waiting for handshake done.
+%%% Non-blocking connection resume, client could send app data without waiting for handshake done.
 tc_conn_resume_nst_async(Config) ->
   Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
-                     | default_conn_opts()],
+                   | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
@@ -1125,21 +1125,21 @@ tc_conn_resume_nst_async(Config) ->
                                              Trace)),
                    %% 2. verify that resumption ticket is received on client side
                    %%    and client use it to resume success
-                     ?assert(?causality(#{ ?snk_kind := debug
-                                              , context := "callback"
-                                              , function := "ClientConnectionCallback"
-                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
-                                              , tag := "event"
-                                              , resource_id := _CRid1
-                                              },
-                                             #{ ?snk_kind := debug
-                                              , context := "callback"
-                                              , function := "ServerConnectionCallback"
-                                              , tag := "event"
-                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMED
-                                              , resource_id := _SRid1
-                                              },
-                                             Trace))
+                   ?assert(?causality(#{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ClientConnectionCallback"
+                                       , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                       , tag := "event"
+                                       , resource_id := _CRid1
+                                       },
+                                      #{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ServerConnectionCallback"
+                                       , tag := "event"
+                                       , mark := ?QUIC_CONNECTION_EVENT_RESUMED
+                                       , resource_id := _SRid1
+                                       },
+                                      Trace))
                end),
   ok.
 

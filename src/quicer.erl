@@ -182,9 +182,9 @@ close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
 %% @doc
-%% Initial New Connection (Client)
+%% Initiate New Connection (Client)
 %%
-%% Initial new connection to remote endpoint with connection opts specified.
+%% Initiate new connection to remote endpoint with connection opts specified.
 %% @see async_connect/3
 %% @end
 -spec connect(inet:hostname() | inet:ip_address(),
@@ -198,26 +198,23 @@ connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
   connect(inet:ntoa(Host), Port, Opts, Timeout);
 connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   do_connect(Host, Port, Opts, Timeout, 1).
-do_connect(_Host, _Port, _Opts, Timeout, _Retries) when Timeout <0 ->
+do_connect(_Host, _Port, _Opts, Timeout, _Retries) when Timeout =< 0 ->
   {error, timeout};
 do_connect(Host, Port, Opts, Timeout, Retries) ->
-  RetryAfter = 200*Retries,
-  HandshakeTOut = case Timeout > RetryAfter of
-                    true ->
-                      RetryAfter;
-                    _ ->
-                      Timeout
-                  end,
-  NewOpts = maps:merge(default_conn_opts(), Opts#{handshake_idle_timeout_ms => HandshakeTOut}),
+  HandshakeTOut = maps:get(handshake_idle_timeout_ms, Opts, 200),
+  RetryAfter = HandshakeTOut*Retries,
+  HandshakeTOut2 = min(Timeout, RetryAfter),
+  NewOpts = maps:merge(default_conn_opts(), Opts#{handshake_idle_timeout_ms => HandshakeTOut2}),
   case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, H} ->
       receive
         {quic, connected, Ctx} ->
           {ok, Ctx};
-        {quic, transport_shutdown, _C, Reason} when Reason == connection_timeout;
-                                                    Reason == connection_idle
-                                                    ->
-          do_connect(Host, Port, Opts, Timeout - HandshakeTOut, Retries + 1);
+        {quic, transport_shutdown, C, Reason} when Reason == connection_timeout
+                                                   orelse Reason == connection_idle ->
+          %% We must close the old one
+          quicer:shutdown_connection(C),
+          do_connect(Host, Port, Opts, Timeout - HandshakeTOut2, Retries * 2);
         {quic, transport_shutdown, _, Reason} ->
           {error, transport_down, Reason}
       end;
@@ -226,7 +223,7 @@ do_connect(Host, Port, Opts, Timeout, Retries) ->
   end.
 
 %% @doc
-%% Initial New Connection (Client)
+%% Initiate New Connection (Client)
 %%
 %% Async variant of connect/4
 %% @see connect/4
