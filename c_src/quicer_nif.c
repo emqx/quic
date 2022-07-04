@@ -416,7 +416,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME,                            \
        quic_execution_profile_type_real_time);                                \
   /*-----------------------------------------*/                               \
-  /*         msquic params starts             */                               \
+  /*         msquic params starts            */                               \
   /*-----------------------------------------*/                               \
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
@@ -494,7 +494,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_QUIC_PARAM_STREAM_PRIORITY, param_stream_priority);               \
                                                                               \
   /*-----------------------*/                                                 \
-  /* msquic params ends     */                                                 \
+  /* msquic params ends     */                                                \
   /*-----------------------*/                                                 \
                                                                               \
   /*                 QUIC_SETTINGS start                      */              \

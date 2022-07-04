@@ -56,23 +56,21 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!conn_owner)
         {
-          TP_CB_3(missing_acceptor, (uintptr_t)c_ctx->Connection, 0);
-          destroy_c_ctx(c_ctx); // no avail conn owner
-          // make msquic close the connection.
+          TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
           Status = QUIC_STATUS_UNREACHABLE;
+          // We are going to reject the connection,
+          // we will not be the owner this connection
+          // msquic will close the Connection Handler internally.
+          // Set it to NULL to avoid close it in resource_conn_dealloc_callback
+          c_ctx->Connection = NULL;
+
+          // However, we still need to free the c_ctx
+          // note, we don't hold the lock of c_ctx since it is new conn.
+          enif_release_resource(c_ctx);
           goto Error;
         }
       TP_CB_3(acceptor_hit, (uintptr_t)c_ctx->Connection, 0);
       c_ctx->owner = conn_owner;
-
-      //
-      // A new connection is being attempted by a client. For the handshake to
-      // proceed, the server must provide a configuration for QUIC to use. The
-      // app MUST set the callback handler before returning.
-      //
-      MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
-                                 (void *)ServerConnectionCallback,
-                                 c_ctx);
 
       if (l_ctx->allow_insecure)
         {
@@ -93,8 +91,27 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                       enif_make_resource(env, c_ctx))))
         {
           Status = QUIC_STATUS_INTERNAL_ERROR;
+
+          // We are going to reject the connection,
+          // we will not be the owner this connection
+          // msquic will close the Connection Handler internally.
+          // Set it to NULL to avoid close it in resource_conn_dealloc_callback
+          c_ctx->Connection = NULL;
+
+          // However, we still need to free the c_ctx
+          // note, we don't hold the lock of c_ctx since it is new conn.
+          enif_release_resource(c_ctx);
           goto Error;
         }
+
+      //
+      // A new connection is being attempted by a client. For the handshake to
+      // proceed, the server must provide a configuration for QUIC to use. The
+      // app MUST set the callback handler before returning.
+      //
+      MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
+                                 (void *)ServerConnectionCallback,
+                                 c_ctx);
 
       c_ctx->is_closed = FALSE; // new connection
       enif_clear_env(env);
