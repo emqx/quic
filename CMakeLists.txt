@@ -90,9 +90,14 @@ endif()
 # @todo clean compiler warnings in the code
 target_compile_options(quicer_static PUBLIC "-ggdb3" "-Wno-unused-variable")
 
+if (DEFINED ENV{QUICER_TEST_COVER})
+  add_compile_options("-fprofile-arcs" "-ftest-coverage")
+  add_link_options("-fprofile-arcs" "-lgcov")
+endif()
+
 add_library(quicer_nif SHARED ${SOURCES})
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
-  target_link_libraries(quicer_nif PRIVATE quicer_static  "-Wl,--no-gc-sections -pthread") # no gc because of erlang nif symbols
+  target_link_libraries(quicer_nif PRIVATE quicer_static "-Wl,--no-gc-sections -pthread") # no gc because of erlang nif symbols
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_nif PRIVATE quicer_static "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip") # link enif lib
 endif()
