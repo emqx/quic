@@ -36,8 +36,20 @@ jobs:
       - name: release build
         run: |
           export PATH="/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
+          erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
-          make ci
+          # run sudo for getting coredump
+          sudo make ci
+
+      - name: lldb bt
+        if: failure()
+        run: |
+          corefile=$(find /cores -name 'core.*')
+          if [ -n $corefile ]; then
+            sudo lldb --one-line bt $(erl -noshell -eval 'io:format(code:root_dir()),halt()')/erts-*/bin/beam.smp -c "${corefile}"
+          else
+            echo "No coredump found"
+          fi
 
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2
