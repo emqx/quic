@@ -34,8 +34,13 @@ eunit: compile
 ct:
 	QUICER_USE_SNK=1 $(REBAR) as test ct -v
 
+.PHONY: cover
 cover:
+	mkdir -p coverage
+	QUICER_TEST_COVER=1 QUICER_USE_SNK=1 $(REBAR) as test ct --cover -v
 	$(REBAR) cover
+	lcov -c  --directory c_build/CMakeFiles/quicer_nif.dir/c_src/ \
+	--output-file ./coverage/lcov.info
 
 .PHONY: dialyzer
 dialyzer:
