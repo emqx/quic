@@ -208,8 +208,8 @@ do_connect(Host, Port, Opts, Timeout, Retries) ->
   case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, H} ->
       receive
-        {quic, connected, Ctx} ->
-          {ok, Ctx};
+        {quic, connected, H} ->
+          {ok, H};
         {quic, transport_shutdown, C, Reason} when Reason == connection_timeout
                                                    orelse Reason == connection_idle ->
           %% We must close the old one

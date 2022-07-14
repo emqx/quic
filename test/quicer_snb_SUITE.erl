@@ -136,6 +136,7 @@ all() ->
   , tc_conn_resume_old
   , tc_conn_resume_nst
   , tc_conn_resume_nst_async
+  , tc_listener_no_acceptor
   ].
 
 %%--------------------------------------------------------------------
@@ -1138,6 +1139,42 @@ tc_conn_resume_nst_async(Config) ->
                                        , tag := "event"
                                        , mark := ?QUIC_CONNECTION_EVENT_RESUMED
                                        , resource_id := _SRid1
+                                       },
+                                      Trace))
+               end),
+  ok.
+
+tc_listener_no_acceptor(Config) ->
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 0} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+                 {error, transport_down, connection_refused} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt),
+                 timer:sleep(5000)
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assert(?causality(#{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ServerListenerCallback"
+                                       , tag := "no_acceptor"
+                                       },
+                                      #{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "resource_conn_dealloc_callback"
+                                         %% assert Connection is unset
+                                       , resource_id := 0
+                                       , tag := "start"
                                        },
                                       Trace))
                end),
