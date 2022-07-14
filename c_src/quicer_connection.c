@@ -440,10 +440,6 @@ ServerConnectionCallback(HQUIC Connection,
               (uintptr_t)Connection,
               Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
 
-      if (!Event->SHUTDOWN_COMPLETE.HandshakeCompleted)
-        {
-          enif_release_resource(c_ctx);
-        }
       report = enif_make_tuple3(
           env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
 
