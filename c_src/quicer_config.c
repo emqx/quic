@@ -727,12 +727,12 @@ create_settings(ErlNifEnv *env,
     {
       Settings->IsSet.IdleTimeoutMs = TRUE;
     }
-  if (get_uint32_from_map(env,
+  if (get_uint64_from_map(env,
                           *emap,
-                          ATOM_QUIC_SETTINGS_TlsClientMaxSendBuffer,
-                          &Settings->TlsClientMaxSendBuffer))
+                          ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs,
+                          &Settings->MtuDiscoverySearchCompleteTimeoutUs))
     {
-      Settings->IsSet.TlsClientMaxSendBuffer = TRUE;
+      Settings->IsSet.MtuDiscoverySearchCompleteTimeoutUs = TRUE;
     }
   if (get_uint32_from_map(env,
                           *emap,
