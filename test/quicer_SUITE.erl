@@ -51,6 +51,8 @@
 
         , tc_conn_basic/1
         , tc_conn_basic_slow_start/1
+        , tc_conn_timeout/1
+        , tc_async_conn_timeout/1
         , tc_conn_double_close/1
         , tc_conn_other_port/1
         , tc_conn_with_localaddr/1
@@ -399,6 +401,48 @@ tc_conn_basic_slow_start(Config)->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, {_, _}} = quicer:sockname(Conn),
       ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_timeout(Config)->
+  Port = select_port(),
+  Owner = self(),
+  TOut = 10,
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_slow_conn_server(Owner, Config, Port, TOut*2)
+                   end),
+  receive
+    listener_ready ->
+      {error, timeout} = quicer:connect("localhost", Port, default_conn_opts(), TOut),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_async_conn_timeout(Config)->
+  Port = select_port(),
+  Owner = self(),
+  Tout = 100,
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_slow_conn_server(Owner, Config, Port, Tout*2)
+                   end),
+  receive
+    listener_ready ->
+      {ok, H} = quicer:async_connect("localhost", Port, [{handshake_idle_timeout_ms, Tout} |
+                                                         default_conn_opts()]),
+      receive
+        {quic, transport_shutdown, H, Reason} ->
+          %% silent local close
+          ?assertEqual(connection_idle, Reason)
+       after Tout * 5 ->
+           ct:fail("conn didn't timeout")
+      end,
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -1170,7 +1214,7 @@ tc_setopt(Config) ->
     ct:fail("listener_timeout")
   end.
 
-tc_setopt_bad_opt(Config)->
+tc_setopt_bad_opt(_Config)->
   Port = select_port(),
   {error, param_error} = quicer:connect("localhost", Port,
                                         [{nst, foobar} %% BAD opt
@@ -1665,10 +1709,25 @@ simple_conn_server(Owner, Config, Port) ->
   end.
 
 simple_slow_conn_server(Owner, Config, Port) ->
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  simple_slow_conn_server(Owner, Config, Port, 0).
+simple_slow_conn_server(Owner, Config, Port, HandshakeDelay) ->
+  {ok, L} = quicer:listen(Port, [ {handshake_idle_timeout_ms, HandshakeDelay*2+10}
+                                | default_listen_opts(Config)]),
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 5000),
-  {ok, Conn} = quicer:handshake(Conn),
+  ct:pal("~p  new conn ~p", [?FUNCTION_NAME, Conn]),
+  timer:sleep(HandshakeDelay),
+  ok = quicer:async_handshake(Conn),
+  ct:pal("~p  handshake ~p", [?FUNCTION_NAME, Conn]),
+  receive
+    {quic, connected, Conn} ->
+      ct:pal("~p  Connected ~p", [?FUNCTION_NAME, Conn]),
+      ok;
+    {quic, closed, Conn} ->
+      %% for timeout test
+      ct:pal("~p conn ~p closed", [?FUNCTION_NAME, Conn]),
+      ok
+  end,
   %% test what happens if handshake twice
   {error, invalid_state} = quicer:handshake(Conn),
   receive done ->

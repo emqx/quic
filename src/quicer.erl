@@ -197,24 +197,16 @@ connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
   connect(inet:ntoa(Host), Port, Opts, Timeout);
 connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
-  do_connect(Host, Port, Opts, Timeout, 1).
-do_connect(_Host, _Port, _Opts, Timeout, _Retries) when Timeout =< 0 ->
-  {error, timeout};
-do_connect(Host, Port, Opts, Timeout, Retries) ->
-  HandshakeTOut = maps:get(handshake_idle_timeout_ms, Opts, 200),
-  RetryAfter = HandshakeTOut*Retries,
-  HandshakeTOut2 = min(Timeout, RetryAfter),
-  NewOpts = maps:merge(default_conn_opts(), Opts#{handshake_idle_timeout_ms => HandshakeTOut2}),
+  NewTimeout = maps:get(handshake_idle_timeout_ms, Opts, Timeout),
+  NewOpts = maps:merge(default_conn_opts(), Opts#{handshake_idle_timeout_ms => NewTimeout}),
   case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, H} ->
       receive
         {quic, connected, H} ->
           {ok, H};
-        {quic, transport_shutdown, C, Reason} when Reason == connection_timeout
+        {quic, transport_shutdown, H, Reason} when Reason == connection_timeout
                                                    orelse Reason == connection_idle ->
-          %% We must close the old one
-          quicer:shutdown_connection(C),
-          do_connect(Host, Port, Opts, Timeout - HandshakeTOut2, Retries * 2);
+          {error, timeout};
         {quic, transport_shutdown, _, Reason} ->
           {error, transport_down, Reason}
       end;
@@ -259,7 +251,8 @@ handshake(Conn, Timeout) ->
     {error, _} = E -> E;
     ok ->
       receive
-        {quic, connected, C} -> {ok, C}
+        {quic, connected, Conn} -> {ok, Conn};
+        {quic, closed, Conn} -> {error, closed}
       after Timeout ->
           {error, timeout}
       end
