@@ -589,8 +589,7 @@ getopt3(ErlNifEnv *env,
     {
       res = get_global_opt(env, NULL, eopt);
     }
-
-  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
+  else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
       res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
     }
@@ -727,10 +726,11 @@ create_settings(ErlNifEnv *env,
     {
       Settings->IsSet.IdleTimeoutMs = TRUE;
     }
-  if (get_uint64_from_map(env,
-                          *emap,
-                          ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs,
-                          &Settings->MtuDiscoverySearchCompleteTimeoutUs))
+  if (get_uint64_from_map(
+          env,
+          *emap,
+          ATOM_QUIC_SETTINGS_MtuDiscoverySearchCompleteTimeoutUs,
+          &Settings->MtuDiscoverySearchCompleteTimeoutUs))
     {
       Settings->IsSet.MtuDiscoverySearchCompleteTimeoutUs = TRUE;
     }
@@ -1798,9 +1798,53 @@ get_global_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS))
     {
-      // @TODO
-      Param = QUIC_PARAM_GLOBAL_PERF_COUNTERS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
+      uint64_t counters[QUIC_PERF_COUNTER_MAX] = { 0 };
+      uint32_t Length = sizeof(counters);
+      status = MsQuic->GetParam(
+          NULL, QUIC_PARAM_GLOBAL_PERF_COUNTERS, &Length, &counters);
+      if (QUIC_SUCCEEDED(status))
+        {
+          ERL_NIF_TERM eCounters[30] = {
+            /* clang-format off */
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_CREATED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_HANDSHAKE_FAIL]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_APP_REJECT]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_ACTIVE]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_CONNECTED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_PROTOCOL_ERRORS]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_NO_ALPN]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_STRM_ACTIVE]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PKTS_SUSPECTED_LOST]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PKTS_DROPPED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PKTS_DECRYPTION_FAIL]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_UDP_RECV]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_UDP_SEND]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_UDP_RECV_BYTES]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_UDP_SEND_BYTES]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_UDP_RECV_EVENTS]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_UDP_SEND_CALLS]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_APP_SEND_BYTES]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_APP_RECV_BYTES]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_QUEUE_DEPTH]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_OPER_QUEUE_DEPTH]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_OPER_QUEUED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_OPER_COMPLETED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_WORK_OPER_QUEUE_DEPTH]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_WORK_OPER_QUEUED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_WORK_OPER_COMPLETED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PATH_VALIDATED]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PATH_FAILURE]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_SEND_STATELESS_RESET]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_SEND_STATELESS_RETRY])
+
+            /* clang-format on */
+          };
+          res = SUCCESS(enif_make_list_from_array(env, eCounters, 30));
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+        }
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_SETTINGS))
