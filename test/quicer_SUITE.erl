@@ -111,6 +111,9 @@
 
         %% insecure, msquic only
         , tc_insecure_traffic/1
+
+        %% counters,
+        , tc_perf_counters/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -1559,6 +1562,9 @@ tc_insecure_traffic(Config) ->
   end,
   quicer:close_connection(Conn),
   ok.
+
+tc_perf_counters(_Config) ->
+  {ok, _} = quicer:perf_counters().
 
 %%% ====================
 %%% Internal helpers

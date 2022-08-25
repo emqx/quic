@@ -78,6 +78,7 @@
         , listeners/0
         , listener/1
         , controlling_process/2
+        , perf_counters/0
         ]).
 
 %% Exports for test
@@ -768,6 +769,49 @@ listener(Name) ->
         {error, closed | badarg | owner_dead | not_owner}.
 controlling_process(Handler, Pid) ->
   quicer_nif:controlling_process(Handler, Pid).
+
+
+%%% @doc get QUIC stack performance counters
+-spec perf_counters() -> {ok, list({atom(), integer()})} | {error, any()}.
+perf_counters() ->
+  CntNames = [ conn_created,
+               conn_handshake_fail,
+               conn_app_reject,
+               conn_active,
+               conn_connected,
+               conn_protocol_errors,
+               conn_no_alpn,
+               strm_active,
+               pkts_suspected_lost,
+               pkts_dropped,
+               pkts_decryption_fail,
+               udp_recv,
+               udp_send,
+               udp_recv_bytes,
+               udp_send_bytes,
+               udp_recv_events,
+               udp_send_calls,
+               app_send_bytes,
+               app_recv_bytes,
+               conn_queue_depth,
+               conn_oper_queue_depth,
+               conn_oper_queued,
+               conn_oper_completed,
+               work_oper_queue_depth,
+               work_oper_queued,
+               work_oper_completed,
+               path_validated,
+               path_failure,
+               send_stateless_reset,
+               send_stateless_retry
+             ],
+  case quicer_nif:getopt(quic_global,
+                         param_global_perf_counters, false) of
+    {ok, Res} ->
+       {ok, lists:zip(CntNames, Res)};
+    Error ->
+      Error
+  end.
 
 %%% Internal helpers
 stats_map(recv_cnt) ->
