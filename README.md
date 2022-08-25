@@ -8,8 +8,10 @@ Project Status: WIP (actively), POC quality
 
 API: is not stable, might be changed in the future.
 
+![Erlang](https://img.shields.io/badge/Erlang-white.svg?style=plastic&logo=erlang&logoColor=a90533)
 ![CI](https://github.com/emqx/quic/workflows/ci/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Coverage Status](https://coveralls.io/repos/emqx/quic/badge.png?branch=main)](https://coveralls.io/r/emqx/quic?branch=main)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/emqx/quic.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/emqx/quic/alerts/)
 [![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/emqx/quic.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/emqx/quic/context:cpp)
 
