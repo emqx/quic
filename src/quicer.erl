@@ -78,7 +78,7 @@
         , listeners/0
         , listener/1
         , controlling_process/2
-        , perf_cnts/0
+        , perf_counters/0
         ]).
 
 %% Exports for test
@@ -772,8 +772,8 @@ controlling_process(Handler, Pid) ->
 
 
 %%% @doc get QUIC stack performance counters
--spec perf_cnts() -> {ok, list({atom(), integer()})} | {error, any()}.
-perf_cnts() ->
+-spec perf_counters() -> {ok, list({atom(), integer()})} | {error, any()}.
+perf_counters() ->
   CntNames = [ conn_created,
                conn_handshake_fail,
                conn_app_reject,

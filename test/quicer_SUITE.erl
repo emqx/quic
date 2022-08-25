@@ -1564,7 +1564,7 @@ tc_insecure_traffic(Config) ->
   ok.
 
 tc_perf_counters(_Config) ->
-  {ok, _} = quicer:perf_cnts().
+  {ok, _} = quicer:perf_counters().
 
 %%% ====================
 %%% Internal helpers
