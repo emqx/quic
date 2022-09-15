@@ -94,6 +94,7 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
+  quicer:stop_listener(mqtt),
   snabbkaffe:cleanup(),
   ok.
 
@@ -158,7 +159,6 @@ all() ->
 %%--------------------------------------------------------------------
 tc_app_echo_server(Config) ->
   Port = select_port(),
-  application:ensure_all_started(quicer),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
@@ -872,7 +872,7 @@ tc_conn_no_gc_2(Config) ->
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
-                 {ClientConn, ClientStream} = receive
+                 {ClientConn, _ClientStream} = receive
                                 {PRef, C, S} -> {C, S}
                               end,
                  %% Server Process
