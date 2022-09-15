@@ -18,7 +18,7 @@ clean: distclean
 
 .PHONY: distclean
 distclean:
-	rebar3 unlock
+	$(REBAR) unlock --all
 	rm -rf _build erl_crash.dump rebar3.crashdump
 	rm -rf c_build/*
 
@@ -65,8 +65,8 @@ tar:
 
 .PHONY: doc
 doc:
-	rebar3 as doc ex_doc
+	$(REBAR) as doc ex_doc
 
 .PHONY: publish
 publish:
-	rebar3 as doc hex publish
+	$(REBAR) as doc hex publish
