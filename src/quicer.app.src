@@ -27,6 +27,7 @@
                   , "get-msquic.sh"
                   , "c_build"
                   , "build.sh"
+                  , "pkgname.sh"
                   ]},
   {exclude_regexps, ["priv/.*.so"]}
 
