@@ -190,6 +190,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       if (!send_ctx)
         {
           status = QUIC_STATUS_INVALID_STATE;
+          break;
         }
 
       if (send_ctx->is_sync)
