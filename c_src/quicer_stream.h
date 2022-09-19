@@ -21,6 +21,11 @@ limitations under the License.
 #include "quicer_internal.h"
 #include "quicer_nif.h"
 
+typedef enum QUICER_STREAM_EVENT_MASKS
+{
+  QUICER_STREAM_EVENT_MASK_START_COMPLETE = 0x00000001
+} QUICER_STREAM_EVENT_MASK;
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event);
 

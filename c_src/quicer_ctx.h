@@ -100,6 +100,7 @@ typedef struct QuicerStreamCTX
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
   _CTX_CALLBACK_WRITE_ BOOLEAN is_buff_ready;
   BOOLEAN is_closed;
+  uint32_t event_mask;
   void *reserved1;
   void *reserved2;
   void *reserved3;

@@ -114,6 +114,9 @@
 
         %% counters,
         , tc_perf_counters/1
+
+        %% stream event masks
+        , tc_event_start_compl/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -1565,6 +1568,43 @@ tc_insecure_traffic(Config) ->
 
 tc_perf_counters(_Config) ->
   {ok, _} = quicer:perf_counters().
+
+tc_event_start_compl(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              [{param_conn_disable_1rtt_encryption, true} |
+                               default_conn_opts()], 5000),
+  %% Stream 1 enabled
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}]),
+  %% Stream 1 disabled
+  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0}]),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
+  receive
+    {quic, start_completed, Stm, success, StreamId, 1} ->
+      ct:pal("Stream ~p started", [StreamId]);
+    {quic, start_completed, Stm, Err, StreamId, _} ->
+      ct:fail("Stream ~p failed to start: ~p", [StreamId, Err])
+  end,
+  receive
+    {quic, start_completed, Stm2, Status, _StreamId, _} ->
+      ct:fail("Stream ~p should NOT recv event : ~p", [Stm, Status])
+  after 0 ->
+      ok
+  end,
+  quicer:close_connection(Conn),
+  ok.
 
 %%% ====================
 %%% Internal helpers

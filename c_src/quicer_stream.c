@@ -42,6 +42,29 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   TP_CB_3(event, (uintptr_t)Stream, Event->Type);
   switch (Event->Type)
     {
+    case QUIC_STREAM_EVENT_START_COMPLETE:
+      // Only for Local initiated stream
+      if (s_ctx->event_mask & QUICER_STREAM_EVENT_MASK_START_COMPLETE)
+        {
+          report = enif_make_tuple6(
+              env,
+              ATOM_QUIC,
+              ATOM_START_COMPLETE,
+              enif_make_copy(env, s_ctx->eHandler),
+              atom_status(env, Event->START_COMPLETE.Status),
+              enif_make_uint64(env, Event->START_COMPLETE.ID),
+              enif_make_uint64(env, Event->START_COMPLETE.PeerAccepted));
+          if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+            {
+              TP_CB_3(app_down, (uintptr_t)Stream, 0);
+              // Owner is gone, we shutdown the stream as well.
+              MsQuic->StreamShutdown(
+                  Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+              // @TODO decides a proper error status
+            }
+        }
+      break;
+
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
       //
       // A previous StreamSend call has completed, and the context is being
@@ -180,6 +203,29 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   TP_CB_3(event, (uintptr_t)Stream, Event->Type);
   switch (Event->Type)
     {
+    case QUIC_STREAM_EVENT_START_COMPLETE:
+      // Only for Local initiated stream
+      if (s_ctx->event_mask & QUICER_STREAM_EVENT_MASK_START_COMPLETE)
+        {
+          report = enif_make_tuple6(
+              env,
+              ATOM_QUIC,
+              ATOM_START_COMPLETE,
+              enif_make_copy(env, s_ctx->eHandler),
+              atom_status(env, Event->START_COMPLETE.Status),
+              enif_make_uint64(env, Event->START_COMPLETE.ID),
+              enif_make_uint64(env, Event->START_COMPLETE.PeerAccepted));
+          if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+            {
+              TP_CB_3(app_down, (uintptr_t)Stream, 0);
+              // Owner is gone, we shutdown the stream as well.
+              MsQuic->StreamShutdown(
+                  Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+              // @TODO decides a proper error status
+            }
+        }
+      break;
+
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
       //
       // A previous StreamSend call has completed, and the context is being
@@ -306,6 +352,7 @@ async_start_stream2(ErlNifEnv *env,
   QuicerConnCTX *c_ctx = NULL;
   ERL_NIF_TERM res = ATOM_ERROR_INTERNAL_ERROR;
   ERL_NIF_TERM active_val;
+  ERL_NIF_TERM eoptions = argv[1];
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
@@ -313,7 +360,7 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   if (!enif_get_map_value(
-          env, argv[1], ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
+          env, eoptions, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -322,6 +369,10 @@ async_start_stream2(ErlNifEnv *env,
   // note, s_ctx is not shared yet, thus no locking is needed.
   //
   QuicerStreamCTX *s_ctx = init_s_ctx();
+
+  // This is optional
+  get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &s_ctx->event_mask);
+
   enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
 
