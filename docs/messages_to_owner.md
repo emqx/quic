@@ -31,6 +31,15 @@ The receiver can discard any data that it already received on the stream.
 {quic, peer_send_aborted, stream_handler(), ErrorCode}
 ```
 
+### peer_receive_aborted
+Received a RESET_STREAM Frame.
+The peer (receiver) abortively shut down the stream.
+The sender may assume the data sent is either handled or not handled.
+
+```erlang
+{quic, peer_receive_aborted, stream_handler(), ErrorCode}
+```
+
 ### stream closed, shutdown_completed,
 
 Both directions of the stream have been shut down.
@@ -133,6 +142,36 @@ The NST could be used by Client for 0-RTT handshake with connection opt '{nst, T
 ``` erlang
 {quic, nst_received, connection_handler(), Ticket::binary()}
 ```
+
+### Peer Address Changed
+Peer addr is changed.
+
+```erlang
+{quic, peer_address_changed, connection_handler(), NewAddr :: string()}.
+
+```
+
+### Local Address Changed
+Local addr is changed.
+
+```erlang
+{quic, local_address_changed, connection_handler(), NewAddr :: string()}.
+
+```
+
+### Streams available
+More streams are available due to flow control from peer.
+
+```erlang
+{quic, streams_available, connection_handler(), BiDirStreamsCnt::integer(), UniDirStreamsCnt::integer()}
+```
+
+### Peer Needs Streams
+Peer wants to open more streams but cannot due to flow control
+```erlang
+{quic, peer_needs_streams, connection_handler()}
+```
+
 
 ## Messages to Listener Owner
 
