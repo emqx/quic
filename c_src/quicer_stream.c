@@ -146,6 +146,29 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
           // @todo return proper bad status
         }
       break;
+    case QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED:
+      //
+      // The peer aborted its send direction of the stream.
+      //
+      TP_CB_3(peer_receive_aborted,
+              (uintptr_t)Stream,
+              Event->PEER_RECEIVE_ABORTED.ErrorCode);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_PEER_RECEIVE_ABORTED,
+          enif_make_copy(env, s_ctx->eHandler),
+          enif_make_uint64(env, Event->PEER_RECEIVE_ABORTED.ErrorCode));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown the stream as well.
+          TP_CB_3(app_down, (uintptr_t)Stream, Event->Type);
+          MsQuic->StreamShutdown(
+              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          // @todo return proper bad status
+        }
+      break;
     case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
       //
       // Both directions of the stream have been shut down and MsQuic is done
@@ -286,6 +309,30 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
           // @todo return proper bad status
         }
       break;
+    case QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED:
+      //
+      // The peer aborted its send direction of the stream.
+      //
+      TP_CB_3(peer_receive_aborted,
+              (uintptr_t)Stream,
+              Event->PEER_RECEIVE_ABORTED.ErrorCode);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_PEER_RECEIVE_ABORTED,
+          enif_make_copy(env, s_ctx->eHandler),
+          enif_make_uint64(env, Event->PEER_RECEIVE_ABORTED.ErrorCode));
+
+      if (!enif_send(NULL, &(s_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown the stream as well.
+          TP_CB_3(app_down, (uintptr_t)Stream, Event->Type);
+          MsQuic->StreamShutdown(
+              Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+          // @todo return proper bad status
+        }
+      break;
+
     case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
       //
       // The peer aborted its send direction of the stream.
