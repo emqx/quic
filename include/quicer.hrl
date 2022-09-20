@@ -58,6 +58,12 @@
 -define(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED         , 15).
 
 
+%% STREAM START FLAGS
+-define(QUIC_STREAM_START_FLAG_NONE                          , 0).
+-define(QUIC_STREAM_START_FLAG_IMMEDIATE                     , 1).
+-define(QUIC_STREAM_START_FLAG_FAIL_BLOCKED                  , 2).
+-define(QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL              , 4).
+-define(QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT          , 8).
 %% STREAM SHUTDOWN FLAGS
 -define(QUIC_STREAM_SHUTDOWN_FLAG_NONE          , 0).
 -define(QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL      , 1).   % Cleanly closes the send path.

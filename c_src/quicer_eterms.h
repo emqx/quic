@@ -244,6 +244,7 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 /* QUIC_STREAM_OPTS starts                                  */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
+extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_START_FLAG;
 /*----------------------------------------------------------*/
 /* QUIC_STREAM_OPTS ends                                    */
 /*----------------------------------------------------------*/

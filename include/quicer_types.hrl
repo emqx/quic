@@ -123,7 +123,17 @@
                               ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
 -type acceptor_opts() :: map(). %% @TODO expand
 
--type stream_opts() :: map(). %% @TODO expand
+-type stream_opts() :: #{ active := boolean() | once | integer()
+                        , send_flag => stream_start_flags()
+                        , event_mask => uint32()
+                        }. %% @TODO expand
+
+-type stream_start_flags() :: ?QUIC_STREAM_START_FLAG_NONE |
+                              ?QUIC_STREAM_START_FLAG_IMMEDIATE |           %% Immediately informs peer that stream is open
+                              ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED |        %% If number of streams is rate limited, notify with event start_completed with status 'stream_limit_reached'
+                              ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL |    %% Shutdown the stream immediately after start failure
+                              ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT. %% Indicate PEER_ACCEPTED event if not accepted at start
+
 -type stream_shutdown_flags() :: ?QUIC_STREAM_SHUTDOWN_FLAG_NONE |
                                  ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL |
                                  ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND |

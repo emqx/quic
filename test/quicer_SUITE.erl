@@ -109,6 +109,10 @@
         , tc_get_conn_rid/1
         , tc_get_stream_rid/1
 
+        , tc_stream_start_flag_fail_blocked/1
+        , tc_stream_start_flag_immediate/1
+        , tc_stream_start_flag_shutdown_on_fail/1
+        , tc_stream_start_flag_indicate_peer_accept_1/1
         %% insecure, msquic only
         , tc_insecure_traffic/1
 
@@ -1514,6 +1518,144 @@ tc_get_stream_rid(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
     {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+  end,
+  ?assert(is_integer(Rid)),
+  ?assert(Rid =/= 0).
+
+tc_stream_start_flag_fail_blocked(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                 | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED}
+                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        ]),
+  {ok, Rid} = quicer:get_stream_rid(Stm),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm,  _, _, _} ->
+      ct:fail("Should not get ping1 due to rate limiter");
+    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+      ct:pal("Stream ~p limit reached", [StreamID]);
+    {quic, start_completed, Stm, Reason, StreamID, _} ->
+      ct:fail("Stream ~pstart complete with unexpect reason: ~p", [StreamID, Reason])
+  end,
+
+  receive
+    {quic, closed, Stm, _} ->
+      ct:failed("Stream ~p is closed but shouldn't since QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL is unset", [Stm]);
+    {quic, transport_shutdown, Conn, connection_idle} ->
+      ct:pal("Connection ~p transport shutdown due to idle, stream isn't closed ahead", [Conn])
+    end,
+  ?assert(is_integer(Rid)),
+  ?assert(Rid =/= 0).
+
+
+tc_stream_start_flag_immediate(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                 | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}
+                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        ]),
+  {ok, Rid} = quicer:get_stream_rid(Stm),
+  %% We don't need to send anything, we should get start_completed even it is rate limited
+  receive
+    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+      ct:fail("Stream ~p limit reached", [StreamID]);
+    {quic, start_completed, Stm, Reason, StreamID, _} ->
+      ct:pal("Stream ~pstart complete with reason: ~p", [StreamID, Reason])
+  end,
+  ?assert(is_integer(Rid)),
+  ?assert(Rid =/= 0).
+
+tc_stream_start_flag_shutdown_on_fail(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                 | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
+                                                        bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
+                                                       }
+                                          , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        ]),
+  {ok, Rid} = quicer:get_stream_rid(Stm),
+  case quicer:async_send(Stm, <<"ping1">>) of
+    {ok, 5} -> ok;
+    {error, stm_send_error, invalid_state} -> ok %% already closed
+  end,
+  receive
+    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+      ct:pal("Stream ~p limit reached", [StreamID]);
+    {quic, start_completed, Stm, Reason, StreamID, _} ->
+      ct:fail("Stream ~pstart complete with other reason: ~p", [StreamID, Reason])
+  end,
+  %% We should get a stream closed event since it is rate limited
+  receive
+    {quic, closed, Stm, 0} -> % not a conn close
+      ct:pal("Stream ~p is closed", [Stm]);
+    {quic, transport_shutdown, Conn, connection_idle} ->
+      ct:fail("Unexpected connection ~p transport shutdown", [Conn]);
+    Other ->
+      ct:fail("Unexpected event ~p after stream start complete", [Other])
+  end,
+  ?assert(is_integer(Rid)),
+  ?assert(Rid =/= 0).
+
+tc_stream_start_flag_indicate_peer_accept_1(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  %% We don't enable flow control
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT}
+                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        ]),
+  quicer:async_send(Stm, <<"ping1">>),
+  {ok, Rid} = quicer:get_stream_rid(Stm),
+  %% We don't need to send anything
+  receive
+    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+      ct:fail("Stream ~p limit reached", [StreamID]);
+    {quic, start_completed, Stm, Reason, StreamID, _} ->
+      ct:pal("Stream ~p start complete with reason: ~p", [StreamID, Reason])
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).

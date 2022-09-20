@@ -352,6 +352,8 @@ async_start_stream2(ErlNifEnv *env,
   QuicerConnCTX *c_ctx = NULL;
   ERL_NIF_TERM res = ATOM_ERROR_INTERNAL_ERROR;
   ERL_NIF_TERM active_val;
+  ERL_NIF_TERM estart_flag;
+  unsigned int start_flag = QUIC_STREAM_START_FLAG_NONE; // default
   ERL_NIF_TERM eoptions = argv[1];
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
@@ -363,6 +365,18 @@ async_start_stream2(ErlNifEnv *env,
           env, eoptions, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  // optional start_flag,
+  if (enif_get_map_value(
+          env, eoptions, ATOM_QUIC_STREAM_OPTS_START_FLAG, &estart_flag))
+    {
+      if (!enif_get_uint(env, estart_flag, &start_flag))
+        {
+          // if set must be valid.
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      // @TODO set event mask for some flags
     }
 
   //
@@ -420,9 +434,7 @@ async_start_stream2(ErlNifEnv *env,
   // Starts the bidirectional stream. By default, the peer is not notified of
   // the stream being started until data is sent on the stream.
   //
-  if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream,
-                                               // @todo flag in options
-                                               QUIC_STREAM_START_FLAG_NONE)))
+  if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream, start_flag)))
     {
       // note, stream call back would close the stream
       // destroy_s_ctx should not be called here

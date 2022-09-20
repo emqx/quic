@@ -260,6 +260,7 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 /* QUIC_STREAM_OPTS starts */
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
+ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_START_FLAG;
 /*----------------------------------------------------------*/
 /* QUIC_STREAM_OPTS ends  */
 /*----------------------------------------------------------*/
@@ -547,6 +548,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   /*                  QUIC_SETTINGS end                        */             \
   /*                  QUIC_STREAM_OPTS start                        */        \
   ATOM(ATOM_QUIC_STREAM_OPTS_ACTIVE, active)                                  \
+  ATOM(ATOM_QUIC_STREAM_OPTS_START_FLAG, start_flag)                          \
   /*                  QUIC_STREAM_OPTS end                        */          \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_KEY, key);                                                        \
