@@ -141,6 +141,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   ErlNifEnv *env = c_ctx->env;
   ERL_NIF_TERM report;
   BOOLEAN is_destroy = FALSE;
+  QUIC_ADDR_STR addrStr = { 0 };
 
   enif_mutex_lock(c_ctx->lock);
   TP_CB_3(event, (uintptr_t)Connection, Event->Type);
@@ -265,15 +266,68 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       is_destroy = TRUE;
       c_ctx->is_closed = TRUE; // client shutdown completed
       break;
+
+    case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
+      QuicAddrToString(Event->PEER_ADDRESS_CHANGED.Address, &addrStr);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_PEER_ADDRESS_CHANGED,
+          enif_make_resource(env, c_ctx),
+          enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
+      break;
     case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
-      // @TODO
+      QuicAddrToString(Event->LOCAL_ADDRESS_CHANGED.Address, &addrStr);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_LOCAL_ADDRESS_CHANGED,
+          enif_make_resource(env, c_ctx),
+          enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
       break;
     case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
-      // @TODO
-      // UpdateMaxStreams
+      report = enif_make_tuple5(
+          env,
+          ATOM_QUIC,
+          ATOM_STREAMS_AVAILABLE,
+          enif_make_resource(env, c_ctx),
+          enif_make_uint(env, Event->STREAMS_AVAILABLE.BidirectionalCount),
+          enif_make_uint(env, Event->STREAMS_AVAILABLE.UnidirectionalCount));
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
       break;
     case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
-      // @TODO
+      report = enif_make_tuple3(env,
+                                ATOM_QUIC,
+                                ATOM_PEER_NEEDS_STREAMS,
+                                enif_make_resource(env, c_ctx));
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
       break;
     case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
       //
@@ -368,7 +422,7 @@ ServerConnectionCallback(HQUIC Connection,
   ERL_NIF_TERM report;
   ErlNifEnv *env = c_ctx->env;
   BOOLEAN is_destroy = FALSE;
-
+  QUIC_ADDR_STR addrStr = { 0 };
   enif_mutex_lock(c_ctx->lock);
   TP_CB_3(event, (uintptr_t)Connection, Event->Type);
   switch (Event->Type)
@@ -459,7 +513,7 @@ ServerConnectionCallback(HQUIC Connection,
       s_ctx->c_ctx = c_ctx;
       s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
 
-      ErlNifEnv *env = s_ctx->env;
+      env = s_ctx->env;
       s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
 
       acc = AcceptorDequeue(c_ctx->acceptor_queue);
@@ -521,6 +575,69 @@ ServerConnectionCallback(HQUIC Connection,
     case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
       handle_dgram_recv_event(c_ctx, Event);
       break;
+    case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
+      QuicAddrToString(Event->PEER_ADDRESS_CHANGED.Address, &addrStr);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_PEER_ADDRESS_CHANGED,
+          enif_make_resource(env, c_ctx),
+          enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
+      break;
+    case QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED:
+      QuicAddrToString(Event->LOCAL_ADDRESS_CHANGED.Address, &addrStr);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_LOCAL_ADDRESS_CHANGED,
+          enif_make_resource(env, c_ctx),
+          enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
+      break;
+    case QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE:
+      report = enif_make_tuple5(
+          env,
+          ATOM_QUIC,
+          ATOM_STREAMS_AVAILABLE,
+          enif_make_resource(env, c_ctx),
+          enif_make_uint(env, Event->STREAMS_AVAILABLE.BidirectionalCount),
+          enif_make_uint(env, Event->STREAMS_AVAILABLE.UnidirectionalCount));
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
+      break;
+    case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
+      report = enif_make_tuple3(env,
+                                ATOM_QUIC,
+                                ATOM_PEER_NEEDS_STREAMS,
+                                enif_make_resource(env, c_ctx));
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
+      break;
+
     default:
       break;
     }

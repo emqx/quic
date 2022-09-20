@@ -543,6 +543,9 @@ tc_stream_client_send_binary(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive
+        {quic, streams_available, Conn, _, _} -> ok
+      end,
+      receive
         {quic, <<"pong">>, _, _, _, _} ->
           ok = quicer:close_stream(Stm),
           ok = quicer:close_connection(Conn);
@@ -565,6 +568,9 @@ tc_stream_client_send_iolist(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, ["p", ["i", ["n"]], <<"g">>]),
       receive
+        {quic, streams_available, Conn, _, _} -> ok
+      end,
+      receive
         {quic, <<"pong">>, _, _, _, _} ->
           ok = quicer:close_stream(Stm),
           ok = quicer:close_connection(Conn);
@@ -586,6 +592,9 @@ tc_stream_client_async_send(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+      receive
+        {quic, streams_available, Conn, _, _} -> ok
+      end,
       receive
         {quic, <<"pong">>, _, _, _, _} ->
           ok = quicer:close_stream(Stm),
@@ -706,6 +715,9 @@ tc_stream_active_switch_to_passive(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
       {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      receive
+        {quic, streams_available, Conn, _, _} -> ok
+      end,
       {error, einval} = quicer:recv(Stm, 0),
       receive
         {quic, <<"ping_active">>, Stm, _, _, _} -> ok
@@ -893,6 +905,9 @@ tc_dgram_client_send(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
+      receive
+        {quic, streams_available, Conn, _, _} -> ok
+      end,
       dgram_client_recv_loop(Conn, false, false),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
