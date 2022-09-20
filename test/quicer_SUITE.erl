@@ -109,6 +109,7 @@
         , tc_get_conn_rid/1
         , tc_get_stream_rid/1
 
+        , tc_stream_open_flag_unidirectional/1
         , tc_stream_start_flag_fail_blocked/1
         , tc_stream_start_flag_immediate/1
         , tc_stream_start_flag_shutdown_on_fail/1
@@ -1533,6 +1534,31 @@ tc_get_stream_rid(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
     {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+  end,
+  ?assert(is_integer(Rid)),
+  ?assert(Rid =/= 0).
+
+tc_stream_open_flag_unidirectional(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}
+                                        , {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                        ]),
+  {ok, Rid} = quicer:get_stream_rid(Stm),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm,  _, _, _} -> ct:fail("unidirectional stream should not receive any");
+    {quic, closed, Stm, 1} -> ct:pal("stream is closed due to connecion idle")
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).

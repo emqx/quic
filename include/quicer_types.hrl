@@ -124,10 +124,14 @@
 -type acceptor_opts() :: map(). %% @TODO expand
 
 -type stream_opts() :: #{ active := boolean() | once | integer()
+                        , open_flag => stream_open_flags()
                         , send_flag => stream_start_flags()
                         , event_mask => uint32()
                         }. %% @TODO expand
 
+-type stream_open_flags() ::  ?QUIC_STREAM_OPEN_FLAG_NONE |
+                              ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL | %% Open unidirectional stream
+                              ?QUIC_STREAM_OPEN_FLAG_0_RTT.           %% The stream is opened via a 0-RTT packet
 -type stream_start_flags() :: ?QUIC_STREAM_START_FLAG_NONE |
                               ?QUIC_STREAM_START_FLAG_IMMEDIATE |           %% Immediately informs peer that stream is open
                               ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED |        %% If number of streams is rate limited, notify with event start_completed with status 'stream_limit_reached'

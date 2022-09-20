@@ -29,10 +29,7 @@ API for registrationshutdown, shutdown all connections under registration
 
 ** NIF Segfault recover
 
-** Stream unidirectional/bidirectional awareness
-
 ** Different Application Profile (low latency, high throughput)
 
 ** NIF Upgrade
 
-** 0RTT support

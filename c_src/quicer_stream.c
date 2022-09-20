@@ -401,6 +401,9 @@ async_start_stream2(ErlNifEnv *env,
   ERL_NIF_TERM active_val;
   ERL_NIF_TERM estart_flag;
   unsigned int start_flag = QUIC_STREAM_START_FLAG_NONE; // default
+  ERL_NIF_TERM eopen_flag;
+  unsigned int open_flag = QUIC_STREAM_OPEN_FLAG_NONE; // default
+
   ERL_NIF_TERM eoptions = argv[1];
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
@@ -412,6 +415,18 @@ async_start_stream2(ErlNifEnv *env,
           env, eoptions, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  // optional open_flag,
+  if (enif_get_map_value(
+          env, eoptions, ATOM_QUIC_STREAM_OPTS_OPEN_FLAG, &eopen_flag))
+    {
+      if (!enif_get_uint(env, eopen_flag, &open_flag))
+        {
+          // if set must be valid.
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      // @TODO set event mask for some flags
     }
 
   // optional start_flag,
@@ -464,7 +479,7 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
-                                              QUIC_STREAM_OPEN_FLAG_NONE,
+                                              open_flag,
                                               ClientStreamCallback,
                                               s_ctx,
                                               &(s_ctx->Stream))))

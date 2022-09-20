@@ -58,6 +58,11 @@
 -define(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED         , 15).
 
 
+%% STREAM OPEN FLAGS
+-define(QUIC_STREAM_OPEN_FLAG_NONE                          , 0).
+-define(QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL                , 1).
+-define(QUIC_STREAM_OPEN_FLAG_0_RTT                         , 2).
+
 %% STREAM START FLAGS
 -define(QUIC_STREAM_START_FLAG_NONE                          , 0).
 -define(QUIC_STREAM_START_FLAG_IMMEDIATE                     , 1).

@@ -249,6 +249,9 @@ SYNC call in non-callback-context
 
 * Event handling
 ** Listener Events
+
+*QUIC_LISTENER_EVENT* in msquic.h
+
 #+begin_verse
     QUIC_LISTENER_EVENT_NEW_CONNECTION      = 0,
     QUIC_LISTENER_EVENT_STOP_COMPLETE       = 1,
@@ -260,6 +263,9 @@ SYNC call in non-callback-context
 | QUIC_LISTENER_EVENT_STOP_COMPLETE  | {quic,  listener_stopped , listener_handler()}    |
 
 ** Connecion Events
+
+*QUIC_CONNECTION_EVENT* in msquic.h
+
 #+begin_verse
     QUIC_CONNECTION_EVENT_CONNECTED                         = 0,
     QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT   = 1,    // The transport started the shutdown process.
@@ -278,7 +284,7 @@ SYNC call in non-callback-context
     QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED        = 14,   // Client-only; provides ticket to persist, if any.
     QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED         = 15,
 #+end_verse
-*QUIC_CONNECTION_EVENT* in msquic.h
+
 
 | MsQuic Event                                          | Erlang Msg                                                                 |
 |-------------------------------------------------------+----------------------------------------------------------------------------|
@@ -302,6 +308,9 @@ SYNC call in non-callback-context
 
 
 ** Stream Events
+
+*QUIC_STREAM_EVENT* in msquic.h
+
 #+begin_verse
 QUIC_STREAM_EVENT_START_COMPLETE            = 0,
 QUIC_STREAM_EVENT_RECEIVE                   = 1,
@@ -327,3 +336,46 @@ QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
 | QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                                        |
 | QUIC_STREAM_EVENT_PEER_ACCEPTED          | @TODO                                                                                        |
 
+* Multistreaming Support
+
+Multistreaming is one of the core features QUIC brings to the transport layer.
+
+Quicer support multistreaming in two levels
+
+** NIF level
+
+Caller of NIF functions in module quicer_nif is free to manage the streams after connection is established.
+
+Both QUIC endpoints could
+1. Start stream(s) with `quicer:start_stream`, other end accepts new streams
+2. Send data over it with `quicer:send` or receive data passively or actively from process message box
+3. Both side is able to shutdown/abort the stream with 'quicer:shutdown_stream' or 'quicer:close_stream'
+   with flags.
+
+** Erlang Process level
+
+In quicer, for best practice, you could use quicer_* modules to manage the listeners, connections and streams.
+
+- quicer_conn_acceptor
+
+  Process handles connections
+
+- quicer_conn_acceptor_sup
+
+  Supervisor that manages connection acceptors
+
+- quicer_listener
+
+  Supervised listener process
+
+- quicer_listener_sup
+
+  Supervisor that manages listener proceses
+
+- quicer_server_conn_callback
+
+  Example callback module for handle *server* connections.
+
+- quicer_server_stream_callback
+
+  Example callback module for handle *server* streams.
