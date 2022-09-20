@@ -246,3 +246,84 @@ SYNC call in non-callback-context
 *** StreamReceiveComplete;
 *** StreamReceiveSetEnabled;
 *** DatagramSend;
+
+* Event handling
+** Listener Events
+#+begin_verse
+    QUIC_LISTENER_EVENT_NEW_CONNECTION      = 0,
+    QUIC_LISTENER_EVENT_STOP_COMPLETE       = 1,
+#+end_verse
+
+| MsQuic Event                       | Erlang Msg                                       |
+|------------------------------------+--------------------------------------------------|
+| QUIC_LISTENER_EVENT_NEW_CONNECTION | {quic,  new_conn         , connection_handler()}  |
+| QUIC_LISTENER_EVENT_STOP_COMPLETE  | {quic,  listener_stopped , listener_handler()}    |
+
+** Connecion Events
+#+begin_verse
+    QUIC_CONNECTION_EVENT_CONNECTED                         = 0,
+    QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT   = 1,    // The transport started the shutdown process.
+    QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER        = 2,    // The peer application started the shutdown process.
+    QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE                 = 3,    // Ready for the handle to be closed.
+    QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED             = 4,
+    QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED              = 5,
+    QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED               = 6,
+    QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE                 = 7,
+    QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS                = 8,
+    QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED           = 9,
+    QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED            = 10,
+    QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED                 = 11,
+    QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED       = 12,
+    QUIC_CONNECTION_EVENT_RESUMED                           = 13,   // Server-only; provides resumption data, if any.
+    QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED        = 14,   // Client-only; provides ticket to persist, if any.
+    QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED         = 15,
+#+end_verse
+*QUIC_CONNECTION_EVENT* in msquic.h
+
+| MsQuic Event                                          | Erlang Msg                                                                 |
+|-------------------------------------------------------+----------------------------------------------------------------------------|
+| QUIC_CONNECTION_EVENT_CONNECTED                       | {quic, connected, connection_handler()}  @TODO more flags                  |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT | {quic, transport_shutdown, connection_handler(), atom_status()}            |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER      | {quic, shutdown, connection_handler(),atom_status()} @TODO errcode         |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE               | {quic, closed, connection_handler()} @TODO flags                           |
+| QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED           | {quic, local_address_changed, connection_handler(), addr_str()}            |
+| QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED            | {quic, peer_address_changed, connection_handler(), addr_str()}             |
+| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handler()} @TODO stream                          |
+| QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE               | {quic, streams_available, connection_handler(), BidirStmCnt, UniDirStmCnt} |
+| QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS              | {quic, peer_needs_streams, connection_handler()}                           |
+| QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED         | -                                                                          |
+| QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED          | {quic, dgram_max_len, integer()} @TODO with handler                        |
+| QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED               | {quic, dgram, binary()}          @TODO with handler                        |
+| QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED     | {quic, send_dgram_completed, connection_handler()}                         |
+| QUIC_CONNECTION_EVENT_RESUMED                         | @TODO                                                                      |
+| QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED      | {quic, nst_received, connection_handler(), Ticket::binary()}               |
+| QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | @TODO                                                                      |
+|-------------------------------------------------------+----------------------------------------------------------------------------|
+
+
+** Stream Events
+#+begin_verse
+QUIC_STREAM_EVENT_START_COMPLETE            = 0,
+QUIC_STREAM_EVENT_RECEIVE                   = 1,
+QUIC_STREAM_EVENT_SEND_COMPLETE             = 2,
+QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN        = 3,
+QUIC_STREAM_EVENT_PEER_SEND_ABORTED         = 4,
+QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED      = 5,
+QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE    = 6,
+QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE         = 7,
+QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE    = 8,
+QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
+
+#+end_verse
+| MsQuic Event                             | Erlang Msg                                                                                   |
+|------------------------------------------+----------------------------------------------------------------------------------------------|
+| QUIC_STREAM_EVENT_START_COMPLETE         | {quic, start_completed, stream_handler(), atom_status(), stream_id(), peer_accepted()}       |
+| QUIC_STREAM_EVENT_RECEIVE                | {quic, stream_handler(), continue} or {quic, binary(), stream_handler(), Offset, Len, Flags} |
+| QUIC_STREAM_EVENT_SEND_COMPLETE          | {quic, send_complete, stream_handler(), CanceledFlag}                                        |
+| QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN     | {quic, peer_send_shutdown, stream_handler()}                                                 |
+| QUIC_STREAM_EVENT_PEER_SEND_ABORTED      | {quic, peer_send_aborted, stream_handler(), error_code()}                                    |
+| QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED   | {quic, peer_receive_aborted, stream_handler(), error_code()}                                 |
+| QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE      | {quic, closed, stream_handler(), IsConnCloseFlag()}                                          |
+| QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                                        |
+| QUIC_STREAM_EVENT_PEER_ACCEPTED          | @TODO                                                                                        |
+
