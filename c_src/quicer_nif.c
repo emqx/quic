@@ -274,6 +274,7 @@ ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
 ERL_NIF_TERM ATOM_PEER_RECEIVE_ABORTED;
 ERL_NIF_TERM ATOM_PEER_ADDRESS_CHANGED;
+ERL_NIF_TERM ATOM_PEER_ACCEPTED;
 ERL_NIF_TERM ATOM_LOCAL_ADDRESS_CHANGED;
 ERL_NIF_TERM ATOM_STREAMS_AVAILABLE;
 ERL_NIF_TERM ATOM_PEER_NEEDS_STREAMS;
@@ -570,6 +571,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_PEER_RECEIVE_ABORTED, peer_receive_aborted);                      \
   ATOM(ATOM_PEER_ADDRESS_CHANGED, peer_address_changed);                      \
+  ATOM(ATOM_PEER_ACCEPTED, peer_accepted);                                    \
   ATOM(ATOM_LOCAL_ADDRESS_CHANGED, local_address_changed);                    \
   ATOM(ATOM_STREAMS_AVAILABLE, streams_available);                            \
   ATOM(ATOM_PEER_NEEDS_STREAMS, peer_needs_streams);                          \

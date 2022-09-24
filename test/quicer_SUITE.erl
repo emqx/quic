@@ -114,6 +114,7 @@
         , tc_stream_start_flag_immediate/1
         , tc_stream_start_flag_shutdown_on_fail/1
         , tc_stream_start_flag_indicate_peer_accept_1/1
+        , tc_stream_start_flag_indicate_peer_accept_2/1
         %% insecure, msquic only
         , tc_insecure_traffic/1
 
@@ -1691,6 +1692,42 @@ tc_stream_start_flag_indicate_peer_accept_1(Config) ->
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
 
+tc_stream_start_flag_indicate_peer_accept_2(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
+  {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, true},
+                                          {start_flag, ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT},
+                                          {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                         ]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm0, _, _, _} ->
+      ct:fail("We should not recv ping1 due to flow control: bidir stream 0")
+  after 1000 ->
+      ct:pal("recv ping1 timeout"),
+      SPid ! {flow_ctl, 1, 1}
+  end,
+  %% check with server if peer addr is correct.
+  receive
+    {quic, peer_accepted, Stm0} ->
+      ct:pal("peer_accepted received"),
+      SPid ! done
+  after 1000 ->
+      ct:fail("peer_accepted timeout")
+  end,
+  ensure_server_exit_normal(Ref).
+
 tc_conn_opt_sslkeylogfile(Config) ->
   Port = select_port(),
   TargetFName = "SSLKEYLOGFILE",
@@ -1792,7 +1829,14 @@ echo_server(Owner, Config, Port)->
       ct:pal("echo server conn accepted", []),
       receive
         {quic, new_stream, Stm} ->
-          {ok, Conn} = quicer:async_accept_stream(Conn, [])
+          {ok, Conn} = quicer:async_accept_stream(Conn, []);
+        {flow_ctl, BidirCount, UniDirCount} ->
+          ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [BidirCount, UniDirCount]),
+          quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => BidirCount,
+                                                     peer_unidi_stream_count => UniDirCount}),
+          receive {quic, new_stream, Stm} ->
+              {ok, Conn} = quicer:async_accept_stream(Conn, [])
+          end
       end,
       ct:pal("echo server stream accepted", []),
       echo_server_stm_loop(L, Conn, Stm);
@@ -1832,6 +1876,11 @@ echo_server_stm_loop(L, Conn, Stm) ->
       echo_server_stm_loop(L, Conn, NewStm);
     {peer_addr, From} ->
       From ! {peer_addr, quicer:peername(Conn)},
+      echo_server_stm_loop(L, Conn, Stm);
+    {flow_ctl, BidirCount, UniDirCount} ->
+      ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [BidirCount, UniDirCount]),
+      quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count =>BidirCount,
+                                                 peer_unidi_stream_count => UniDirCount}),
       echo_server_stm_loop(L, Conn, Stm);
     done ->
       ct:pal("echo server shutting down", []),
@@ -2026,6 +2075,7 @@ default_listen_opts(Config) ->
   , {idle_timeout_ms, 10000}
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
+  , {peer_unidi_stream_count, 0}
   ].
 
 active_recv(Stream, Len) ->

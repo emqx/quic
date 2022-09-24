@@ -40,6 +40,12 @@ The sender may assume the data sent is either handled or not handled.
 {quic, peer_receive_aborted, stream_handler(), ErrorCode}
 ```
 
+### peer accepted
+The stream which was not accepted due to peer flow control is now accepted by the peer.
+```erlang
+{quic, peer_accepted, stream_handler()}
+```
+
 ### stream closed, shutdown_completed,
 
 Both directions of the stream have been shut down.
