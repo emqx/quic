@@ -1591,6 +1591,10 @@ tc_stream_start_flag_fail_blocked(Config) ->
     {quic, transport_shutdown, Conn, connection_idle} ->
       ct:pal("Connection ~p transport shutdown due to idle, stream isn't closed ahead", [Conn])
     end,
+  receive
+    {quic, closed, Conn} ->
+      ct:pal("Connecion is closed ~p", [Conn])
+  end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
 
