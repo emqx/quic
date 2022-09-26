@@ -566,6 +566,11 @@ tc_stream_close_errno(Config) ->
                               #{?snk_kind := debug, context := "callback",
                                 function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
                                 tag := "event"}, 1000, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := peer_send_aborted
+                               , module := quicer_stream
+                               , reason := 1234
+                               }, 1000, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -581,7 +586,7 @@ tc_stream_close_errno(Config) ->
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
-                                              , function := "ServerStreamCallback"
+                                              , function := "handle_stream_event_peer_send_aborted"
                                               , tag := "peer_send_aborted"
                                               , mark := Errno
                                               },
