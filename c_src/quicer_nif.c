@@ -293,6 +293,7 @@ ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
 ERL_NIF_TERM ATOM_NEW_CONN;
 ERL_NIF_TERM ATOM_CONNECTED;
+ERL_NIF_TERM ATOM_CONN_RESUMED;
 ERL_NIF_TERM ATOM_NEW_STREAM;
 
 /*----------------------------------------------------------*/
@@ -590,6 +591,7 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_ONCE, once);                                                      \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \
   ATOM(ATOM_CONNECTED, connected);                                            \
+  ATOM(ATOM_CONN_RESUMED, connection_resumed);                                \
   ATOM(ATOM_NEW_STREAM, new_stream);                                          \
   ATOM(ATOM_SNABBKAFFE_COLLECTOR, snabbkaffe_collector);                      \
   ATOM(ATOM_TRACE, trace);                                                    \

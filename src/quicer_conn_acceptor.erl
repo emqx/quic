@@ -135,6 +135,16 @@ handle_info({quic, new_conn, C},
     {ok, NewCBState} = M:new_conn(C, CBState),
     {noreply, State#state{conn = C, callback_state = NewCBState} };
 
+handle_info({quic, connection_resumed, C, ResumeData},
+            #state{callback = M, callback_state = CBState} = State) ->
+    case erlang:function_exported(M, resumed, 3) of
+        true ->
+            {ok, NewCBState} = M:resumed(C, ResumeData, CBState),
+            {noreply, State#state{callback_state = NewCBState}};
+        false ->
+            {noreply, State}
+    end;
+
 handle_info({quic, connected, C}, #state{ conn = C
                                         , callback = M
                                         , callback_state = CbState} = State) ->

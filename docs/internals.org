@@ -301,7 +301,7 @@ SYNC call in non-callback-context
 | QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED          | {quic, dgram_max_len, integer()} @TODO with handler                        |
 | QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED               | {quic, dgram, binary()}          @TODO with handler                        |
 | QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED     | {quic, send_dgram_completed, connection_handler()}                         |
-| QUIC_CONNECTION_EVENT_RESUMED                         | @TODO                                                                      |
+| QUIC_CONNECTION_EVENT_RESUMED                         | {quic, connection_resumed, connection_handler, false \vert binary()}       |
 | QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED      | {quic, nst_received, connection_handler(), Ticket::binary()}               |
 | QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | @TODO                                                                      |
 |-------------------------------------------------------+----------------------------------------------------------------------------|

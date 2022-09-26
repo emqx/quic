@@ -1003,8 +1003,13 @@ tc_conn_resume_old(Config) ->
 %%% Resume connection with connection opt: `nst'
 tc_conn_resume_nst(Config) ->
   Port = select_port(),
+  ServerResumeCBFun = fun(_Conn, Data, S) -> %% @TODO test Non empty 'Resume Data'
+                          ct:pal("recv resume data: ~p", [Data]),
+                          {ok, S}
+                      end,
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {resumed_callback, ServerResumeCBFun}
                    , {stream_acceptors, 32}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}

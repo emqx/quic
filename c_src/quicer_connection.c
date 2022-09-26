@@ -32,6 +32,9 @@ static void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
 static void handle_dgram_recv_event(QuicerConnCTX *c_ctx,
                                     QUIC_CONNECTION_EVENT *Event);
 
+static void handle_conn_resumed(QuicerConnCTX *c_ctx,
+                                QUIC_CONNECTION_EVENT *Event);
+
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
                    _In_ QUIC_TLS_SECRETS TlsSecrets)
@@ -578,6 +581,7 @@ ServerConnectionCallback(HQUIC Connection,
       // The connection succeeded in doing a TLS resumption of a previous
       // connection's session.
       //
+      handle_conn_resumed(c_ctx, Event);
       break;
     case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
       handle_dgram_state_event(c_ctx, Event);
@@ -1186,6 +1190,42 @@ handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
   report = enif_make_tuple3(
       env, ATOM_QUIC, ATOM_DGRAM, enif_make_binary(env, &bin));
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+}
+
+void
+handle_conn_resumed(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
+{
+  ErlNifEnv *env = c_ctx->env;
+  ERL_NIF_TERM edata;
+  ERL_NIF_TERM report;
+
+  if (Event->RESUMED.ResumptionStateLength > 0
+      && !Event->RESUMED.ResumptionState)
+    {
+      unsigned char *binbuff = enif_make_new_binary(
+          env, Event->RESUMED.ResumptionStateLength, &edata);
+      memcpy(binbuff,
+             Event->RESUMED.ResumptionState,
+             Event->RESUMED.ResumptionStateLength);
+    }
+  else
+    {
+      edata = ATOM_FALSE;
+    }
+
+  report = enif_make_tuple4(env,
+                            ATOM_QUIC,
+                            ATOM_CONN_RESUMED,
+                            enif_make_resource(env, c_ctx),
+                            edata);
+  if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+    {
+      // Owner is gone, we shutdown our side as well.
+      // connection shutdown could result a connection close
+      MsQuic->ConnectionShutdown(c_ctx->Connection,
+                                 QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                 QUIC_STATUS_UNREACHABLE);
+    }
 }
 
 ///_* Emacs

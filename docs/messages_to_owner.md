@@ -101,6 +101,12 @@ This message notifies the connection owner that quic connection is established(T
 
 also see [[Accept New Connection (Server)]]
 
+### Connection resumed
+``` erlang
+{quic, connection_resumed, connection_handler(), SessionData :: false | binary() }
+```
+
+Connection is resumed with binary session data or with 'false' means empty session data.
 
 ### New Stream Started
 

@@ -17,6 +17,7 @@
 
 -export([ init/1
         , new_conn/2
+        , resumed/3
         , connected/2
         , shutdown/2
         ]).
@@ -29,6 +30,12 @@ init(ConnOpts) when is_map(ConnOpts) ->
 new_conn(Conn, #{stream_opts := SOpts} = S) ->
     quicer_stream:start_link(Conn, SOpts),
     ok = quicer:async_handshake(Conn),
+    {ok, S}.
+
+resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
+  when is_function(ResumeFun) ->
+    ResumeFun(Conn, Data, S);
+resumed(_Conn, _Data, S) ->
     {ok, S}.
 
 connected(Conn, #{slow_start := false, stream_opts := SOpts} = S) ->
