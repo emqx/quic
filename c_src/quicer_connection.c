@@ -465,8 +465,21 @@ ServerConnectionCallback(HQUIC Connection,
       // is the expected way for the connection to shut down with this
       // protocol, since we let idle timeout kill the connection.
       //
-      /* printf("[conn][%p] Shut down by transport, 0x%x\n", Connection, */
-      /*        Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status); */
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          ATOM_TRANS_SHUTDOWN,
+          enif_make_resource(env, c_ctx),
+          ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
+
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
+        {
+          // Owner is gone, we shutdown our side as well.
+          // connection shutdown could result a connection close
+          MsQuic->ConnectionShutdown(Connection,
+                                     QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                     QUIC_STATUS_UNREACHABLE);
+        }
       break;
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
       //

@@ -1178,7 +1178,10 @@ tc_idle_timeout(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
       {ok, Stm0} = quicer:start_stream(Conn, []),
       {ok, 5} = quicer:send(Stm0, <<"ping0">>),
-      timer:sleep(5000),
+      receive
+        {echo_server_transport_shutdown,  connection_idle} ->
+          ok
+      end,
       case quicer:start_stream(Conn, []) of
         {error, ctx_init_failed} ->
           %% connection is closing
@@ -1820,6 +1823,7 @@ tc_event_start_compl(Config) ->
 %%% Internal helpers
 %%% ====================
 echo_server(Owner, Config, Port)->
+  put(echo_server_test_coordinator, Owner),
   case quicer:listen(Port, default_listen_opts(Config)) of
     {ok, L} ->
       Owner ! listener_ready,
@@ -1858,6 +1862,10 @@ echo_server_stm_loop(L, Conn, Stm) ->
     {quic, peer_send_shutdown, Stm} ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
+      echo_server_stm_loop(L, Conn, Stm);
+    {quic, transport_shutdown, Conn, ErrorAtom} ->
+      ct:pal("echo server transport_shutdown due to ~p", [ErrorAtom]),
+      get(echo_server_test_coordinator) ! {echo_server_transport_shutdown, ErrorAtom},
       echo_server_stm_loop(L, Conn, Stm);
     {quic, shutdown, Conn} ->
       ct:pal("echo server conn shutdown ~p", [Conn]),
