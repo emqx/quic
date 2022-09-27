@@ -1191,6 +1191,8 @@ tc_idle_timeout(Config) ->
           ok;
         {error, stm_open_error, invalid_state} ->
           %% Invalid state
+          ok;
+        {ok, _Stream} ->
           ok
       end,
       SPid ! done,

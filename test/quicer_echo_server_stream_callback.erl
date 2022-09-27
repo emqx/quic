@@ -16,6 +16,7 @@
 
 -module(quicer_echo_server_stream_callback).
 -export([ new_stream/2
+        , handle_call/4
         , handle_stream_data/4
         , shutdown/1
         , peer_send_aborted/3
@@ -36,3 +37,6 @@ shutdown(Stream) ->
 peer_send_aborted(Stream, State, _Reason)->
     quicer:close_stream(Stream),
     State.
+
+handle_call(_Stream, _Request, _Opts, _CBState) ->
+    ok.

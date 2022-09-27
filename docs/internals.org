@@ -333,6 +333,7 @@ QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
 | QUIC_STREAM_EVENT_PEER_SEND_ABORTED      | {quic, peer_send_aborted, stream_handler(), error_code()}                                    |
 | QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED   | {quic, peer_receive_aborted, stream_handler(), error_code()}                                 |
 | QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE      | {quic, closed, stream_handler(), IsConnCloseFlag()}                                          |
+| QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE | @TODO                                                                                        |
 | QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                                        |
 | QUIC_STREAM_EVENT_PEER_ACCEPTED          | {quic, peer_accepted, stream_handler()}                                                      |
 

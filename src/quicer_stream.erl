@@ -19,17 +19,24 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2]).
+-export([ %% Start before conn handshake, with only Conn handler
+          start_link/2
+          %% Start after conn handshake with new Stream Handler
+        , start_link/3
+        ]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3, format_status/2]).
 
 -define(SERVER, ?MODULE).
+-define(post_init, post_init).
 
 -record(state, { stream :: quicer:stream_handler()
+               , conn   :: quicer:connection_handler()
                , opts :: stream_opts()
                , cbstate :: any()
+               , is_owner :: boolean()
                }).
 
 -type stream_opts() :: map().
@@ -51,6 +58,15 @@
 start_link(Conn, Opts) ->
     gen_server:start_link(?MODULE, [Conn, Opts], []).
 
+-spec start_link(Stream :: quicer:connection_handler(),
+                 Conn :: quicer:connection_handler(),
+                 Opts :: map()) -> {ok, Pid :: pid()} |
+          {error, Error :: {already_started, pid()}} |
+          {error, Error :: term()} |
+          ignore.
+start_link(Stream, Conn, Opts) ->
+    gen_server:start_link(?MODULE, [Stream, Conn, Opts], []).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -66,13 +82,34 @@ start_link(Conn, Opts) ->
           {ok, State :: term(), hibernate} |
           {stop, Reason :: term()} |
           ignore.
+%% Before conn handshake, with only Conn handler
 init([Conn, SOpts]) when is_list(SOpts) ->
     init([Conn, maps:from_list(SOpts)]);
 init([Conn, SOpts]) ->
     process_flag(trap_exit, true),
     {ok, Conn} = quicer:async_accept_stream(Conn, SOpts),
-    {ok, #state{opts = SOpts}}.
+    {ok, #state{opts = SOpts, conn = Conn, is_owner = true }};
 
+%% After conn handshake, with stream handler
+init([Stream, Conn, SOpts]) when is_list(SOpts) ->
+    ?tp(new_stream_2, #{module=>?MODULE, stream=>Stream}),
+    init([Stream, Conn, maps:from_list(SOpts)]);
+init([Stream, Conn, #{stream_callback := CallbackModule} = SOpts]) ->
+    ?tp(new_stream_3, #{module=>?MODULE, stream=>Stream}),
+    process_flag(trap_exit, true),
+    case CallbackModule:new_stream(Stream, SOpts) of
+        {ok, CBState} ->
+            %% handoff must be done for now
+            self() ! ?post_init,
+            {ok, #state{ is_owner = false
+                       , opts = SOpts
+                       , conn = Conn
+                       , stream = Stream
+                       , cbstate = CBState
+                       }};
+        {error, Reason} ->
+            {stop , Reason}
+    end.
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -88,15 +125,15 @@ init([Conn, SOpts]) ->
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
           {stop, Reason :: term(), NewState :: term()}.
-handle_call(_Request, _From,
+handle_call(Request, _From,
             #state{stream = Stream,
                    opts = Options, cbstate = CBState} = State) ->
     #{stream_callback := CallbackModule} = Options,
-    try CallbackModule:handle_call(Stream, Options, CBState) of
+    try CallbackModule:handle_call(Stream, Request, Options, CBState) of
         {ok, Reply, NewCBState} ->
-            {reply, Reply, #state{ cbstate = NewCBState
-                                 , opts = Options
-                                 }};
+            {reply, Reply, State#state{ cbstate = NewCBState
+                                      , opts = Options
+                                      }};
         Other -> % @todo
             Other
     catch _:Reason:ST ->
@@ -129,8 +166,23 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
+handle_info(?post_init, #state{ is_owner = false, stream = Stream} = State) ->
+    ?tp(debug, #{event=>?post_init, module=>?MODULE, stream=>Stream}),
+    case wait_for_handoff() of
+        undefined ->
+            ?tp(debug, #{event=>post_init_undef , module=>?MODULE, stream=>Stream}),
+            {noreply, State#state{is_owner = true}};
+        {BinList, Len, Flag} ->
+            ?tp(debug, #{event=>post_init_data, module=>?MODULE, stream=>Stream}),
+            %% @TODO first data from the stream, offset 0,
+            Msg = {quic, iolist_to_binary(BinList), Stream, 0, Len, Flag},
+            handle_info(Msg, State#state{is_owner = true})
+    end;
+handle_info(?post_init, #state{ is_owner = true} = State) ->
+    logger:error("post_init when is owner"),
+    {noreply, State};
 handle_info({quic, new_stream, Stream, Flags}, #state{opts = Options} = State) ->
-    ?tp(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags=>Flags}),
+    ?tp(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
     #{stream_callback := CallbackModule} = Options,
     try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}) of
         {ok, CBState} ->
@@ -249,3 +301,10 @@ is_fin(0) ->
     false;
 is_fin(Flags) when is_integer(Flags) ->
     (1 bsl 1) band Flags =/= 0.
+
+%% handoff must happen
+wait_for_handoff() ->
+    receive
+        {stream_owner_handoff, _From, Msg} ->
+            Msg
+    end.

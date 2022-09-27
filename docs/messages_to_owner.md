@@ -13,12 +13,19 @@ Data received in binary format
 {quic, binary(), stream_handler(), AbsoluteOffset::integer(), TotalBufferLength::integer(), Flag :: integer()}
 ```
 
+### start_completed
+The stream initiated locally is started regardless of success/fail or sync/async.
+
+```erlang
+{quic, start_completed, stream_handler(), atom_status(), StreamId::integer(), PeerAccepted :: 0|1}
+```
+
 ### peer_send_shutdown
 
 Peer has sent all the data and wants to shutdown gracefully.
 
 ```erlang
-{quic, peer_send_shutdown, stream_handler(), ErrorCode}
+{quic, peer_send_shutdown, stream_handler(), ErrorCode::integer()}
 ```
 
 ### peer_send_aborted
