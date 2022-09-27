@@ -111,7 +111,7 @@ Connection is resumed with binary session data or with 'false' means empty sessi
 ### New Stream Started
 
 ``` erlang
-{quic, new_stream, stream_handler()} %% @TODO, it should carry connection_handler() as well
+{quic, new_stream, stream_handler(), stream_open_flags()}
 ```
 
 This message is sent to notify the process which is accpeting new stream.

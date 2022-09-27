@@ -952,7 +952,7 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
   assert(c_ctx->Connection);
   ACCEPTOR *acc = c_ctx->owner;
   assert(acc);
-  ErlNifPid *acc_pid = acc_pid = &(acc->Pid);
+  ErlNifPid *acc_pid = &(acc->Pid);
 
   // A monitor is automatically removed when it triggers or when the
   // resource is deallocated.
@@ -1124,13 +1124,14 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   s_ctx->owner = acc;
   s_ctx->is_closed = FALSE;
 
-  if (enif_send(NULL,
-                acc_pid,
-                NULL,
-                enif_make_tuple3(env,
-                                 ATOM_QUIC,
-                                 ATOM_NEW_STREAM,
-                                 enif_make_resource(env, s_ctx))))
+  ERL_NIF_TERM report = enif_make_tuple4(
+      env,
+      ATOM_QUIC,
+      ATOM_NEW_STREAM,
+      enif_make_resource(env, s_ctx),
+      enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags));
+
+  if (enif_send(NULL, acc_pid, NULL, report))
     {
       MsQuic->SetCallbackHandler(
           Event->PEER_STREAM_STARTED.Stream, stream_callback, s_ctx);

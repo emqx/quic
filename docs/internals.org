@@ -294,7 +294,7 @@ SYNC call in non-callback-context
 | QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE               | {quic, closed, connection_handler()} @TODO flags                           |
 | QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED           | {quic, local_address_changed, connection_handler(), addr_str()}            |
 | QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED            | {quic, peer_address_changed, connection_handler(), addr_str()}             |
-| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handler()} @TODO stream                          |
+| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handler(), stream_open_flag()} stream            |
 | QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE               | {quic, streams_available, connection_handler(), BidirStmCnt, UniDirStmCnt} |
 | QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS              | {quic, peer_needs_streams, connection_handler()}                           |
 | QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED         | -                                                                          |

@@ -129,10 +129,10 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info({quic, new_stream, Stream}, #state{opts = Options} = State) ->
-    ?tp(new_stream, #{module=>?MODULE, stream=>Stream}),
+handle_info({quic, new_stream, Stream, Flags}, #state{opts = Options} = State) ->
+    ?tp(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags=>Flags}),
     #{stream_callback := CallbackModule} = Options,
-    try CallbackModule:new_stream(Stream, Options) of
+    try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}) of
         {ok, CBState} ->
             {noreply, State#state{stream = Stream, cbstate = CBState}};
         {error, Reason} ->

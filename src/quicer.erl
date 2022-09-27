@@ -81,6 +81,10 @@
         , perf_counters/0
         ]).
 
+%% helpers
+-export([ %% Stream flags tester
+          is_unidirectional/1
+        ]).
 %% Exports for test
 -export([ get_conn_rid/1
         , get_stream_rid/1
@@ -432,7 +436,7 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
   case quicer_nif:async_accept_stream(Conn, NewOpts) of
     {ok, Conn} ->
       receive
-        {quic, new_stream, Stream} ->
+        {quic, new_stream, Stream, _StreamFlags} ->
           {ok, Stream}
       after Timeout ->
           {error, timeout}
@@ -449,7 +453,7 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
 %%
 %% Caller process should expect to receive
 %% ```
-%% {quic, new_stream, stream_handler()}
+%% {quic, new_stream, stream_handler(), stream_open_flags()}
 %% '''
 %%
 %% note, it returns
@@ -736,6 +740,11 @@ getstat(Conn, Cnts) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 peername(Handle) ->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
+
+%% @doc Return true if stream open flags has unidirectional flag set
+-spec is_unidirectional(stream_open_flags()) -> boolean().
+is_unidirectional(Flags) ->
+  Flags band ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL > 0.
 
 -spec get_conn_rid(connection_handler()) ->
         {ok, non_neg_integer()} | {error, any()}.

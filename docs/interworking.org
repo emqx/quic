@@ -118,7 +118,7 @@ end note
 
 msw o--[#blue]->o stream_acceptor: nif monitor
 
-msw --> stream_acceptor: {new_stream, StreamHandler}
+msw --> stream_acceptor: {new_stream, StreamHandler, StreamFlag}
 
 hnote over stream_acceptor: unblocked
 

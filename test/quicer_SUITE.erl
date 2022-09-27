@@ -1201,7 +1201,10 @@ tc_idle_timeout(Config) ->
 tc_setopt(Config) ->
   Port = select_port(),
   Owner = self(),
-  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, Ref} = spawn_monitor(fun() ->
+                                  echo_server(Owner,
+                                              Config ++ [{peer_bidi_stream_count, 1}], Port)
+                              end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -1712,7 +1715,8 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
   after 5000 ->
     ct:fail("listener_timeout")
   end,
-  {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
+  {ok, Conn} = quicer:connect("127.0.0.1", Port,
+                              default_conn_opts() ++ [{peer_unidi_stream_count, 1}], 5000),
   {ok, Stm0} = quicer:start_stream(Conn, [{active, true},
                                           {start_flag, ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT},
                                           {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
@@ -1723,16 +1727,33 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
       ct:fail("We should not recv ping1 due to flow control: bidir stream 0")
   after 1000 ->
       ct:pal("recv ping1 timeout"),
-      SPid ! {flow_ctl, 1, 1}
+      SPid ! {flow_ctl, 10, 1}
   end,
+  quicer:async_accept_stream(Conn, []),
   %% check with server if peer addr is correct.
   receive
     {quic, peer_accepted, Stm0} ->
-      ct:pal("peer_accepted received"),
-      SPid ! done
+      ct:pal("peer_accepted received")
   after 1000 ->
       ct:fail("peer_accepted timeout")
   end,
+
+  %% Now we expect server initiat an Server -> Stream unidirectional stream
+  receive
+    {quic, new_stream, Stm1, Flags} ->
+      ?assert(quicer:is_unidirectional(Flags)),
+      %% We also expect server send reply over new stream
+      receive
+        {quic, <<"ping1">>, Stm0, _, _, _} ->
+          ct:fail("Data recvd from client -> server unidirectional stream");
+        {quic, <<"ping1">>, Stm1, _, _, _} ->
+          ct:pal("Data recvd from server -> client unidirectional stream")
+      end
+  after 2000 ->
+      ct:fail("No new_stream for stream initiated from Server")
+  end,
+
+  SPid ! done,
   ensure_server_exit_normal(Ref).
 
 tc_conn_opt_sslkeylogfile(Config) ->
@@ -1836,64 +1857,88 @@ echo_server(Owner, Config, Port)->
       {ok, Conn} = quicer:handshake(Conn),
       ct:pal("echo server conn accepted", []),
       receive
-        {quic, new_stream, Stm} ->
+        {quic, new_stream, Stm, _Flags} ->
           {ok, Conn} = quicer:async_accept_stream(Conn, []);
         {flow_ctl, BidirCount, UniDirCount} ->
           ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [BidirCount, UniDirCount]),
           quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => BidirCount,
                                                      peer_unidi_stream_count => UniDirCount}),
-          receive {quic, new_stream, Stm} ->
+          receive {quic, new_stream, Stm, _Flag} ->
               {ok, Conn} = quicer:async_accept_stream(Conn, [])
           end
       end,
       ct:pal("echo server stream accepted", []),
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, [Stm]);
     {error, listener_start_error, 200000002} ->
       ct:pal("echo_server: listener_start_error", []),
       timer:sleep(100),
       echo_server(Owner, Config, Port)
   end.
 
-echo_server_stm_loop(L, Conn, Stm) ->
+echo_server_stm_loop(L, Conn, Stms) ->
   receive
     {quic, Bin, Stm, _, _, _} ->
-      quicer:async_send(Stm, Bin),
-      echo_server_stm_loop(L, Conn, Stm);
+      case quicer:send(Stm, Bin) of
+        {error, stm_send_error, aborted} ->
+          ct:pal("echo server: send aborted: ~p ", [Bin]);
+        {error, stm_send_error, invalid_state} ->
+          {ok, RetStream} =
+            quicer:start_stream(Conn, [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+          quicer:send(RetStream, Bin);
+        {error, cancelled} ->
+          ct:pal("echo server: send cancelled: ~p ", [Bin]),
+          cancelled;
+        {ok, _} ->
+          ok
+      end,
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, peer_send_aborted, Stm, _Error} ->
       ct:pal("echo server peer_send_aborted", []),
       quicer:close_stream(Stm),
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, peer_send_shutdown, Stm} ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, transport_shutdown, Conn, ErrorAtom} ->
       ct:pal("echo server transport_shutdown due to ~p", [ErrorAtom]),
       get(echo_server_test_coordinator) ! {echo_server_transport_shutdown, ErrorAtom},
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, shutdown, Conn} ->
       ct:pal("echo server conn shutdown ~p", [Conn]),
       quicer:close_connection(Conn),
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, closed, Conn} ->
       ct:pal("echo server Conn closed", []),
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, closed, Stm, Flag} ->
       ct:pal("echo server stream closed ~p", [Flag]),
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms -- [Stm]);
     {set_stm_cnt, N } ->
       ct:pal("echo_server: set max stream count: ~p", [N]),
       ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => N}),
       {ok, NewStm} = quicer:accept_stream(Conn, []),
-      echo_server_stm_loop(L, Conn, NewStm);
+      echo_server_stm_loop(L, Conn, [NewStm | Stms]);
     {peer_addr, From} ->
       From ! {peer_addr, quicer:peername(Conn)},
-      echo_server_stm_loop(L, Conn, Stm);
+      echo_server_stm_loop(L, Conn, Stms);
     {flow_ctl, BidirCount, UniDirCount} ->
       ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [BidirCount, UniDirCount]),
-      quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count =>BidirCount,
+      quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => BidirCount,
                                                  peer_unidi_stream_count => UniDirCount}),
-      echo_server_stm_loop(L, Conn, Stm);
+      {ok, Conn} = quicer:async_accept_stream(Conn, []),
+      echo_server_stm_loop(L, Conn, Stms);
+    {quic, new_stream, NewStm, Flags} ->
+      NewStmList = case quicer:is_unidirectional(Flags) of
+                     true ->
+                       ct:pal("echo server: new incoming unidirectional stream"),
+                       {ok, ReturnStm} = quicer:start_stream(Conn, [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                       [{NewStm, ReturnStm} | Stms];
+                     false ->
+                       ct:pal("echo server: new incoming binary stream"),
+                       [NewStm | Stms]
+                   end,
+      echo_server_stm_loop(L, Conn, NewStmList);
     done ->
       ct:pal("echo server shutting down", []),
       quicer:async_close_connection(Conn),
@@ -1908,7 +1953,7 @@ ping_pong_server(Owner, Config, Port) ->
       {ok, Conn} = quicer:async_accept_stream(Conn, []),
       {ok, Conn} = quicer:handshake(Conn),
       receive
-        {quic, new_stream, Stm} ->
+        {quic, new_stream, Stm, _Flags} ->
           {ok, Conn} = quicer:async_accept_stream(Conn, [])
       end,
       ping_pong_server_stm_loop(L, Conn, Stm);
@@ -2032,7 +2077,7 @@ simple_stream_server(Owner, Config, Port) ->
   {ok, Conn} = quicer:async_accept_stream(Conn, []),
   {ok, Conn} = quicer:handshake(Conn),
   receive
-    {quic, new_stream, Stream} ->
+    {quic, new_stream, Stream, _Flag} ->
       {ok, StreamId} = quicer:get_stream_id(Stream),
       ct:pal("New StreamID: ~p", [StreamId]),
       receive
@@ -2088,7 +2133,7 @@ default_listen_opts(Config) ->
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   , {peer_unidi_stream_count, 0}
-  ].
+  | Config ].
 
 active_recv(Stream, Len) ->
   active_recv(Stream, Len, []).
