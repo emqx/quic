@@ -825,10 +825,10 @@ tc_conn_no_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 {ok, CRid}
+                 {ok, CRid, Conn}
 
                end,
-               fun({ok, CRid}, Trace) ->
+               fun({ok, CRid, Conn}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -848,7 +848,9 @@ tc_conn_no_gc(Config) ->
                    %% Check that there is no GC
                    ?assertEqual(0, length([ E || #{ function := "resource_conn_dealloc_callback"
                                                   , resource_id := Rid
-                                                  } = E <- Trace, Rid == CRid]))
+                                                  } = E <- Trace, Rid == CRid])),
+                 %% Just keep the ref till end
+                  ?assert(Conn =/= undefined)
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
