@@ -326,7 +326,7 @@ QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
 #+end_verse
 | MsQuic Event                             | Erlang Msg                                                                                   |
 |------------------------------------------+----------------------------------------------------------------------------------------------|
-| QUIC_STREAM_EVENT_START_COMPLETE         | {quic, start_completed, stream_handler(), atom_status(), stream_id(), peer_accepted()}       |
+| QUIC_STREAM_EVENT_START_COMPLETE         | {quic, start_completed, #{}}                                                                 |
 | QUIC_STREAM_EVENT_RECEIVE                | {quic, stream_handler(), continue} or {quic, binary(), stream_handler(), Offset, Len, Flags} |
 | QUIC_STREAM_EVENT_SEND_COMPLETE          | {quic, send_complete, stream_handler(), CanceledFlag}                                        |
 | QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN     | {quic, peer_send_shutdown, stream_handler()}                                                 |

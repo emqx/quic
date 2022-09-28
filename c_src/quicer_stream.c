@@ -797,14 +797,19 @@ handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
   // Only for Local initiated stream
   if (s_ctx->event_mask & QUICER_STREAM_EVENT_MASK_START_COMPLETE)
     {
-      report = enif_make_tuple6(
-          env,
-          ATOM_QUIC,
-          ATOM_START_COMPLETE,
-          enif_make_copy(env, s_ctx->eHandler),
-          atom_status(env, Event->START_COMPLETE.Status),
-          enif_make_uint64(env, Event->START_COMPLETE.ID),
-          enif_make_uint64(env, Event->START_COMPLETE.PeerAccepted));
+      ERL_NIF_TERM props_name[]
+          = { ATOM_STATUS, ATOM_STREAM_ID, ATOM_IS_PEER_ACCEPTED };
+      ERL_NIF_TERM props_value[]
+          = { atom_status(env, Event->START_COMPLETE.Status),
+              enif_make_uint64(env, Event->START_COMPLETE.ID),
+              ATOM_BOOLEAN(Event->START_COMPLETE.PeerAccepted) };
+
+      report = make_event_with_props(env,
+                                     ATOM_START_COMPLETE,
+                                     enif_make_copy(env, s_ctx->eHandler),
+                                     props_name,
+                                     props_value,
+                                     3);
       enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
     }
   return QUIC_STATUS_SUCCESS;

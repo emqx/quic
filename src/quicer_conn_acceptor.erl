@@ -413,9 +413,10 @@ handle_info({quic, closed, C, #{is_app_closing := false} = Flags}, #state{conn =
 %%% Handle messages from streams
 %%% !!! note, we don't handle recv event
 %%% ==============================================================
-handle_info({quic, start_completed, Stream, AtomStatus, StreamId, PeerAccepted},
-            #state{callback = M,
-                   callback_state = CBState} = State) ->
+handle_info({quic, start_completed, Stream,
+             #{status := AtomStatus, stream_id := StreamId, is_peer_accepted := PeerAccepted}
+            }, #state{callback = M,
+                      callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => start_completed}),
     {ok, NewCBState} = M:start_complete(Stream, AtomStatus, StreamId, PeerAccepted, CBState),
     {noreply, State#state{ callback_state = NewCBState} };

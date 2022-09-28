@@ -40,7 +40,7 @@ The stream initiated locally is started regardless of success/fail or sync/async
 ```erlang
 {quic, start_complete, stream_handler(), #{ status := atom_status()
                                           , stream_id := integer(), 
-                                          , peer_accepted := 0 | 1 }
+                                          , is_peer_accepted := boolean() }
 ```
 
 ### 'active received data'

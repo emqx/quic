@@ -1585,10 +1585,13 @@ tc_stream_start_flag_fail_blocked(Config) ->
   receive
     {quic, <<"ping1">>, Stm,  _, _, _} ->
       ct:fail("Should not get ping1 due to rate limiter");
-    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := stream_limit_reached, stream_id := StreamID}} ->
       ct:pal("Stream ~p limit reached", [StreamID]);
-    {quic, start_completed, Stm, Reason, StreamID, _} ->
-      ct:fail("Stream ~pstart complete with unexpect reason: ~p", [StreamID, Reason])
+    {quic, start_completed, Stm,
+             #{status := AtomStatus, stream_id := StreamID, is_peer_accepted := _PeerAccepted}
+    } ->
+      ct:fail("Stream ~pstart complete with unexpect reason: ~p", [StreamID, AtomStatus])
   end,
 
   receive
@@ -1625,9 +1628,11 @@ tc_stream_start_flag_immediate(Config) ->
   {ok, Rid} = quicer:get_stream_rid(Stm),
   %% We don't need to send anything, we should get start_completed even it is rate limited
   receive
-    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := stream_limit_reached, stream_id := StreamID}} ->
       ct:fail("Stream ~p limit reached", [StreamID]);
-    {quic, start_completed, Stm, Reason, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := Reason, stream_id := StreamID}} ->
       ct:pal("Stream ~pstart complete with reason: ~p", [StreamID, Reason])
   end,
   ?assert(is_integer(Rid)),
@@ -1658,9 +1663,11 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
     {error, stm_send_error, invalid_state} -> ok %% already closed
   end,
   receive
-    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := stream_limit_reached, stream_id := StreamID}} ->
       ct:pal("Stream ~p limit reached", [StreamID]);
-    {quic, start_completed, Stm, Reason, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := Reason, stream_id := StreamID}} ->
       ct:fail("Stream ~pstart complete with other reason: ~p", [StreamID, Reason])
   end,
   %% We should get a stream closed event since it is rate limited
@@ -1697,9 +1704,11 @@ tc_stream_start_flag_indicate_peer_accept_1(Config) ->
   {ok, Rid} = quicer:get_stream_rid(Stm),
   %% We don't need to send anything
   receive
-    {quic, start_completed, Stm, stream_limit_reached, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := stream_limit_reached, stream_id := StreamID}} ->
       ct:fail("Stream ~p limit reached", [StreamID]);
-    {quic, start_completed, Stm, Reason, StreamID, _} ->
+    {quic, start_completed, Stm,
+             #{status := Reason, stream_id := StreamID}} ->
       ct:pal("Stream ~p start complete with reason: ~p", [StreamID, Reason])
   end,
   ?assert(is_integer(Rid)),
@@ -1833,13 +1842,16 @@ tc_event_start_compl(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
   receive
-    {quic, start_completed, Stm, success, StreamId, 1} ->
+    {quic, start_completed, Stm,
+     #{status := success, stream_id := StreamId, is_peer_accepted := true}} ->
       ct:pal("Stream ~p started", [StreamId]);
-    {quic, start_completed, Stm, Err, StreamId, _} ->
-      ct:fail("Stream ~p failed to start: ~p", [StreamId, Err])
+    {quic, start_completed, Stm,
+     #{status := Reason, stream_id := StreamId}} ->
+      ct:fail("Stream ~p failed to start: ~p", [StreamId, Reason])
   end,
   receive
-    {quic, start_completed, Stm2, Status, _StreamId, _} ->
+    {quic, start_completed, Stm2,
+     #{status := Status}} ->
       ct:fail("Stream ~p should NOT recv event : ~p", [Stm, Status])
   after 0 ->
       ok
