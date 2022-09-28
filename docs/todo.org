@@ -33,3 +33,5 @@ API for registrationshutdown, shutdown all connections under registration
 
 ** NIF Upgrade
 
+* Improvement
+- mask stream available

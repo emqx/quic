@@ -330,6 +330,8 @@ ERL_NIF_TERM ATOM_ALPNS;
 ERL_NIF_TERM ATOM_IS_HANDSHAKE_COMPLETED;
 ERL_NIF_TERM ATOM_IS_PEER_ACKED;
 ERL_NIF_TERM ATOM_IS_APP_CLOSING;
+ERL_NIF_TERM ATOM_BIDI_STREAMS;
+ERL_NIF_TERM ATOM_UNIDI_STREAMS;
 ERL_NIF_TERM ATOM_UNDEFINED;
 
 // Mirror 'status' in msquic_linux.h
@@ -626,6 +628,8 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_IS_HANDSHAKE_COMPLETED, is_handshake_completed)                   \
   ATOM(ATOM_IS_PEER_ACKED, is_peer_acked)                                     \
   ATOM(ATOM_IS_APP_CLOSING, is_app_closing)                                   \
+  ATOM(ATOM_BIDI_STREAMS, bidi_streams)                                       \
+  ATOM(ATOM_UNIDI_STREAMS, unidi_streams)                                     \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;

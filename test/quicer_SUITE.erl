@@ -2179,7 +2179,8 @@ select_port()->
 
 flush_streams_available(Conn) ->
   receive
-    {quic, streams_available, Conn, _, _} -> ok
+    {quic, streams_available, Conn,
+     #{bidi_streams := _, unidi_streams := _}} -> ok
   end.
 
 receive_all() ->

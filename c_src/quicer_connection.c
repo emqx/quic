@@ -1064,23 +1064,14 @@ handle_connection_event_local_address_changed(QuicerConnCTX *c_ctx,
   assert(QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
   QUIC_ADDR_STR addrStr = { 0 };
   QuicAddrToString(Event->LOCAL_ADDRESS_CHANGED.Address, &addrStr);
-  report = enif_make_tuple4(
-      env,
-      ATOM_QUIC,
-      ATOM_LOCAL_ADDRESS_CHANGED,
-      enif_make_resource(env, c_ctx),
-      enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
-
-  if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
-    {
-      // Owner is gone, we shutdown our side as well.
-      MsQuic->ConnectionShutdown(c_ctx->Connection,
-                                 QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                 QUIC_STATUS_UNREACHABLE);
-    }
+  ERL_NIF_TERM report
+      = make_event(env,
+                   ATOM_LOCAL_ADDRESS_CHANGED,
+                   enif_make_resource(env, c_ctx),
+                   enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1091,15 +1082,13 @@ handle_connection_event_peer_address_changed(QuicerConnCTX *c_ctx,
   assert(QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
   QUIC_ADDR_STR addrStr = { 0 };
   QuicAddrToString(Event->PEER_ADDRESS_CHANGED.Address, &addrStr);
-  report = enif_make_tuple4(
-      env,
-      ATOM_QUIC,
-      ATOM_PEER_ADDRESS_CHANGED,
-      enif_make_resource(env, c_ctx),
-      enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
+  ERL_NIF_TERM report
+      = make_event(env,
+                   ATOM_PEER_ADDRESS_CHANGED,
+                   enif_make_resource(env, c_ctx),
+                   enif_make_string(env, addrStr.Address, ERL_NIF_LATIN1));
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -1153,13 +1142,11 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   s_ctx->owner = acc;
   s_ctx->is_closed = FALSE;
 
-  ERL_NIF_TERM report = enif_make_tuple4(
-      env,
-      ATOM_QUIC,
-      ATOM_NEW_STREAM,
-      enif_make_resource(env, s_ctx),
-      enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags));
-
+  ERL_NIF_TERM report
+      = make_event(env,
+                   ATOM_NEW_STREAM,
+                   enif_make_resource(env, s_ctx),
+                   enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags));
   if (enif_send(NULL, acc_pid, NULL, report))
     {
       MsQuic->SetCallbackHandler(
@@ -1180,14 +1167,19 @@ handle_connection_event_streams_available(QuicerConnCTX *c_ctx,
   assert(QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
-  report = enif_make_tuple5(
-      env,
-      ATOM_QUIC,
-      ATOM_STREAMS_AVAILABLE,
-      enif_make_resource(env, c_ctx),
-      enif_make_uint(env, Event->STREAMS_AVAILABLE.BidirectionalCount),
-      enif_make_uint(env, Event->STREAMS_AVAILABLE.UnidirectionalCount));
+
+  ERL_NIF_TERM props_name[] = { ATOM_BIDI_STREAMS, ATOM_UNIDI_STREAMS };
+  ERL_NIF_TERM props_value[]
+      = { enif_make_uint64(env, Event->STREAMS_AVAILABLE.BidirectionalCount),
+          enif_make_uint64(env,
+                           Event->STREAMS_AVAILABLE.UnidirectionalCount) };
+
+  ERL_NIF_TERM report = make_event_with_props(env,
+                                              ATOM_STREAMS_AVAILABLE,
+                                              enif_make_resource(env, c_ctx),
+                                              props_name,
+                                              props_value,
+                                              2);
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -1199,9 +1191,10 @@ handle_connection_event_peer_needs_streams(
   assert(QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
-  report = enif_make_tuple3(
-      env, ATOM_QUIC, ATOM_PEER_NEEDS_STREAMS, enif_make_resource(env, c_ctx));
+  ERL_NIF_TERM report = make_event(env,
+                                   ATOM_PEER_NEEDS_STREAMS,
+                                   enif_make_resource(env, c_ctx),
+                                   ATOM_UNDEFINED);
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -1250,8 +1243,6 @@ handle_connection_event_resumed(QuicerConnCTX *c_ctx,
   assert(QUIC_CONNECTION_EVENT_RESUMED == Event->Type);
   ErlNifEnv *env = c_ctx->env;
   ERL_NIF_TERM edata;
-  ERL_NIF_TERM report;
-
   if (Event->RESUMED.ResumptionStateLength > 0
       && !Event->RESUMED.ResumptionState)
     {
@@ -1266,11 +1257,8 @@ handle_connection_event_resumed(QuicerConnCTX *c_ctx,
       edata = ATOM_FALSE;
     }
 
-  report = enif_make_tuple4(env,
-                            ATOM_QUIC,
-                            ATOM_CONN_RESUMED,
-                            enif_make_resource(env, c_ctx),
-                            edata);
+  ERL_NIF_TERM report = make_event(
+      env, ATOM_CONN_RESUMED, enif_make_resource(env, c_ctx), edata);
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -1298,12 +1286,8 @@ handle_connection_event_resumption_ticket_received(
               Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket,
               Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
 
-          report = enif_make_tuple4(env,
-                                    ATOM_QUIC,
-                                    ATOM_NST_RECEIVED,
-                                    enif_make_resource(env, c_ctx),
-                                    ticket);
-
+          report = make_event(
+              env, ATOM_NST_RECEIVED, enif_make_resource(env, c_ctx), ticket);
           enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
         }
     }

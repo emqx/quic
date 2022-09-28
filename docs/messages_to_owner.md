@@ -217,8 +217,8 @@ also see [[Accept Stream (Server)]]
 More streams are available due to flow control from peer.
 
 ```erlang
-{quic, streams_available, connection_handler(), #{ bidir_streams := integer()
-                                                 , unidir_streams := integer()
+{quic, streams_available, connection_handler(), #{ bidi_streams := integer()
+                                                 , unidi_streams := integer()
                                                  }}
 ```
 

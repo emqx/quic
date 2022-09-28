@@ -290,9 +290,9 @@ handle_info({quic, connection_resumed, C, ResumeData},
     end;
 
 %% @TODO handle conn info
-handle_info({quic, connected, C, _ConnInfo}, #state{ conn = C
-                                           , callback = M
-                                           , callback_state = CbState} = State) ->
+handle_info({quic, connected, C, #{is_resumed := _IsResumed}}, #state{ conn = C
+                                                                     , callback = M
+                                                                     , callback_state = CbState} = State) ->
     ?tp(quic_connected_slow, #{module=>?MODULE, conn=>C}),
     {ok, NewCBState} = M:connected(C, CbState),
     {noreply, State#state{ callback_state = NewCBState }};
@@ -403,8 +403,8 @@ handle_info({quic, shutdown, C, ErrorCode}, #state{conn = C, callback = M,
     {ok, NewCBState} = M:shutdown(C, ErrorCode, CBState),
     {noreply, State#state{ callback_state = NewCBState} };
 
-handle_info({quic, closed, C, #{} = Flags}, #state{conn = C, callback = M,
-                                                   callback_state = CBState} = State) ->
+handle_info({quic, closed, C, #{is_app_closing := false} = Flags}, #state{conn = C, callback = M,
+                                                                         callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => closed}),
     M:closed(C, Flags, CBState),
     {stop, normal, State};
