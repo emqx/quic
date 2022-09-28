@@ -22,14 +22,14 @@
         , resumed/3
         , new_stream/3
         , connected/2
-        , shutdown/2
+        , shutdown/3
         , transport_shutdown/3
         , peer_address_changed/3
         , local_address_changed/3
         , streams_available/4
         , peer_needs_streams/2
         , stream_closed/3
-        , closed/2
+        , closed/3
         ]).
 
 init(ConnOpts) when is_list(ConnOpts) ->
@@ -39,7 +39,7 @@ init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
 init(ConnOpts) when is_map(ConnOpts) ->
     ConnOpts.
 
-closed(_Conn, S)->
+closed(_Conn, #{} = _Flags, S)->
     S.
 
 new_conn(Conn, #{stream_opts := SOpts} = S) ->
@@ -76,7 +76,7 @@ new_stream(Conn, Stream, #{conn := Conn, streams := Streams, stream_opts := SOpt
             Other
     end.
 
-shutdown(Conn, S) ->
+shutdown(Conn, _ErrorCode, S) ->
     quicer:async_close_connection(Conn),
     {ok, S}.
 

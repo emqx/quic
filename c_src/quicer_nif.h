@@ -63,6 +63,12 @@ make_event_with_props(ErlNifEnv *env,
                       ERL_NIF_TERM *values,
                       size_t cnt);
 
+ERL_NIF_TERM
+make_event(ErlNifEnv *env,
+           ERL_NIF_TERM event_name,
+           ERL_NIF_TERM resource,
+           ERL_NIF_TERM prop);
+
 #define ATOM_BOOLEAN(X) (X ? ATOM_TRUE : ATOM_FALSE)
 
 // Compiler attributes

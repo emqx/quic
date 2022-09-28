@@ -100,9 +100,9 @@ The sender may assume the data sent is either handled or not handled.
 Both endpoints of sending and receiving of the stream have been shut down.
 
 ```erlang
-{quic, closed, stream_handler(), #{ is_conn_shutdown := 0 | 1
-                                  , app_close_in_progress := 0 | 1
-                                  }
+{quic, stream_closed, stream_handler(), #{ is_conn_shutdown := 0 | 1
+                                         , app_close_in_progress := 0 | 1
+                                         }
 ```
 
 ### 'idea_send_buffer_size'
@@ -176,9 +176,9 @@ The connection has completed the shutdown process and is ready to be
 safely cleaned up.
 
 ``` erlang
-{quic, closed, connection_handler(), #{ is_handshake_completed := 0 | 1}
-                                      , is_peer_acked := 0 | 1
-                                      , is_app_closing := 0 | 1
+{quic, closed, connection_handler(), #{ is_handshake_completed := boolean()}
+                                      , is_peer_acked := boolean()
+                                      , is_app_closing := boolean()
                                       }} 
 ```
 

@@ -200,6 +200,7 @@ end_per_testcase(tc_open_listener_neg_1, _Config) ->
   quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   quicer:stop_listener(mqtt),
+  ct:pal("What left in the message queue: ~p", [receive_all()]),
   ok.
 
 %%%===================================================================
@@ -936,7 +937,7 @@ tc_conn_controlling_process(Config) ->
       {NewOwner, MonRef} = spawn_monitor(
                              fun() ->
                                  receive
-                                   {quic, closed, Conn} ->
+                                   {quic, closed, Conn, _Flags} ->
                                      ok
                                  end
                              end),
@@ -1557,7 +1558,7 @@ tc_stream_open_flag_unidirectional(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
     {quic, <<"ping1">>, Stm,  _, _, _} -> ct:fail("unidirectional stream should not receive any");
-    {quic, closed, Stm, 1} -> ct:pal("stream is closed due to connecion idle")
+    {quic, stream_closed, Stm, 1} -> ct:pal("stream is closed due to connecion idle")
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
@@ -1591,13 +1592,13 @@ tc_stream_start_flag_fail_blocked(Config) ->
   end,
 
   receive
-    {quic, closed, Stm, _} ->
+    {quic, stream_closed, Stm, _} ->
       ct:failed("Stream ~p is closed but shouldn't since QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL is unset", [Stm]);
     {quic, transport_shutdown, Conn, connection_idle} ->
       ct:pal("Connection ~p transport shutdown due to idle, stream isn't closed ahead", [Conn])
-    end,
+  end,
   receive
-    {quic, closed, Conn} ->
+    {quic, closed, Conn, _Flags} ->
       ct:pal("Connecion is closed ~p", [Conn])
   end,
   ?assert(is_integer(Rid)),
@@ -1664,7 +1665,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
   end,
   %% We should get a stream closed event since it is rate limited
   receive
-    {quic, closed, Stm, 0} -> % not a conn close
+    {quic, stream_closed, Stm, 0} -> % not a conn close
       ct:pal("Stream ~p is closed", [Stm]);
     {quic, transport_shutdown, Conn, connection_idle} ->
       ct:fail("Unexpected connection ~p transport shutdown", [Conn]);
@@ -1906,14 +1907,14 @@ echo_server_stm_loop(L, Conn, Stms) ->
       ct:pal("echo server transport_shutdown due to ~p", [ErrorAtom]),
       get(echo_server_test_coordinator) ! {echo_server_transport_shutdown, ErrorAtom},
       echo_server_stm_loop(L, Conn, Stms);
-    {quic, shutdown, Conn} ->
-      ct:pal("echo server conn shutdown ~p", [Conn]),
+    {quic, shutdown, Conn, ErrorCode} ->
+      ct:pal("echo server conn shutdown ~p due to ~p", [Conn, ErrorCode]),
       quicer:close_connection(Conn),
       echo_server_stm_loop(L, Conn, Stms);
-    {quic, closed, Conn} ->
+    {quic, closed, Conn, _Flags} ->
       ct:pal("echo server Conn closed", []),
       echo_server_stm_loop(L, Conn, Stms);
-    {quic, closed, Stm, Flag} ->
+    {quic, stream_closed, Stm, Flag} ->
       ct:pal("echo server stream closed ~p", [Flag]),
       echo_server_stm_loop(L, Conn, Stms -- [Stm]);
     {set_stm_cnt, N } ->
@@ -1976,8 +1977,8 @@ ping_pong_server_stm_loop(L, Conn, Stm) ->
       ct:pal("closing stream"),
       quicer:close_stream(Stm),
       ping_pong_server_stm_loop(L, Conn, Stm);
-    {quic, shutdown, Conn} ->
-      ct:pal("closing conn"),
+    {quic, shutdown, Conn, ErrorCode} ->
+      ct:pal("closing conn: ~p", [ErrorCode]),
       quicer:close_connection(Conn),
       ping_pong_server_stm_loop(L, Conn, Stm);
     done ->
@@ -2013,8 +2014,8 @@ ping_pong_server_dgram_loop(L, Conn, Stm) ->
       ct:pal("closing stream"),
       quicer:close_stream(Stm),
       ping_pong_server_dgram_loop(L, Conn, Stm);
-    {quic, shutdown, Conn} ->
-      ct:pal("closing conn"),
+    {quic, shutdown, Conn, ErrorCode} ->
+      ct:pal("closing conn: ~p", [ErrorCode]),
       quicer:close_connection(Conn),
       ping_pong_server_dgram_loop(L, Conn, Stm);
     done ->
@@ -2030,7 +2031,7 @@ simple_conn_server(Owner, Config, Port) ->
     done ->
       quicer:close_listener(L),
       ok;
-    {quic, shutdown, Conn} ->
+    {quic, shutdown, Conn, _ErrorCode} ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
   end.
@@ -2050,7 +2051,7 @@ simple_slow_conn_server(Owner, Config, Port, HandshakeDelay) ->
     {quic, connected, Conn, _} ->
       ct:pal("~p  Connected ~p", [?FUNCTION_NAME, Conn]),
       ok;
-    {quic, closed, Conn} ->
+    {quic, closed, Conn, _Flags} ->
       %% for timeout test
       ct:pal("~p conn ~p closed", [?FUNCTION_NAME, Conn]),
       ok
@@ -2083,7 +2084,7 @@ simple_stream_server(Owner, Config, Port) ->
       {ok, StreamId} = quicer:get_stream_id(Stream),
       ct:pal("New StreamID: ~p", [StreamId]),
       receive
-        {quic, shutdown, Conn} ->
+        {quic, shutdown, Conn, _ErrorCode} ->
           ct:pal("closing ~p", [Conn]),
           quicer:close_connection(Conn);
         {quic, peer_send_shutdown, Stream} ->
@@ -2091,13 +2092,13 @@ simple_stream_server(Owner, Config, Port) ->
         done ->
           exit(normal)
       end;
-   {quic, shutdown, Conn} ->
+   {quic, shutdown, Conn, _ErrorCode} ->
       ct:pal("Received Conn close for ~p", [Conn]),
       quicer:close_connection(Conn)
   end,
   receive
-    {quic, shutdown, Conn} ->
-      ct:pal("Received Conn close for ~p", [Conn]),
+    {quic, shutdown, Conn, ErrorCode} ->
+      ct:pal("Received Conn shutdown for ~p: ~p", [Conn, ErrorCode]),
       quicer:close_connection(Conn);
     done ->
       ok
@@ -2181,6 +2182,16 @@ flush_streams_available(Conn) ->
     {quic, streams_available, Conn, _, _} -> ok
   end.
 
+receive_all() ->
+  receive_all([]).
+
+receive_all(Res)->
+  receive
+    X ->
+      receive_all([X|Res])
+  after 0 ->
+      Res
+  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

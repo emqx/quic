@@ -257,7 +257,7 @@ handshake(Conn, Timeout) ->
     ok ->
       receive
         {quic, connected, Conn, _} -> {ok, Conn};
-        {quic, closed, Conn} -> {error, closed}
+        {quic, closed, Conn, _Flags} -> {error, closed}
       after Timeout ->
           {error, timeout}
       end
@@ -349,7 +349,7 @@ shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
   case async_shutdown_connection(Conn, Flags, ErrorCode) of
     ok ->
       receive
-        {quic, closed, Conn} ->
+        {quic, closed, Conn, _Flags} ->
           ok
       after Timeout ->
           {error, timeout}
@@ -612,7 +612,7 @@ shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
   case async_shutdown_stream(Stream, Flags, ErrorCode) of
     ok ->
       receive
-        {quic, closed, Stream, _IsGraceful} ->
+        {quic, stream_closed, Stream, _IsGraceful} ->
           ok
       after Timeout ->
           {error, timeout}
@@ -633,7 +633,7 @@ async_shutdown_stream(Stream) ->
 
 %% @doc async variant of {@link shutdown_stream/4}
 %% Caller should expect to receive
-%% ```{quic, closed, Stream, _IsGraceful}'''
+%% ```{quic, stream_closed, Stream, _IsGraceful}'''
 %%
 -spec async_shutdown_stream(stream_handler(),
                          stream_shutdown_flags(),

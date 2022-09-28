@@ -267,6 +267,7 @@ ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_START_FLAG;
 /*----------------------------------------------------------*/
 
 ERL_NIF_TERM ATOM_CLOSED;
+ERL_NIF_TERM ATOM_STREAM_CLOSED;
 ERL_NIF_TERM ATOM_LISTENER_STOPPED;
 ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 ERL_NIF_TERM ATOM_SHUTDOWN;
@@ -326,7 +327,9 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_IS_RESUMED;
 ERL_NIF_TERM ATOM_ALPNS;
-
+ERL_NIF_TERM ATOM_IS_HANDSHAKE_COMPLETED;
+ERL_NIF_TERM ATOM_IS_PEER_ACKED;
+ERL_NIF_TERM ATOM_IS_APP_CLOSING;
 ERL_NIF_TERM ATOM_UNDEFINED;
 
 // Mirror 'status' in msquic_linux.h
@@ -573,6 +576,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_HANDLER, handler);                                                \
   ATOM(ATOM_CLOSED, closed);                                                  \
+  ATOM(ATOM_STREAM_CLOSED, stream_closed);                                    \
   ATOM(ATOM_LISTENER_STOPPED, listener_stopped);                              \
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
@@ -619,6 +623,9 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_ALLOW_INSECURE, allow_insecure);                                  \
   ATOM(ATOM_IS_RESUMED, is_resumed);                                          \
   ATOM(ATOM_ALPNS, alpns);                                                    \
+  ATOM(ATOM_IS_HANDSHAKE_COMPLETED, is_handshake_completed)                   \
+  ATOM(ATOM_IS_PEER_ACKED, is_peer_acked)                                     \
+  ATOM(ATOM_IS_APP_CLOSING, is_app_closing)                                   \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;
@@ -1211,6 +1218,22 @@ make_event_with_props(ErlNifEnv *env,
       enif_make_map_from_arrays(env, keys, values, cnt, &prop);
     }
 
+  return enif_make_tuple4(env,
+                          ATOM_QUIC,  // 1st element, :: quic
+                          event_name, // 2nd element, event name :: atom()
+                          resource,   // 3rd element, resource
+                          prop);      // 4th element, event props :: map()) //
+}
+
+/*
+** Make an 4 tuple event
+*/
+ERL_NIF_TERM
+make_event(ErlNifEnv *env,
+           ERL_NIF_TERM event_name,
+           ERL_NIF_TERM resource,
+           ERL_NIF_TERM prop)
+{
   return enif_make_tuple4(env,
                           ATOM_QUIC,  // 1st element, :: quic
                           event_name, // 2nd element, event name :: atom()

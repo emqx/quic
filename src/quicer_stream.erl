@@ -235,7 +235,7 @@ handle_info({quic, peer_send_shutdown, Stream},
     CallbackModule:shutdown(Stream),
     {noreply, State};
 
-handle_info({quic, closed, Stream, _Reason}, #state{stream = Stream} = State) ->
+handle_info({quic, stream_closed, Stream, _Reason}, #state{stream = Stream} = State) ->
     %% @todo
     {stop, normal, State}.
 

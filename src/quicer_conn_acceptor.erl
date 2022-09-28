@@ -48,13 +48,13 @@
 %% ====================================================================================================
 %%      Handle connection shutdown initiated by peer
 %%
--callback shutdown(connection_handler(), _OldState) -> {ok, _State}.
+-callback shutdown(connection_handler(), ErrorCode :: integer(), _OldState) -> {ok, _State}.
 %% ====================================================================================================
 
 %% ====================================================================================================
 %%      Handle connection closed (both sides shutdown_complete)
 %%
--callback closed(connection_handler(), _OldState) -> {ok, _State}.
+-callback closed(connection_handler(), Flags::map(), _OldState) -> {ok, _State}.
 %% ====================================================================================================
 
 %% ====================================================================================================
@@ -339,9 +339,9 @@ handle_info({quic, shutdown, C}, #state{ conn = C
     {noreply, State#state{ callback_state = NewCBState }};
 
 %% handle stream close, the process is the owner of stream or it is during ownership handoff.
-handle_info({quic, closed, Stream, ConnectionShutdownFlag}, #state{callback = M,
-                                                                   conn = C,
-                                                                   callback_state = CbState} = State)->
+handle_info({quic, stream_closed, Stream, ConnectionShutdownFlag}, #state{callback = M,
+                                                                          conn = C,
+                                                                          callback_state = CbState} = State)->
     ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed}),
     NewCBState = case erlang:function_exported(M, stream_closed, 3) of
                      true ->
@@ -397,16 +397,16 @@ handle_info({quic, peer_needs_streams, C, BiDirStreams, UniDirStreams}, #state{ 
     {ok, NewCBState} = M:peer_needs_streams(C, BiDirStreams, UniDirStreams, CbState),
     {noreply, State#state{ callback_state = NewCBState }};
 
-handle_info({quic, shutdown, C}, #state{conn = C, callback = M,
-                                        callback_state = CBState} = State) ->
+handle_info({quic, shutdown, C, ErrorCode}, #state{conn = C, callback = M,
+                                                   callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => shutdown}),
-    {ok, NewCBState} = M:shutdown(C, CBState),
+    {ok, NewCBState} = M:shutdown(C, ErrorCode, CBState),
     {noreply, State#state{ callback_state = NewCBState} };
 
-handle_info({quic, closed, C}, #state{conn = C, callback = M,
-                                      callback_state = CBState} = State) ->
+handle_info({quic, closed, C, #{} = Flags}, #state{conn = C, callback = M,
+                                                   callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => closed}),
-    M:closed(C, CBState),
+    M:closed(C, Flags, CBState),
     {stop, normal, State};
 
 %%% ==============================================================
@@ -414,7 +414,7 @@ handle_info({quic, closed, C}, #state{conn = C, callback = M,
 %%% !!! note, we don't handle recv event
 %%% ==============================================================
 handle_info({quic, start_completed, Stream, AtomStatus, StreamId, PeerAccepted},
-            #state{conn = C, callback = M,
+            #state{callback = M,
                    callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => start_completed}),
     {ok, NewCBState} = M:start_complete(Stream, AtomStatus, StreamId, PeerAccepted, CBState),
@@ -453,28 +453,6 @@ handle_info({quic, peer_accepted, Stream},
                    callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => peer_accepted}),
     {ok, NewCBState} = M:peer_accepted(Stream, CBState),
-    {noreply, State#state{ callback_state = NewCBState} };
-
-handle_info({quic, closed, Stream, ConnectionShutdown},
-            #state{callback = M,
-                   callback_state = CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => stream_closed}),
-    {ok, NewCBState} = M:stream_closed(Stream, ConnectionShutdown, CBState),
-    {noreply, State#state{ callback_state = NewCBState} };
-
-handle_info({quic, closed, C},
-            #state{callback = M,
-                   conn = C,
-                   callback_state = CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => closed}),
-    {ok, NewCBState} = M:closed(C, CBState),
-    {noreply, State#state{ callback_state = NewCBState} };
-
-handle_info({quic, send_complete, Stream, IsSendCanceled},
-            #state{callback = M,
-                   callback_state = CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => send_complete}),
-    {ok, NewCBState} = M:send_complete(Stream, IsSendCanceled, CBState),
     {noreply, State#state{ callback_state = NewCBState} };
 
 %%% ==============================================================

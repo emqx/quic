@@ -885,7 +885,7 @@ handle_stream_event_shutdown_complete(QuicerStreamCTX *s_ctx,
   report = enif_make_tuple4(
       env,
       ATOM_QUIC,
-      ATOM_CLOSED,
+      ATOM_STREAM_CLOSED,
       enif_make_copy(env, s_ctx->eHandler),
       enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);

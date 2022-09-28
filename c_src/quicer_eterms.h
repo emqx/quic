@@ -254,6 +254,7 @@ extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_START_FLAG;
 /* Terms for message sending                                */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_CLOSED;
+extern ERL_NIF_TERM ATOM_STREAM_CLOSED;
 extern ERL_NIF_TERM ATOM_LISTENER_STOPPED;
 extern ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_SHUTDOWN;
@@ -313,6 +314,9 @@ extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_IS_RESUMED;
 extern ERL_NIF_TERM ATOM_ALPNS;
+extern ERL_NIF_TERM ATOM_IS_HANDSHAKE_COMPLETED;
+extern ERL_NIF_TERM ATOM_IS_PEER_ACKED;
+extern ERL_NIF_TERM ATOM_IS_APP_CLOSING;
 
 extern ERL_NIF_TERM ATOM_UNDEFINED;
 /*----------------------------------------------------------*/

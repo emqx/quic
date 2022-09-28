@@ -257,10 +257,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // in this case, we don't need to report closed to the owner
       if (!c_ctx->is_closed) // owner doesn't know it is closed
         {
-          report = enif_make_tuple3(
-              env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
-
-          enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+          status = handle_connection_event_shutdown_complete(c_ctx, Event);
         }
       is_destroy = TRUE;
       c_ctx->is_closed = TRUE; // client shutdown completed
@@ -1006,14 +1003,11 @@ handle_connection_event_shutdown_initiated_by_transport(
   assert(QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
-  report = enif_make_tuple4(
-      env,
-      ATOM_QUIC,
-      ATOM_TRANS_SHUTDOWN,
-      enif_make_resource(env, c_ctx),
-      ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
-
+  ERL_NIF_TERM report
+      = make_event(env,
+                   ATOM_TRANS_SHUTDOWN,
+                   enif_make_resource(env, c_ctx),
+                   ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -1025,9 +1019,11 @@ handle_connection_event_shutdown_initiated_by_peer(
   assert(QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
-  report = enif_make_tuple3(
-      env, ATOM_QUIC, ATOM_SHUTDOWN, enif_make_resource(env, c_ctx));
+  ERL_NIF_TERM report
+      = make_event(env,
+                   ATOM_SHUTDOWN,
+                   enif_make_resource(env, c_ctx),
+                   ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode));
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -1040,14 +1036,23 @@ handle_connection_event_shutdown_complete(
   assert(QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
-
   TP_CB_3(shutdown_complete,
           (uintptr_t)c_ctx->Connection,
           Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
-  report = enif_make_tuple3(
-      env, ATOM_QUIC, ATOM_CLOSED, enif_make_resource(env, c_ctx));
+  ERL_NIF_TERM props_name[] = { ATOM_IS_HANDSHAKE_COMPLETED,
+                                ATOM_IS_PEER_ACKED,
+                                ATOM_IS_APP_CLOSING };
+  ERL_NIF_TERM props_value[]
+      = { ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.HandshakeCompleted),
+          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.PeerAcknowledgedShutdown),
+          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.AppCloseInProgress) };
 
+  ERL_NIF_TERM report = make_event_with_props(env,
+                                              ATOM_CLOSED,
+                                              enif_make_resource(env, c_ctx),
+                                              props_name,
+                                              props_value,
+                                              3);
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
