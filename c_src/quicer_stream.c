@@ -824,10 +824,10 @@ handle_stream_event_peer_send_shutdown(
   TP_CB_3(peer_send_shutdown, (uintptr_t)s_ctx->Stream, 0);
   assert(env);
   assert(QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN == Event->Type);
-  report = enif_make_tuple3(env,
-                            ATOM_QUIC,
-                            ATOM_PEER_SEND_SHUTDOWN,
-                            enif_make_copy(env, s_ctx->eHandler));
+  report = make_event(env,
+                      ATOM_PEER_SEND_SHUTDOWN,
+                      enif_make_copy(env, s_ctx->eHandler),
+                      ATOM_UNDEFINED);
 
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
@@ -844,12 +844,11 @@ handle_stream_event_peer_send_aborted(QuicerStreamCTX *s_ctx,
           (uintptr_t)s_ctx->Stream,
           Event->PEER_SEND_ABORTED.ErrorCode);
   assert(env);
-  report = enif_make_tuple4(
-      env,
-      ATOM_QUIC,
-      ATOM_PEER_SEND_ABORTED,
-      enif_make_copy(env, s_ctx->eHandler),
-      enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
+  report
+      = make_event(env,
+                   ATOM_PEER_SEND_ABORTED,
+                   enif_make_copy(env, s_ctx->eHandler),
+                   enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
@@ -866,9 +865,8 @@ handle_stream_event_peer_receive_aborted(QuicerStreamCTX *s_ctx,
           (uintptr_t)s_ctx->Stream,
           Event->PEER_RECEIVE_ABORTED.ErrorCode);
   assert(env);
-  report = enif_make_tuple4(
+  report = make_event(
       env,
-      ATOM_QUIC,
       ATOM_PEER_RECEIVE_ABORTED,
       enif_make_copy(env, s_ctx->eHandler),
       enif_make_uint64(env, Event->PEER_RECEIVE_ABORTED.ErrorCode));
@@ -887,12 +885,16 @@ handle_stream_event_shutdown_complete(QuicerStreamCTX *s_ctx,
           (uintptr_t)s_ctx->Stream,
           Event->SHUTDOWN_COMPLETE.ConnectionShutdown);
   assert(env);
-  report = enif_make_tuple4(
-      env,
-      ATOM_QUIC,
-      ATOM_STREAM_CLOSED,
-      enif_make_copy(env, s_ctx->eHandler),
-      enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionShutdown));
+  ERL_NIF_TERM props_name[] = { ATOM_IS_CONN_SHUTDOWN, ATOM_IS_APP_CLOSING };
+  ERL_NIF_TERM props_value[]
+      = { ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.ConnectionShutdown),
+          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.AppCloseInProgress) };
+  report = make_event_with_props(env,
+                                 ATOM_STREAM_CLOSED,
+                                 enif_make_copy(env, s_ctx->eHandler),
+                                 props_name,
+                                 props_value,
+                                 2);
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -906,10 +908,10 @@ handle_stream_event_peer_accepted(QuicerStreamCTX *s_ctx,
   assert(QUIC_STREAM_EVENT_PEER_ACCEPTED == Event->Type);
   TP_CB_3(peer_accepted, (uintptr_t)s_ctx->Stream, 0);
   assert(env);
-  report = enif_make_tuple3(env,
-                            ATOM_QUIC,
-                            ATOM_PEER_ACCEPTED,
-                            enif_make_copy(env, s_ctx->eHandler));
+  report = make_event(env,
+                      ATOM_PEER_ACCEPTED,
+                      enif_make_copy(env, s_ctx->eHandler),
+                      ATOM_UNDEFINED);
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
@@ -931,12 +933,10 @@ handle_stream_event_send_complete(QuicerStreamCTX *s_ctx,
 
   if (send_ctx->is_sync)
     {
-      report = enif_make_tuple4(
-          env,
-          ATOM_QUIC,
-          ATOM_SEND_COMPLETE,
-          enif_make_copy(env, s_ctx->eHandler),
-          enif_make_uint64(env, Event->SEND_COMPLETE.Canceled));
+      report = make_event(env,
+                          ATOM_SEND_COMPLETE,
+                          enif_make_copy(env, s_ctx->eHandler),
+                          ATOM_BOOLEAN(Event->SEND_COMPLETE.Canceled));
 
       // note, report to caller instead of stream owner
       enif_send(NULL, &send_ctx->caller, NULL, report);

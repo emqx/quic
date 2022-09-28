@@ -28,7 +28,7 @@
         , local_address_changed/3
         , streams_available/4
         , peer_needs_streams/2
-        , stream_closed/3
+        , stream_closed/4
         , closed/3
         ]).
 
@@ -95,7 +95,7 @@ streams_available(_C, _BidirCnt, _UnidirCnt, S) ->
 peer_needs_streams(_C, S) ->
     {ok, S}.
 
-stream_closed(_Connecion, _Stream, S) ->
+stream_closed(_Connecion, _Stream, _Flags, S) ->
     {ok, S}.
 
 

@@ -322,6 +322,7 @@ extern ERL_NIF_TERM ATOM_UNIDI_STREAMS;
 extern ERL_NIF_TERM ATOM_STATUS;
 extern ERL_NIF_TERM ATOM_STREAM_ID;
 extern ERL_NIF_TERM ATOM_IS_PEER_ACCEPTED;
+extern ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
 
 extern ERL_NIF_TERM ATOM_UNDEFINED;
 /*----------------------------------------------------------*/

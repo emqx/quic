@@ -1558,7 +1558,7 @@ tc_stream_open_flag_unidirectional(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
     {quic, <<"ping1">>, Stm,  _, _, _} -> ct:fail("unidirectional stream should not receive any");
-    {quic, stream_closed, Stm, 1} -> ct:pal("stream is closed due to connecion idle")
+    {quic, stream_closed, Stm, #{is_conn_shutdown := true}} -> ct:pal("stream is closed due to connecion idle")
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
@@ -1672,7 +1672,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
   end,
   %% We should get a stream closed event since it is rate limited
   receive
-    {quic, stream_closed, Stm, 0} -> % not a conn close
+    {quic, stream_closed, Stm, #{is_conn_shutdown := false}} -> % not a conn close
       ct:pal("Stream ~p is closed", [Stm]);
     {quic, transport_shutdown, Conn, connection_idle} ->
       ct:fail("Unexpected connection ~p transport shutdown", [Conn]);
@@ -1744,7 +1744,7 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
   quicer:async_accept_stream(Conn, []),
   %% check with server if peer addr is correct.
   receive
-    {quic, peer_accepted, Stm0} ->
+    {quic, peer_accepted, Stm0, undefined} ->
       ct:pal("peer_accepted received")
   after 1000 ->
       ct:fail("peer_accepted timeout")
@@ -1911,7 +1911,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
       ct:pal("echo server peer_send_aborted", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stms);
-    {quic, peer_send_shutdown, Stm} ->
+    {quic, peer_send_shutdown, Stm, undefined} ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stms);
@@ -1985,7 +1985,7 @@ ping_pong_server_stm_loop(L, Conn, Stm) ->
       ct:pal("send pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_stm_loop(L, Conn, Stm);
-    {quic, peer_send_shutdown, Stm} ->
+    {quic, peer_send_shutdown, Stm, undefined} ->
       ct:pal("closing stream"),
       quicer:close_stream(Stm),
       ping_pong_server_stm_loop(L, Conn, Stm);
@@ -2022,7 +2022,7 @@ ping_pong_server_dgram_loop(L, Conn, Stm) ->
       ct:pal("send dgram pong"),
       {ok, 4} = quicer:send_dgram(Conn, <<"pong">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);
-    {quic, peer_send_shutdown, Stm} ->
+    {quic, peer_send_shutdown, Stm, undefined} ->
       ct:pal("closing stream"),
       quicer:close_stream(Stm),
       ping_pong_server_dgram_loop(L, Conn, Stm);
@@ -2099,7 +2099,7 @@ simple_stream_server(Owner, Config, Port) ->
         {quic, shutdown, Conn, _ErrorCode} ->
           ct:pal("closing ~p", [Conn]),
           quicer:close_connection(Conn);
-        {quic, peer_send_shutdown, Stream} ->
+        {quic, peer_send_shutdown, Stream, undefined} ->
           quicer:close_stream(Stream);
         done ->
           exit(normal)

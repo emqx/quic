@@ -336,6 +336,7 @@ ERL_NIF_TERM ATOM_UNIDI_STREAMS;
 ERL_NIF_TERM ATOM_STATUS;
 ERL_NIF_TERM ATOM_STREAM_ID;
 ERL_NIF_TERM ATOM_IS_PEER_ACCEPTED;
+ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
 ERL_NIF_TERM ATOM_UNDEFINED;
 
 // Mirror 'status' in msquic_linux.h
@@ -637,6 +638,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_STATUS, status)                                                   \
   ATOM(ATOM_STREAM_ID, stream_id)                                             \
   ATOM(ATOM_IS_PEER_ACCEPTED, is_peer_accepted)                               \
+  ATOM(ATOM_IS_CONN_SHUTDOWN, is_conn_shutdown)                               \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;

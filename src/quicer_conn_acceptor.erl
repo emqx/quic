@@ -143,7 +143,7 @@
 %%      but our end could still keep sending
 %% a. forward a msg to the (new) owner process
 %%
--callback stream_closed(connection_handler(), stream_handler(), _OldState) -> {ok, _State}.
+-callback stream_closed(connection_handler(), stream_handler(), CloseFlags :: map(), _OldState) -> {ok, _State}.
 %% ====================================================================================================
 
 %% ====================================================================================================
@@ -160,7 +160,7 @@
                     , peer_send_aborted/3
                     , peer_receive_aborted/3
                     , send_shutdown_complete/3
-                    , stream_closed/3
+                    , stream_closed/4
                     , peer_accepted/3
                     ]).
 
@@ -339,13 +339,13 @@ handle_info({quic, shutdown, C}, #state{ conn = C
     {noreply, State#state{ callback_state = NewCBState }};
 
 %% handle stream close, the process is the owner of stream or it is during ownership handoff.
-handle_info({quic, stream_closed, Stream, ConnectionShutdownFlag}, #state{callback = M,
+handle_info({quic, stream_closed, Stream, Flags}, #state{callback = M,
                                                                           conn = C,
                                                                           callback_state = CbState} = State)->
     ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed}),
-    NewCBState = case erlang:function_exported(M, stream_closed, 3) of
+    NewCBState = case erlang:function_exported(M, stream_closed, 4) of
                      true ->
-                         case M:stream_closed(C, Stream, ConnectionShutdownFlag, CbState) of
+                         case M:stream_closed(C, Stream, Flags, CbState) of
                              {ok, NewCBState0} ->
                                  NewCBState0;
                              {error, _Reason} ->
@@ -428,11 +428,11 @@ handle_info({quic, send_complete, Stream, IsSendCanceled},
     {ok, NewCBState} = M:send_complete(Stream, IsSendCanceled, CBState),
     {noreply, State#state{ callback_state = NewCBState} };
 
-handle_info({quic, peer_send_shutdown, Stream, ErrorCode},
+handle_info({quic, peer_send_shutdown, Stream, undefined},
             #state{callback = M,
                    callback_state = CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => peer_send_shutdown}),
-    {ok, NewCBState} = M:peer_send_shutdown(Stream, ErrorCode, CBState),
+    {ok, NewCBState} = M:peer_send_shutdown(Stream, undefined, CBState),
     {noreply, State#state{ callback_state = NewCBState} };
 
 handle_info({quic, peer_send_aborted, Stream, ErrorCode},

@@ -42,7 +42,6 @@ The stream initiated locally is started regardless of success/fail or sync/async
                                           , stream_id := integer(), 
                                           , is_peer_accepted := boolean() }
 ```
-
 ### 'active received data'
 
 Data received in binary format
@@ -60,7 +59,7 @@ Send call is handled by stack, caller is ok to release the sndbuffer
 This message is for sync send only.
 
 ```erlang
-{quic, send_complete, stream_handler(), IsSendCanceled :: 0 | 1}
+{quic, send_complete, stream_handler(), IsSendCanceled :: boolean()}
 ```
 
 
@@ -69,7 +68,7 @@ This message is for sync send only.
 Peer has sent all the data and wants to shutdown gracefully.
 
 ```erlang
-{quic, peer_send_shutdown, stream_handler(), ErrorCode::integer()}
+{quic, peer_send_shutdown, stream_handler(), undefined}
 ```
 
 ### 'peer_send_aborted'
@@ -100,8 +99,8 @@ The sender may assume the data sent is either handled or not handled.
 Both endpoints of sending and receiving of the stream have been shut down.
 
 ```erlang
-{quic, stream_closed, stream_handler(), #{ is_conn_shutdown := 0 | 1
-                                         , app_close_in_progress := 0 | 1
+{quic, stream_closed, stream_handler(), #{ is_conn_shutdown := boolean()
+                                         , is_app_closing := boolean()
                                          }
 ```
 

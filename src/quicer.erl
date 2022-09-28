@@ -502,9 +502,9 @@ send(Stream, Data) ->
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
-        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_SUCCESS} ->
+        {quic, send_completed, Stream, false} ->
           OK;
-        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_CANCELLED} ->
+        {quic, send_completed, Stream, true} ->
           {error, cancelled}
       end;
     E ->
@@ -612,7 +612,7 @@ shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
   case async_shutdown_stream(Stream, Flags, ErrorCode) of
     ok ->
       receive
-        {quic, stream_closed, Stream, _IsGraceful} ->
+        {quic, stream_closed, Stream, _Flags} ->
           ok
       after Timeout ->
           {error, timeout}
@@ -633,7 +633,7 @@ async_shutdown_stream(Stream) ->
 
 %% @doc async variant of {@link shutdown_stream/4}
 %% Caller should expect to receive
-%% ```{quic, stream_closed, Stream, _IsGraceful}'''
+%% ```{quic, stream_closed, Stream, Flags}'''
 %%
 -spec async_shutdown_stream(stream_handler(),
                          stream_shutdown_flags(),
