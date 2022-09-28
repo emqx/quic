@@ -309,6 +309,13 @@ extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
 /*----------------------------------------------------------*/
+/* Used in messages to the owners */
+/*----------------------------------------------------------*/
+extern ERL_NIF_TERM ATOM_IS_RESUMED;
+extern ERL_NIF_TERM ATOM_ALPNS;
+
+extern ERL_NIF_TERM ATOM_UNDEFINED;
+/*----------------------------------------------------------*/
 /* ATOMS ends here                                          */
 /*----------------------------------------------------------*/
 

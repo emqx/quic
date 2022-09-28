@@ -55,6 +55,16 @@ extern void MsQuicLibraryLoad(void);
 
 ERL_NIF_TERM atom_status(ErlNifEnv *env, QUIC_STATUS status);
 
+ERL_NIF_TERM
+make_event_with_props(ErlNifEnv *env,
+                      ERL_NIF_TERM event_name,
+                      ERL_NIF_TERM resource,
+                      ERL_NIF_TERM *keys,
+                      ERL_NIF_TERM *values,
+                      size_t cnt);
+
+#define ATOM_BOOLEAN(X) (X ? ATOM_TRUE : ATOM_FALSE)
+
 // Compiler attributes
 #define __unused_parm__ __attribute__((unused))
 

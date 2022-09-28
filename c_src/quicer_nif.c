@@ -321,6 +321,14 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 ERL_NIF_TERM ATOM_ALLOW_INSECURE;
 
+/*----------------------------------------------------------*/
+/* Used in messages to the owners */
+/*----------------------------------------------------------*/
+ERL_NIF_TERM ATOM_IS_RESUMED;
+ERL_NIF_TERM ATOM_ALPNS;
+
+ERL_NIF_TERM ATOM_UNDEFINED;
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -608,7 +616,10 @@ ERL_NIF_TERM ATOM_ALLOW_INSECURE;
   ATOM(ATOM_FUNCTION, function);                                              \
   ATOM(ATOM_SNABBKAFFE_NEMESIS, snabbkaffe_nemesis);                          \
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
-  ATOM(ATOM_ALLOW_INSECURE, allow_insecure);
+  ATOM(ATOM_ALLOW_INSECURE, allow_insecure);                                  \
+  ATOM(ATOM_IS_RESUMED, is_resumed);                                          \
+  ATOM(ATOM_ALPNS, alpns);                                                    \
+  ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;
 const QUIC_API_TABLE *MsQuic = NULL;
@@ -1176,6 +1187,35 @@ stream_controlling_process(ErlNifEnv *env,
 
   TP_NIF_3(exit, (uintptr_t)s_ctx->Stream, (uintptr_t)&s_ctx->owner->Pid);
   return ATOM_OK;
+}
+
+/*
+** Make an 4 tuple event
+** note all keys&values of props belongs to 'env'
+*/
+ERL_NIF_TERM
+make_event_with_props(ErlNifEnv *env,
+                      ERL_NIF_TERM event_name,
+                      ERL_NIF_TERM resource,
+                      ERL_NIF_TERM *keys,
+                      ERL_NIF_TERM *values,
+                      size_t cnt)
+{
+  ERL_NIF_TERM prop = ATOM_UNDEFINED;
+
+  // build prop
+  if (!(0 == cnt || values == NULL || keys == NULL))
+    {
+      assert(values != NULL);
+      assert(keys != NULL);
+      enif_make_map_from_arrays(env, keys, values, cnt, &prop);
+    }
+
+  return enif_make_tuple4(env,
+                          ATOM_QUIC,  // 1st element, :: quic
+                          event_name, // 2nd element, event name :: atom()
+                          resource,   // 3rd element, resource
+                          prop);      // 4th element, event props :: any()) //
 }
 
 static ErlNifFunc nif_funcs[] = {

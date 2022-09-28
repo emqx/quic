@@ -145,8 +145,8 @@ Or use quicer:recv/2 to receive in passive mode
 ### Connection connected
 
 ``` erlang
-{quic, connected, connection_handler(), #{ is_resumed := 0 | 1
-                                         , alpns = list() %% @TODO
+{quic, connected, connection_handler(), #{ is_resumed := boolean()
+                                         , alpns = string() | undefined
                                          }}
 ```
 

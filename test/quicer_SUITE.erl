@@ -2047,7 +2047,7 @@ simple_slow_conn_server(Owner, Config, Port, HandshakeDelay) ->
   ok = quicer:async_handshake(Conn),
   ct:pal("~p  handshake ~p", [?FUNCTION_NAME, Conn]),
   receive
-    {quic, connected, Conn} ->
+    {quic, connected, Conn, _} ->
       ct:pal("~p  Connected ~p", [?FUNCTION_NAME, Conn]),
       ok;
     {quic, closed, Conn} ->

@@ -207,7 +207,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, H} ->
       receive
-        {quic, connected, H} ->
+        {quic, connected, H, _} ->
           {ok, H};
         {quic, transport_shutdown, H, Reason} when Reason == connection_timeout
                                                    orelse Reason == connection_idle ->
@@ -256,7 +256,7 @@ handshake(Conn, Timeout) ->
     {error, _} = E -> E;
     ok ->
       receive
-        {quic, connected, Conn} -> {ok, Conn};
+        {quic, connected, Conn, _} -> {ok, Conn};
         {quic, closed, Conn} -> {error, closed}
       after Timeout ->
           {error, timeout}
@@ -297,7 +297,7 @@ accept(LSock, Opts, Timeout) ->
   receive
     {quic, new_conn, C} ->
       {ok, C};
-    {quic, connected, C} ->
+    {quic, connected, C, _} ->
       {ok, C}
   after Timeout ->
     {error, timeout}

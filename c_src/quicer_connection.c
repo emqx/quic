@@ -196,7 +196,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 {
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report;
   BOOLEAN is_destroy = FALSE;
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
 
@@ -307,7 +306,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     default:
       break;
     }
-  enif_clear_env(c_ctx->env);
+  enif_clear_env(env);
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
@@ -944,6 +943,11 @@ handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 }
 
+/* handle conn connected event and deliver the message to the conn owner
+   {quic, connected, connection_handler(), #{ is_resumed := boolean()
+                                            , alpns = binary() | undefined
+                                         }}
+*/
 static QUIC_STATUS
 handle_connection_event_connected(QuicerConnCTX *c_ctx,
                                   __unused_parm__ QUIC_CONNECTION_EVENT *Event)
@@ -959,19 +963,39 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
   enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
 
   ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
-  // testing this, just unblock accecptor
+
+  uint8_t alpn_size = Event->CONNECTED.NegotiatedAlpnLength;
+  const uint8_t *alpn_buff = Event->CONNECTED.NegotiatedAlpn;
+  ERL_NIF_TERM ealpns;
+
+  if (alpn_size > 0 && alpn_buff)
+    {
+      memcpy(enif_make_new_binary(c_ctx->env, alpn_size, &ealpns),
+             alpn_buff,
+             alpn_size);
+    }
+  else
+    {
+      ealpns = ATOM_UNDEFINED;
+    }
+
+  ERL_NIF_TERM props_name[] = { ATOM_IS_RESUMED, ATOM_ALPNS };
+  ERL_NIF_TERM props_value[]
+      = { ATOM_BOOLEAN(Event->CONNECTED.SessionResumed), ealpns };
+
+  ERL_NIF_TERM report = make_event_with_props(
+      c_ctx->env, ATOM_CONNECTED, ConnHandler, props_name, props_value, 2);
+
+  // testing this, just unblock acceptor
   // should pick a 'acceptor' here?
-  if (!enif_send(NULL,
-                 acc_pid,
-                 NULL,
-                 enif_make_tuple3(
-                     c_ctx->env, ATOM_QUIC, ATOM_CONNECTED, ConnHandler)))
+  if (!enif_send(NULL, acc_pid, NULL, report))
     {
       return QUIC_STATUS_UNREACHABLE;
     }
 
   MsQuic->ConnectionSendResumptionTicket(
       c_ctx->Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
+
   return QUIC_STATUS_SUCCESS;
 }
 

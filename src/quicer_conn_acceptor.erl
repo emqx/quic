@@ -289,9 +289,10 @@ handle_info({quic, connection_resumed, C, ResumeData},
             {noreply, State}
     end;
 
-handle_info({quic, connected, C}, #state{ conn = C
-                                        , callback = M
-                                        , callback_state = CbState} = State) ->
+%% @TODO handle conn info
+handle_info({quic, connected, C, _ConnInfo}, #state{ conn = C
+                                           , callback = M
+                                           , callback_state = CbState} = State) ->
     ?tp(quic_connected_slow, #{module=>?MODULE, conn=>C}),
     {ok, NewCBState} = M:connected(C, CbState),
     {noreply, State#state{ callback_state = NewCBState }};
