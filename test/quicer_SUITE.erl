@@ -547,7 +547,7 @@ tc_stream_client_send_binary(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       flush_streams_available(Conn),
       receive
-        {quic, <<"pong">>, _, _, _, _} ->
+        {quic, <<"pong">>, _, _} ->
           ok = quicer:close_stream(Stm),
           ok = quicer:close_connection(Conn);
         Other ->
@@ -570,7 +570,7 @@ tc_stream_client_send_iolist(Config) ->
       {ok, 4} = quicer:send(Stm, ["p", ["i", ["n"]], <<"g">>]),
       flush_streams_available(Conn),
       receive
-        {quic, <<"pong">>, _, _, _, _} ->
+        {quic, <<"pong">>, _, _} ->
           ok = quicer:close_stream(Stm),
           ok = quicer:close_connection(Conn);
         Other ->
@@ -593,7 +593,7 @@ tc_stream_client_async_send(Config) ->
       {ok, 4} = quicer:async_send(Stm, <<"ping">>),
       flush_streams_available(Conn),
       receive
-        {quic, <<"pong">>, _, _, _, _} ->
+        {quic, <<"pong">>, _, _} ->
           ok = quicer:close_stream(Stm),
           ok = quicer:close_connection(Conn);
         Other ->
@@ -690,12 +690,12 @@ tc_stream_passive_switch_to_active(Config) ->
       {ok, 11} = quicer:send(Stm, <<"ping_active">>),
       {error, einval} = quicer:recv(Stm, 0),
       receive
-        {quic, <<"ping_active">>, Stm, _, _, _} -> ok
+        {quic, <<"ping_active">>, Stm, _} -> ok
       end,
       quicer:setopt(Stm, active, 100),
       {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
       receive
-        {quic, <<"ping_active_2">>, Stm, _, _, _} -> ok
+        {quic, <<"ping_active_2">>, Stm, _} -> ok
       end,
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -715,7 +715,7 @@ tc_stream_active_switch_to_passive(Config) ->
       flush_streams_available(Conn),
       {error, einval} = quicer:recv(Stm, 0),
       receive
-        {quic, <<"ping_active">>, Stm, _, _, _} -> ok
+        {quic, <<"ping_active">>, Stm, _} -> ok
       end,
       quicer:setopt(Stm, active, false),
       {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
@@ -873,7 +873,7 @@ tc_stream_controlling_process(Config) ->
       {NewOwner, MonRef} = spawn_monitor(
                              fun() ->
                                  receive
-                                   {quic, <<"owner_changed">>, Stm, _, _, _} ->
+                                   {quic, <<"owner_changed">>, Stm, _} ->
                                      ok = quicer:async_close_stream(Stm)
                                  end
                              end),
@@ -915,7 +915,7 @@ dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram) ->
   receive
     {quic, dgram, <<"pong">>} ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, true);
-    {quic, <<"pong">>, _, _, _, _} ->
+    {quic, <<"pong">>, _, _} ->
       dgram_client_recv_loop(Conn, true, ReceivedViaDgram);
     {quic, dgram_max_len, _} ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram);
@@ -965,7 +965,7 @@ tc_conn_controlling_process(Config) ->
 %%       {ok, Stm} = quicer:start_stream(Conn, []),
 %%       timer:sleep(10),
 %%       {ok, 4} = quicer:send(Stm, <<"ping">>),
-%%       receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
+%%       receive {quic, <<"ping">>, Stm, _} -> ok end,
 %%       {ok, <<1,0,0,0>>} = quicer:getopt(Stm, Parm),
 %%       ok = quicer:close_connection(Conn),
 %%       SPid ! done,
@@ -992,7 +992,7 @@ tc_getopt(Config) ->
       true = proplists:get_value(send_buffering_enabled, Settings),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
+      receive {quic, <<"ping">>, Stm, _} -> ok end,
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -1011,7 +1011,7 @@ tc_getopt_stream_active(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {error,param_error} = quicer:getopt(Conn, Parm, false),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
+      receive {quic, <<"ping">>, Stm, _} -> ok end,
       {ok, true} = quicer:getopt(Stm, Parm, false),
       ok = quicer:setopt(Stm, active, false),
       {ok, false} = quicer:getopt(Stm, Parm, false),
@@ -1073,7 +1073,7 @@ tc_getstat_closed(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      receive {quic, _, _, _,_,_} -> ok end,
+      receive {quic, _, _, _} -> ok end,
       ok = quicer:close_stream(Stm),
       ok = quicer:close_connection(Conn),
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
@@ -1219,7 +1219,7 @@ tc_setopt(Config) ->
       {ok, Stm1} = quicer:start_stream(Conn, [{active, true}]),
       {ok, 5} = quicer:send(Stm1, <<"ping1">>),
       receive
-        {quic, _Data, Stm1, _, _, _} = Msg ->
+        {quic, _Data, Stm1, _} = Msg ->
           ct:fail("unexpected_recv ~p ", [Msg])
       after 1000 ->
                 ok
@@ -1229,7 +1229,7 @@ tc_setopt(Config) ->
       SPid ! {set_stm_cnt, 3},
 
       receive
-        {quic, <<"ping1">>, Stm1, _, _, _} ->
+        {quic, <<"ping1">>, Stm1, _} ->
           ok
       after 1000 ->
           ct:fail("sending is still blocked", [])
@@ -1263,7 +1263,7 @@ tc_setopt_conn_local_addr(Config) ->
   {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
   {ok, 5} = quicer:send(Stm0, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm0, _, _, _} ->
+    {quic, <<"ping1">>, Stm0, _} ->
       ok
   after 1000 ->
       ct:fail("recv ping1 timeout")
@@ -1289,7 +1289,7 @@ tc_setopt_conn_local_addr(Config) ->
              end, 20, "addr migration failed"),
   {ok, 5} = quicer:send(Stm0, <<"ping2">>),
   receive
-    {quic, <<"ping2">>, Stm0, _, _, _} ->
+    {quic, <<"ping2">>, Stm0, _} ->
       ok
   after 1000 ->
       ct:fail("recv ping2 timeout")
@@ -1315,7 +1315,7 @@ tc_setopt_conn_local_addr_in_use(Config) ->
   {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
   {ok, 5} = quicer:send(Stm0, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm0, _, _, _} ->
+    {quic, <<"ping1">>, Stm0, _} ->
       ok
   after 1000 ->
       ct:fail("recv ping1 timeout")
@@ -1341,7 +1341,7 @@ tc_setopt_conn_local_addr_in_use(Config) ->
   ct:pal("send after migration failed"),
   {ok, 5} = quicer:send(Stm0, <<"ping2">>),
   receive
-    {quic, <<"ping2">>, Stm0, _, _, _} ->
+    {quic, <<"ping2">>, Stm0, _} ->
       ok
   after 1000 ->
       ct:fail("recv ping2 timeout")
@@ -1414,10 +1414,10 @@ tc_strm_opt_active_1(Config) ->
   {ok, Stm} = quicer:start_stream(Conn, [{active, 1}]),
   {ok, 5} = quicer:send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+    {quic, <<"ping1">>, Stm,  _} -> ok
   end,
 
-  receive {quic_passive, Stm} -> ok end,
+  receive {quic, passive, Stm, undefined} -> ok end,
 
   {ok, 5} = quicer:async_send(Stm, <<"ping4">>),
   {ok, <<"ping4">>} = quicer:recv(Stm, 5),
@@ -1440,16 +1440,16 @@ tc_strm_opt_active_n(Config) ->
   {ok, Stm} = quicer:start_stream(Conn, [{active, 3}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+    {quic, <<"ping1">>, Stm,  _} -> ok
   end,
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
   receive
-    {quic, <<"ping2">>, Stm,  _, _, _} -> ok
+    {quic, <<"ping2">>, Stm,  _} -> ok
   end,
   {ok, 5} = quicer:async_send(Stm, <<"ping3">>),
   receive
-    {quic, <<"ping3">>, Stm,  _, _, _} ->
-      receive {quic_passive, Stm} -> ok end
+    {quic, <<"ping3">>, Stm,  _} ->
+      receive {quic, passive, Stm, undefined} -> ok end
   end,
 
   {ok, 5} = quicer:async_send(Stm, <<"ping4">>),
@@ -1473,8 +1473,8 @@ tc_strm_opt_active_once(Config) ->
   {ok, Stm} = quicer:start_stream(Conn, [{active, once}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} ->
-      receive {quic_passive, Stm} = Event ->
+    {quic, <<"ping1">>, Stm,  _} ->
+      receive {quic, passive, Stm, undefined} = Event ->
           ct:fail("unexpected recv ~p ", Event)
       after 500 ->
           ok
@@ -1533,7 +1533,7 @@ tc_get_stream_rid(Config) ->
   {ok, Rid} = quicer:get_stream_rid(Stm),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+    {quic, <<"ping1">>, Stm,  _} -> ok
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
@@ -1557,7 +1557,7 @@ tc_stream_open_flag_unidirectional(Config) ->
   {ok, Rid} = quicer:get_stream_rid(Stm),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} -> ct:fail("unidirectional stream should not receive any");
+    {quic, <<"ping1">>, Stm,  _} -> ct:fail("unidirectional stream should not receive any");
     {quic, stream_closed, Stm, #{is_conn_shutdown := true}} -> ct:pal("stream is closed due to connecion idle")
   end,
   ?assert(is_integer(Rid)),
@@ -1583,7 +1583,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
   {ok, Rid} = quicer:get_stream_rid(Stm),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} ->
+    {quic, <<"ping1">>, Stm,  _} ->
       ct:fail("Should not get ping1 due to rate limiter");
     {quic, start_completed, Stm,
              #{status := stream_limit_reached, stream_id := StreamID}} ->
@@ -1735,7 +1735,7 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
                                          ]),
   {ok, 5} = quicer:send(Stm0, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm0, _, _, _} ->
+    {quic, <<"ping1">>, Stm0, _} ->
       ct:fail("We should not recv ping1 due to flow control: bidir stream 0")
   after 1000 ->
       ct:pal("recv ping1 timeout"),
@@ -1756,9 +1756,9 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
       ?assert(quicer:is_unidirectional(Flags)),
       %% We also expect server send reply over new stream
       receive
-        {quic, <<"ping1">>, Stm0, _, _, _} ->
+        {quic, <<"ping1">>, Stm0, _} ->
           ct:fail("Data recvd from client -> server unidirectional stream");
-        {quic, <<"ping1">>, Stm1, _, _, _} ->
+        {quic, <<"ping1">>, Stm1, _} ->
           ct:pal("Data recvd from server -> client unidirectional stream")
       end
   after 2000 ->
@@ -1809,7 +1809,7 @@ tc_insecure_traffic(Config) ->
   {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
-    {quic, <<"ping1">>, Stm,  _, _, _} ->
+    {quic, <<"ping1">>, Stm,  _} ->
       {ok, true} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
       ok
   end,
@@ -1892,7 +1892,7 @@ echo_server(Owner, Config, Port)->
 
 echo_server_stm_loop(L, Conn, Stms) ->
   receive
-    {quic, Bin, Stm, _, _, _} ->
+    {quic, Bin, Stm, _} when is_binary(Bin) ->
       case quicer:send(Stm, Bin) of
         {error, stm_send_error, aborted} ->
           ct:pal("echo server: send aborted: ~p ", [Bin]);
@@ -1981,7 +1981,7 @@ ping_pong_server(Owner, Config, Port) ->
 ping_pong_server_stm_loop(L, Conn, Stm) ->
   true = is_reference(Stm),
   receive
-    {quic, <<"ping">>, _, _, _, _} ->
+    {quic, <<"ping">>, _, _} ->
       ct:pal("send pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_stm_loop(L, Conn, Stm);
@@ -2014,7 +2014,7 @@ ping_pong_server_dgram(Owner, Config, Port) ->
 
 ping_pong_server_dgram_loop(L, Conn, Stm) ->
   receive
-    {quic, <<"ping">>, _, _, _, _} ->
+    {quic, <<"ping">>, _, _} ->
       ct:pal("send stream pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);
@@ -2157,7 +2157,7 @@ active_recv(Stream, Len, BinList) ->
     true ->
       binary:list_to_bin(lists:reverse(BinList));
     false ->
-      receive {quic, Bin, Stream, _, _, _} ->
+      receive {quic, Bin, Stream, _} when is_binary(Bin) ->
           active_recv(Stream, Len, [Bin |BinList])
       end
 end.

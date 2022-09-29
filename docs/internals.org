@@ -324,18 +324,18 @@ QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE    = 8,
 QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
 
 #+end_verse
-| MsQuic Event                             | Erlang Msg                                                                                   |
-|------------------------------------------+----------------------------------------------------------------------------------------------|
-| QUIC_STREAM_EVENT_START_COMPLETE         | {quic, start_completed, #{}}                                                                 |
-| QUIC_STREAM_EVENT_RECEIVE                | {quic, stream_handler(), continue} or {quic, binary(), stream_handler(), Offset, Len, Flags} |
-| QUIC_STREAM_EVENT_SEND_COMPLETE          | {quic, send_complete, stream_handler(), CanceledFlag}                                        |
-| QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN     | {quic, peer_send_shutdown, stream_handler(), undefined}                                            |
-| QUIC_STREAM_EVENT_PEER_SEND_ABORTED      | {quic, peer_send_aborted, stream_handler(), error_code()}                                    |
-| QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED   | {quic, peer_receive_aborted, stream_handler(), error_code()}                                 |
-| QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE      | {quic, stream_closed, stream_handler(), #{}}                                  |
-| QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE | @TODO                                                                                        |
-| QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                                        |
-| QUIC_STREAM_EVENT_PEER_ACCEPTED          | {quic, peer_accepted, stream_handler()}                                                      |
+| MsQuic Event                             | Erlang Msg                                                                      |
+|------------------------------------------+---------------------------------------------------------------------------------|
+| QUIC_STREAM_EVENT_START_COMPLETE         | {quic, start_completed, #{}}                                                    |
+| QUIC_STREAM_EVENT_RECEIVE                | {quic, stream_handler(), continue} or {quic, binary(), stream_handler(), map()} |
+| QUIC_STREAM_EVENT_SEND_COMPLETE          | {quic, send_complete, stream_handler(), CanceledFlag}                           |
+| QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN     | {quic, peer_send_shutdown, stream_handler(), undefined}                         |
+| QUIC_STREAM_EVENT_PEER_SEND_ABORTED      | {quic, peer_send_aborted, stream_handler(), error_code()}                       |
+| QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED   | {quic, peer_receive_aborted, stream_handler(), error_code()}                    |
+| QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE      | {quic, stream_closed, stream_handler(), #{}}                                    |
+| QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE | @TODO                                                                           |
+| QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                           |
+| QUIC_STREAM_EVENT_PEER_ACCEPTED          | {quic, peer_accepted, stream_handler()}                                         |
 
 * Multistreaming Support
 

@@ -716,10 +716,10 @@ handle_stream_event_recv(HQUIC Stream,
           if (!enif_send(NULL,
                          &(s_ctx->owner->Pid),
                          s_ctx->env,
-                         enif_make_tuple3(env,
-                                          ATOM_QUIC,
-                                          enif_make_copy(env, s_ctx->eHandler),
-                                          ATOM_QUIC_STATUS_CONTINUE)))
+                         make_event(env,
+                                    ATOM_QUIC_STATUS_CONTINUE,
+                                    enif_make_copy(env, s_ctx->eHandler),
+                                    ATOM_UNDEFINED)))
             {
               // App down, shutdown stream
               MsQuic->StreamShutdown(Stream,
@@ -733,15 +733,18 @@ handle_stream_event_recv(HQUIC Stream,
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 1);
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
       ERL_NIF_TERM eHandler = enif_make_copy(env, s_ctx->eHandler);
-      ERL_NIF_TERM report_active = enif_make_tuple6(
-          env,
-          ATOM_QUIC,
-          enif_make_binary(env, &bin),
-          eHandler,
-          enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
-          enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
-          enif_make_int(env, Event->RECEIVE.Flags) // @todo handle fin flag.
-      );
+      ERL_NIF_TERM props_name[] = { ATOM_ABS_OFFSET, ATOM_LEN, ATOM_FLAGS };
+      ERL_NIF_TERM props_value[]
+          = { enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
+              enif_make_uint64(env, Event->RECEIVE.TotalBufferLength),
+              enif_make_int(env, Event->RECEIVE.Flags) };
+      ERL_NIF_TERM report_active
+          = make_event_with_props(env,
+                                  enif_make_binary(env, &bin),
+                                  eHandler,
+                                  props_name,
+                                  props_value,
+                                  3);
 
       if (!enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_active))
         {
@@ -768,7 +771,7 @@ handle_stream_event_recv(HQUIC Stream,
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
 
               ERL_NIF_TERM report_passive
-                  = enif_make_tuple2(env, ATOM_QUIC_PASSIVE, eHandler);
+                  = make_event(env, ATOM_PASSIVE, eHandler, ATOM_UNDEFINED);
 
               if (!enif_send(
                       NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive))

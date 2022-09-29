@@ -120,18 +120,18 @@ handoff_stream(Stream, Owner) ->
 -spec forward_stream_msgs(stream_handler(), pid(), list()) -> ok.
 forward_stream_msgs(Stream, Owner, Acc) ->
     receive
-        {quic, Data, Stream, _Offset, _Len, _Flag} = Msg when is_binary(Data) ->
+        {quic, Data, Stream, _Props} = Msg when is_binary(Data) ->
             forward_stream_msgs(Stream, Owner, [Msg | Acc])
     after 0 ->
-            Owner ! {stream_owner_handoff, self(), aggr_steam_data(Acc)},
+            Owner ! {stream_owner_handoff, self(), aggr_stream_data(Acc)},
             ok
     end.
 
-aggr_steam_data([]) ->
+aggr_stream_data([]) ->
     undefined;
-aggr_steam_data(Acc) ->
+aggr_stream_data(Acc) ->
     %% Maybe assert offset is 0
-    lists:foldl(fun({quic, Bin, _Stream, _Offset, Len, Flag},
+    lists:foldl(fun({quic, Bin, _Stream, #{len := Len, flags := Flag}},
                     {BinAcc, LenAcc, FlagAcc}) ->
                         {[Bin | BinAcc], LenAcc + Len, FlagAcc bor Flag}
                 end, {[], _Len = 0, _Flag = 0}, Acc).

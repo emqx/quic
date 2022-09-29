@@ -175,7 +175,8 @@ handle_info(?post_init, #state{ is_owner = false, stream = Stream} = State) ->
         {BinList, Len, Flag} ->
             ?tp(debug, #{event=>post_init_data, module=>?MODULE, stream=>Stream}),
             %% @TODO first data from the stream, offset 0,
-            Msg = {quic, iolist_to_binary(BinList), Stream, 0, Len, Flag},
+            Msg = {quic, iolist_to_binary(BinList), Stream,
+                   #{absolute_offset => 0, len => Len, flags => Flag}},
             handle_info(Msg, State#state{is_owner = true})
     end;
 handle_info(?post_init, #state{ is_owner = true} = State) ->
@@ -194,7 +195,7 @@ handle_info({quic, new_stream, Stream, Flags}, #state{opts = Options} = State) -
             maybe_log_stracetrace(ST),
             {stop, {new_stream_crash, Reason}, State#state{stream = Stream}}
     end;
-handle_info({quic, Bin, Stream, _, _, Flags},
+handle_info({quic, Bin, Stream, #{flags := Flags}},
             #state{stream = Stream, opts = Options, cbstate = CBState}= State) ->
     ?tp(stream_data, #{module=>?MODULE, stream=>Stream}),
     #{stream_callback := CallbackModule} = Options,
@@ -211,7 +212,7 @@ handle_info({quic, Bin, Stream, _, _, Flags},
             {stop, {handle_stream_data_crash, Reason}, State}
     end;
 
-handle_info({quic, _Bin, StreamA, _, _, _}, #state{stream = StreamB} = State)
+handle_info({quic, _Bin, StreamA, _Props}, #state{stream = StreamB} = State)
   when StreamB =/=StreamA ->
     ?tp(inval_stream_data, #{module=>?MODULE, stream_a=>StreamA, stream_b => StreamB}),
     {stop, wrong_stream, State};

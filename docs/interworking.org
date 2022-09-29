@@ -137,7 +137,7 @@ Execute stream callback:
 while receiving side threadhold is reached,
 end note
 
-msw --> stream_acceptor : erl msg {quic, Bin, Stream, Offset, Size, Flag}
+msw --> stream_acceptor : erl msg {quic, Bin, Stream, Props}
 
 hnote over stream_acceptor: unblocked
 

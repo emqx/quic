@@ -1296,11 +1296,11 @@ tc_multi_streams(Config) ->
                  {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
                  ct:pal("ping2 sent"),
                  receive
-                   {quic, <<"ping1">>, Stm,  _, _, _} -> ok
+                   {quic, <<"ping1">>, Stm,  _} -> ok
                  after 100 -> ct:fail("no ping1")
                  end,
                  receive
-                   {quic, <<"ping2">>, Stm2,  _, _, _} -> ok
+                   {quic, <<"ping2">>, Stm2,  _} -> ok
                  after 100 -> ct:fail("no ping2")
                  end
                end,

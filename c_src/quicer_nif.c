@@ -284,7 +284,7 @@ ERL_NIF_TERM ATOM_SEND_COMPLETE;
 ERL_NIF_TERM ATOM_SEND_DGRAM_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
-ERL_NIF_TERM ATOM_QUIC_PASSIVE;
+ERL_NIF_TERM ATOM_PASSIVE;
 ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
 ERL_NIF_TERM ATOM_NST_RECEIVED;
 ERL_NIF_TERM ATOM_NST;
@@ -332,11 +332,13 @@ ERL_NIF_TERM ATOM_IS_PEER_ACKED;
 ERL_NIF_TERM ATOM_IS_APP_CLOSING;
 ERL_NIF_TERM ATOM_BIDI_STREAMS;
 ERL_NIF_TERM ATOM_UNIDI_STREAMS;
-
 ERL_NIF_TERM ATOM_STATUS;
 ERL_NIF_TERM ATOM_STREAM_ID;
 ERL_NIF_TERM ATOM_IS_PEER_ACCEPTED;
 ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
+ERL_NIF_TERM ATOM_ABS_OFFSET;
+ERL_NIF_TERM ATOM_LEN;
+ERL_NIF_TERM ATOM_FLAGS;
 ERL_NIF_TERM ATOM_UNDEFINED;
 
 // Mirror 'status' in msquic_linux.h
@@ -371,7 +373,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_NOT_OWNER, not_owner);                                            \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
-  ATOM(ATOM_ERROR_CONTINUE, contiune);                                        \
+  ATOM(ATOM_ERROR_CONTINUE, continue);                                        \
   ATOM(ATOM_ERROR_NOT_READY, not_ready);                                      \
   ATOM(ATOM_ERROR_NOT_ENOUGH_MEMORY, not_enough_mem);                         \
   ATOM(ATOM_ERROR_INVALID_STATE, invalid_state);                              \
@@ -600,7 +602,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_SEND_DGRAM_COMPLETE, send_dgram_completed);                       \
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \
-  ATOM(ATOM_QUIC_PASSIVE, quic_passive);                                      \
+  ATOM(ATOM_PASSIVE, passive);                                                \
   ATOM(ATOM_QUIC_EVENT_MASK, quic_event_mask);                                \
   ATOM(ATOM_NST_RECEIVED, nst_received);                                      \
   ATOM(ATOM_NST, nst);                                                        \
@@ -639,6 +641,9 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_STREAM_ID, stream_id)                                             \
   ATOM(ATOM_IS_PEER_ACCEPTED, is_peer_accepted)                               \
   ATOM(ATOM_IS_CONN_SHUTDOWN, is_conn_shutdown)                               \
+  ATOM(ATOM_ABS_OFFSET, absolute_offset)                                      \
+  ATOM(ATOM_LEN, len)                                                         \
+  ATOM(ATOM_FLAGS, flags)                                                     \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;

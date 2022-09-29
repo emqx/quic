@@ -545,7 +545,7 @@ do_recv(Stream, Count) ->
       %% Data is not ready yet but last call has been reg.
       receive
         %% @todo recv_mark
-        {quic, Stream, continue} ->
+        {quic, continue, Stream, undefined} ->
           recv(Stream, Count)
       end;
     {ok, Bin} ->

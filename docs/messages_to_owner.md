@@ -47,9 +47,9 @@ The stream initiated locally is started regardless of success/fail or sync/async
 Data received in binary format
 
 ```erlang
-{quic, binary(), stream_handler(), #{abs_offset := integer(), 
+{quic, binary(), stream_handler(), #{absolute_offset := integer(), 
                                      len := integer(), 
-                                     flag := integer()} }
+                                     flags := integer()} }
 ```
 
 ### 'send_complete'
