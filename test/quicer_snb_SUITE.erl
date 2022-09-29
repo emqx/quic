@@ -879,14 +879,17 @@ tc_conn_no_gc_2(Config) ->
                  _Child = spawn_link(fun() ->
                                          {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-                                         Parent ! {PRef, Conn, Stm},
+                                         {ok, ConnRid} = quicer:get_conn_rid(Conn),
+                                         Parent ! {PRef, Conn, ConnRid, Stm},
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
-                 {ClientConn, _ClientStream} = receive
-                                {PRef, C, S} -> {C, S}
-                              end,
+                 {ClientConn, CRid, _ClientStream} =
+                   receive
+                     %% Get ConnRid from client for Matches exact shutdown complete event
+                     {PRef, C, ConnRid, S} -> {C, ConnRid, S}
+                   end,
                  %% Server Process
                  {ok, #{resource_id := _SRid}}
                    = ?block_until(#{ ?snk_kind := debug
@@ -901,6 +904,7 @@ tc_conn_no_gc_2(Config) ->
                                    , context := "callback"
                                    , function := "ClientConnectionCallback"
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , resource_id := CRid
                                    , tag := "event" },
                                   5000, 1000),
                  %% Give it time for GC of `Conn' that caused by dead client process.
