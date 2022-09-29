@@ -295,7 +295,7 @@ accept(LSock, Opts, Timeout) ->
   % non-blocking
   {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
   receive
-    {quic, new_conn, C} ->
+    {quic, new_conn, C, _Props} ->
       {ok, C};
     {quic, connected, C, _} ->
       {ok, C}

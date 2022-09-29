@@ -18,7 +18,7 @@
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
 -export([ init/1
-        , new_conn/2
+        , new_conn/3
         , resumed/3
         , new_stream/3
         , connected/2
@@ -42,7 +42,7 @@ init(ConnOpts) when is_map(ConnOpts) ->
 closed(_Conn, #{} = _Flags, S)->
     S.
 
-new_conn(Conn, #{stream_opts := SOpts} = S) ->
+new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
     %% @TODO configurable behavior of spawing stream acceptor
     case quicer_stream:start_link(Conn, SOpts) of
         {ok, Pid} ->

@@ -339,6 +339,13 @@ ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
 ERL_NIF_TERM ATOM_ABS_OFFSET;
 ERL_NIF_TERM ATOM_LEN;
 ERL_NIF_TERM ATOM_FLAGS;
+
+ERL_NIF_TERM ATOM_VER;
+ERL_NIF_TERM ATOM_LOCAL_ADDR;
+ERL_NIF_TERM ATOM_REMOTE_ADDR;
+ERL_NIF_TERM ATOM_SERVER_NAME;
+ERL_NIF_TERM ATOM_CLIENT_ALPNS;
+ERL_NIF_TERM ATOM_CRYPTO_BUFFER;
 ERL_NIF_TERM ATOM_UNDEFINED;
 
 // Mirror 'status' in msquic_linux.h
@@ -644,6 +651,12 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_ABS_OFFSET, absolute_offset)                                      \
   ATOM(ATOM_LEN, len)                                                         \
   ATOM(ATOM_FLAGS, flags)                                                     \
+  ATOM(ATOM_VER, version)                                                     \
+  ATOM(ATOM_LOCAL_ADDR, local_addr)                                           \
+  ATOM(ATOM_REMOTE_ADDR, remote_addr)                                         \
+  ATOM(ATOM_SERVER_NAME, server_name)                                         \
+  ATOM(ATOM_CLIENT_ALPNS, client_alpns)                                       \
+  ATOM(ATOM_CRYPTO_BUFFER, crypto_buffer)                                     \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;

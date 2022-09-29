@@ -326,6 +326,13 @@ extern ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_ABS_OFFSET;
 extern ERL_NIF_TERM ATOM_LEN;
 extern ERL_NIF_TERM ATOM_FLAGS;
+extern ERL_NIF_TERM ATOM_VER;
+extern ERL_NIF_TERM ATOM_LOCAL_ADDR;
+extern ERL_NIF_TERM ATOM_REMOTE_ADDR;
+extern ERL_NIF_TERM ATOM_SERVER_NAME;
+extern ERL_NIF_TERM ATOM_CLIENT_ALPNS;
+extern ERL_NIF_TERM ATOM_CRYPTO_BUFFER;
+
 extern ERL_NIF_TERM ATOM_UNDEFINED;
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */

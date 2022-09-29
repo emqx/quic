@@ -281,13 +281,13 @@ The NST could be used by Client for 0-RTT handshake with connection opt '{nst, T
 ### New incoming connection
 
 ``` erlang
-{quic, new_conn, connection_handler(), ConnecionInfo :: #{ ver := integer()
+{quic, new_conn, connection_handler(), ConnecionInfo :: #{ version      := integer()
                                                          , local_addr   := string()
                                                          , remote_addr  := string()
-                                                         , server_name  := string()
-                                                         , alpns        := [atom()]
-                                                         , client_alpns := [atom()]
-                                                         , crypto_buff  := binary()
+                                                         , server_name  := binary()
+                                                         , alpns        := binary()
+                                                         , client_alpns := binary()
+                                                         , crypto_buffer:= binary()
                                                          }}
 ```
 

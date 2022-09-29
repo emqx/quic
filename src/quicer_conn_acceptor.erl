@@ -30,7 +30,7 @@
 %%      a. Reject (close) the connection
 %%      b. Continue handshake,
 %%      c. Spawn stream acceptors and continue with handshake. (accept new stream call could be sync/async)
--callback new_conn(connection_handler(), _OldState) -> {ok, _NewState} | {error, term()}.
+-callback new_conn(connection_handler(), Props::map(), _OldState) -> {ok, _NewState} | {error, term()}.
 %% ====================================================================================================
 
 %% ====================================================================================================
@@ -271,12 +271,12 @@ handle_cast(_Request, State) ->
           {noreply, NewState :: term(), Timeout :: timeout()} |
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: normal | term(), NewState :: term()}.
-handle_info({quic, new_conn, C},
+handle_info({quic, new_conn, C, Props},
             #state{callback = M, sup = Sup, callback_state = CBState} = State) ->
-    ?tp(quic_new_conn, #{module=>?MODULE, conn=>C}),
+    ?tp(quic_new_conn, #{module=>?MODULE, conn=>C, props=>Props}),
     %% I become the connection owner, I should start an new acceptor.
     supervisor:start_child(Sup, [Sup]),
-    {ok, NewCBState} = M:new_conn(C, CBState),
+    {ok, NewCBState} = M:new_conn(C, Props, CBState),
     {noreply, State#state{conn = C, callback_state = NewCBState} };
 
 handle_info({quic, connection_resumed, C, ResumeData},

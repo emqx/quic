@@ -82,13 +82,75 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                            &value);
         }
 
-      if (!enif_send(NULL,
-                     &(c_ctx->owner->Pid),
-                     NULL,
-                     enif_make_tuple3(env,
-                                      ATOM_QUIC,
-                                      ATOM_NEW_CONN,
-                                      enif_make_resource(env, c_ctx))))
+      // @TODO check ret values of  memcpy and addr to string...
+      QUIC_ADDR_STR addrStr_local = { 0 };
+      QuicAddrToString(Event->NEW_CONNECTION.Info->LocalAddress,
+                       &addrStr_local);
+      QUIC_ADDR_STR addrStr_remote = { 0 };
+      QuicAddrToString(Event->NEW_CONNECTION.Info->RemoteAddress,
+                       &addrStr_remote);
+
+      ERL_NIF_TERM eserver_name;
+      memcpy(enif_make_new_binary(env,
+                                  Event->NEW_CONNECTION.Info->ServerNameLength,
+                                  &eserver_name),
+             Event->NEW_CONNECTION.Info->ServerName,
+             Event->NEW_CONNECTION.Info->ServerNameLength);
+
+      ERL_NIF_TERM ealpns;
+      memcpy(
+          enif_make_new_binary(
+              env, Event->NEW_CONNECTION.Info->NegotiatedAlpnLength, &ealpns),
+          Event->NEW_CONNECTION.Info->NegotiatedAlpn,
+          Event->NEW_CONNECTION.Info->NegotiatedAlpnLength);
+
+      ERL_NIF_TERM eclient_alpns;
+      memcpy(enif_make_new_binary(
+                 env,
+                 Event->NEW_CONNECTION.Info->ClientAlpnListLength,
+                 &eclient_alpns),
+             Event->NEW_CONNECTION.Info->ClientAlpnList,
+             Event->NEW_CONNECTION.Info->ClientAlpnListLength);
+
+      ERL_NIF_TERM ecrypto_buffer;
+      memcpy(
+          enif_make_new_binary(env,
+                               Event->NEW_CONNECTION.Info->CryptoBufferLength,
+                               &ecrypto_buffer),
+          Event->NEW_CONNECTION.Info->CryptoBuffer,
+          Event->NEW_CONNECTION.Info->CryptoBufferLength);
+
+      ERL_NIF_TERM props_name[] = {
+        ATOM_VER,           // version
+        ATOM_LOCAL_ADDR,    // local addr
+        ATOM_REMOTE_ADDR,   // remote addr
+        ATOM_SERVER_NAME,   // server name
+        ATOM_ALPNS,         // alpns
+        ATOM_CLIENT_ALPNS,  // client alpns
+        ATOM_CRYPTO_BUFFER, // crypto buffer
+      };
+
+      ERL_NIF_TERM props_value[] = {
+        enif_make_uint(env,
+                       Event->NEW_CONNECTION.Info->QuicVersion), // version
+        enif_make_string(
+            env, addrStr_local.Address, ERL_NIF_LATIN1), // local addr
+        enif_make_string(
+            env, addrStr_remote.Address, ERL_NIF_LATIN1), // remote addr //
+        eserver_name,                                     // server name
+        ealpns,                                           // alpns
+        eclient_alpns,                                    // client alpns
+        ecrypto_buffer,                                   // crypto buffer
+      };
+
+      ERL_NIF_TERM report
+          = make_event_with_props(env,
+                                  ATOM_NEW_CONN,
+                                  enif_make_resource(env, c_ctx),
+                                  props_name,
+                                  props_value,
+                                  7);
+      if (!enif_send(NULL, &(c_ctx->owner->Pid), NULL, report))
         {
           Status = QUIC_STATUS_INTERNAL_ERROR;
 
