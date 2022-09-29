@@ -115,6 +115,9 @@
         , tc_stream_start_flag_shutdown_on_fail/1
         , tc_stream_start_flag_indicate_peer_accept_1/1
         , tc_stream_start_flag_indicate_peer_accept_2/1
+
+        , tc_stream_send_with_fin/1
+
         %% insecure, msquic only
         , tc_insecure_traffic/1
 
@@ -1768,6 +1771,42 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
   SPid ! done,
   ensure_server_exit_normal(Ref).
 
+tc_stream_send_with_fin(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
+  {ok, Conn} = quicer:connect("127.0.0.1", Port,
+                              default_conn_opts() ++ [{peer_unidi_stream_count, 1}], 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>, ?QUIC_SEND_FLAG_FIN),
+  receive
+    {quic, <<"ping1">>, Stm0, #{flags := Flag}} ->
+      ct:pal("ping1 recvd with flag ~p ", [Flag]),
+      ?assert(Flag band ?QUIC_RECEIVE_FLAG_FIN > 0)
+  after 1000 ->
+      ct:fail("recv ping1 timeout")
+  end,
+
+  %% Check that stream close isn't caused by conn close.
+  receive
+    {quic, stream_closed, Stm0, #{is_conn_shutdown := IsConn}} ->
+      ?assert(not IsConn)
+  after 1000 ->
+      ct:fail("stream didn't close")
+  end,
+
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
+
 tc_conn_opt_sslkeylogfile(Config) ->
   Port = select_port(),
   TargetFName = "SSLKEYLOGFILE",
@@ -1892,8 +1931,12 @@ echo_server(Owner, Config, Port)->
 
 echo_server_stm_loop(L, Conn, Stms) ->
   receive
-    {quic, Bin, Stm, _} when is_binary(Bin) ->
-      case quicer:send(Stm, Bin) of
+    {quic, Bin, Stm, #{flags := Flag}} when is_binary(Bin) ->
+      SendFlag = case (Flag band ?QUIC_RECEIVE_FLAG_FIN) > 0 of
+                   true -> ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN;
+                   false -> ?QUICER_SEND_FLAG_SYNC
+                 end,
+      case quicer:send(Stm, Bin, SendFlag) of
         {error, stm_send_error, aborted} ->
           ct:pal("echo server: send aborted: ~p ", [Bin]);
         {error, stm_send_error, invalid_state} ->

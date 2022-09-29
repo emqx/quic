@@ -410,7 +410,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eFlags = argv[2];
   ERL_NIF_TERM res = ATOM_OK;
-  uint32_t sendflags;
+  uint32_t sendflags = 0;
 
   if (3 != argc)
     {
@@ -434,9 +434,10 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
       enif_self(env, &send_ctx->caller);
 
-      if ((sendflags & 1UL) > 0)
+      if ((sendflags & QUICER_SEND_FLAGS_SYNC) > 0)
         {
           send_ctx->is_sync = TRUE;
+          sendflags &= ~QUICER_SEND_FLAGS_SYNC;
         }
       else
         {
@@ -477,7 +478,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // confirmed.
   if (QUIC_FAILED(
           Status = MsQuic->StreamSend(
-              Stream, &send_ctx->Buffer, 1, QUIC_SEND_FLAG_NONE, send_ctx)))
+              Stream, &send_ctx->Buffer, 1, sendflags, send_ctx)))
     {
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;

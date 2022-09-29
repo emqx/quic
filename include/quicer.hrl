@@ -108,4 +108,19 @@
 %% QUICER_STREAM_EVENT_MASKS
 -define(QUICER_STREAM_EVENT_MASK_SEND_COMPLETE                      , 16#00000001).
 
+%% QUIC SEND FLAGS
+-define(QUIC_SEND_FLAG_NONE                     , 16#0000).
+-define(QUIC_SEND_FLAG_ALLOW_0_RTT              , 16#0001).   % Allows the use of encrypting with 0-RTT key.
+-define(QUIC_SEND_FLAG_START                    , 16#0002).   % Asynchronously starts the stream with the sent data.
+-define(QUIC_SEND_FLAG_FIN                      , 16#0004).   % Indicates the request is the one last sent on the stream.
+-define(QUIC_SEND_FLAG_DGRAM_PRIORITY           , 16#0008).   % Indicates the datagram is higher priority than others.
+-define(QUIC_SEND_FLAG_DELAY_SEND               , 16#0010).
+%% QUICER SEND FLAG
+-define(QUICER_SEND_FLAG_SYNC                   , 16#1000).
+
+%% QUIC RECV FLAGS
+-define(QUIC_RECEIVE_FLAG_NONE                  , 16#0000).
+-define(QUIC_RECEIVE_FLAG_0_RTT                 , 16#0001).
+-define(QUIC_RECEIVE_FLAG_FIN                   , 16#0002).
+
 -endif. %% QUICER_HRL

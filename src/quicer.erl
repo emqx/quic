@@ -56,7 +56,9 @@
         , async_accept_stream/2
         , start_stream/2
         , send/2
+        , send/3
         , async_send/2
+        , async_send/3
         , recv/2
         , send_dgram/2
         , shutdown_stream/1
@@ -295,7 +297,7 @@ accept(LSock, Opts, Timeout) ->
   % non-blocking
   {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
   receive
-    {quic, new_conn, C, _Props} ->
+    {quic, new_conn, C, _} ->
       {ok, C};
     {quic, connected, C, _} ->
       {ok, C}
@@ -498,7 +500,18 @@ start_stream(Conn, Opts) when is_map(Opts) ->
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 send(Stream, Data) ->
-  case quicer_nif:send(Stream, Data, _IsSync = 1) of
+  send(Stream, Data, ?QUICER_SEND_FLAG_SYNC).
+
+%% @doc Send binary data over stream with send flags
+%% either succeeded or cancelled
+-spec send(stream_handler(), iodata(), non_neg_integer()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, cancelled}                        |
+        {error, badarg | not_enough_mem | closed} |
+        {error, stream_send_error, atom_reason()}.
+send(Stream, Data, Flag) ->
+  %% This is an sync send, set flag ?QUICER_SEND_FLAG_SYNC
+  case quicer_nif:send(Stream, Data, Flag bor ?QUICER_SEND_FLAG_SYNC) of
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
@@ -511,8 +524,19 @@ send(Stream, Data) ->
       E
   end.
 
+%% @doc async variant of {@link send/3}
+%% If QUICER_SEND_FLAG_SYNC is set , the caller should expect to receive
+%% ```{quic, send_completed, Stream, send_complete_flag()}'''
+%% note, check send_complete_flag() to ensure it is delivered or not.
+-spec async_send(stream_handler(), iodata(), non_neg_integer()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, badarg | not_enough_mem | closed} |
+        {error, stream_send_error, atom_reason()}.
+async_send(Stream, Data, Flag) ->
+  quicer_nif:send(Stream, Data, Flag).
+
 %% @doc async variant of {@link send/2}
-%% Caller should expect to receive
+%% Caller should NOT expect to receive
 %% ```{quic, send_completed, Stream, send_complete_flag()}'''
 %% note, check send_complete_flag() to ensure it is delivered or not.
 -spec async_send(stream_handler(), iodata()) ->
@@ -520,7 +544,7 @@ send(Stream, Data) ->
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 async_send(Stream, Data) ->
-  quicer_nif:send(Stream, Data, _IsSync = 0).
+  async_send(Stream, Data, ?QUIC_SEND_FLAG_NONE).
 
 %% @doc Recv Data (Passive mode)
 %% Passive recv data from stream.

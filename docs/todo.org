@@ -21,9 +21,6 @@ with lock protection set/get the callback context.
 
 ** RegistrationShutdown
 API for registrationshutdown, shutdown all connections under registration
-** Stream recv FIN flag
-
-** Stream send flags
 
 ** Unintentional Transport Migration
 
