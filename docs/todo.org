@@ -19,6 +19,9 @@ Load QUIC_CREDENTIAL_CONFIG to configuration
 ** Get/Set Context
 with lock protection set/get the callback context.
 
+** New API: open_send(connection_handler(), Data, Flags)
+Open stream over this connection and send without starting the stream
+
 ** RegistrationShutdown
 API for registrationshutdown, shutdown all connections under registration
 
@@ -31,4 +34,11 @@ API for registrationshutdown, shutdown all connections under registration
 ** NIF Upgrade
 
 * Improvement
-- mask stream available
+
+- send buffering
+
+- event masks
+
+  mask start_complete
+
+- close handle in worker callback ctx to get less scheduler blockings
