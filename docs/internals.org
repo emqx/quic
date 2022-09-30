@@ -377,6 +377,3 @@ In quicer, for best practice, you could use quicer_* modules to manage the liste
 
   Example callback module for handle *server* connections.
 
-- quicer_server_stream_callback
-
-  Example callback module for handle *server* streams.

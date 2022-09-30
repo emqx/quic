@@ -15,7 +15,6 @@
             , quicer_conn_acceptor
             , quicer_conn_acceptor_sup
             , quicer_server_conn_callback
-            , quicer_server_stream_callback
             , quicer_stream
             , quicer_sup
             , quicer_nif]},
