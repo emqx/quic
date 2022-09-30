@@ -21,7 +21,8 @@ limitations under the License.
 #include "quicer_internal.h"
 #include "quicer_nif.h"
 
-typedef enum QUICER_SEND_FLAGS {
+typedef enum QUICER_SEND_FLAGS
+{
   QUICER_SEND_FLAGS_SYNC = 0x1000
 } QUICER_SEND_FLAGS;
 

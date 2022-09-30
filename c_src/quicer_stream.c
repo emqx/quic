@@ -53,6 +53,10 @@ static QUIC_STATUS handle_stream_event_peer_accepted(QuicerStreamCTX *s_ctx,
 static QUIC_STATUS handle_stream_event_send_complete(QuicerStreamCTX *s_ctx,
                                                      QUIC_STREAM_EVENT *Event);
 
+static QUIC_STATUS
+handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
+                                           QUIC_STREAM_EVENT *Event);
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
@@ -118,6 +122,12 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       // we don't use trylock since we are in callback context
       status = handle_stream_event_shutdown_complete(s_ctx, Event);
       is_destroy = TRUE;
+      break;
+
+    case QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE:
+      status = handle_stream_event_send_shutdown_complete(s_ctx, Event);
+      // note, dont set is_destroy to TRUE,
+      // let QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE fly in.
       break;
     default:
       break;
@@ -211,6 +221,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       TP_CB_3(event_ideal_send_buffer_size,
               (uintptr_t)Stream,
               Event->IDEAL_SEND_BUFFER_SIZE.ByteCount);
+      break;
+    case QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE:
+      status = handle_stream_event_send_shutdown_complete(s_ctx, Event);
+      // note, dont set is_destroy to TRUE,
+      // let QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE fly in.
       break;
     default:
       break;
@@ -476,9 +491,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS Status;
   // note, SendBuffer as sendcontext, free the buffer while message is sent
   // confirmed.
-  if (QUIC_FAILED(
-          Status = MsQuic->StreamSend(
-              Stream, &send_ctx->Buffer, 1, sendflags, send_ctx)))
+  if (QUIC_FAILED(Status = MsQuic->StreamSend(
+                      Stream, &send_ctx->Buffer, 1, sendflags, send_ctx)))
     {
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
@@ -947,6 +961,24 @@ handle_stream_event_send_complete(QuicerStreamCTX *s_ctx,
     }
 
   destroy_send_ctx(send_ctx);
+  return QUIC_STATUS_SUCCESS;
+}
+
+static QUIC_STATUS
+handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
+                                           QUIC_STREAM_EVENT *Event)
+{
+  ERL_NIF_TERM report;
+  ErlNifEnv *env = s_ctx->env;
+  assert(QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE == Event->Type);
+  BOOLEAN is_graceful = Event->SEND_SHUTDOWN_COMPLETE.Graceful;
+  TP_CB_3(send_shutdown_complete, (uintptr_t)s_ctx->Stream, is_graceful);
+  assert(env);
+  report = make_event(env,
+                      ATOM_SEND_SHUTDOWN_COMPLETE,
+                      enif_make_copy(env, s_ctx->eHandler),
+                      ATOM_BOOLEAN(is_graceful));
+  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
 

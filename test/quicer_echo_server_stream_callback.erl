@@ -20,6 +20,7 @@
         , handle_stream_data/4
         , shutdown/1
         , peer_send_aborted/3
+        , send_shutdown_complete/3
         ]
        ).
 
@@ -36,6 +37,9 @@ shutdown(Stream) ->
 
 peer_send_aborted(Stream, State, _Reason)->
     quicer:close_stream(Stream),
+    State.
+
+send_shutdown_complete(_Stream, State, _IsGraceful)->
     State.
 
 handle_call(_Stream, _Request, _Opts, _CBState) ->

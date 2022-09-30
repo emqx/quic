@@ -117,6 +117,7 @@
         , tc_stream_start_flag_indicate_peer_accept_2/1
 
         , tc_stream_send_with_fin/1
+        , tc_stream_send_shutdown_complete/1
 
         %% insecure, msquic only
         , tc_insecure_traffic/1
@@ -1673,6 +1674,10 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
              #{status := Reason, stream_id := StreamID}} ->
       ct:fail("Stream ~pstart complete with other reason: ~p", [StreamID, Reason])
   end,
+
+  %% Expect a send_shutdown_complete
+  receive {quic, send_shutdown_complete, Stm, false } -> ok end,
+
   %% We should get a stream closed event since it is rate limited
   receive
     {quic, stream_closed, Stm, #{is_conn_shutdown := false}} -> % not a conn close
@@ -1794,6 +1799,49 @@ tc_stream_send_with_fin(Config) ->
       ?assert(Flag band ?QUIC_RECEIVE_FLAG_FIN > 0)
   after 1000 ->
       ct:fail("recv ping1 timeout")
+  end,
+
+  %% Check that stream close isn't caused by conn close.
+  receive
+    {quic, stream_closed, Stm0, #{is_conn_shutdown := IsConn}} ->
+      ?assert(not IsConn)
+  after 1000 ->
+      ct:fail("stream didn't close")
+  end,
+
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
+
+tc_stream_send_shutdown_complete(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
+  {ok, Conn} = quicer:connect("127.0.0.1", Port,
+                              default_conn_opts() ++ [{peer_unidi_stream_count, 1}], 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, true}]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>, ?QUIC_SEND_FLAG_FIN),
+  receive
+    {quic, <<"ping1">>, Stm0, #{flags := Flag}} ->
+      ct:pal("ping1 recvd with flag ~p ", [Flag]),
+      ?assert(Flag band ?QUIC_RECEIVE_FLAG_FIN > 0)
+  after 1000 ->
+      ct:fail("recv ping1 timeout")
+  end,
+
+  quicer:async_shutdown_stream(Stm0, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,0),
+
+  %% Check we shutdown the stream gracefully.
+  receive {quic,send_shutdown_complete, Stm0, IsGraceful} ->
+      ?assert(IsGraceful)
   end,
 
   %% Check that stream close isn't caused by conn close.

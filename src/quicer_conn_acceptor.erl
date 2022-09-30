@@ -449,6 +449,13 @@ handle_info({quic, peer_receive_aborted, Stream, ErrorCode},
     {ok, NewCBState} = M:peer_receive_aborted(Stream, ErrorCode, CBState),
     {noreply, State#state{ callback_state = NewCBState} };
 
+handle_info({quic, send_shutdown_complete, Stream, IsGraceful},
+            #state{callback = M,
+                   callback_state = CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => send_shutdown_complete}),
+    {ok, NewCBState} = M:send_shutdown_complete(Stream, IsGraceful, CBState),
+    {noreply, State#state{ callback_state = NewCBState} };
+
 handle_info({quic, peer_accepted, Stream},
             #state{callback = M,
                    callback_state = CBState} = State) ->

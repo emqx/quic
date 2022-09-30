@@ -236,6 +236,13 @@ handle_info({quic, peer_send_shutdown, Stream, undefined},
     CallbackModule:shutdown(Stream),
     {noreply, State};
 
+handle_info({quic, send_shutdown_complete, Stream, IsGraceful},
+            #state{stream = Stream, opts = Options} = State) ->
+    ?tp(peer_shutdown, #{module=>?MODULE, stream=>Stream}),
+    #{stream_callback := CallbackModule} = Options,
+    NewState = CallbackModule:send_shutdown_complete(Stream, State, IsGraceful),
+    {noreply, NewState};
+
 handle_info({quic, stream_closed, Stream, _Flags}, #state{stream = Stream} = State) ->
     %% @todo
     {stop, normal, State}.
