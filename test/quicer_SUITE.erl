@@ -51,6 +51,9 @@
 
         , tc_conn_basic/1
         , tc_conn_basic_slow_start/1
+        , tc_conn_basic_verify_peer/1
+        , tc_conn_basic_verify_peer_no_cacert/1
+
         , tc_conn_timeout/1
         , tc_async_conn_timeout/1
         , tc_conn_double_close/1
@@ -423,6 +426,35 @@ tc_conn_basic_slow_start(Config)->
   after 1000 ->
       ct:fail("timeout")
   end.
+
+tc_conn_basic_verify_peer(Config)->
+  {ok, Conn} = quicer:connect("google.com", 443,
+                              [ {verify, verify_peer}
+                              , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+                              , {peer_unidi_stream_count, 3}
+                              , {alpn, ["h3"]}], 5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  ok = quicer:close_connection(Conn),
+  ok.
+
+tc_conn_basic_verify_peer_no_cacert(Config)->
+  %% Verify that the connection handshake should fail if
+  %% `verif_peer` is set but CA is unknown
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_slow_conn_server(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+
+  %% error state should be updated in msquic
+  {error, transport_down, {unknown_quic_status, 200000304}} =
+     quicer:connect("localhost", Port,
+                    [ {verify, verify_peer}
+                    , {peer_unidi_stream_count, 3}
+                    , {alpn, ["sample"]}], 5000),
+   ok.
 
 tc_conn_timeout(Config)->
   Port = select_port(),

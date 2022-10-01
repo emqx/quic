@@ -467,10 +467,10 @@ async_connect3(ErlNifEnv *env,
 
   // convert eoptions to Configuration
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
-      env, &eoptions, &(c_ctx->config_resource->Configuration), true);
+      env, &eoptions, &(c_ctx->config_resource->Configuration));
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
-      res = ERROR_TUPLE_2(ATOM_CONFIG_ERROR);
+      res = ERROR_TUPLE_2(estatus);
       goto Error;
     }
 

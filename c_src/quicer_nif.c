@@ -119,6 +119,7 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_EXPIRED;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_NO_CERT;
 
 // option keys
 ERL_NIF_TERM ATOM_CERT;
@@ -322,6 +323,9 @@ ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 ERL_NIF_TERM ATOM_ALLOW_INSECURE;
+ERL_NIF_TERM ATOM_VERIFY;
+ERL_NIF_TERM ATOM_VERIFY_NONE;
+ERL_NIF_TERM ATOM_VERIFY_PEER;
 
 /*----------------------------------------------------------*/
 /* Used in messages to the owners */
@@ -442,6 +446,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, atom_quic_status_cert_expired);         \
   ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
        atom_quic_status_cert_untrusted_root);                                 \
+  ATOM(ATOM_QUIC_STATUS_CERT_NO_CERT, atom_quic_status_cert_no_cert);         \
   /*-------------------------------------------------------*/                 \
   /*         msquic  execution profile for reg             */                 \
   /*-------------------------------------------------------*/                 \
@@ -640,6 +645,9 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_SSL_KEYLOGFILE_NAME, sslkeylogfile);                              \
   ATOM(ATOM_ALLOW_INSECURE, allow_insecure);                                  \
   ATOM(ATOM_IS_RESUMED, is_resumed);                                          \
+  ATOM(ATOM_VERIFY, verify);                                                  \
+  ATOM(ATOM_VERIFY_NONE, verify_none);                                        \
+  ATOM(ATOM_VERIFY_PEER, verify_peer);                                        \
   ATOM(ATOM_ALPNS, alpns);                                                    \
   ATOM(ATOM_IS_HANDSHAKE_COMPLETED, is_handshake_completed)                   \
   ATOM(ATOM_IS_PEER_ACKED, is_peer_acked)                                     \
@@ -1113,6 +1121,17 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
     case QUIC_STATUS_STREAM_LIMIT_REACHED:
       eterm = ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
       break;
+    case QUIC_STATUS_CERT_EXPIRED:
+      eterm = QUIC_STATUS_CERT_EXPIRED;
+      break;
+    case QUIC_STATUS_CERT_UNTRUSTED_ROOT:
+      eterm = ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
+      break;
+    /*
+    case ATOM_QUIC_STATUS_CERT_NO_CERT:
+      eterm = ATOM_QUIC_STATUS_CERT_NO_CERT;
+      break;
+    */
     default:
       eterm = enif_make_tuple2(
           env, ATOM_UNKNOWN_STATUS_CODE, ETERM_UINT_64(status));

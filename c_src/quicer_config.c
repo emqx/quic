@@ -192,8 +192,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
 ERL_NIF_TERM
 ClientLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option, // map
-                        HQUIC *Configuration,
-                        bool Unsecure)
+                        HQUIC *Configuration)
 {
   QUIC_SETTINGS Settings = { 0 };
   //
@@ -220,8 +219,34 @@ ClientLoadConfiguration(ErlNifEnv *env,
   CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
-  if (Unsecure)
+
+  ERL_NIF_TERM verify;
+  char cert_path[PATH_MAX + 1] = { 0 };
+  if (enif_get_map_value(env, *option, ATOM_VERIFY, &verify))
     {
+      if (ATOM_VERIFY_PEER == verify)
+        {
+          // verify peer
+          if (get_str_from_map(env, ATOM_CERT, option, cert_path, PATH_MAX + 1)
+              > 0)
+            {
+              QUIC_CERTIFICATE_FILE *CertFile
+                  = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+                      sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
+              CertFile->CertificateFile = cert_path;
+              CredConfig.CertificateFile = CertFile;
+              CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+            }
+        }
+      else if (ATOM_VERIFY_NONE == verify)
+        {
+          // verify none
+          CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+        }
+    }
+  else
+    {
+      // fallback to verify none
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
     }
 
@@ -250,8 +275,8 @@ ClientLoadConfiguration(ErlNifEnv *env,
     }
 
   //
-  // Loads the TLS credential part of the configuration. This is required even
-  // on client side, to indicate if a certificate is required or not.
+  // Loads the TLS credential part of the configuration. This is required
+  // even on client side, to indicate if a certificate is required or not.
   //
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
                                                                &CredConfig)))

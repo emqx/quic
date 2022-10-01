@@ -103,6 +103,7 @@ extern ERL_NIF_TERM ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_EXPIRED;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
+extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_NO_CERT;
 
 // option keys
 extern ERL_NIF_TERM ATOM_CERT;
@@ -309,6 +310,9 @@ extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
+extern ERL_NIF_TERM ATOM_VERIFY;
+extern ERL_NIF_TERM ATOM_VERIFY_NONE;
+extern ERL_NIF_TERM ATOM_VERIFY_PEER;
 
 /*----------------------------------------------------------*/
 /* Used in messages to the owners */
