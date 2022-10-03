@@ -443,13 +443,13 @@ tc_conn_basic_verify_peer_no_cacert(Config)->
   Port = select_port(),
   Owner = self(),
   {SPid, Ref} = spawn_monitor(
-                   fun() ->
-                       simple_slow_conn_server(Owner, Config, Port)
-                   end),
+                  fun() ->
+                      simple_slow_conn_server(Owner, Config, Port)
+                  end),
   receive listener_ready -> ok end,
 
-  %% error state should be updated in msquic
-  {error, transport_down, {unknown_quic_status, 200000304}} =
+  %% ErrorCode is different per platform
+  {error, transport_down, {unknown_quic_status, _ErrorCode}} =
      quicer:connect("localhost", Port,
                     [ {verify, verify_peer}
                     , {peer_unidi_stream_count, 3}
