@@ -143,7 +143,7 @@ passive(_Stream, undefined, S)->
 %%  handoff stream to another proc
 %%  1) change stream owner to new pid
 %%  2) forward all data to new pid
--spec handoff_stream(stream_handler(), pid()) -> ok.
+-spec handoff_stream(stream_handle(), pid()) -> ok.
 handoff_stream(Stream, Owner) ->
     ?tp(debug, #{event=>?FUNCTION_NAME , module=>?MODULE, stream=>Stream, owner => Owner}),
     case quicer:controlling_process(Stream, Owner) of
@@ -155,7 +155,7 @@ handoff_stream(Stream, Owner) ->
 
 %% @doc Forward all erl msgs of the Stream to the Stream Owner
 %% Stream Owner should block for the {owner_handoff, Msg} and then 'flush_done' msg,
--spec forward_stream_msgs(stream_handler(), pid(), list()) -> ok.
+-spec forward_stream_msgs(stream_handle(), pid(), list()) -> ok.
 forward_stream_msgs(Stream, Owner, Acc) ->
     receive
         {quic, Data, Stream, _Props} = Msg when is_binary(Data) ->

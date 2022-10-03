@@ -30,7 +30,7 @@
 -define(SERVER, ?MODULE).
 
 -record(state, { name :: atom()
-               , listener :: quicer:listener_handler()
+               , listener :: quicer:listener_handle()
                , conn_sup :: pid()
                , alpn :: [string()]
                }).

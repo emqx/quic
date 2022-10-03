@@ -550,9 +550,9 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  if (enif_get_map_value(env, eoptions, ATOM_HANDLER, &NST))
+  if (enif_get_map_value(env, eoptions, ATOM_HANDLE, &NST))
     {
-      // Resume connection with Old Connection Handler
+      // Resume connection with Old Connection Handle
       //
       QuicerConnCTX *old_c_ctx = NULL;
       if (!enif_get_resource(env, NST, ctx_connection_t, (void **)&old_c_ctx))
@@ -620,9 +620,9 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
   c_ctx->is_closed = FALSE; // connection started
-  ERL_NIF_TERM eHandler = enif_make_resource(env, c_ctx);
+  ERL_NIF_TERM eHandle = enif_make_resource(env, c_ctx);
 
-  return SUCCESS(eHandler);
+  return SUCCESS(eHandle);
 
 Error:
   // Error exit, it must not be started!
@@ -708,8 +708,8 @@ async_accept2(ErlNifEnv *env,
 
   assert(enif_is_process_alive(env, &(acceptor->Pid)));
 
-  ERL_NIF_TERM listenHandler = enif_make_resource(env, l_ctx);
-  return SUCCESS(listenHandler);
+  ERL_NIF_TERM listenHandle = enif_make_resource(env, l_ctx);
+  return SUCCESS(listenHandle);
 }
 
 ERL_NIF_TERM
@@ -941,7 +941,7 @@ handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
 }
 
 /* handle conn connected event and deliver the message to the conn owner
-   {quic, connected, connection_handler(), #{ is_resumed := boolean()
+   {quic, connected, connection_handle(), #{ is_resumed := boolean()
                                             , alpns = binary() | undefined
                                          }}
 */
@@ -959,7 +959,7 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
   // resource is deallocated.
   enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
 
-  ERL_NIF_TERM ConnHandler = enif_make_resource(c_ctx->env, c_ctx);
+  ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
 
   uint8_t alpn_size = Event->CONNECTED.NegotiatedAlpnLength;
   const uint8_t *alpn_buff = Event->CONNECTED.NegotiatedAlpn;
@@ -981,7 +981,7 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
       = { ATOM_BOOLEAN(Event->CONNECTED.SessionResumed), ealpns };
 
   ERL_NIF_TERM report = make_event_with_props(
-      c_ctx->env, ATOM_CONNECTED, ConnHandler, props_name, props_value, 2);
+      c_ctx->env, ATOM_CONNECTED, ConnHandle, props_name, props_value, 2);
 
   // testing this, just unblock acceptor
   // should pick a 'acceptor' here?
@@ -1107,7 +1107,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   QuicerStreamCTX *s_ctx = init_s_ctx();
   enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
-  s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+  s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
   env = s_ctx->env;
   s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;

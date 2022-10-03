@@ -44,8 +44,8 @@ typedef struct
   ErlNifPid listenerPid;
   ErlNifEnv *env;
   ErlNifMutex *lock;
-  // Listener handler closed flag
-  // false means the handler is invalid
+  // Listener handle closed flag
+  // false means the handle is invalid
   BOOLEAN is_closed;
   BOOLEAN allow_insecure;
   void *reserved1;
@@ -66,8 +66,8 @@ typedef struct QuicerConnCTX
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
-  // Connection handler closed flag
-  // false means the handler is invalid
+  // Connection handle closed flag
+  // false means the handle is invalid
   QUIC_TLS_SECRETS *TlsSecrets;
   QUIC_BUFFER *ResumptionTicket;
   BOOLEAN is_closed;
@@ -92,7 +92,7 @@ typedef struct QuicerStreamCTX
   // imm_env should be freed in ctx destroy fun.
   ErlNifEnv *imm_env;
   // Set once
-  ERL_NIF_TERM eHandler;
+  ERL_NIF_TERM eHandle;
   ErlNifMutex *lock;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;

@@ -30,8 +30,8 @@
              , cb_ret/0
              ]).
 
--type state() :: #{ listener := listener_handler()
-                  , conn := connection_handler()
+-type state() :: #{ listener := listener_handle()
+                  , conn := connection_handle()
                   , callback := atom()
                   , callback_state := term()
                   , sup := undefined | pid()
@@ -40,7 +40,7 @@
                   , is_resumed := boolean()
                   }.
 
--type cb_init_args() :: [ listener_handler() |
+-type cb_init_args() :: [ listener_handle() |
                           [ {listen_opts(), conn_opts(), stream_opts()}
                           | [Supervisor :: undefined | pid() ]]
                         ].
@@ -58,7 +58,7 @@
 -callback init(cb_init_args()) -> {ok, cb_state()} | {error, app_error(), cb_state()}.
 %% Init Callback, after return should expect for recv new connection
 
--callback new_conn(connection_handler(), new_conn_props(), cb_state()) -> cb_ret().
+-callback new_conn(connection_handle(), new_conn_props(), cb_state()) -> cb_ret().
 %% Handle new incoming connection request
 %%  return {ok, cb_state()} to complete handshake
 %%
@@ -69,41 +69,41 @@
 %%   2. Connection maybe rejected in the stack earlier before this Callback.
 %%
 
--callback connected(connection_handler(), connected_props(), cb_state()) -> cb_ret().
+-callback connected(connection_handle(), connected_props(), cb_state()) -> cb_ret().
 %% Handle connection handshake done
 %%      callback is suggested to accept new streams @see quicer:accept_stream/3
 
--callback transport_shutdown(connection_handler(), Reason::atom(), cb_state()) -> cb_ret().
+-callback transport_shutdown(connection_handle(), Reason::atom(), cb_state()) -> cb_ret().
 %% Handle connection shutdown due to transport error with error reason.
 %%
 %% NOTE: Cleanup is prefered to be handled in @see closed/3
 %% @TODO: the Reason is bounded to a few atoms.
 
--callback shutdown(connection_handler(), error_code(), cb_state()) -> cb_ret().
+-callback shutdown(connection_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle connection shutdown initiated by peer
 
--callback closed(connection_handler(), conn_closed_props(), cb_state()) -> cb_ret().
+-callback closed(connection_handle(), conn_closed_props(), cb_state()) -> cb_ret().
 %% Handle connection closed.
 %% We don't have to terminate this process since connection could be resumed.
 
--callback local_address_changed(connection_handler(), quicer_addr(), cb_state()) -> cb_ret().
+-callback local_address_changed(connection_handle(), quicer_addr(), cb_state()) -> cb_ret().
 %% Handle Local Addr Changed, currently not in use.
 
--callback peer_address_changed(connection_handler(), quicer_addr(), cb_state) -> cb_ret().
+-callback peer_address_changed(connection_handle(), quicer_addr(), cb_state) -> cb_ret().
 %% Handle Peer Addr Changed
 
--callback streams_available(connection_handler(), {BidirStreams::non_neg_integer(), UnidirStreams::non_neg_integer()},
+-callback streams_available(connection_handle(), {BidirStreams::non_neg_integer(), UnidirStreams::non_neg_integer()},
                             cb_state()) -> cb_ret().
 %% Handle Stream Available, reflect number of streams flow control at peer.
 
 -callback peer_needs_streams(connection_handle(), undefined, cb_state()) -> cb_ret().
 %% Handle Peer needs streams that peer could not start new stream due to local flow control.
 
--callback resumed(connection_handler(), SessionData:: binary() | false, cb_state()) -> cb_ret().
+-callback resumed(connection_handle(), SessionData:: binary() | false, cb_state()) -> cb_ret().
 %% Handle connection is resumed with 0-RTT
 %% SessionData contains session data was sent in 0-RTT
 
--callback new_stream(connection_handler(), stream_handler(), cb_state()) -> cb_ret().
+-callback new_stream(connection_handle(), stream_handle(), cb_state()) -> cb_ret().
 %% Handle new stream from peer
 %% NOTE: It could be a race cond. that new stream isn't accepted in new process that is created by connection owner.
 %% In this case, handoff should be used to hand over the owership and the message to the new stream owner
@@ -111,33 +111,33 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Stream Callbacks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--callback start_completed(stream_handler(), stream_start_completed_props(), cb_state()) -> cb_ret().
+-callback start_completed(stream_handle(), stream_start_completed_props(), cb_state()) -> cb_ret().
 %% Handle local initiated stream start completed
 
--callback send_complete(stream_handler(), IsCanceled::boolean(), cb_state()) -> cb_ret().
+-callback send_complete(stream_handle(), IsCanceled::boolean(), cb_state()) -> cb_ret().
 %% Handle send completed.
 
--callback peer_send_shutdown(stream_handler(), error_code(), cb_state()) -> cb_ret().
+-callback peer_send_shutdown(stream_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle stream peer_send_shutdown.
 
--callback peer_send_aborted(stream_handler(), error_code(), cb_state()) -> cb_ret().
+-callback peer_send_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle stream peer_send_aborted.
 
--callback peer_receive_aborted(stream_handler(), error_code(), cb_state()) -> cb_ret().
+-callback peer_receive_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle stream peer_receive_aborted
 
--callback send_shutdown_complete(stream_handler(), error_code(), cb_state()) -> cb_ret().
+-callback send_shutdown_complete(stream_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle stream send_shutdown_complete.
 %% Happen immediately on an abortive send or after a graceful send has been acknowledged by the peer.
 
 -callback stream_closed(stream_handle(), stream_closed_props(), cb_state()) -> cb_ret().
 %% Handle stream closed, Both endpoints of sending and receiving of the stream have been shut down.
 
--callback peer_accepted(connection_handler(), stream_handler(), cb_state()) -> cb_ret().
+-callback peer_accepted(connection_handle(), stream_handle(), cb_state()) -> cb_ret().
 %% Handle stream 'peer_accepted'.
 %% The stream which **was not accepted** due to peer flow control is now accepted by the peer.
 
--callback passive(stream_handler(), undefined, cb_state()) -> cb_ret().
+-callback passive(stream_handle(), undefined, cb_state()) -> cb_ret().
 %% Stream now in 'passive' mode.
 
 %% API
@@ -158,7 +158,7 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Listener::quicer:listener_handler(),
+-spec start_link(Listener::quicer:listener_handle(),
                  ConnOpts :: map(), Sup :: pid()) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |

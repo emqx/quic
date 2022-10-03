@@ -126,7 +126,7 @@ ERL_NIF_TERM ATOM_CERT;
 ERL_NIF_TERM ATOM_KEY;
 ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
-ERL_NIF_TERM ATOM_HANDLER;
+ERL_NIF_TERM ATOM_HANDLE;
 
 /*-------------------------------------------------------*/
 /*         msquic  execution profile for registration    */
@@ -596,7 +596,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
-  ATOM(ATOM_HANDLER, handler);                                                \
+  ATOM(ATOM_HANDLE, handle);                                                \
   ATOM(ATOM_CLOSED, closed);                                                  \
   ATOM(ATOM_STREAM_CLOSED, stream_closed);                                    \
   ATOM(ATOM_LISTENER_STOPPED, listener_stopped);                              \

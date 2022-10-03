@@ -19,9 +19,9 @@
 -behaviour(gen_server).
 
 %% API
--export([ %% Start before conn handshake, with only Conn handler
+-export([ %% Start before conn handshake, with only Conn handle
           start_link/2
-          %% Start after conn handshake with new Stream Handler
+          %% Start after conn handshake with new Stream Handle
         , start_link/3
         ]).
 
@@ -32,8 +32,8 @@
 -define(SERVER, ?MODULE).
 -define(post_init, post_init).
 
--record(state, { stream :: quicer:stream_handler()
-               , conn   :: quicer:connection_handler()
+-record(state, { stream :: quicer:stream_handle()
+               , conn   :: quicer:connection_handle()
                , opts :: stream_opts()
                , cbstate :: any()
                , is_owner :: boolean()
@@ -50,7 +50,7 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Conn :: quicer:connection_handler(),
+-spec start_link(Conn :: quicer:connection_handle(),
                  Opts :: map()) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
@@ -58,8 +58,8 @@
 start_link(Conn, Opts) ->
     gen_server:start_link(?MODULE, [Conn, Opts], []).
 
--spec start_link(Stream :: quicer:connection_handler(),
-                 Conn :: quicer:connection_handler(),
+-spec start_link(Stream :: quicer:connection_handle(),
+                 Conn :: quicer:connection_handle(),
                  Opts :: map()) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
@@ -82,7 +82,7 @@ start_link(Stream, Conn, Opts) ->
           {ok, State :: term(), hibernate} |
           {stop, Reason :: term()} |
           ignore.
-%% Before conn handshake, with only Conn handler
+%% Before conn handshake, with only Conn handle
 init([Conn, SOpts]) when is_list(SOpts) ->
     init([Conn, maps:from_list(SOpts)]);
 init([Conn, SOpts]) ->
@@ -90,7 +90,7 @@ init([Conn, SOpts]) ->
     {ok, Conn} = quicer:async_accept_stream(Conn, SOpts),
     {ok, #state{opts = SOpts, conn = Conn, is_owner = true }};
 
-%% After conn handshake, with stream handler
+%% After conn handshake, with stream handle
 init([Stream, Conn, SOpts]) when is_list(SOpts) ->
     ?tp(new_stream_2, #{module=>?MODULE, stream=>Stream}),
     init([Stream, Conn, maps:from_list(SOpts)]);

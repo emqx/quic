@@ -347,8 +347,8 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
-  // Now we have Stream handler
-  s_ctx->eHandler = enif_make_resource(s_ctx->imm_env, s_ctx);
+  // Now we have Stream handle
+  s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
   //
   // Starts the bidirectional stream. By default, the peer is not notified of
@@ -362,7 +362,7 @@ async_start_stream2(ErlNifEnv *env,
     }
 
   s_ctx->is_closed = FALSE;
-  res = enif_make_copy(env, s_ctx->eHandler);
+  res = enif_make_copy(env, s_ctx->eHandle);
 
   return SUCCESS(res);
 
@@ -413,8 +413,8 @@ async_accept_stream2(ErlNifEnv *env,
   acceptor->active = IS_SAME_TERM(active_val, ATOM_TRUE);
 
   AcceptorEnqueue(c_ctx->acceptor_queue, acceptor);
-  ERL_NIF_TERM connectionHandler = enif_make_resource(env, c_ctx);
-  return SUCCESS(connectionHandler);
+  ERL_NIF_TERM connectionHandle = enif_make_resource(env, c_ctx);
+  return SUCCESS(connectionHandle);
 }
 
 ERL_NIF_TERM
@@ -733,7 +733,7 @@ handle_stream_event_recv(HQUIC Stream,
                          s_ctx->env,
                          make_event(env,
                                     ATOM_QUIC_STATUS_CONTINUE,
-                                    enif_make_copy(env, s_ctx->eHandler),
+                                    enif_make_copy(env, s_ctx->eHandle),
                                     ATOM_UNDEFINED)))
             {
               // App down, shutdown stream
@@ -747,7 +747,7 @@ handle_stream_event_recv(HQUIC Stream,
     { // active receive
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 1);
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
-      ERL_NIF_TERM eHandler = enif_make_copy(env, s_ctx->eHandler);
+      ERL_NIF_TERM eHandle = enif_make_copy(env, s_ctx->eHandle);
       ERL_NIF_TERM props_name[] = { ATOM_ABS_OFFSET, ATOM_LEN, ATOM_FLAGS };
       ERL_NIF_TERM props_value[]
           = { enif_make_uint64(env, Event->RECEIVE.AbsoluteOffset),
@@ -756,7 +756,7 @@ handle_stream_event_recv(HQUIC Stream,
       ERL_NIF_TERM report_active
           = make_event_with_props(env,
                                   enif_make_binary(env, &bin),
-                                  eHandler,
+                                  eHandle,
                                   props_name,
                                   props_value,
                                   3);
@@ -786,7 +786,7 @@ handle_stream_event_recv(HQUIC Stream,
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
 
               ERL_NIF_TERM report_passive
-                  = make_event(env, ATOM_PASSIVE, eHandler, ATOM_UNDEFINED);
+                  = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);
 
               if (!enif_send(
                       NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive))
@@ -824,7 +824,7 @@ handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
 
       report = make_event_with_props(env,
                                      ATOM_START_COMPLETE,
-                                     enif_make_copy(env, s_ctx->eHandler),
+                                     enif_make_copy(env, s_ctx->eHandle),
                                      props_name,
                                      props_value,
                                      3);
@@ -844,7 +844,7 @@ handle_stream_event_peer_send_shutdown(
   assert(QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN == Event->Type);
   report = make_event(env,
                       ATOM_PEER_SEND_SHUTDOWN,
-                      enif_make_copy(env, s_ctx->eHandler),
+                      enif_make_copy(env, s_ctx->eHandle),
                       ATOM_UNDEFINED);
 
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
@@ -865,7 +865,7 @@ handle_stream_event_peer_send_aborted(QuicerStreamCTX *s_ctx,
   report
       = make_event(env,
                    ATOM_PEER_SEND_ABORTED,
-                   enif_make_copy(env, s_ctx->eHandler),
+                   enif_make_copy(env, s_ctx->eHandle),
                    enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
@@ -886,7 +886,7 @@ handle_stream_event_peer_receive_aborted(QuicerStreamCTX *s_ctx,
   report = make_event(
       env,
       ATOM_PEER_RECEIVE_ABORTED,
-      enif_make_copy(env, s_ctx->eHandler),
+      enif_make_copy(env, s_ctx->eHandle),
       enif_make_uint64(env, Event->PEER_RECEIVE_ABORTED.ErrorCode));
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
@@ -909,7 +909,7 @@ handle_stream_event_shutdown_complete(QuicerStreamCTX *s_ctx,
           ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.AppCloseInProgress) };
   report = make_event_with_props(env,
                                  ATOM_STREAM_CLOSED,
-                                 enif_make_copy(env, s_ctx->eHandler),
+                                 enif_make_copy(env, s_ctx->eHandle),
                                  props_name,
                                  props_value,
                                  2);
@@ -928,7 +928,7 @@ handle_stream_event_peer_accepted(QuicerStreamCTX *s_ctx,
   assert(env);
   report = make_event(env,
                       ATOM_PEER_ACCEPTED,
-                      enif_make_copy(env, s_ctx->eHandler),
+                      enif_make_copy(env, s_ctx->eHandle),
                       ATOM_UNDEFINED);
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
@@ -953,7 +953,7 @@ handle_stream_event_send_complete(QuicerStreamCTX *s_ctx,
     {
       report = make_event(env,
                           ATOM_SEND_COMPLETE,
-                          enif_make_copy(env, s_ctx->eHandler),
+                          enif_make_copy(env, s_ctx->eHandle),
                           ATOM_BOOLEAN(Event->SEND_COMPLETE.Canceled));
 
       // note, report to caller instead of stream owner
@@ -976,7 +976,7 @@ handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
   assert(env);
   report = make_event(env,
                       ATOM_SEND_SHUTDOWN_COMPLETE,
-                      enif_make_copy(env, s_ctx->eHandler),
+                      enif_make_copy(env, s_ctx->eHandle),
                       ATOM_BOOLEAN(is_graceful));
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;

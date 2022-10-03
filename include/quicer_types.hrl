@@ -22,7 +22,7 @@
 -define(BIT(Bits), (1 bsl (Bits))).
 -define(MASK(Bits), (?BIT(Bits) - 1)).
 
--export_type([handler/0]).
+-export_type([handle/0]).
 
 %% Msquic Status Code Translation
 -type atom_reason() ::
@@ -53,20 +53,20 @@
 -type app_errno() :: non_neg_integer().
 -type hostname() :: string().
 
--type listener_handler()   :: reference().
--type connection_handler() :: reference().
--type stream_handler()     :: reference().
--type conf_handler()       :: reference().
--type reg_handler()        :: reference().
--type global_handler()     :: quic_global.
+-type listener_handle()   :: reference().
+-type connection_handle() :: reference().
+-type stream_handle()     :: reference().
+-type conf_handle()       :: reference().
+-type reg_handle()        :: reference().
+-type global_handle()     :: quic_global.
 
--type handler() ::
-        global_handler()     |
-        listener_handler()   |
-        connection_handler() |
-        stream_handler()     |
-        conf_handler()       |
-        reg_handler().
+-type handle() ::
+        global_handle()     |
+        listener_handle()   |
+        connection_handle() |
+        stream_handle()     |
+        conf_handle()       |
+        reg_handle().
 
 -type listen_on() :: inet:port_number() | string().
 -type listen_opts() :: listen_security_opts() | quic_settings().
@@ -166,7 +166,7 @@
         optname_configuration() |
         optname_tls().
                                                               %% | GET | SET|
--type optname_conn() ::   %% with connection_handler()
+-type optname_conn() ::   %% with connection_handle()
         %% /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */|
         param_conn_quic_version                   |           %% |  X  |    |
         param_conn_local_address                  |           %% |  X  |    | @TODO
@@ -188,7 +188,7 @@
         param_conn_peer_certificate_valid         |           %% |     |  X | @TODO
         param_conn_local_interface.                           %% |     |  X | @TODO
 
--type optname_tls()   ::  %% with connection_handler()
+-type optname_tls()   ::  %% with connection_handle()
         param_tls_schannel_context_attribute_w    |           %% |  X  |    | @TODO
         param_tls_handshake_info                  |           %% |  X  |  X | @TODO
         param_tls_negotiated_alpn.                            %% |  X  |    | @TODO
@@ -201,7 +201,7 @@
         param_stream_ideal_send_buffer_size       |           %% |  X  |    | @TODO
         param_stream_priority.                                %% |     |    |
 
--type optname_global() ::                                     %% with `undefined' handler
+-type optname_global() ::                                     %% with `undefined' handle
         param_global_retry_memory_percent |                   %% |  X  | X  | @TODO
         param_global_supported_versions   |                   %% |  X  |    | @TODO
         param_global_load_balacing_mode   |                   %% |  X  | X  | @TODO
@@ -211,7 +211,7 @@
 
 -type optname_reg() :: param_registration_cid_prefix.         %% |  X  | X  | @TODO
 
--type optname_configuration() ::                              %% with config_handler()
+-type optname_configuration() ::                              %% with config_handle()
         param_configuration_settings        |                 %% |  X  | X  | @TODO
         param_configuration_ticket_keys.                      %% |     | X  | @TODO
 

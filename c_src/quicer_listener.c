@@ -60,7 +60,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           Status = QUIC_STATUS_UNREACHABLE;
           // We are going to reject the connection,
           // we will not be the owner this connection
-          // msquic will close the Connection Handler internally.
+          // msquic will close the Connection Handle internally.
           // Set it to NULL to avoid close it in resource_conn_dealloc_callback
           c_ctx->Connection = NULL;
 
@@ -156,7 +156,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
           // We are going to reject the connection,
           // we will not be the owner this connection
-          // msquic will close the Connection Handler internally.
+          // msquic will close the Connection Handle internally.
           // Set it to NULL to avoid close it in resource_conn_dealloc_callback
           c_ctx->Connection = NULL;
 
@@ -185,7 +185,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       // Close listener in NIF CTX leads to NULL Listener HQUIC
       assert(l_ctx->Listener == NULL);
 
-      // Dummy call to prevent leakage if handler is not NULL
+      // Dummy call to prevent leakage if handle is not NULL
       // @TODO they should be removed when we support ListenerStop call
       MsQuic->ListenerClose(l_ctx->Listener);
       l_ctx->Listener = NULL;
@@ -366,8 +366,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
-  ERL_NIF_TERM listenHandler = enif_make_resource(env, l_ctx);
-  return OK_TUPLE_2(listenHandler);
+  ERL_NIF_TERM listenHandle = enif_make_resource(env, l_ctx);
+  return OK_TUPLE_2(listenHandle);
 }
 
 ERL_NIF_TERM

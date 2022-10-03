@@ -34,7 +34,7 @@
 %% Starts the supervisor
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(ListenerH :: quicer:listener_handler(),
+-spec start_link(ListenerH :: quicer:listener_handle(),
                  ConnOpts::map()) -> {ok, Pid :: pid()} |
           {error, {already_started, Pid :: pid()}} |
           {error, {shutdown, term()}} |
