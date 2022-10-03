@@ -1307,14 +1307,18 @@ tc_setopt_conn_local_addr(Config) ->
   {ok, OldAddr} = quicer:sockname(Conn),
   %% change local addr with a new random port (0)
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
-  %% sleep is needed to finish migration at protocol level
-  timer:sleep(100),
   {ok, NewAddr} = quicer:sockname(Conn),
   ?assertNotEqual(OldAddr, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, NewAddr),
   ?assertNotEqual({ok, {{127,0,0,1}, 50600}}, OldAddr),
   %% change local addr with a new port 5060
   ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
+  receive
+    {quic, peer_address_changed, Conn, NewPeerAddr} ->
+      ct:pal("new peer addr: ~p", [NewPeerAddr])
+    after 1000 ->
+      ct:fail("timeout wait for peer_address_changed")
+  end,
   %% sleep is needed to finish migration at protocol level
   retry_with(fun() ->
                  timer:sleep(100),
@@ -1594,7 +1598,8 @@ tc_stream_open_flag_unidirectional(Config) ->
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   receive
     {quic, <<"ping1">>, Stm,  _} -> ct:fail("unidirectional stream should not receive any");
-    {quic, stream_closed, Stm, #{is_conn_shutdown := true}} -> ct:pal("stream is closed due to connecion idle")
+    {quic, stream_closed, Stm, #{is_conn_shutdown := true, is_app_closing := false}}
+    -> ct:pal("stream is closed due to connecion idle")
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
@@ -1642,7 +1647,6 @@ tc_stream_start_flag_fail_blocked(Config) ->
   end,
   ?assert(is_integer(Rid)),
   ?assert(Rid =/= 0).
-
 
 tc_stream_start_flag_immediate(Config) ->
   Port = select_port(),

@@ -203,7 +203,7 @@ Or use quicer:recv/2 to receive in passive mode
 
 ``` erlang
 {quic, connected, connection_handler(), #{ is_resumed := boolean()
-                                         , alpns = string() | undefined
+                                         , alpns := string() | undefined
                                          }}
 ```
 
@@ -330,7 +330,7 @@ set in connection opt `quic_event_mask` when client starts the connection.
 {quic, nst_received, connection_handler(), Ticket::binary()}
 ```
 
-The `NST`` could be used by Client for 0-RTT handshake with a connection opt 
+The `NST` could be used by Client for 0-RTT handshake with a connection opt 
 ```erlang
 {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST}], 5000),
 ```
@@ -374,6 +374,5 @@ To complete the TLS handshake, quicer:handshake/1,2 should be called.
 This message is sent to the listener owner process, indicating the listener
 is stopped and closed. 
 
-`is_app_closing`: handle is closed in the stack and in quicer we should never it as `true`
+`is_app_closing`: handle is closed in the stack and in quicer we should never get _true_
 because quicer close handle in resource dtor.
-

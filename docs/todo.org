@@ -5,6 +5,9 @@
 * Features List
 
 Feature todo list, priority descending
+
+** Notify acceptors when listener/connecion is closed.
+
 ** Impl ConfigurationLoadCredential
 Load QUIC_CREDENTIAL_CONFIG to configuration
 
@@ -42,3 +45,9 @@ API for registrationshutdown, shutdown all connections under registration
   mask start_complete
 
 - close handle in worker callback ctx to get less scheduler blockings
+
+- 0-RTT NST
+
+  stateful and stateless.
+
+- make sending NST configurable

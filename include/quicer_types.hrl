@@ -251,4 +251,35 @@
         quic_execution_profile_type_scavenger |
         quic_execution_profile_type_realtime.
 
+%% Connection Event Props
+-type new_conn_props() :: #{ version      := integer()
+                           , local_addr   := string()
+                           , remote_addr  := string()
+                           , server_name  := binary()
+                           , alpns        := binary()
+                           , client_alpns := binary()
+                           , crypto_buffer:= binary()
+                           }.
+
+-type connected_props() :: #{ is_resumed := boolean()
+                            , alpns := string() | undefined
+                            }.
+
+-type conn_closed_props() :: map().
+
+%% Stream Event Props
+-type stream_start_completed_props() :: map().
+-type stream_closed_props() :: map().
+
+%% @doc QUIC Application error code, not protocol error code.
+%% The app error code will be passed to the peer while shutdown the connection.
+%% 0 means no error
+-type app_error() :: non_neg_integer().
+
+
+-type error_code() :: non_neg_integer().
+
+%% @doc addr in quicer, IP and Port
+-type quicer_addr() :: string().
+
 -endif. %% QUICER_TYPES_HRL

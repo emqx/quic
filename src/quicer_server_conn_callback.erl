@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2020 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2020-2022 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -17,19 +17,34 @@
 -behavior(quicer_conn_acceptor).
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
--export([ init/1
-        , new_conn/3
+
+%% Callback init
+-export([ init/1 ]).
+
+%% Connection Callbacks
+-export([ new_conn/3
+        , connected/3
+        , transport_shutdown/3
+        , shutdown/3
+        , closed/3
+        , local_address_changed/3
+        , peer_address_changed/3
+        , streams_available/3
+        , peer_needs_streams/3
         , resumed/3
         , new_stream/3
-        , connected/2
-        , shutdown/3
-        , transport_shutdown/3
-        , peer_address_changed/3
-        , local_address_changed/3
-        , streams_available/4
-        , peer_needs_streams/2
-        , stream_closed/4
-        , closed/3
+        ]).
+
+%% Stream Callbacks
+-export([ start_completed/3
+        , send_complete/3
+        , peer_send_shutdown/3
+        , peer_send_aborted/3
+        , peer_receive_aborted/3
+        , send_shutdown_complete/3
+        , stream_closed/3
+        , peer_accepted/3
+        , passive/3
         ]).
 
 init(ConnOpts) when is_list(ConnOpts) ->
@@ -37,17 +52,18 @@ init(ConnOpts) when is_list(ConnOpts) ->
 init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
     init(S#{stream_opts := maps:from_list(SOpts)});
 init(ConnOpts) when is_map(ConnOpts) ->
-    ConnOpts.
+    {ok, ConnOpts}.
 
 closed(_Conn, #{} = _Flags, S)->
-    S.
+    {ok, S}.
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
-    %% @TODO configurable behavior of spawing stream acceptor
+    %% @TODO configurable behavior of spawning stream acceptor
     case quicer_stream:start_link(Conn, SOpts) of
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
-            {ok, S#{streams => [{Pid, undefined}]}};
+            {ok, S#{ conn => Conn
+                   , streams => [{Pid, undefined}]}};
         {error, _} = Error ->
             Error
     end.
@@ -58,15 +74,8 @@ resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
 resumed(_Conn, _Data, S) ->
     {ok, S}.
 
-connected(Conn, #{slow_start := false, stream_opts := SOpts} = S) ->
-    %% @TODO configurable behavior of spawing stream acceptor
-    quicer_stream:start_link(Conn, SOpts),
-    {ok, S#{conn => Conn}};
-connected(Conn, S) ->
-    {ok, S#{conn => Conn}}.
-
 %% handles stream when there is no stream acceptors.
-new_stream(Conn, Stream, #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
+new_stream(Stream, _Flags, #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
     %% spawn new stream
     case quicer_stream:start_link(Stream, Conn, SOpts) of
         {ok, StreamOwner} ->
@@ -89,15 +98,45 @@ peer_address_changed(_C, _NewAddr, S) ->
 local_address_changed(_C, _NewAddr, S) ->
     {ok, S}.
 
-streams_available(_C, _BidirCnt, _UnidirCnt, S) ->
+streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
     {ok, S}.
 
-peer_needs_streams(_C, S) ->
+peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
 
-stream_closed(_Connecion, _Stream, _Flags, S) ->
+stream_closed(_Stream, _Flags, S) ->
     {ok, S}.
 
+connected(Conn, _Flags, #{slow_start := false, stream_opts := SOpts} = S) ->
+    %% @TODO configurable behavior of spawing stream acceptor
+    quicer_stream:start_link(Conn, SOpts),
+    {ok, S#{conn => Conn}};
+connected(_Connecion, _Flags, S) ->
+    {ok, S}.
+
+peer_accepted(_Stream, _Flags, S) ->
+    {ok, S}.
+
+peer_receive_aborted(_Stream, _Flags, S) ->
+    {ok, S}.
+
+peer_send_aborted(_Stream, _Flags, S) ->
+    {ok, S}.
+
+peer_send_shutdown(_Stream, _Flags, S) ->
+    {ok, S}.
+
+send_complete(_Stream, _Flags, S) ->
+    {ok, S}.
+
+send_shutdown_complete(_Stream, _Flags, S) ->
+    {ok, S}.
+
+start_completed(_Stream, _Flags, S) ->
+    {ok, S}.
+
+passive(_Stream, undefined, S)->
+    {ok, S}.
 
 %% Internals
 %% @doc
@@ -116,7 +155,6 @@ handoff_stream(Stream, Owner) ->
 
 %% @doc Forward all erl msgs of the Stream to the Stream Owner
 %% Stream Owner should block for the {owner_handoff, Msg} and then 'flush_done' msg,
-%% -spec forward_stream_msgs(stream_handler(), pid()) -> ok.
 -spec forward_stream_msgs(stream_handler(), pid(), list()) -> ok.
 forward_stream_msgs(Stream, Owner, Acc) ->
     receive
