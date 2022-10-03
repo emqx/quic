@@ -704,11 +704,8 @@ sockname(Conn) ->
 
 %% @doc Get connection/stream/listener opts
 %% mimic {@link ssl:getopts/2}
--spec getopt(Handle::connection_handler()
-                   | stream_handler()
-                   | listener_handler(),
-             optname()) ->
-        {ok, OptVal::any()} | {error, any()}.
+-spec getopt(Handle::handler(), optname()) ->
+        {ok, OptVal::any()} | {error, any() | not_found}.
 getopt(Handle, Opt) ->
   quicer_nif:getopt(Handle, Opt, false).
 
@@ -716,7 +713,7 @@ getopt(Handle, Opt) ->
 %% mimic {@link ssl:getopt/2}
 -spec getopt(handler(), optname(), optlevel()) ->
         not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
-        {ok, conn_settings()}   | %% when optname = param_conn_settings
+        {ok, [any()]}   | %% when optname = param_conn_settings
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 getopt(Handle, Opt, Optlevel) ->
@@ -737,7 +734,7 @@ setopt(Handle, Opt, Value) ->
 
 %% @doc get stream id with stream handler
 -spec get_stream_id(Stream::stream_handler()) ->
-        {ok, integer()} | {error, any()}.
+        {ok, integer()} | {error, any()} | not_found.
 get_stream_id(Stream) ->
   quicer_nif:getopt(Stream, param_stream_id, false).
 

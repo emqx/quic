@@ -22,6 +22,8 @@
 -define(BIT(Bits), (1 bsl (Bits))).
 -define(MASK(Bits), (?BIT(Bits) - 1)).
 
+-export_type([handler/0]).
+
 %% Msquic Status Code Translation
 -type atom_reason() ::
         success             |

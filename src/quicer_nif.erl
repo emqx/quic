@@ -183,7 +183,7 @@ sockname(_Conn) ->
 
 -spec getopt(handler(), optname(), optlevel()) ->
         not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
-        {ok, conn_settings()}   | %% when optname = param_conn_settings
+        {ok, any()}   | %% when optname = param_conn_settings
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 
