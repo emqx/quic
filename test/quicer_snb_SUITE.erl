@@ -326,9 +326,9 @@ tc_stream_owner_down(Config) ->
                                               , tag := "event"
                                               , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
                                               },
-                                             #{ ?snk_kind := peer_send_aborted
-                                              , module := quicer_stream
-                                              , reason := 0
+                                             #{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , error_code := 0
                                               },
                                              Trace))
                      end),
@@ -571,9 +571,9 @@ tc_stream_close_errno(Config) ->
                                 function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
                                 tag := "event"}, 1000, 1000),
                  {ok, _} = ?block_until(
-                              #{?snk_kind := peer_send_aborted
-                               , module := quicer_stream
-                               , reason := 1234
+                              #{?snk_kind := debug
+                               , event :=  peer_send_aborted
+                               , error_code := 1234
                                }, 1000, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
@@ -601,9 +601,9 @@ tc_stream_close_errno(Config) ->
                                               , tag := "event"
                                               , mark := ?QUIC_STREAM_EVENT_PEER_SEND_ABORTED
                                               },
-                                             #{ ?snk_kind := peer_send_aborted
-                                              , module := quicer_stream
-                                              , reason := Errno
+                                             #{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , error_code := Errno
                                               },
                                              Trace))
                      end),
@@ -1310,18 +1310,19 @@ tc_multi_streams(Config) ->
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assert(?causality(
-                              #{ ?snk_kind := debug
-                               , event := post_init
-                               , module := quicer_stream
-                               , stream := _STREAM0
-                               },
-                              #{ ?snk_kind := debug
-                               , event := handoff_stream
-                               , module := quicer_server_conn_callback
-                               , stream := _STREAM0
-                               },
-                              Trace))
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(
+                                   #{ ?snk_kind := debug
+                                    , event := post_init
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                   #{ ?snk_kind := debug
+                                    , event := handoff_stream
+                                    , module := quicer_server_conn_callback
+                                    , stream := _STREAM0
+                                    },
+                                   Trace))
                end),
   ok.
 

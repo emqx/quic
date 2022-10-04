@@ -15,32 +15,60 @@
 %%--------------------------------------------------------------------
 
 -module(quicer_echo_server_stream_callback).
+-behavior(quicer_stream).
+
 -export([ new_stream/2
-        , handle_call/4
-        , handle_stream_data/4
-        , shutdown/1
+        , start_completed/3
+        , send_complete/3
+        , peer_send_shutdown/3
         , peer_send_aborted/3
+        , peer_receive_aborted/3
         , send_shutdown_complete/3
-        ]
-       ).
+        , stream_closed/3
+        , peer_accepted/3
+        , passive/3
+        , handle_call/4
+        ]).
+
+-export([handle_stream_data/4]).
 
 new_stream(_,_) ->
     InitState = #{sent_bytes => 0},
     {ok, InitState}.
 
+peer_accepted(_Stream, _Flags, S) ->
+    {ok, S}.
+
+peer_receive_aborted(_Stream, _Flags, S) ->
+    {ok, S}.
+
+peer_send_aborted(Stream, _Flags, S) ->
+    quicer:close_stream(Stream),
+    {ok, S}.
+
+peer_send_shutdown(Stream, _Flags, S) ->
+    quicer:close_stream(Stream),
+    {ok, S}.
+
+send_complete(_Stream, _Flags, S) ->
+    {ok, S}.
+
+send_shutdown_complete(_Stream, _Flags, S) ->
+    {ok, S}.
+
+start_completed(_Stream, _Flags, S) ->
+    {ok, S}.
+
 handle_stream_data(Stream, Bin, _Opts, #{sent_bytes := Cnt} = State) ->
     {ok, Size} = quicer:send(Stream, Bin),
     {ok, State#{ sent_bytes => Cnt + Size }}.
 
-shutdown(Stream) ->
-    ok = quicer:close_stream(Stream).
-
-peer_send_aborted(Stream, State, _Reason)->
-    quicer:close_stream(Stream),
-    State.
-
-send_shutdown_complete(_Stream, State, _IsGraceful)->
-    State.
+passive(_Stream, undefined, S)->
+    ct:fail("Steam go into passive mode"),
+    {ok, S}.
 
 handle_call(_Stream, _Request, _Opts, _CBState) ->
     ok.
+
+stream_closed(_Stream, _Flags, S) ->
+    {ok, S}.

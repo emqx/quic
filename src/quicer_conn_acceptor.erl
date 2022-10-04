@@ -374,8 +374,8 @@ handle_info({quic, send_shutdown_complete, Stream, IsGraceful},
 
 handle_info({quic, stream_closed, Stream, Flags},
             #{ callback := M
-              , conn := C
-              , callback_state := CbState} = State) when C =/= undefined andalso is_map(Flags) ->
+             , conn := C
+             , callback_state := CbState} = State) when C =/= undefined andalso is_map(Flags) ->
     ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed, flags=>Flags}),
     default_cb_ret(M:stream_closed(Stream, Flags, CbState), State);
 
@@ -449,16 +449,16 @@ format_status(_Opt, Status) ->
           {stop, Reason :: term(), NewState :: term()}.
 default_cb_ret({ok, NewCBState}, State) ->
     %% ok
-    {noreply, State#{callback_state => NewCBState}};
+    {noreply, State#{callback_state := NewCBState}};
 default_cb_ret({hibernate, NewCBState}, State) ->
     %% hibernate
-    {noreply, State#{callback_state => NewCBState}, hibernate};
+    {noreply, State#{callback_state := NewCBState}, hibernate};
 default_cb_ret({Timeout, NewCBState}, State) when is_integer(Timeout) ->
     %% timeout
-    {noreply, State#{callback_state => NewCBState}, Timeout};
+    {noreply, State#{callback_state := NewCBState}, Timeout};
 default_cb_ret({{continue, _} = Continue, NewCBState}, State) ->
     %% continue
-    {noreply, State#{callback_state => NewCBState}, Continue};
+    {noreply, State#{callback_state := NewCBState}, Continue};
 default_cb_ret({stop, Reason, NewCBState}, State) ->
     %% stop
-    {stop, Reason, State#{callback_state => NewCBState}}.
+    {stop, Reason, State#{callback_state := NewCBState}}.
