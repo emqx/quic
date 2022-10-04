@@ -66,7 +66,7 @@ init([ListenerH, Opts]) ->
                  period => 5},
 
     OneChild = #{id => ignored,
-                 start => {quicer_conn_acceptor, start_link,
+                 start => {quicer_connection, start_link,
                            [ListenerH, Opts]},
                  restart => temporary,
                  shutdown => 5000,

@@ -96,7 +96,7 @@
         , stop_listener/1
         ]).
 
--type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().
+-type connection_opts() :: proplists:proplist() | quicer_connection:opts().
 -type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
 
 %% @doc Quicer library must be opened before any use.

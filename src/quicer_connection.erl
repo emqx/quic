@@ -14,12 +14,15 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
-%% @doc QUIC connection acceptor beahivor.
-%% == Generic Quic Connection Acceptor ==
-%% Best practice for server side connection owner and stream owner.
+%% @doc
+%% == Quic Connection Behavior  ==
+%% Best practice for
+%% 1. server side connection acceptor
+%%
+%% 1. server side connection initiator
 %%
 %% @end
--module(quicer_conn_acceptor).
+-module(quicer_connection).
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
 
@@ -119,13 +122,13 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Listener::quicer:listener_handle(),
+-spec start_link(StartFrom::quicer:listener_handle() | { inet:hostname(), inet:ip_address() },
                  ConnOpts :: map(), Sup :: pid()) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(Listener, ConnOpts, Sup) ->
-    gen_server:start_link(?MODULE, [Listener, ConnOpts, Sup], []).
+start_link(StartFrom, ConnOpts, Sup) ->
+    gen_server:start_link(?MODULE, [StartFrom, ConnOpts, Sup], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -142,23 +145,30 @@ start_link(Listener, ConnOpts, Sup) ->
           {ok, State :: term(), hibernate} |
           {stop, Reason :: term()} |
           ignore.
-init([Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
-    init([Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
-init([Listener, {_, #{conn_callback := CallbackModule} = COpts, SOpts}, Sup]) ->
+init([StartFrom, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
+    init([StartFrom, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
+init([StartFrom, {_, #{conn_callback := CallbackModule} = COpts, SOpts}, Sup]) ->
     process_flag(trap_exit, true),
-    %% Async Acceptor
-    {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
-
-    State0 = #{ listener => Listener
+    State0 = #{ listener => undefined
+              , conn => undefined
               , callback => CallbackModule
               , conn_opts => maps:without([conn_callback], COpts)
               , stream_opts => SOpts
               , sup => Sup},
+    State1 = case StartFrom of
+                 {Host, Port} ->
+                     {ok, Conn} = quicer:async_connect(Host, Port, COpts),
+                     State0#{conn := Conn};
+                 Listener ->
+                     %% Async Acceptor
+                     {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
+                     State0#{listener := Listener}
+             end,
     case CallbackModule:init(COpts#{stream_opts => SOpts}) of
         {ok, CBState} ->
-            {ok, State0#{callback_state => CBState}};
+            {ok, State1#{callback_state => CBState}};
         {ok, CBState, Action} ->
-            {ok, State0#{callback_state => CBState}, Action};
+            {ok, State1#{callback_state => CBState}, Action};
          Other -> %% ignore, {stop, Reason} ...
             Other
     end.

@@ -52,7 +52,7 @@
                  ListenOn :: listen_on(),
                  Options ::
                    { listener_opts()
-                   , quicer_conn_acceptor:opts()
+                   , quicer_connection:opts()
                    , quicer_stream:stream_opts()
                    }
                 ) -> {ok, Pid :: pid()} |

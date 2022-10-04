@@ -357,7 +357,7 @@ Both QUIC endpoints could
 
 In quicer, for best practice, you could use quicer_* modules to manage the listeners, connections and streams.
 
-- quicer_conn_acceptor
+- quicer_connection
 
   Process handles connections
 

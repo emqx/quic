@@ -370,7 +370,7 @@ tc_conn_owner_down(Config) ->
                                 tag := "event"}, 1000, 1000)),
                  ?assert(timeout =/=
                            ?block_until(
-                              #{?snk_kind := debug, event := closed, module := quicer_conn_acceptor}, 1000, 1000)),
+                              #{?snk_kind := debug, event := closed, module := quicer_connection}, 1000, 1000)),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt),
                  {ok, CRid} = quicer:get_conn_rid(Conn),
@@ -438,11 +438,11 @@ tc_conn_owner_down(Config) ->
                    %% check that client side immediate shutdown triggers a close at server side
                    ?assert(?strict_causality( #{ ?snk_kind := debug
                                                , event := shutdown
-                                               , module := quicer_conn_acceptor
+                                               , module := quicer_connection
                                                , '~meta' := #{pid := _PID}},
                                               #{ ?snk_kind := debug
                                                , event := closed
-                                               , module := quicer_conn_acceptor
+                                               , module := quicer_connection
                                                ,'~meta' := #{pid := _PID}},
                                               Trace))
                end),
