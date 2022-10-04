@@ -50,8 +50,9 @@
 -callback passive(stream_handle(), undefined, cb_state()) -> cb_ret().
 %% Stream now in 'passive' mode.
 
--type cb_state() :: any().
+-import(quicer_lib, [default_cb_ret/2]).
 
+-type cb_state() :: term().
 -type cb_ret() :: {ok, cb_state()}                    %% ok and update cb_state
                 | {error, Reason::term(), cb_state()} %% error handling per callback
                 | {hibernate, cb_state()}           %% ok but also hibernate process
@@ -80,7 +81,6 @@
                   , callback_state := term()
                   , is_owner := boolean()
                   , stream_opts := map()
-                  , is_resumed := boolean()
                   }.
 
 %%%===================================================================
@@ -244,8 +244,64 @@ handle_info({quic, Bin, Stream, #{flags := Flags}},
             maybe_log_stracetrace(ST),
             {stop, {handle_stream_data_crash, Reason}, State}
     end;
-handle_info({quic, _Event, _Stream, _Props} = Msg, State) ->
-    quicer_conn_acceptor:handle_info(Msg, State).
+
+handle_info({quic, start_completed, Stream,
+             #{ status := _AtomStatus
+              , stream_id := _StreamId
+              , is_peer_accepted := _PeerAccepted}} = Props
+           , #{ callback := M
+              , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => start_completed, props => Props}),
+    default_cb_ret(M:start_complete(Stream, Props, CBState), State);
+
+handle_info({quic, send_complete, Stream, IsSendCanceled},
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event=>send_complete, is_canceled=>IsSendCanceled}),
+    default_cb_ret(M:send_complete(Stream, IsSendCanceled, CBState), State);
+
+handle_info({quic, peer_send_shutdown, Stream, undefined},
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => peer_send_shutdown}),
+    default_cb_ret(M:peer_send_shutdown(Stream, undefined, CBState), State);
+
+handle_info({quic, peer_send_aborted, Stream, ErrorCode},
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => peer_send_aborted, error_code => ErrorCode}),
+    default_cb_ret(M:peer_send_aborted(Stream, ErrorCode, CBState), State);
+
+handle_info({quic, peer_receive_aborted, Stream, ErrorCode},
+            #{ callback := M,
+               callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => peer_receive_aborted, error_code => ErrorCode}),
+    default_cb_ret(M:peer_receive_aborted(Stream, ErrorCode, CBState), State);
+
+handle_info({quic, send_shutdown_complete, Stream, IsGraceful},
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => send_shutdown_complete, is_graceful => IsGraceful}),
+    default_cb_ret(M:send_shutdown_complete(Stream, IsGraceful, CBState), State);
+
+handle_info({quic, stream_closed, Stream, Flags},
+            #{ callback := M
+             , conn := C
+             , callback_state := CbState} = State) when C =/= undefined andalso is_map(Flags) ->
+    ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed, flags=>Flags}),
+    default_cb_ret(M:stream_closed(Stream, Flags, CbState), State);
+
+handle_info({quic, peer_accepted, Stream, undefined},
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => peer_accepted}),
+    default_cb_ret(M:peer_accepted(Stream, CBState), State);
+
+handle_info({quic, passive, Stream, undefined},
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => passive}),
+    default_cb_ret(M:passive(Stream, CBState), State).
 
 %%--------------------------------------------------------------------
 %% @private

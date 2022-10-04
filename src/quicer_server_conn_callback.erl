@@ -14,7 +14,10 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 -module(quicer_server_conn_callback).
+
 -behavior(quicer_conn_acceptor).
+-behavior(quicer_stream).
+
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
 

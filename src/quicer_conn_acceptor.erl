@@ -25,10 +25,9 @@
 
 -behaviour(gen_server).
 
--export_type([ cb_init_args/0
-             , cb_state/0
-             , cb_ret/0
-             ]).
+-export_type([cb_state/0]).
+
+-type cb_state() :: quicer_lib:cb_state().
 
 -type state() :: #{ listener := listener_handle()
                   , conn := connection_handle()
@@ -45,15 +44,7 @@
                           | [Supervisor :: undefined | pid() ]]
                         ].
 
--type cb_state() :: any().
-
--type cb_ret() :: {ok, cb_state()}                    %% ok and update cb_state
-                | {error, Reason::term(), cb_state()} %% error handling per callback
-                | {hibernate, cb_state()}           %% ok but also hibernate process
-                | {{continue, Continue :: term()}, cb_state()}  %% split callback work with Continue
-                | {timeout(), cb_state()}           %% ok but also hibernate process
-                | {stop, Reason :: term(), cb_state()}.            %% terminate with reason
-
+-type cb_ret() :: quicer_lib:cb_ret().
 
 -callback init(cb_init_args()) -> {ok, cb_state()} | {error, app_error(), cb_state()}.
 %% Init Callback, after return should expect for recv new connection
@@ -108,44 +99,14 @@
 %% NOTE: It could be a race cond. that new stream isn't accepted in new process that is created by connection owner.
 %% In this case, handoff should be used to hand over the owership and the message to the new stream owner
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%  Stream Callbacks
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--callback start_completed(stream_handle(), stream_start_completed_props(), cb_state()) -> cb_ret().
-%% Handle local initiated stream start completed
-
--callback send_complete(stream_handle(), IsCanceled::boolean(), cb_state()) -> cb_ret().
-%% Handle send completed.
-
--callback peer_send_shutdown(stream_handle(), error_code(), cb_state()) -> cb_ret().
-%% Handle stream peer_send_shutdown.
-
--callback peer_send_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
-%% Handle stream peer_send_aborted.
-
--callback peer_receive_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
-%% Handle stream peer_receive_aborted
-
--callback send_shutdown_complete(stream_handle(), error_code(), cb_state()) -> cb_ret().
-%% Handle stream send_shutdown_complete.
-%% Happen immediately on an abortive send or after a graceful send has been acknowledged by the peer.
-
--callback stream_closed(stream_handle(), stream_closed_props(), cb_state()) -> cb_ret().
-%% Handle stream closed, Both endpoints of sending and receiving of the stream have been shut down.
-
--callback peer_accepted(connection_handle(), stream_handle(), cb_state()) -> cb_ret().
-%% Handle stream 'peer_accepted'.
-%% The stream which **was not accepted** due to peer flow control is now accepted by the peer.
-
--callback passive(stream_handle(), undefined, cb_state()) -> cb_ret().
-%% Stream now in 'passive' mode.
-
 %% API
 -export([start_link/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3, format_status/2]).
+
+-import(quicer_lib, [default_cb_ret/2]).
 
 -define(SERVER, ?MODULE).
 
@@ -333,57 +294,17 @@ handle_info({quic, connection_resumed, C, ResumeData},
 %%% Handle messages from streams
 %%% !!! note, we don't handle recv event
 %%% ==============================================================
-handle_info({quic, start_completed, Stream,
-             #{ status := _AtomStatus
-              , stream_id := _StreamId
-              , is_peer_accepted := _PeerAccepted}} = Props
-           , #{ callback := M
-              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => start_completed, props => Props}),
-    default_cb_ret(M:start_complete(Stream, Props, CBState), State);
-
-handle_info({quic, send_complete, Stream, IsSendCanceled},
-            #{ callback := M
-             , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event=>send_complete, is_canceled=>IsSendCanceled}),
-    default_cb_ret(M:send_complete(Stream, IsSendCanceled, CBState), State);
-
-handle_info({quic, peer_send_shutdown, Stream, undefined},
-            #{ callback := M
-             , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_send_shutdown}),
-    default_cb_ret(M:peer_send_shutdown(Stream, undefined, CBState), State);
-
-handle_info({quic, peer_send_aborted, Stream, ErrorCode},
-            #{ callback := M
-             , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_send_aborted, error_code => ErrorCode}),
-    default_cb_ret(M:peer_send_aborted(Stream, ErrorCode, CBState), State);
-
-handle_info({quic, peer_receive_aborted, Stream, ErrorCode},
-            #{ callback := M,
-               callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_receive_aborted, error_code => ErrorCode}),
-    default_cb_ret(M:peer_receive_aborted(Stream, ErrorCode, CBState), State);
-
-handle_info({quic, send_shutdown_complete, Stream, IsGraceful},
-            #{ callback := M
-             , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => send_shutdown_complete, is_graceful => IsGraceful}),
-    default_cb_ret(M:send_shutdown_complete(Stream, IsGraceful, CBState), State);
-
-handle_info({quic, stream_closed, Stream, Flags},
-            #{ callback := M
-             , conn := C
-             , callback_state := CbState} = State) when C =/= undefined andalso is_map(Flags) ->
-    ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed, flags=>Flags}),
-    default_cb_ret(M:stream_closed(Stream, Flags, CbState), State);
-
-handle_info({quic, peer_accepted, Stream, undefined},
-            #{ callback := M
-             , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_accepted}),
-    default_cb_ret(M:peer_accepted(Stream, CBState), State);
+handle_info({quic, Event, _Stream, _Props} = Msg, State) when
+      Event =:= start_completed orelse
+      Event =:= send_completed orelse
+      Event =:= peer_send_completed orelse
+      Event =:= peer_send_aborted orelse
+      Event =:= peer_receive_aborted orelse
+      Event =:= peer_shutdown_complete orelse
+      Event =:= stream_closed orelse
+      Event =:= peer_accepted orelse
+      Event =:= passive ->
+    quicer_stream:handle_info(Msg, State);
 
 %%% ==============================================================
 %%% Handle messages for link/monitor
@@ -443,22 +364,3 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
--spec default_cb_ret(cb_ret(), state()) ->
-          {noreply, NewState :: term()} |
-          {noreply, NewState :: term(), timeout() | hibernate | {continue, term()}} |
-          {stop, Reason :: term(), NewState :: term()}.
-default_cb_ret({ok, NewCBState}, State) ->
-    %% ok
-    {noreply, State#{callback_state := NewCBState}};
-default_cb_ret({hibernate, NewCBState}, State) ->
-    %% hibernate
-    {noreply, State#{callback_state := NewCBState}, hibernate};
-default_cb_ret({Timeout, NewCBState}, State) when is_integer(Timeout) ->
-    %% timeout
-    {noreply, State#{callback_state := NewCBState}, Timeout};
-default_cb_ret({{continue, _} = Continue, NewCBState}, State) ->
-    %% continue
-    {noreply, State#{callback_state := NewCBState}, Continue};
-default_cb_ret({stop, Reason, NewCBState}, State) ->
-    %% stop
-    {stop, Reason, State#{callback_state := NewCBState}}.
