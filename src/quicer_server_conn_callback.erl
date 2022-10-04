@@ -16,7 +16,6 @@
 -module(quicer_server_conn_callback).
 
 -behavior(quicer_connection).
--behavior(quicer_stream).
 
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
@@ -35,6 +34,7 @@
         , streams_available/3
         , peer_needs_streams/3
         , resumed/3
+        , nst_received/3
         , new_stream/3
         ]).
 
@@ -76,6 +76,9 @@ resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
     ResumeFun(Conn, Data, S);
 resumed(_Conn, _Data, S) ->
     {ok, S}.
+
+nst_received(_Conn, _Data, S) ->
+    {stop, no_nst_for_server, S}.
 
 %% handles stream when there is no stream acceptors.
 new_stream(Stream, _Flags, #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->

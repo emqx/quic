@@ -17,7 +17,7 @@
 -module(quicer_echo_server_stream_callback).
 -behavior(quicer_stream).
 
--export([ new_stream/2
+-export([ new_stream/3
         , start_completed/3
         , send_complete/3
         , peer_send_shutdown/3
@@ -32,7 +32,7 @@
 
 -export([handle_stream_data/4]).
 
-new_stream(_,_) ->
+new_stream(_, _, _) ->
     InitState = #{sent_bytes => 0},
     {ok, InitState}.
 

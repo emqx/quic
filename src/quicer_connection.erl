@@ -98,9 +98,12 @@
 %% SessionData contains session data was sent in 0-RTT
 
 -callback new_stream(connection_handle(), stream_handle(), cb_state()) -> cb_ret().
-%% Handle new stream from peer
-%% NOTE: It could be a race cond. that new stream isn't accepted in new process that is created by connection owner.
-%% In this case, handoff should be used to hand over the owership and the message to the new stream owner
+%% Handle new stream from peer which has no owner assigned, or stream acceptor
+%% didn't accept the stream on time
+%% NOTE: The connection could start stream handoff procedure
+
+-callback nst_received(connection_handle(), TicketBin :: binary(), cb_state()) -> cb_ret().
+%% Client only, New session ticket received,
 
 %% API
 -export([start_link/3]).
@@ -212,6 +215,7 @@ handle_cast(_Request, State) ->
 %% Handling all non call/cast messages
 %% @end
 %%--------------------------------------------------------------------
+
 -spec handle_info(Info :: timeout() | term(), State :: state()) ->
           {noreply, NewState :: term()} |
           {noreply, NewState :: term(), Timeout :: timeout()} |
@@ -299,6 +303,12 @@ handle_info({quic, connection_resumed, C, ResumeData},
             #{callback := M, callback_state := CBState} = State) ->
     ?tp(debug, #{module => ?MODULE, conn => C, event => connection_resumed, data => ResumeData}),
     default_cb_ret(M:resumed(C, ResumeData, CBState), State);
+
+%% Client Only
+handle_info({quic, nst_received, C, TicketBin},
+            #{callback := M, callback_state := CBState} = State) ->
+    ?tp(debug, #{module => ?MODULE, conn => C, event => nst_received, ticket => TicketBin}),
+    default_cb_ret(M:nst_received(C, TicketBin, CBState), State);
 
 %%% ==============================================================
 %%% Handle messages from streams

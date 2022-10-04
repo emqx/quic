@@ -21,6 +21,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Stream Callbacks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-callback new_stream(stream_handle(), stream_open_flags(), cb_state()) -> cb_ret().
+%% Stream accepter is assigned to the owner of the new stream
+
 -callback start_completed(stream_handle(), stream_start_completed_props(), cb_state()) -> cb_ret().
 %% Handle local initiated stream start completed
 
@@ -146,7 +149,7 @@ init([Stream, Conn, StreamOpts]) when is_list(StreamOpts) ->
 init([Stream, Conn, #{stream_callback := CallbackModule} = StreamOpts]) ->
     ?tp(new_stream_3, #{module=>?MODULE, stream=>Stream}),
     process_flag(trap_exit, true),
-    case CallbackModule:new_stream(Stream, StreamOpts) of
+    case CallbackModule:new_stream(Stream, StreamOpts, undefined) of
         {ok, CallbackState} ->
             State = #{ is_owner => false
                      , stream_opts => StreamOpts
@@ -215,9 +218,13 @@ handle_cast(_Request, State) ->
           {noreply, state(), hibernate} |
           {stop, Reason :: normal | term(), state()}.
 handle_info({quic, new_stream, Stream, Flags},
-            #{stream_opts := Options, stream := undefined, callback := CallbackModule} = State) ->
+            #{ stream_opts := Options
+             , stream := undefined
+             , callback := CallbackModule
+             , callback_state := CBState
+             } = State) ->
     ?tp(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
-    try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}) of
+    try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}, CBState) of
         {ok, CallbackState} ->
             {noreply, State#{stream => Stream, callback_state => CallbackState}};
         {error, Reason} ->
@@ -306,7 +313,10 @@ handle_info({quic, passive, Stream, undefined},
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% This callback is optional, so callback modules need to export it only if they return one of the tuples containing {continue,Continue} from another callback. If such a {continue,_} tuple is used and the callback is not implemented, the process will exit with undef error.
+%% This callback is optional, so callback modules need to export it only if they return
+%% one of the tuples containing {continue,Continue} from another callback.
+%% If such a {continue,_} tuple is used and the callback is not implemented,
+%% the process will exit with undef error.
 -spec handle_continue(Continue::term(), State::term()) ->
           {noreply, state()} |
           {noreply, state(), Timeout :: timeout()} |
