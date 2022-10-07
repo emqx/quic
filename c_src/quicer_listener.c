@@ -91,21 +91,21 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                        &addrStr_remote);
 
       ERL_NIF_TERM eserver_name;
-      memcpy(enif_make_new_binary(env,
+      CxPlatCopyMemory(enif_make_new_binary(env,
                                   Event->NEW_CONNECTION.Info->ServerNameLength,
                                   &eserver_name),
              Event->NEW_CONNECTION.Info->ServerName,
              Event->NEW_CONNECTION.Info->ServerNameLength);
 
       ERL_NIF_TERM ealpns;
-      memcpy(
+      CxPlatCopyMemory(
           enif_make_new_binary(
               env, Event->NEW_CONNECTION.Info->NegotiatedAlpnLength, &ealpns),
           Event->NEW_CONNECTION.Info->NegotiatedAlpn,
           Event->NEW_CONNECTION.Info->NegotiatedAlpnLength);
 
       ERL_NIF_TERM eclient_alpns;
-      memcpy(enif_make_new_binary(
+      CxPlatCopyMemory(enif_make_new_binary(
                  env,
                  Event->NEW_CONNECTION.Info->ClientAlpnListLength,
                  &eclient_alpns),
@@ -113,7 +113,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
              Event->NEW_CONNECTION.Info->ClientAlpnListLength);
 
       ERL_NIF_TERM ecrypto_buffer;
-      memcpy(
+      CxPlatCopyMemory(
           enif_make_new_binary(env,
                                Event->NEW_CONNECTION.Info->CryptoBufferLength,
                                &ecrypto_buffer),
@@ -133,6 +133,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       ERL_NIF_TERM props_value[] = {
         enif_make_uint(env,
                        Event->NEW_CONNECTION.Info->QuicVersion), // version
+        // @TODO:TBD Binary is better?
         enif_make_string(
             env, addrStr_local.Address, ERL_NIF_LATIN1), // local addr
         enif_make_string(

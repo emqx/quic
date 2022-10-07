@@ -127,7 +127,7 @@
 
 -type stream_opts() :: #{ active := boolean() | once | integer()
                         , open_flag => stream_open_flags()
-                        , send_flag => stream_start_flags()
+                        , start_flag => stream_start_flags()
                         , event_mask => uint32()
                         }. %% @TODO expand
 

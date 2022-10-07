@@ -432,21 +432,17 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_STATUS_USER_CANCELED, user_canceled);                        \
   ATOM(ATOM_QUIC_STATUS_ALPN_NEG_FAILURE, alpn_neg_failure);                  \
   ATOM(ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED, stream_limit_reached);          \
-  ATOM(ATOM_QUIC_STATUS_CLOSE_NOTIFY, atom_quic_status_close_notify);         \
+  ATOM(ATOM_QUIC_STATUS_CLOSE_NOTIFY, close_notify);                          \
   /*  TLS Error Status */                                                     \
-  ATOM(ATOM_QUIC_STATUS_BAD_CERTIFICATE, atom_quic_status_bad_certificate);   \
-  ATOM(ATOM_QUIC_STATUS_UNSUPPORTED_CERTIFICATE,                              \
-       atom_quic_status_unsupported_certificate);                             \
-  ATOM(ATOM_QUIC_STATUS_REVOKED_CERTIFICATE,                                  \
-       atom_quic_status_revoked_certificate);                                 \
-  ATOM(ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE,                                  \
-       atom_quic_status_expired_certificate);                                 \
-  ATOM(ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE,                                  \
-       atom_quic_status_unknown_certificate);                                 \
-  ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, atom_quic_status_cert_expired);         \
+  ATOM(ATOM_QUIC_STATUS_BAD_CERTIFICATE, bad_certificate);                    \
+  ATOM(ATOM_QUIC_STATUS_UNSUPPORTED_CERTIFICATE, unsupported_certificate);    \
+  ATOM(ATOM_QUIC_STATUS_REVOKED_CERTIFICATE, revoked_certificate);            \
+  ATOM(ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE, expired_certificate);            \
+  ATOM(ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE, unknown_certificate);            \
+  ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, cert_expired);                          \
   ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
        atom_quic_status_cert_untrusted_root);                                 \
-  ATOM(ATOM_QUIC_STATUS_CERT_NO_CERT, atom_quic_status_cert_no_cert);         \
+  ATOM(ATOM_QUIC_STATUS_CERT_NO_CERT, cert_no_cert);                          \
   /*-------------------------------------------------------*/                 \
   /*         msquic  execution profile for reg             */                 \
   /*-------------------------------------------------------*/                 \
@@ -596,7 +592,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
-  ATOM(ATOM_HANDLE, handle);                                                \
+  ATOM(ATOM_HANDLE, handle);                                                  \
   ATOM(ATOM_CLOSED, closed);                                                  \
   ATOM(ATOM_STREAM_CLOSED, stream_closed);                                    \
   ATOM(ATOM_LISTENER_STOPPED, listener_stopped);                              \
@@ -612,7 +608,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_STREAMS_AVAILABLE, streams_available);                            \
   ATOM(ATOM_PEER_NEEDS_STREAMS, peer_needs_streams);                          \
   ATOM(ATOM_START_COMPLETE, start_completed);                                 \
-  ATOM(ATOM_SEND_COMPLETE, send_complete);                                   \
+  ATOM(ATOM_SEND_COMPLETE, send_complete);                                    \
   ATOM(ATOM_SEND_DGRAM_COMPLETE, send_dgram_completed);                       \
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \
@@ -649,24 +645,24 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_VERIFY_NONE, verify_none);                                        \
   ATOM(ATOM_VERIFY_PEER, verify_peer);                                        \
   ATOM(ATOM_ALPNS, alpns);                                                    \
-  ATOM(ATOM_IS_HANDSHAKE_COMPLETED, is_handshake_completed)                   \
-  ATOM(ATOM_IS_PEER_ACKED, is_peer_acked)                                     \
-  ATOM(ATOM_IS_APP_CLOSING, is_app_closing)                                   \
-  ATOM(ATOM_BIDI_STREAMS, bidi_streams)                                       \
-  ATOM(ATOM_UNIDI_STREAMS, unidi_streams)                                     \
-  ATOM(ATOM_STATUS, status)                                                   \
-  ATOM(ATOM_STREAM_ID, stream_id)                                             \
-  ATOM(ATOM_IS_PEER_ACCEPTED, is_peer_accepted)                               \
-  ATOM(ATOM_IS_CONN_SHUTDOWN, is_conn_shutdown)                               \
-  ATOM(ATOM_ABS_OFFSET, absolute_offset)                                      \
-  ATOM(ATOM_LEN, len)                                                         \
-  ATOM(ATOM_FLAGS, flags)                                                     \
-  ATOM(ATOM_VER, version)                                                     \
-  ATOM(ATOM_LOCAL_ADDR, local_addr)                                           \
-  ATOM(ATOM_REMOTE_ADDR, remote_addr)                                         \
-  ATOM(ATOM_SERVER_NAME, server_name)                                         \
-  ATOM(ATOM_CLIENT_ALPNS, client_alpns)                                       \
-  ATOM(ATOM_CRYPTO_BUFFER, crypto_buffer)                                     \
+  ATOM(ATOM_IS_HANDSHAKE_COMPLETED, is_handshake_completed);                  \
+  ATOM(ATOM_IS_PEER_ACKED, is_peer_acked);                                    \
+  ATOM(ATOM_IS_APP_CLOSING, is_app_closing);                                  \
+  ATOM(ATOM_BIDI_STREAMS, bidi_streams);                                      \
+  ATOM(ATOM_UNIDI_STREAMS, unidi_streams);                                    \
+  ATOM(ATOM_STATUS, status);                                                  \
+  ATOM(ATOM_STREAM_ID, stream_id);                                            \
+  ATOM(ATOM_IS_PEER_ACCEPTED, is_peer_accepted);                              \
+  ATOM(ATOM_IS_CONN_SHUTDOWN, is_conn_shutdown);                              \
+  ATOM(ATOM_ABS_OFFSET, absolute_offset);                                     \
+  ATOM(ATOM_LEN, len);                                                        \
+  ATOM(ATOM_FLAGS, flags);                                                    \
+  ATOM(ATOM_VER, version);                                                    \
+  ATOM(ATOM_LOCAL_ADDR, local_addr);                                          \
+  ATOM(ATOM_REMOTE_ADDR, remote_addr);                                        \
+  ATOM(ATOM_SERVER_NAME, server_name);                                        \
+  ATOM(ATOM_CLIENT_ALPNS, client_alpns);                                      \
+  ATOM(ATOM_CRYPTO_BUFFER, crypto_buffer);                                    \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;
@@ -1122,7 +1118,7 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
       eterm = ATOM_QUIC_STATUS_STREAM_LIMIT_REACHED;
       break;
     case QUIC_STATUS_CERT_EXPIRED:
-      eterm = QUIC_STATUS_CERT_EXPIRED;
+      eterm = ATOM_QUIC_STATUS_CERT_EXPIRED;
       break;
     case QUIC_STATUS_CERT_UNTRUSTED_ROOT:
       eterm = ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
@@ -1270,11 +1266,10 @@ make_event_with_props(ErlNifEnv *env,
       enif_make_map_from_arrays(env, keys, values, cnt, &prop);
     }
 
-  return enif_make_tuple4(env,
-                          ATOM_QUIC,  // 1st element, :: quic
-                          event_name, // 2nd element, event name :: atom()
-                          resource,   // 3rd element, resource
-                          prop);      // 4th element, event props :: map()) //
+  return make_event(env,
+                    event_name, // 2nd element, event name :: atom()
+                    resource,   // 3rd element, resource handle
+                    prop);      // 4th element, event props :: map()
 }
 
 /*

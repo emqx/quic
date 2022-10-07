@@ -66,7 +66,8 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
             {ok, S#{ conn => Conn
-                   , streams => [{Pid, undefined}]}};
+                     %% @TODO track the streams?
+                   , streams => [{Pid, accepting}]}};
         {error, _} = Error ->
             Error
     end.
@@ -106,9 +107,11 @@ peer_address_changed(_C, _NewAddr, S) ->
 local_address_changed(_C, _NewAddr, S) ->
     {ok, S}.
 
-streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
-    {ok, S}.
+streams_available(_C, {BidirCnt, UnidirCnt}, S) ->
+    {ok, S# { peer_unidi_stream_count => UnidirCnt
+            , peer_bidi_stream_count => BidirCnt}}.
 
+%% @doc May integrate with App flow control
 peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
 

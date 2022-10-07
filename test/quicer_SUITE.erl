@@ -430,7 +430,7 @@ tc_conn_basic_slow_start(Config)->
 tc_conn_basic_verify_peer(Config)->
   {ok, Conn} = quicer:connect("google.com", 443,
                               [ {verify, verify_peer}
-                              , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+                              %, {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
                               , {peer_unidi_stream_count, 3}
                               , {alpn, ["h3"]}], 5000),
   {ok, {_, _}} = quicer:sockname(Conn),
@@ -1109,7 +1109,7 @@ tc_getstat_closed(Config) ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
-      receive {quic, _, _, _} -> ok end,
+      receive {quic, Bin, _, _} when is_binary(Bin)-> ok end,
       ok = quicer:close_stream(Stm),
       ok = quicer:close_connection(Conn),
       case quicer:getstat(Conn, [send_cnt, recv_oct, send_pend]) of
@@ -1255,7 +1255,7 @@ tc_setopt(Config) ->
       {ok, Stm1} = quicer:start_stream(Conn, [{active, true}]),
       {ok, 5} = quicer:send(Stm1, <<"ping1">>),
       receive
-        {quic, _Data, Stm1, _} = Msg ->
+        {quic, Data, Stm1, _} = Msg when is_binary(Data) ->
           ct:fail("unexpected_recv ~p ", [Msg])
       after 1000 ->
                 ok
@@ -1666,7 +1666,7 @@ tc_stream_start_flag_immediate(Config) ->
                                         , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
                                         ]),
   {ok, Rid} = quicer:get_stream_rid(Stm),
-  %% We don't need to send anything, we should get start_completed even it is rate limited
+  %% We don't need to send anything, we should get start_completed even it is flow controlled
   receive
     {quic, start_completed, Stm,
              #{status := stream_limit_reached, stream_id := StreamID}} ->

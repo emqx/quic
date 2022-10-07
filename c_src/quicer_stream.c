@@ -730,9 +730,10 @@ handle_stream_event_recv(HQUIC Stream,
           // notify owner to trigger async recv
           if (!enif_send(NULL,
                          &(s_ctx->owner->Pid),
-                         s_ctx->env,
+                         env,
                          make_event(env,
                                     ATOM_QUIC_STATUS_CONTINUE,
+                                    // @TODO eHandle is in env, no need to copy?
                                     enif_make_copy(env, s_ctx->eHandle),
                                     ATOM_UNDEFINED)))
             {

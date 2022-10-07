@@ -242,7 +242,7 @@ handle_info({quic, new_conn, C, Props},
     ?tp(debug, #{module=>?MODULE, conn=>C, props=>Props, event=>new_conn}),
     %% I become the connection owner, I should start an new acceptor.
     Sup =/= undefined andalso (catch supervisor:start_child(Sup, [Sup])),
-    default_cb_ret(M:new_conn(C, Props, CBState), State#{conn => C});
+    default_cb_ret(M:new_conn(C, Props, CBState), State#{conn := C});
 
 handle_info({quic, connected, C, #{is_resumed := IsResumed} = Props},
             #{ conn := C
@@ -292,7 +292,7 @@ handle_info({quic, new_stream, Stream, Flags},
              , callback := M
              , callback_state := CbState} = State) when C =/= undefined->
     %% Best practice:
-    %%   One connection will have a control stream that have the same life cycle as the connection.
+    %%   One connection will have a control stream that has the same life cycle as the connection.
     %%   The connection may spawn one *control stream* acceptor before starting the handshake
     %%   AND the stream acceptor should accept new stream so it will likely pick up the control stream
     %% note, by desgin, control stream doesn't have to be the first stream initiated.

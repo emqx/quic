@@ -967,7 +967,7 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
 
   if (alpn_size > 0 && alpn_buff)
     {
-      memcpy(enif_make_new_binary(c_ctx->env, alpn_size, &ealpns),
+      CxPlatCopyMemory(enif_make_new_binary(c_ctx->env, alpn_size, &ealpns),
              alpn_buff,
              alpn_size);
     }
@@ -989,7 +989,7 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
     {
       return QUIC_STATUS_UNREACHABLE;
     }
-
+  // @TODO make it configurable
   MsQuic->ConnectionSendResumptionTicket(
       c_ctx->Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
 
@@ -1125,7 +1125,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
         }
       // We must copy here, otherwise it will become double free
       // in resource dealloc callbacks (for Stream and Connection)
-      memcpy(acc, c_ctx->owner, sizeof(ACCEPTOR));
+      CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
 
       // @TODO we could set it to passive and let new owner set it to
       // active
@@ -1156,6 +1156,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
     }
   else
     {
+      // NOTE: we must return non sucess status
       return QUIC_STATUS_UNREACHABLE;
     }
 }
@@ -1192,11 +1193,10 @@ handle_connection_event_peer_needs_streams(
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
   /* reserved for the future upgrade
-  ERL_NIF_TERM props_name[] = { Event->PEER_NEEDS_STREAMS.Bidirectional ? ATOM_BIDI_STREAMS : ATOM_UNIDI_STREAMS };
-  ERL_NIF_TERM props_value[]
-    = { enif_make_uint64(env, Event->PEER_NEEDS_STREAMS.StreamLimit) };
-  ERL_NIF_TERM report = make_event_with_props(env,
-                                              ATOM_PEER_NEEDS_STREAMS,
+  ERL_NIF_TERM props_name[] = { Event->PEER_NEEDS_STREAMS.Bidirectional ?
+  ATOM_BIDI_STREAMS : ATOM_UNIDI_STREAMS }; ERL_NIF_TERM props_value[] = {
+  enif_make_uint64(env, Event->PEER_NEEDS_STREAMS.StreamLimit) }; ERL_NIF_TERM
+  report = make_event_with_props(env, ATOM_PEER_NEEDS_STREAMS,
                                               enif_make_resource(env, c_ctx),
                                               props_name,
                                               props_value,
@@ -1217,7 +1217,8 @@ handle_connection_event_ideal_processor_changed(
     __unused_parm__ QUIC_CONNECTION_EVENT *Event)
 {
   assert(QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED == Event->Type);
-  // @TODO ideal_processor_changed
+  // @NOTE: improve performance if we could move owner proc closer to
+  // the 'ideal processor'
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1260,7 +1261,7 @@ handle_connection_event_resumed(QuicerConnCTX *c_ctx,
     {
       unsigned char *binbuff = enif_make_new_binary(
           env, Event->RESUMED.ResumptionStateLength, &edata);
-      memcpy(binbuff,
+      CxPlatCopyMemory(binbuff,
              Event->RESUMED.ResumptionState,
              Event->RESUMED.ResumptionStateLength);
     }
@@ -1305,6 +1306,7 @@ handle_connection_event_resumption_ticket_received(
     }
   else // if QUICER_CONNECTION_EVENT_MASK_NST is unset in event_mask, we
        // just store it in the c_ctx
+       // @TODO:TBD maybe we don't need it at all.
     {
       if (c_ctx->ResumptionTicket)
         {

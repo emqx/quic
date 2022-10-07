@@ -21,7 +21,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Stream Callbacks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--callback init_handoff(stream_handle(), stream_opts(), connection_handle()) -> cb_ret().
+-callback init_handoff(stream_handle(), stream_opts(), connection_handle(), stream_start_flags()) -> cb_ret().
 %% Prepare callback state before ownership handoff
 
 -callback new_stream(stream_handle(), stream_open_flags(), connection_handle()) -> cb_ret().
@@ -237,8 +237,8 @@ handle_call(Request, _From,
     #{stream_callback := CallbackModule} = Options,
     try CallbackModule:handle_call(Stream, Request, Options, CallbackState) of
         {ok, Reply, NewCallbackState} ->
-            {reply, Reply, State#{ callback_state => NewCallbackState
-                                 , stream_opts => Options
+            {reply, Reply, State#{ callback_state := NewCallbackState
+                                 , stream_opts := Options
                                  }}
     catch _:Reason:ST ->
             maybe_log_stracetrace(ST),
@@ -280,13 +280,13 @@ handle_info({quic, new_stream, Stream, Flags},
     ?tp(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
     try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}, Conn) of
         {ok, CallbackState} ->
-            {noreply, State#{stream => Stream, callback_state => CallbackState}};
+            {noreply, State#{stream := Stream, callback_state := CallbackState}};
         {error, Reason} ->
-            {stop, Reason, State#{stream => Stream}}
+            {stop, Reason, State#{stream := Stream}}
     catch
         _:Reason:ST ->
             maybe_log_stracetrace(ST),
-            {stop, {new_stream_crash, Reason}, State#{stream => Stream}}
+            {stop, {new_stream_crash, Reason}, State#{stream := Stream}}
     end;
 handle_info({quic, Bin, Stream, #{flags := Flags}},
             #{stream := Stream, stream_opts := Options, callback_state := CallbackState}= State)
@@ -297,9 +297,9 @@ handle_info({quic, Bin, Stream, #{flags := Flags}},
         {ok, NewCallbackState} ->
             %% @todo this should be a configurable behavior
             is_fin(Flags) andalso CallbackModule:shutdown(Stream),
-            {noreply, State#{callback_state => NewCallbackState}};
+            {noreply, State#{callback_state := NewCallbackState}};
         {error, Reason, NewCallbackState} ->
-            {noreply, Reason, State#{callback_state => NewCallbackState}}
+            {noreply, Reason, State#{callback_state := NewCallbackState}}
     catch
         _:Reason:ST ->
             maybe_log_stracetrace(ST),
@@ -415,7 +415,7 @@ terminate(Reason, _State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec code_change(OldVsn :: term() | {down, term()},
-                  state(),
+                  term(),
                   Extra :: term()) -> {ok, NewState :: term()} |
           {error, Reason :: term()}.
 code_change(_OldVsn, State, _Extra) ->
@@ -458,7 +458,9 @@ is_fin(Flags) when is_integer(Flags) ->
 
 %% handoff must happen
 wait_for_handoff() ->
+    %% @TODO 1. Monitor Conn Proc and handle EXIT
     receive
         {stream_owner_handoff, _From, Msg} ->
             Msg
+    %% For correctness we should never add timeout
     end.

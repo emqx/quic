@@ -38,7 +38,7 @@ API for registrationshutdown, shutdown all connections under registration
 
 ** NIF Upgrade
 
-* Improvement
+* Improvements
 
 - send buffering
 
@@ -53,3 +53,7 @@ API for registrationshutdown, shutdown all connections under registration
   stateful and stateless.
 
 - make sending NST configurable
+
+- check types.
+
+- refactor DATAGRAM handling

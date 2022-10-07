@@ -54,11 +54,11 @@ peer_receive_aborted(_Stream, _Flags, S) ->
     {ok, S}.
 
 peer_send_aborted(Stream, _Flags, S) ->
-    quicer:close_stream(Stream),
+    quicer:async_close_stream(Stream),
     {ok, S}.
 
 peer_send_shutdown(Stream, _Flags, S) ->
-    quicer:close_stream(Stream),
+    quicer:async_close_stream(Stream),
     {ok, S}.
 
 send_complete(_Stream, _Flags, S) ->
@@ -76,7 +76,7 @@ handle_stream_data(Stream, Bin, _Opts, #{sent_bytes := Cnt} = State) ->
 
 passive(_Stream, undefined, S)->
     ct:fail("Steam go into passive mode"),
-    {ok, S}.
+    {stop, no_passive, S}.
 
 handle_call(_Stream, _Request, _Opts, _CBState) ->
     ok.
