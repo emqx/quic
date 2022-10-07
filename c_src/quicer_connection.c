@@ -1109,6 +1109,8 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   s_ctx->c_ctx = c_ctx;
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
+  // @TODO Generally, we rely on outer caller to clean the env,
+  // or we should clean the env in this function.
   env = s_ctx->env;
   s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
 

@@ -364,6 +364,8 @@ handle_info({quic, passive, Stream, undefined},
     ?tp(debug, #{module=>?MODULE, event => passive}),
     default_cb_ret(M:passive(Stream, CBState), State).
 
+%% @TODO  handle_info({EXIT....
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
