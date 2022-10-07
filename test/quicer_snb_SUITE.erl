@@ -1314,16 +1314,16 @@ tc_multi_streams(Config) ->
                    ?assertMatch([{pair, _, _}],
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
-                                    , event := post_init
-                                    , module := quicer_stream
-                                    , stream := _STREAM0
-                                    },
-                                   #{ ?snk_kind := debug
                                     , event := handoff_stream
                                     , module := quicer_connection
                                     , stream := _STREAM0
                                     },
-                                   Trace))
+                                   #{ ?snk_kind := debug
+                                    , event := stream_owner_handoff_done
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                Trace))
                end),
   ok.
 
@@ -1398,13 +1398,13 @@ tc_multi_streams_example_server(Config) ->
                    ?assertMatch([{pair, _, _}],
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
-                                    , event := post_init
-                                    , module := quicer_stream
+                                    , event := handoff_stream
+                                    , module := quicer_connection
                                     , stream := _STREAM0
                                     },
                                    #{ ?snk_kind := debug
-                                    , event := handoff_stream
-                                    , module := quicer_connection
+                                    , event := stream_owner_handoff_done
+                                    , module := quicer_stream
                                     , stream := _STREAM0
                                     },
                                    Trace)),

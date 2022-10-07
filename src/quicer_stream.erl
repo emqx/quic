@@ -380,7 +380,7 @@ handle_info({quic, passive, Stream, undefined},
           {stop, Reason :: normal | term(), state()}.
 handle_continue(?post_init, #{ is_owner := false, stream := Stream} = State) ->
     ?tp(debug, #{event=>?post_init, module=>?MODULE, stream=>Stream}),
-    case wait_for_handoff() of
+    case wait_for_handoff(Stream) of
         undefined ->
             ?tp(debug, #{event=>post_init_undef , module=>?MODULE, stream=>Stream}),
             {noreply, State#{is_owner => true}};
@@ -459,10 +459,11 @@ is_fin(Flags) when is_integer(Flags) ->
     (1 bsl 1) band Flags =/= 0.
 
 %% handoff must happen
-wait_for_handoff() ->
+wait_for_handoff(Stream) ->
     %% @TODO 1. Monitor Conn Proc and handle EXIT
     receive
         {stream_owner_handoff, _From, Msg} ->
+            ?tp(debug, #{event=>stream_owner_handoff_done, module=>?MODULE, stream=>Stream}),
             Msg
     %% For correctness we should never add timeout
     end.

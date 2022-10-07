@@ -94,7 +94,9 @@ Data received in binary format.
 
 Send call is handled by stack, caller is ok to release the send buffer
 
-This message is for sync send only.
+This message is for sync send only. 
+
+IsSendCanceled: Peer abort receive
 
 ```erlang
 {quic, send_complete, stream_handler(), IsSendCanceled :: boolean()}
