@@ -272,6 +272,8 @@ The process becomes the owner of the stream.
 
 More streams are available due to flow control from the peer.
 
+`Available = Max - Used`
+
 ```erlang
 {quic, streams_available, connection_handler(), #{ bidi_streams := integer()
                                                  , unidi_streams := integer()
