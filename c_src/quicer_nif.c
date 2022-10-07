@@ -612,7 +612,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_STREAMS_AVAILABLE, streams_available);                            \
   ATOM(ATOM_PEER_NEEDS_STREAMS, peer_needs_streams);                          \
   ATOM(ATOM_START_COMPLETE, start_completed);                                 \
-  ATOM(ATOM_SEND_COMPLETE, send_completed);                                   \
+  ATOM(ATOM_SEND_COMPLETE, send_complete);                                   \
   ATOM(ATOM_SEND_DGRAM_COMPLETE, send_dgram_completed);                       \
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \

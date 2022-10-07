@@ -97,7 +97,7 @@
 %% Handle connection is resumed with 0-RTT
 %% SessionData contains session data was sent in 0-RTT
 
--callback new_stream(connection_handle(), stream_handle(), cb_state()) -> cb_ret().
+-callback new_stream(stream_handle(), stream_open_flags(), cb_state()) -> cb_ret().
 %% Handle new stream from peer which has no owner assigned, or stream acceptor
 %% didn't accept the stream on time
 %% NOTE: The connection could start stream handoff procedure
@@ -106,7 +106,7 @@
 %% Client only, New session ticket received,
 
 %% API
--export([start_link/3]).
+-export([start_link/3, handoff_stream/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -133,6 +133,22 @@
 start_link(StartFrom, ConnOpts, Sup) ->
     gen_server:start_link(?MODULE, [StartFrom, ConnOpts, Sup], []).
 
+
+%% @doc
+%%  handoff stream to another proc
+%%  1) change stream owner to new pid
+%%  2) forward all data to new pid
+%%  3) @TODO also handoff signaling
+%% @end
+-spec handoff_stream(stream_handle(), pid()) -> ok.
+handoff_stream(Stream, Owner) ->
+    ?tp(debug, #{event=>?FUNCTION_NAME , module=>?MODULE, stream=>Stream, owner => Owner}),
+    case quicer:controlling_process(Stream, Owner) of
+        ok ->
+            forward_stream_msgs(Stream, Owner, _ACC = []);
+        {error, _Reason} = E->
+            E
+    end.
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -292,12 +308,13 @@ handle_info({quic, streams_available, BiDirStreams, UniDirStreams},
                  bidir_cnt => BiDirStreams, unidir_cnt => UniDirStreams}),
     default_cb_ret(M:streams_available(C, {BiDirStreams, UniDirStreams}, CbState), State);
 
-handle_info({quic, peer_needs_streams, C},
+%% for https://github.com/microsoft/msquic/issues/3120
+handle_info({quic, peer_needs_streams, C, Needs},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
     ?tp(debug, #{module => ?MODULE, conn => C, event => peer_needs_streams}),
-    default_cb_ret(M:peer_needs_streams(C, undefined, CbState), State);
+    default_cb_ret(M:peer_needs_streams(C, Needs, CbState), State);
 
 handle_info({quic, connection_resumed, C, ResumeData},
             #{callback := M, callback_state := CBState} = State) ->
@@ -316,8 +333,8 @@ handle_info({quic, nst_received, C, TicketBin},
 %%% ==============================================================
 handle_info({quic, Event, _Stream, _Props} = Msg, State) when
       Event =:= start_completed orelse
-      Event =:= send_completed orelse
-      Event =:= peer_send_completed orelse
+      Event =:= send_complete orelse
+      Event =:= peer_send_complete orelse
       Event =:= peer_send_aborted orelse
       Event =:= peer_receive_aborted orelse
       Event =:= peer_shutdown_complete orelse
@@ -384,3 +401,24 @@ format_status(_Opt, Status) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @doc Forward all erl msgs of the Stream to the Stream Owner
+%% Stream Owner should block for the {owner_handoff, Msg} and then 'flush_done' msg,
+-spec forward_stream_msgs(stream_handle(), pid(), list()) -> ok.
+forward_stream_msgs(Stream, Owner, Acc) ->
+    receive
+        {quic, Data, Stream, _Props} = Msg when is_binary(Data) ->
+            forward_stream_msgs(Stream, Owner, [Msg | Acc])
+    after 0 ->
+            Owner ! {stream_owner_handoff, self(), aggr_stream_data(Acc)},
+            ok
+    end.
+
+aggr_stream_data([]) ->
+    undefined;
+aggr_stream_data(Acc) ->
+    %% Maybe assert offset is 0
+    lists:foldl(fun({quic, Bin, _Stream, #{len := Len, flags := Flag}},
+                    {BinAcc, LenAcc, FlagAcc}) ->
+                        {[Bin | BinAcc], LenAcc + Len, FlagAcc bor Flag}
+                end, {[], _Len = 0, _Flag = 0}, Acc).

@@ -515,9 +515,9 @@ send(Stream, Data, Flag) ->
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
-        {quic, send_completed, Stream, false} ->
+        {quic, send_complete, Stream, false} ->
           OK;
-        {quic, send_completed, Stream, true} ->
+        {quic, send_complete, Stream, true} ->
           {error, cancelled}
       end;
     E ->
@@ -526,7 +526,7 @@ send(Stream, Data, Flag) ->
 
 %% @doc async variant of {@link send/3}
 %% If QUICER_SEND_FLAG_SYNC is set , the caller should expect to receive
-%% ```{quic, send_completed, Stream, send_complete_flag()}'''
+%% ```{quic, send_complete, Stream, send_complete_flag()}'''
 %% note, check send_complete_flag() to ensure it is delivered or not.
 -spec async_send(stream_handle(), iodata(), non_neg_integer()) ->
         {ok, BytesSent :: pos_integer()}          |
@@ -537,7 +537,7 @@ async_send(Stream, Data, Flag) ->
 
 %% @doc async variant of {@link send/2}
 %% Caller should NOT expect to receive
-%% ```{quic, send_completed, Stream, send_complete_flag()}'''
+%% ```{quic, send_complete, Stream, send_complete_flag()}'''
 %% note, check send_complete_flag() to ensure it is delivered or not.
 -spec async_send(stream_handle(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |

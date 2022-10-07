@@ -637,7 +637,7 @@ tc_stream_client_async_send(Config) ->
       end,
       SPid ! done,
       receive
-        {quic, send_completed, _Stm, _} -> ct:fail("shouldn't recv send_completed")
+        {quic, send_complete, _Stm, _} -> ct:fail("shouldn't recv send_complete")
       after 0 ->
             ok
       end,

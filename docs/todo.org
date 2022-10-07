@@ -11,6 +11,8 @@ Feature todo list, priority descending
 ** Impl ConfigurationLoadCredential
 Load QUIC_CREDENTIAL_CONFIG to configuration
 
+** quicer_stream proc should able to handle more streams
+
 ** Close configurations in resource destroy callback
 
 ** Check shutdown connection wait for peer to close or not

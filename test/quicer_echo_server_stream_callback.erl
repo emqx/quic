@@ -17,7 +17,8 @@
 -module(quicer_echo_server_stream_callback).
 -behavior(quicer_stream).
 
--export([ new_stream/3
+-export([ init_handoff/4
+        , new_stream/3
         , start_completed/3
         , send_complete/3
         , peer_send_shutdown/3
@@ -31,6 +32,16 @@
         ]).
 
 -export([handle_stream_data/4]).
+
+init_handoff(Stream, StreamOpts, Conn, Flags) ->
+    InitState = #{ stream => Stream
+                 , conn => Conn
+                 , is_local => false
+                 , is_unidir => quicer:is_unidirectional(Flags)
+                 , sent_bytes => 0
+                 },
+    ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
+    {ok, InitState}.
 
 new_stream(_, _, _) ->
     InitState = #{sent_bytes => 0},

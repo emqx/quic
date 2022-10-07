@@ -141,6 +141,7 @@ all() ->
   , tc_listener_no_acceptor
     %% multistreams
   , tc_multi_streams
+  , tc_multi_streams_example_server
   ].
 
 %%--------------------------------------------------------------------
@@ -1319,10 +1320,105 @@ tc_multi_streams(Config) ->
                                     },
                                    #{ ?snk_kind := debug
                                     , event := handoff_stream
-                                    , module := quicer_server_conn_callback
+                                    , module := quicer_connection
                                     , stream := _STREAM0
                                     },
                                    Trace))
+               end),
+  ok.
+
+
+tc_multi_streams_example_server(Config) ->
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 10},
+                  {peer_unidi_stream_count, 0} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(example, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+                 receive
+                   {quic, <<"ping2">>, Stm2,  _} -> ok
+                 after 100 -> ct:fail("no ping2")
+                 end,
+
+                 quicer:async_accept_stream(Conn, []),
+                 %% Now we open unidirectional stream
+                 {ok, Stm3Out} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                 quicer:async_send(Stm3Out, <<"ping3">>),
+                 Stm3In = receive
+                            {quic, new_stream, Incoming, Flag} ->
+                              ct:pal("incoming stream from server: ~p", [Incoming]),
+                              true = quicer:is_unidirectional(Flag),
+                              Incoming
+                          after 1000 ->
+                              %%ct:fail("no incoming stream")
+                              %% reenable the check when it is fixed.
+                              %% https://github.com/microsoft/msquic/issues/3120
+                              ok
+                          end,
+                 receive
+                   {quic, Data, Stm3In, DFlag} ->
+                     ct:pal("~p is received from ~p with flag: ~p", [Data, Stm3In, DFlag]),
+                     ?assertEqual(Data, <<"ping3">>)
+                 after 1000 ->
+                     %% ct:fail("no incoming data")
+                     %% reenable the check when it is fixed.
+                     %% https://github.com/microsoft/msquic/issues/3120
+                     ok
+                 end,
+                 quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
+                 receive
+                   {quic, closed, Conn, _} ->
+                     ct:pal("Connecion is closed")
+                 end
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(
+                                   #{ ?snk_kind := debug
+                                    , event := post_init
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                   #{ ?snk_kind := debug
+                                    , event := handoff_stream
+                                    , module := quicer_connection
+                                    , stream := _STREAM0
+                                    },
+                                   Trace)),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs( #{ ?snk_kind := debug
+                                              , event := handoff_stream
+                                              , module := quicer_connection
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "nif"
+                                              , function := "stream_controlling_process"
+                                              , tag := "enter"
+                                              },
+                                             Trace))
                end),
   ok.
 
