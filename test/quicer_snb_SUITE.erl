@@ -41,6 +41,10 @@ init_per_suite(Config) ->
   %% dbg:tracer(),
   %% dbg:p(all,c),
   %% dbg:tpl(snabbkaffe, do_find_pairs, cx),
+  DataDir = ?config(data_dir, Config),
+  _ = gen_ca(DataDir),
+  _ = gen_host_cert("server", DataDir),
+  _ = gen_host_cert("client", DataDir),
   application:ensure_all_started(quicer),
   application:ensure_all_started(snabbkaffe),
   Config.
@@ -627,7 +631,9 @@ tc_conn_idle_close(Config) ->
   ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
-                 {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
+                 {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
+                                                                 {verify, none},
+                                                                 {alpn, ["sample"]}], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  {ok, <<"ping">>} = quicer:recv(Stm, 4),
@@ -706,7 +712,9 @@ tc_conn_gc(Config) ->
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  _Child = spawn_link(fun() ->
                                          %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
-                                         {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
+                                         {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
+                                                                                         {verify, none},
+                                                                                         {alpn, ["sample"]}], 5000),
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4)
@@ -796,7 +804,9 @@ tc_conn_no_gc(Config) ->
                  %% still holds the 'Conn' var ref.
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  %% We hold a ref the Conn in this process, so Conn won't be gc-ed.
-                 {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
+                 {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, 
+                                                                 {verify, none},
+                                                                 {alpn, ["sample"]}], 5000),
                  _Child = spawn_link(fun() ->
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -880,7 +890,9 @@ tc_conn_no_gc_2(Config) ->
                  Parent = self(),
                  PRef = erlang:make_ref(),
                  _Child = spawn_link(fun() ->
-                                         {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
+                                         {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
+                                                                                         {verify, none},
+                                                                                         {alpn, ["sample"]}], 5000),
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                          {ok, ConnRid} = quicer:get_conn_rid(Conn),
                                          Parent ! {PRef, Conn, ConnRid, Stm},
@@ -1658,14 +1670,16 @@ default_stream_opts() ->
 default_conn_opts() ->
   [ {alpn, ["sample"]}
   %% , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+  , {verify, none}
   , {idle_timeout_ms, 5000}
   ].
 
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
-  [ {cert, filename:join(DataDir, "cert.pem")}
-  , {key,  filename:join(DataDir, "key.pem")}
+  [ {cert, filename:join(DataDir, "server.pem")}
+  , {key,  filename:join(DataDir, "server.key")}
   , {alpn, ["sample"]}
+  , {verify, none}
   , {idle_timeout_ms, 10000}
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
@@ -1693,6 +1707,70 @@ quicer_start_listener(Name, Port, Options, N) ->
       Error
   end.
 
+
+gen_ca(Path) ->
+  %% Generate ca.pem and ca.key which will be used
+  %% to generate certs for server and clients
+  ECKeyFile = filename(Path, "ec.key", []),
+  os:cmd("openssl ecparam -name secp256r1 > " ++ ECKeyFile),
+  Cmd = lists:flatten(
+          io_lib:format("openssl req -new -x509 -nodes "
+                        "-newkey ec:~s "
+                        "-keyout ~s -out ~s -days 3650 "
+                        "-subj \"/C=SE/O=Internet Widgits Pty Ltd CA\"",
+                        [ECKeyFile, ca_key_name(Path), ca_cert_name(Path)])),
+  os:cmd(Cmd).
+
+ca_cert_name(Path) ->
+  filename(Path, "ca.pem", []).
+ca_key_name(Path) ->
+  filename(Path, "ca.key", []).
+
+gen_host_cert(H, Path) ->
+  ECKeyFile = filename(Path, "ec.key", []),
+  CN = str(H),
+  HKey = filename(Path, "~s.key", [H]),
+  HCSR = filename(Path, "~s.csr", [H]),
+  HPEM = filename(Path, "~s.pem", [H]),
+  HEXT = filename(Path, "~s.extfile", [H]),
+  CSR_Cmd =
+    lists:flatten(
+      io_lib:format(
+        "openssl req -new -nodes -newkey ec:~s "
+        "-keyout ~s -out ~s "
+        "-addext \"subjectAltName=DNS:~s\" "
+        "-addext keyUsage=digitalSignature,keyAgreement "
+        "-subj \"/C=SE/O=Internet Widgits Pty Ltd/CN=~s\"",
+        [ECKeyFile, HKey, HCSR, CN, CN])),
+  create_file(HEXT,
+              "keyUsage=digitalSignature,keyAgreement\n"
+              "subjectAltName=DNS:~s\n", [CN]),
+  CERT_Cmd =
+    lists:flatten(
+      io_lib:format(
+        "openssl x509 -req "
+        "-extfile ~s "
+        "-in ~s -CA ~s -CAkey ~s -CAcreateserial "
+        "-out ~s -days 500",
+        [HEXT, HCSR, ca_cert_name(Path), ca_key_name(Path), HPEM])),
+  os:cmd(CSR_Cmd),
+  os:cmd(CERT_Cmd),
+  file:delete(HEXT).
+
+filename(Path, F, A) ->
+  filename:join(Path, str(io_lib:format(F, A))).
+
+str(Arg) ->
+  binary_to_list(iolist_to_binary(Arg)).
+
+create_file(Filename, Fmt, Args) ->
+  {ok, F} = file:open(Filename, [write]),
+  try
+    io:format(F, Fmt, Args)
+  after
+    file:close(F)
+  end,
+  ok.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

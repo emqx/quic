@@ -17,6 +17,8 @@ limitations under the License.
 #include "quicer_ctx.h"
 #include <assert.h>
 #include <unistd.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
 
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
@@ -207,6 +209,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
   enif_mutex_lock(c_ctx->lock);
   TP_CB_3(event, (uintptr_t)Connection, Event->Type);
+
+  // dbg("client connection event: %d", Event->Type);
+
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -288,6 +293,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
       status = handle_connection_event_peer_certificate_received(c_ctx, Event);
       break;
+
     case QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED:
       status = handle_connection_event_datagram_state_changed(c_ctx, Event);
       break;
@@ -321,6 +327,7 @@ ServerConnectionCallback(HQUIC Connection,
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)Context;
   ErlNifEnv *env = c_ctx->env;
   BOOLEAN is_destroy = FALSE;
+  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
 
   assert(Connection == c_ctx->Connection);
 
@@ -329,9 +336,11 @@ ServerConnectionCallback(HQUIC Connection,
       c_ctx->Connection = Connection;
     }
 
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   enif_mutex_lock(c_ctx->lock);
   TP_CB_3(event, (uintptr_t)Connection, Event->Type);
+
+  // dbg("server connection event: %d", Event->Type);
+
   switch (Event->Type)
     {
     case QUIC_CONNECTION_EVENT_CONNECTED:
@@ -402,7 +411,9 @@ ServerConnectionCallback(HQUIC Connection,
     case QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS:
       status = handle_connection_event_peer_needs_streams(c_ctx, Event);
       break;
-
+    case QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED:
+      status = handle_connection_event_peer_certificate_received(c_ctx, Event);
+      break;
     default:
       break;
     }
@@ -465,9 +476,48 @@ async_connect3(ErlNifEnv *env,
 
   enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
 
+  ERL_NIF_TERM ecacertfile;
+  X509_STORE *trusted = NULL;
+  if (enif_get_map_value(env, eoptions, ATOM_CACERTFILE, &ecacertfile))
+    {
+      char cacertfile[PATH_MAX];
+      if (enif_get_string(env, ecacertfile, cacertfile,
+                          PATH_MAX, ERL_NIF_LATIN1) > 0)
+        {
+          X509_LOOKUP *lookup = NULL;
+          trusted = X509_STORE_new();
+
+          if (trusted != NULL)
+            {
+              lookup = X509_STORE_add_lookup(trusted, X509_LOOKUP_file());
+              if (lookup != NULL)
+                {
+                  if (!X509_LOOKUP_load_file(lookup, cacertfile,
+                                             X509_FILETYPE_PEM))
+                    {
+                      X509_STORE_free(trusted);
+                      trusted = NULL;
+                    }
+                }
+              else
+                {
+                  X509_STORE_free(trusted);
+                  trusted = NULL;
+                }
+            }
+          c_ctx->trusted = trusted;
+        }
+
+      if (trusted == NULL)
+          fprintf(stderr, "failed to set cacertfile");
+    }
+
   // convert eoptions to Configuration
+  bool HasCaCertfile = trusted != NULL;
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
-      env, &eoptions, &(c_ctx->config_resource->Configuration));
+      env, &eoptions, &(c_ctx->config_resource->Configuration),
+      HasCaCertfile);
+
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(estatus);
@@ -1350,7 +1400,25 @@ handle_connection_event_peer_certificate_received(
   // @TODO peer_certificate_received
   // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
   assert(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED == Event->Type);
-  return QUIC_STATUS_SUCCESS;
+  // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
+  // Validate against CA certificates using OpenSSL API:s
+  X509 *cert =
+      (X509*) Event->PEER_CERTIFICATE_RECEIVED.Certificate;
+  X509_STORE_CTX *x509_ctx =
+      (X509_STORE_CTX*) Event->PEER_CERTIFICATE_RECEIVED.Chain;
+  STACK_OF(X509) *untrusted = X509_STORE_CTX_get0_untrusted(x509_ctx);
+
+  X509_STORE_CTX *ctx = X509_STORE_CTX_new();
+  X509_STORE_CTX_init(ctx, c_ctx->trusted, cert, untrusted);
+  int res = X509_verify_cert(ctx);
+  X509_STORE_CTX_free(ctx);
+
+  if (res <= 0)
+      return  QUIC_STATUS_BAD_CERTIFICATE;
+  else
+      return  QUIC_STATUS_SUCCESS;
+
+  /* @TODO validate SNI */
 }
 
 ///_* Emacs

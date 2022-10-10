@@ -18,6 +18,9 @@ limitations under the License.
 #include "quicer_config.h"
 #include "quicer_tp.h"
 #include <netinet/in.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -30,6 +33,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
   BOOLEAN is_destroy = FALSE;
 
   enif_mutex_lock(l_ctx->lock);
+  // dbg("server listener event: %d", Event->Type);
   switch (Event->Type)
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
@@ -46,6 +50,37 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         }
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
+
+      /* reload trusted store very time to make sure we incorporate
+       * any changes to the file
+       */
+      if (l_ctx->cacertfile)
+        {
+          X509_STORE *trusted = NULL;
+          X509_LOOKUP *lookup = NULL;
+          trusted = X509_STORE_new();
+
+          if (trusted != NULL)
+            {
+              lookup = X509_STORE_add_lookup(trusted, X509_LOOKUP_file());
+              if (lookup != NULL)
+                {
+                  if (!X509_LOOKUP_load_file(lookup,
+                                             l_ctx->cacertfile,
+                                             X509_FILETYPE_PEM))
+                    {
+                      X509_STORE_free(trusted);
+                      trusted = NULL;
+                    }
+                }
+              else
+                {
+                  X509_STORE_free(trusted);
+                  trusted = NULL;
+                }
+            }
+          c_ctx->trusted = trusted;
+        }
 
       assert(l_ctx->config_resource);
       // Keep resource for c_ctx
@@ -278,7 +313,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
     {
-      if (get_str_from_map(env, ATOM_KEY, &options, password, 256) <= 0)
+      if (get_str_from_map(env, ATOM_PASSWORD, &options, password, 256) <= 0)
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
@@ -303,6 +338,46 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       CertFile->PrivateKeyFile = key_path;
       CredConfig.CertificateFile = CertFile;
       CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+    }
+
+  ERL_NIF_TERM ecacertfile;
+  if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
+    {
+      unsigned len;
+      if (enif_get_list_length(env, ecacertfile, &len))
+        {
+          l_ctx->cacertfile =
+            (char *) CXPLAT_ALLOC_NONPAGED(len+1, QUICER_CACERTFILE);
+          if (!enif_get_string(env, ecacertfile, l_ctx->cacertfile,
+                               len+1, ERL_NIF_LATIN1))
+            {
+              CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
+              l_ctx->cacertfile = NULL;
+              return ERROR_TUPLE_2(ATOM_BADARG);
+            }
+        }
+      else
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+
+  bool Verify = load_verify(env, &options, false);
+
+  if (!Verify)
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+  else
+    {
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+      if (l_ctx->cacertfile)
+        {
+          // We do our own certificate verification agains the certificates
+          // in cacertfile
+          CredConfig.Flags |=
+            QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+          CredConfig.Flags |=
+            QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+        }
     }
 
   ERL_NIF_TERM estatus = ServerLoadConfiguration(

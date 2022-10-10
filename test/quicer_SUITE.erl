@@ -63,6 +63,11 @@
         , tc_conn_with_localaddr/1
         , tc_conn_controlling_process/1
 
+        , tc_conn_custom_ca/1
+        , tc_conn_custom_ca_other/1
+        , tc_conn_client_cert/1
+        , tc_conn_client_bad_cert/1
+
         , tc_stream_client_init/1
         , tc_stream_client_send_binary/1
         , tc_stream_client_send_iolist/1
@@ -76,7 +81,7 @@
         , tc_stream_send_after_async_conn_close/1
         , tc_stream_sendrecv_large_data_passive/1
         %% @deprecated
-        %%, tc_stream_sendrecv_large_data_passive_2/1
+        %% , tc_stream_sendrecv_large_data_passive_2/1
         , tc_stream_sendrecv_large_data_active/1
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
@@ -171,6 +176,12 @@ groups() ->
 %%% Overall setup/teardown
 %%%===================================================================
 init_per_suite(Config) ->
+  DataDir = ?config(data_dir, Config),
+  _ = gen_ca(DataDir, "ca"),
+  _ = gen_host_cert("server", "ca", DataDir),
+  _ = gen_host_cert("client", "ca", DataDir),
+  _ = gen_ca(DataDir, "other-ca"),
+  _ = gen_host_cert("other-client", "other-ca", DataDir),
   application:ensure_all_started(quicer),
   Config.
 
@@ -347,11 +358,13 @@ tc_get_listeners(Config) ->
               , {alpn3, 24569}
               , {alpn4, "[::1]:24570"}
               ],
-  Res = lists:map(fun({Alpn, ListenOn}) ->
-                      {ok, L} = quicer:start_listener(Alpn, ListenOn,
-                                                     {ListenerOpts, ConnectionOpts, StreamOpts}),
-                      L
-                  end, Listeners),
+  Res = lists:map(
+          fun({Alpn, ListenOn}) ->
+              {ok, L} = quicer:start_listener(
+                          Alpn, ListenOn,
+                          {ListenerOpts, ConnectionOpts, StreamOpts}),
+              L
+          end, Listeners),
   ?assertEqual(lists:reverse(lists:zip(Listeners, Res)),
                quicer:listeners()),
   lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
@@ -381,7 +394,7 @@ tc_get_listener(Config) ->
                 end, Listeners),
 
   lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners),
-  
+
   lists:foreach(fun({Name, _} = NameListenON) ->
                     ?assertEqual({error, not_found}, quicer:listener(Name)),
                     ?assertEqual({error, not_found}, quicer:listener(NameListenON))
@@ -458,7 +471,7 @@ tc_conn_basic_verify_peer_no_cacert(Config)->
   %% ErrorCode is different per platform
   {error,transport_down,
    #{error := _ErrorCode,
-     status := {unknown_quic_status, _}}} =
+     status := atom_quic_status_cert_untrusted_root}} =
     quicer:connect("localhost", Port,
                    [ {verify, verify_peer}
                    , {peer_unidi_stream_count, 3}
@@ -569,6 +582,141 @@ tc_conn_with_localaddr(Config)->
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
       ct:fail("timeout")
+  end.
+
+tc_conn_custom_ca(Config) ->
+  {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_custom_ca(Config) end),
+  receive
+    {'DOWN', Ref, process, Pid, normal} ->
+      ok;
+    {'DOWN', Ref, process, Pid, Error} ->
+      ct:fail({run_error, Error})
+  end.
+
+run_tc_conn_custom_ca(Config)->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts_verify(Config, "ca"), 5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      ct:pal("closing connection : ~p", [Conn]),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_custom_ca_other(Config) ->
+  {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_custom_ca_other(Config) end),
+  receive
+    {'DOWN', Ref, process, Pid, normal} ->
+      ok;
+    {'DOWN', Ref, process, Pid, Error} ->
+      ct:fail({run_error, Error})
+  end.
+
+run_tc_conn_custom_ca_other(Config)->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server_close(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {error,transport_down,
+       #{error := _ErrorCode,
+         status := bad_certificate}} =
+        quicer:connect("localhost", Port,
+                       default_conn_opts_verify(Config, "other-ca"),
+                       5000),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_client_cert(Config) ->
+  {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_client_cert(Config) end),
+  receive
+    {'DOWN', Ref, process, Pid, normal} ->
+      ok;
+    {'DOWN', Ref, process, Pid, Error} ->
+      ct:fail({run_error, Error})
+  end.
+
+run_tc_conn_client_cert(Config)->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server_client_cert(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port,
+                                  default_conn_opts_client_cert(Config, "ca"),
+                                  5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      ct:pal("closing connection : ~p", [Conn]),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+tc_conn_client_bad_cert(Config) ->
+  {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_client_bad_cert(Config) end),
+  receive
+    {'DOWN', Ref, process, Pid, normal} ->
+      ok;
+    {'DOWN', Ref, process, Pid, Error} ->
+      ct:fail({run_error, Error})
+  end.
+
+run_tc_conn_client_bad_cert(Config)->
+  Port = select_port(),
+  Owner = self(),
+  {_SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server_client_bad_cert(Owner, Config, Port)
+                   end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect(
+                     "localhost", Port,
+                     default_conn_opts_bad_client_cert(Config, "ca"),
+                     5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive
+        {quic, transport_shutdown, _Ref,
+         #{error := _ErrorCode, status := bad_certificate}} ->
+          _ = flush([])
+      after
+        2000 ->
+          Other = flush([]),
+          ct:fail("Unexpected Msg ~p", [Other])
+      end,
+      ensure_server_exit_normal(Ref)
+  after 1000 ->
+      ct:fail("timeout")
+  end.
+
+flush(Acc) ->
+  receive
+    Other ->
+      flush([Other|Acc])
+  after
+    0 ->
+      lists:reverse(Acc)
   end.
 
 tc_stream_client_init(Config) ->
@@ -2185,7 +2333,34 @@ simple_conn_server(Owner, Config, Port) ->
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 1000),
   {ok, Conn} = quicer:handshake(Conn),
-  receive 
+  receive
+    done ->
+      quicer:close_listener(L),
+      ok;
+    {quic, shutdown, Conn} ->
+      quicer:close_connection(Conn),
+      quicer:close_listener(L)
+  end.
+
+simple_conn_server_close(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Owner ! listener_ready,
+  {ok, Conn} = quicer:accept(L, [], 1000),
+  {error, closed} = quicer:handshake(Conn),
+  receive
+    done ->
+      quicer:close_listener(L),
+      ok;
+    {quic, shutdown, Conn} ->
+      quicer:close_listener(L)
+  end.
+
+simple_conn_server_client_cert(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts_client_cert(Config)),
+  Owner ! listener_ready,
+  {ok, Conn} = quicer:accept(L, [], 1000),
+  {ok, Conn} = quicer:handshake(Conn),
+  receive
     done ->
       quicer:close_listener(L),
       ok;
@@ -2193,6 +2368,13 @@ simple_conn_server(Owner, Config, Port) ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
   end.
+
+simple_conn_server_client_bad_cert(Owner, Config, Port) ->
+  {ok, L} = quicer:listen(Port, default_listen_opts_client_cert(Config)),
+  Owner ! listener_ready,
+  {ok, Conn} = quicer:accept(L, [], 1000),
+  {error, closed} = quicer:handshake(Conn),
+  quicer:close_listener(L).
 
 simple_slow_conn_server(Owner, Config, Port) ->
   simple_slow_conn_server(Owner, Config, Port, 0).
@@ -2280,21 +2462,46 @@ default_stream_opts() ->
   [].
 
 default_conn_opts() ->
-  [{alpn, ["sample"]},
-   %{sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
-   {idle_timeout_ms, 5000}
-  ].
+  [{verify, none},
+   {alpn, ["sample"]},
+   %% {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
+   {idle_timeout_ms, 5000}].
+
+default_conn_opts_verify(Config, Ca) ->
+  DataDir = ?config(data_dir, Config),
+  [{verify, peer},
+   {cacertfile, filename(DataDir, "~s.pem", [Ca])}|
+   tl(default_conn_opts())].
+
+default_conn_opts_client_cert(Config, Ca) ->
+  DataDir = ?config(data_dir, Config),
+  [{key, filename:join(DataDir, "client.key")},
+   {cert, filename:join(DataDir, "client.pem")}|
+   default_conn_opts_verify(Config, Ca)].
+
+default_conn_opts_bad_client_cert(Config, Ca) ->
+  DataDir = ?config(data_dir, Config),
+  [{key, filename:join(DataDir, "other-client.key")},
+   {cert, filename:join(DataDir, "other-client.pem")}|
+   default_conn_opts_verify(Config, Ca)].
 
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
-  [ {cert, filename:join(DataDir, "cert.pem")}
-  , {key,  filename:join(DataDir, "key.pem")}
+  [ {verify, none}
+  , {cert, filename:join(DataDir, "server.pem")}
+  , {key,  filename:join(DataDir, "server.key")}
   , {alpn, ["sample"]}
   , {idle_timeout_ms, 10000}
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   , {peer_unidi_stream_count, 0}
   | Config ].
+
+default_listen_opts_client_cert(Config) ->
+  DataDir = ?config(data_dir, Config),
+  [ {cacertfile, filename:join(DataDir, "ca.pem")}
+  , {verify, peer} |
+    tl(default_listen_opts(Config)) ].
 
 active_recv(Stream, Len) ->
   active_recv(Stream, Len, []).
@@ -2351,6 +2558,73 @@ receive_all(Res)->
   after 0 ->
       Res
   end.
+
+gen_ca(Path, Name) ->
+  %% Generate ca.pem and ca.key which will be used to generate certs
+  %% for hosts server and clients
+  ECKeyFile = filename(Path, "~s-ec.key", [Name]),
+  os:cmd("openssl ecparam -name secp256r1 > " ++ ECKeyFile),
+  Cmd = lists:flatten(
+          io_lib:format("openssl req -new -x509 -nodes "
+                        "-newkey ec:~s "
+                        "-keyout ~s -out ~s -days 3650 "
+                        "-subj \"/C=SE/O=Internet Widgits Pty Ltd CA\"",
+                        [ECKeyFile, ca_key_name(Path, Name),
+                         ca_cert_name(Path, Name)])),
+  os:cmd(Cmd).
+
+ca_cert_name(Path, Name) ->
+  filename(Path, "~s.pem", [Name]).
+ca_key_name(Path, Name) ->
+  filename(Path, "~s.key", [Name]).
+
+gen_host_cert(H, CaName, Path) ->
+  ECKeyFile = filename(Path, "~s-ec.key", [CaName]),
+  CN = str(H),
+  HKey = filename(Path, "~s.key", [H]),
+  HCSR = filename(Path, "~s.csr", [H]),
+  HPEM = filename(Path, "~s.pem", [H]),
+  HEXT = filename(Path, "~s.extfile", [H]),
+  CSR_Cmd =
+    lists:flatten(
+      io_lib:format(
+        "openssl req -new -nodes -newkey ec:~s "
+        "-keyout ~s -out ~s "
+        "-addext \"subjectAltName=DNS:~s\" "
+        "-addext keyUsage=digitalSignature,keyAgreement "
+        "-subj \"/C=SE/O=Internet Widgits Pty Ltd/CN=~s\"",
+        [ECKeyFile, HKey, HCSR, CN, CN])),
+  create_file(HEXT,
+              "keyUsage=digitalSignature,keyAgreement\n"
+              "subjectAltName=DNS:~s\n", [CN]),
+  CERT_Cmd =
+    lists:flatten(
+      io_lib:format(
+        "openssl x509 -req "
+        "-extfile ~s "
+        "-in ~s -CA ~s -CAkey ~s -CAcreateserial "
+        "-out ~s -days 500",
+        [HEXT, HCSR, ca_cert_name(Path, CaName), ca_key_name(Path, CaName),
+         HPEM])),
+  os:cmd(CSR_Cmd),
+  os:cmd(CERT_Cmd),
+  file:delete(HEXT).
+
+filename(Path, F, A) ->
+  filename:join(Path, str(io_lib:format(F, A))).
+
+str(Arg) ->
+  binary_to_list(iolist_to_binary(Arg)).
+
+create_file(Filename, Fmt, Args) ->
+  {ok, F} = file:open(Filename, [write]),
+  try
+    io:format(F, Fmt, Args)
+  after
+    file:close(F)
+  end,
+  ok.
+
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
