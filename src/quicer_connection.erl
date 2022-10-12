@@ -106,7 +106,9 @@
 %% Client only, New session ticket received,
 
 %% API
--export([start_link/3, handoff_stream/2]).
+-export([start_link/3, %% for client
+         start_link/4, %% for server
+         handoff_stream/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -125,20 +127,32 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(StartFrom::quicer:listener_handle() | { inet:hostname(), inet:ip_address() },
-                 ConnOpts :: map(), Sup :: pid()) -> {ok, Pid :: pid()} |
+
+%% start_link/3
+%% @doc spawn Client spawstart connection
+-spec start_link(atom(), {hostname(), inet:port_number()}, {conn_opts(), stream_opts()}) -> gen_server:start_ret().
+start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when is_atom(CallbackModule) ->
+    gen_server:start_link(?MODULE, [CallbackModule, Peer, Opts], []).
+
+%% start_link/4
+%% @doc Server starts acceptors for new connection on the Listener
+%% Get `CallbackModule` from conn_opts, key:`conn_callback` if `CallbackModule` is undefined,
+%% @end
+-spec start_link(CallbackModule :: undefined | module(),
+                 Listener ::quicer:listener_handle(),
+                 ConnOpts :: term(),
+                 Sup :: pid()) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(StartFrom, ConnOpts, Sup) ->
-    gen_server:start_link(?MODULE, [StartFrom, ConnOpts, Sup], []).
-
+start_link(CallbackModule, Listener, Opts, Sup) ->
+    gen_server:start_link(?MODULE, [CallbackModule, Listener, Opts, Sup], []).
 
 %% @doc
 %%  handoff stream to another proc
-%%  1) change stream owner to new pid
+%%  1) change stream owner to the new pid
 %%  2) forward all data to new pid
-%%  3) @TODO also handoff signaling
+%%  3) @TODO also handoff signals
 %% @end
 -spec handoff_stream(stream_handle(), pid()) -> ok.
 handoff_stream(Stream, Owner) ->
@@ -164,30 +178,55 @@ handoff_stream(Stream, Owner) ->
           {ok, State :: term(), hibernate} |
           {stop, Reason :: term()} |
           ignore.
-init([StartFrom, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
-    init([StartFrom, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
-init([StartFrom, {_, #{conn_callback := CallbackModule} = COpts, SOpts}, Sup]) ->
-    process_flag(trap_exit, true),
+
+%% For Client
+init([CallbackModule, {Host, Port}, {COpts, SOpts}])
+  when is_atom(CallbackModule) andalso
+       is_list(COpts) ->
+    init([CallbackModule, {Host, Port}, {maps:from_list(COpts), SOpts}]);
+init([CallbackModule, {Host, Port}, {COpts, SOpts}])
+  when is_atom(CallbackModule) andalso
+       is_map(COpts) ->
     State0 = #{ listener => undefined
               , conn => undefined
               , callback => CallbackModule
-              , conn_opts => maps:without([conn_callback], COpts)
+              , conn_opts => COpts
               , stream_opts => SOpts
-              , sup => Sup},
-    State1 = case StartFrom of
-                 {Host, Port} ->
-                     {ok, Conn} = quicer:async_connect(Host, Port, COpts),
-                     State0#{conn := Conn};
-                 Listener ->
-                     %% Async Acceptor
-                     {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
-                     State0#{listener := Listener}
-             end,
-    case CallbackModule:init(COpts#{stream_opts => SOpts}) of
+              , sup => undefined
+              },
+    {ok, Conn} = quicer:async_connect(Host, Port, COpts),
+    State1 = State0#{conn := Conn},
+    case CallbackModule:init(COpts#{stream_opts => SOpts, conn => Conn}) of
         {ok, CBState} ->
             {ok, State1#{callback_state => CBState}};
         {ok, CBState, Action} ->
             {ok, State1#{callback_state => CBState}, Action};
+         Other -> %% ignore, {stop, Reason} ...
+            Other
+    end;
+
+%% For Server
+init([undefined, Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
+    init([undefined, Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
+init([undefined, Listener, {LOpts, #{conn_callback := CallbackModule} = COpts, SOpts}, Sup]) ->
+    init([CallbackModule, Listener, {LOpts, maps:without([conn_callback], COpts), SOpts}, Sup]);
+init([CallbackModule, Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
+    init([CallbackModule, Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
+init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) ->
+    process_flag(trap_exit, true),
+    State0 = #{ listener => Listener
+              , conn => undefined
+              , callback => CallbackModule
+              , conn_opts => COpts
+              , stream_opts => SOpts
+              , sup => Sup},
+    %% Async Acceptor
+    {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
+    case CallbackModule:init(COpts#{stream_opts => SOpts}) of
+        {ok, CBState} ->
+            {ok, State0#{callback_state => CBState}};
+        {ok, CBState, Action} ->
+            {ok, State0#{callback_state => CBState}, Action};
          Other -> %% ignore, {stop, Reason} ...
             Other
     end.
@@ -249,6 +288,7 @@ handle_info({quic, connected, C, #{is_resumed := IsResumed} = Props},
              , callback := M
              , callback_state := CbState} = State) ->
     ?tp(debug, #{module=>?MODULE, conn=>C, props=>Props, event => connected}),
+    %% @TODO add option to unlink from supervisor
     default_cb_ret(M:connected(C, Props, CbState), State#{is_resumed => IsResumed});
 
 handle_info({quic, transport_shutdown, C, Reason},
@@ -328,7 +368,8 @@ handle_info({quic, nst_received, C, TicketBin},
     default_cb_ret(M:nst_received(C, TicketBin, CBState), State);
 
 %%% ==============================================================
-%%% Handle messages from streams
+%%% Handle messages from streams,
+%%% @TODO, remove when we have stream signal handoff
 %%% !!! note, we don't handle recv event
 %%% ==============================================================
 handle_info({quic, Event, _Stream, _Props} = Msg, State) when
@@ -410,7 +451,7 @@ forward_stream_msgs(Stream, Owner, Acc) ->
         {quic, Data, Stream, _Props} = Msg when is_binary(Data) ->
             forward_stream_msgs(Stream, Owner, [Msg | Acc])
     after 0 ->
-            Owner ! {stream_owner_handoff, self(), aggr_stream_data(Acc)},
+            Owner ! {stream_owner_handoff, Stream, self(), aggr_stream_data(Acc)},
             ok
     end.
 

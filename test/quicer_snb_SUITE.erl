@@ -141,7 +141,8 @@ all() ->
   , tc_listener_no_acceptor
     %% multistreams
   , tc_multi_streams
-  , tc_multi_streams_example_server
+  , tc_multi_streams_example_server_1
+  , tc_multi_streams_example_server_2
   ].
 
 %%--------------------------------------------------------------------
@@ -1327,8 +1328,7 @@ tc_multi_streams(Config) ->
                end),
   ok.
 
-
-tc_multi_streams_example_server(Config) ->
+tc_multi_streams_example_server_1(Config) ->
   ServerConnCallback = example_server_connection,
   ServerStreamCallback = example_server_stream,
   Port = select_port(),
@@ -1344,7 +1344,7 @@ tc_multi_streams_example_server(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(example, Port, Options),
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port,
                                              [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
@@ -1419,6 +1419,58 @@ tc_multi_streams_example_server(Config) ->
                                               , tag := "enter"
                                               },
                                              Trace))
+               end),
+  ok.
+
+tc_multi_streams_example_server_2(Config) ->
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 0},
+                  {peer_unidi_stream_count, 1} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 ClientConnOpts = [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
+                 {ok, ClientConnPid} = example_client_connection:start_link("localhost", Port,
+                                                                   {ClientConnOpts, default_stream_opts()}),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               },
+                              5000, 1000),
+                 ok,
+                 ct:pal("status : ~p", [sys:get_status(ClientConnPid)])
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace))
                end),
   ok.
 

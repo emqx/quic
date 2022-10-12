@@ -13,7 +13,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
--module(example_server_stream).
+-module(example_client_stream).
 
 -behavior(quicer_stream).
 
@@ -36,21 +36,13 @@
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
-init_handoff(Stream, StreamOpts, Conn, Flags) ->
-    InitState = #{ stream => Stream
-                 , conn => Conn
-                 , is_local => false
-                 , is_unidir => quicer:is_unidirectional(Flags)
-                 },
-    ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
-    {ok, InitState}.
+init_handoff(_Stream, _StreamOpts, _Conn, _Flags) ->
+    %% stream owner already set while starts.
+    {stop, not_impl, #{}}.
 
 new_stream(Stream, #{open_flags := Flags}, Conn) ->
-    InitState = #{ stream => Stream
-                  , conn => Conn
-                  , is_local => false
-                  , is_unidir => quicer:is_unidirectional(Flags)},
-    {ok, InitState}.
+    {ok, #{ stream => Stream, conn => Conn, is_local => false
+          , is_unidir => quicer:is_unidirectional(Flags)}}.
 
 peer_accepted(_Stream, _Flags, S) ->
     %% we just ignore it
@@ -83,33 +75,30 @@ send_complete(_Stream, true = _IsCanceled, S) ->
     ct:pal("~p : send is canceled", [?FUNCTION_NAME]),
     {ok, S}.
 
-
 send_shutdown_complete(_Stream, _Flags, S) ->
     ct:pal("~p : stream send is complete", [?FUNCTION_NAME]),
     {ok, S}.
 
-start_completed(_Stream, #{status := success, stream_id := StreamId}, S) ->
+start_completed(Stream, #{status := success, stream_id := StreamId}, S) ->
+    quicer:async_send(Stream, <<"ping_from_example">>, ?QUIC_SEND_FLAG_FIN bor ?QUICER_SEND_FLAG_SYNC),
     {ok, S#{stream_id => StreamId}};
 start_completed(_Stream, #{status := Other }, S) ->
     %% or we could retry
     {stop, {start_fail, Other}, S}.
 
-handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
-    %% for bidir stream, we just echo in place.
-    ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => bidir}),
-    {ok, _} = quicer:send(Stream, Bin),
+%% Local stream, Unidir
+handle_stream_data(Stream, Bin, _Flags, #{is_local := true, is_unidir := false} = State) ->
+    ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => local_bidir}),
+    ct:pal("Client recv: ~p from ~p", [Bin, Stream] ),
     {ok, State};
-handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, conn := Conn} = State) ->
-    ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
-    {ok, StreamProc} = quicer_stream:start_link(?MODULE, Conn,
-                                                [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
-                                                , {is_local, true}
-                                                ]),
-    {ok, _} = quicer_stream:send(StreamProc, Bin),
+%% Remote stream
+handle_stream_data(Stream, Bin, _Flags, #{is_local := false, is_unidir := true, conn := _Conn} = State) ->
+    ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => remote_unidir}),
+    ct:pal("Client recv: ~p from ~p", [Bin, Stream] ),
     {ok, State}.
 
-passive(_Stream, undefined, S)->
-    ct:fail("Steam go into passive mode"),
+passive(Stream, undefined, S)->
+    ct:fail("Steam ~p go into passive mode", [Stream]),
     {ok, S}.
 
 handle_call(_Stream, _Request, _Opts, S) ->

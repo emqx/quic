@@ -123,13 +123,11 @@ start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
 start_link(Callback, Stream, Conn, StreamOpts, StreamOpenFlags) when is_atom(Callback) ->
     gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, StreamOpenFlags], []).
 
-
 send(StreamProc, Data) ->
     send(StreamProc, Data, ?QUICER_SEND_FLAG_SYNC).
 
 send(StreamProc, Data, Flag) ->
     gen_server:call(StreamProc, {send, Data, Flag}, infinity).
-
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -173,12 +171,15 @@ init([Callback, Conn, StreamOpts]) ->
             %% Initiate local stream
             case quicer:start_stream(Conn, StreamOpts) of
                 {ok, Stream} ->
+                    IsUni = quicer:is_unidirectional(
+                              maps:get(open_flag, StreamOpts, ?QUIC_STREAM_START_FLAG_NONE)),
                     {ok, InitState#{ stream => Stream
                                    , is_owner => true
                                    , callback_state :=
                                          #{ conn => Conn
                                           , is_owner => true
                                           , is_local => true
+                                          , is_unidir => IsUni
                                           }
                                    }};
                 {error, Reason, SecReason} ->
@@ -233,8 +234,8 @@ handle_call({send, Data, Flag}, _From,
 
 handle_call(Request, _From,
             #{stream := Stream,
+              callback := CallbackModule,
               stream_opts := Options, callback_state := CallbackState} = State) ->
-    #{stream_callback := CallbackModule} = Options,
     try CallbackModule:handle_call(Stream, Request, Options, CallbackState) of
         {ok, Reply, NewCallbackState} ->
             {reply, Reply, State#{ callback_state := NewCallbackState
@@ -289,14 +290,12 @@ handle_info({quic, new_stream, Stream, Flags},
             {stop, {new_stream_crash, Reason}, State#{stream := Stream}}
     end;
 handle_info({quic, Bin, Stream, #{flags := Flags}},
-            #{stream := Stream, stream_opts := Options, callback_state := CallbackState}= State)
+            #{ stream := Stream, callback := CallbackModule
+             , callback_state := CallbackState } = State)
   when is_binary(Bin) ->
-    ?tp(stream_data, #{module=>?MODULE, stream=>Stream}),
-    #{stream_callback := CallbackModule} = Options,
-    try CallbackModule:handle_stream_data(Stream, Bin, Options, CallbackState) of
+    ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream}),
+    try CallbackModule:handle_stream_data(Stream, Bin, Flags, CallbackState) of
         {ok, NewCallbackState} ->
-            %% @todo this should be a configurable behavior
-            is_fin(Flags) andalso CallbackModule:shutdown(Stream),
             {noreply, State#{callback_state := NewCallbackState}};
         {error, Reason, NewCallbackState} ->
             {noreply, Reason, State#{callback_state := NewCallbackState}}
@@ -452,17 +451,11 @@ maybe_log_stracetrace(ST) ->
     logger:error("~p~n", [ST]),
     ok.
 
--spec is_fin(integer()) ->  boolean().
-is_fin(0) ->
-    false;
-is_fin(Flags) when is_integer(Flags) ->
-    (1 bsl 1) band Flags =/= 0.
-
 %% handoff must happen
 wait_for_handoff(Stream) ->
     %% @TODO 1. Monitor Conn Proc and handle EXIT
     receive
-        {stream_owner_handoff, _From, Msg} ->
+        {stream_owner_handoff, Stream, _From, Msg} ->
             ?tp(debug, #{event=>stream_owner_handoff_done, module=>?MODULE, stream=>Stream}),
             Msg
     %% For correctness we should never add timeout

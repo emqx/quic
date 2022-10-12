@@ -67,7 +67,7 @@ init([ListenerH, Opts]) ->
 
     OneChild = #{id => ignored,
                  start => {quicer_connection, start_link,
-                           [ListenerH, Opts]},
+                           [undefined, ListenerH, Opts]},
                  restart => temporary,
                  shutdown => 5000,
                  type => worker

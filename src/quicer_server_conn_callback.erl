@@ -38,18 +38,6 @@
         , new_stream/3
         ]).
 
-%% Stream Callbacks
--export([ start_completed/3
-        , send_complete/3
-        , peer_send_shutdown/3
-        , peer_send_aborted/3
-        , peer_receive_aborted/3
-        , send_shutdown_complete/3
-        , stream_closed/3
-        , peer_accepted/3
-        , passive/3
-        ]).
-
 init(ConnOpts) when is_list(ConnOpts) ->
     init(maps:from_list(ConnOpts));
 init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
@@ -115,9 +103,6 @@ streams_available(_C, {BidirCnt, UnidirCnt}, S) ->
 peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
 
-stream_closed(_Stream, _Flags, S) ->
-    {ok, S}.
-
 connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
                          , stream_callback := Callback} = S) ->
     %% @TODO configurable behavior of spawing stream acceptor
@@ -126,29 +111,6 @@ connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
 connected(_Connecion, _Flags, S) ->
     {ok, S}.
 
-peer_accepted(_Stream, _Flags, S) ->
-    {ok, S}.
-
-peer_receive_aborted(_Stream, _Flags, S) ->
-    {ok, S}.
-
-peer_send_aborted(_Stream, _Flags, S) ->
-    {ok, S}.
-
-peer_send_shutdown(_Stream, _Flags, S) ->
-    {ok, S}.
-
-send_complete(_Stream, _Flags, S) ->
-    {ok, S}.
-
-send_shutdown_complete(_Stream, _Flags, S) ->
-    {ok, S}.
-
-start_completed(_Stream, _Flags, S) ->
-    {ok, S}.
-
-passive(_Stream, undefined, S)->
-    {ok, S}.
 
 %% Internals
 
