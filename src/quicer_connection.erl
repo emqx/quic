@@ -108,7 +108,10 @@
 %% API
 -export([start_link/3, %% for client
          start_link/4, %% for server
-         handoff_stream/2]).
+         handoff_stream/2,
+         get_cb_state/1,
+         stream_send/6
+        ]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -163,6 +166,17 @@ handoff_stream(Stream, Owner) ->
         {error, _Reason} = E->
             E
     end.
+
+-spec get_cb_state(ConnPid :: pid()) -> {ok, cb_state()} | {error, any()}.
+get_cb_state(ConnPid) ->
+    gen_server:call(ConnPid, get_cb_state, infinity).
+
+-spec stream_send(ConnPid :: pid(), Callback :: atom(), Data :: iodata(), SendFlag :: send_flags(),
+                  StreamOpts :: stream_opts(), timeout())
+                 -> ok | {error, any()}.
+stream_send(ConnPid, Callback, Data, SendFlag, StreamOpts, Timeout) ->
+    gen_server:call(ConnPid, {stream_send, Callback, Data, SendFlag, StreamOpts}, Timeout).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -187,6 +201,7 @@ init([CallbackModule, {Host, Port}, {COpts, SOpts}])
 init([CallbackModule, {Host, Port}, {COpts, SOpts}])
   when is_atom(CallbackModule) andalso
        is_map(COpts) ->
+    process_flag(trap_exit, true),
     State0 = #{ listener => undefined
               , conn => undefined
               , callback => CallbackModule
@@ -246,8 +261,25 @@ init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) ->
           {noreply, NewState :: term(), hibernate} |
           {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
           {stop, Reason :: term(), NewState :: term()}.
+handle_call(get_cb_state, _From, #{ callback_state := CbState } = State) ->
+    {reply, CbState, State};
+handle_call({stream_send, Callback, Data, SendFlags, Opts}, _From,
+            #{ callback_state := _CbState, conn := Conn } = State) ->
+    ?tp(debug, #{module => ?MODULE, event => stream_send, conn => Conn}),
+    case quicer_stream:start_link(Callback, Conn, Opts) of
+        {ok, StreamPid} ->
+            try quicer_stream:send(StreamPid, Data, SendFlags) of
+                Res ->
+                    {reply, Res, State}
+            catch exit:Info:_ ->
+                    {reply , {error, {stream_down, Info}}, State}
+            end;
+        {error, Reason} ->
+            {reply, {error, {start_stream, Reason}}, State}
+    end;
+
 handle_call(_Request, _From, State) ->
-    Reply = ok,
+    Reply = {error, unimpl},
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
@@ -340,13 +372,14 @@ handle_info({quic, new_stream, Stream, Flags},
     ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event => new_stream}),
     default_cb_ret(M:new_stream(Stream, Flags, CbState), State);
 
-handle_info({quic, streams_available, BiDirStreams, UniDirStreams},
+handle_info({quic, streams_available, C, #{ bidi_streams := BidirStreams
+                                          , unidi_streams := UnidirStreams}},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
     ?tp(debug, #{module => ?MODULE, conn => C, event => streams_available,
-                 bidir_cnt => BiDirStreams, unidir_cnt => UniDirStreams}),
-    default_cb_ret(M:streams_available(C, {BiDirStreams, UniDirStreams}, CbState), State);
+                 bidir_cnt => BidirStreams, unidir_cnt => UnidirStreams}),
+    default_cb_ret(M:streams_available(C, {BidirStreams, UnidirStreams}, CbState), State);
 
 %% for https://github.com/microsoft/msquic/issues/3120
 handle_info({quic, peer_needs_streams, C, Needs},
@@ -372,17 +405,17 @@ handle_info({quic, nst_received, C, TicketBin},
 %%% @TODO, remove when we have stream signal handoff
 %%% !!! note, we don't handle recv event
 %%% ==============================================================
-handle_info({quic, Event, _Stream, _Props} = Msg, State) when
-      Event =:= start_completed orelse
-      Event =:= send_complete orelse
-      Event =:= peer_send_complete orelse
-      Event =:= peer_send_aborted orelse
-      Event =:= peer_receive_aborted orelse
-      Event =:= peer_shutdown_complete orelse
-      Event =:= stream_closed orelse
-      Event =:= peer_accepted orelse
-      Event =:= passive ->
-    quicer_stream:handle_info(Msg, State);
+%% handle_info({quic, Event, _Stream, _Props} = Msg, State) when
+%%       Event =:= start_completed orelse
+%%       Event =:= send_complete orelse
+%%       Event =:= peer_send_complete orelse
+%%       Event =:= peer_send_aborted orelse
+%%       Event =:= peer_receive_aborted orelse
+%%       Event =:= peer_shutdown_complete orelse
+%%       Event =:= stream_closed orelse
+%%       Event =:= peer_accepted orelse
+%%       Event =:= passive ->
+%%     quicer_stream:handle_info(Msg, State);
 
 %%% ==============================================================
 %%% Handle messages for link/monitor
@@ -448,8 +481,11 @@ format_status(_Opt, Status) ->
 -spec forward_stream_msgs(stream_handle(), pid(), list()) -> ok.
 forward_stream_msgs(Stream, Owner, Acc) ->
     receive
-        {quic, Data, Stream, _Props} = Msg when is_binary(Data) ->
-            forward_stream_msgs(Stream, Owner, [Msg | Acc])
+        {quic, Data, Stream, _Props} = Msg when is_binary(Data)  ->
+            forward_stream_msgs(Stream, Owner, [Msg | Acc]);
+        {quic, _, Stream, _} ->
+            %% @TODO We should not drop
+            forward_stream_msgs(Stream, Owner, Acc)
     after 0 ->
             Owner ! {stream_owner_handoff, Stream, self(), aggr_stream_data(Acc)},
             ok

@@ -161,6 +161,7 @@ init([Callback, Conn, StreamOpts]) ->
             %% Accept remote stream,
             case quicer:async_accept_stream(Conn, StreamOpts) of
                 {ok, Conn} ->
+                    ?tp(new_stream_accept, #{module=>?MODULE, conn=>Conn}),
                     {ok, InitState#{ stream => undefined
                                    , is_owner => false
                                    }};
@@ -171,6 +172,7 @@ init([Callback, Conn, StreamOpts]) ->
             %% Initiate local stream
             case quicer:start_stream(Conn, StreamOpts) of
                 {ok, Stream} ->
+                    ?tp(new_stream_local_start, #{module=>?MODULE, stream=>Stream}),
                     IsUni = quicer:is_unidirectional(
                               maps:get(open_flag, StreamOpts, ?QUIC_STREAM_START_FLAG_NONE)),
                     {ok, InitState#{ stream => Stream
@@ -308,11 +310,12 @@ handle_info({quic, Bin, Stream, #{flags := Flags}},
 handle_info({quic, start_completed, Stream,
              #{ status := _AtomStatus
               , stream_id := _StreamId
-              , is_peer_accepted := _PeerAccepted}} = Props
+              , is_peer_accepted := _PeerAccepted} = Props
+             }
            , #{ callback := M
               , callback_state := CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => start_completed, props => Props}),
-    default_cb_ret(M:start_complete(Stream, Props, CBState), State);
+    default_cb_ret(M:start_completed(Stream, Props, CBState), State);
 
 handle_info({quic, send_complete, Stream, IsSendCanceled},
             #{ callback := M
@@ -355,7 +358,7 @@ handle_info({quic, peer_accepted, Stream, undefined},
             #{ callback := M
              , callback_state := CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => peer_accepted}),
-    default_cb_ret(M:peer_accepted(Stream, CBState), State);
+    default_cb_ret(M:peer_accepted(Stream, undefined, CBState), State);
 
 handle_info({quic, passive, Stream, undefined},
             #{ callback := M
@@ -386,7 +389,7 @@ handle_continue(?post_init, #{ is_owner := false, stream := Stream} = State) ->
         {BinList, Len, Flag} ->
             ?tp(debug, #{event=>post_init_data, module=>?MODULE, stream=>Stream}),
             %% @TODO first data from the stream, offset 0,
-            Msg = {quic, iolist_to_binary(BinList), Stream,
+            Msg = {quic, iolist_to_binary(lists:reverse(BinList)), Stream,
                    #{absolute_offset => 0, len => Len, flags => Flag}},
             handle_info(Msg, State#{is_owner => true})
     end;

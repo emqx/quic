@@ -79,9 +79,13 @@ send_shutdown_complete(_Stream, _Flags, S) ->
     ct:pal("~p : stream send is complete", [?FUNCTION_NAME]),
     {ok, S}.
 
-start_completed(Stream, #{status := success, stream_id := StreamId}, S) ->
-    quicer:async_send(Stream, <<"ping_from_example">>, ?QUIC_SEND_FLAG_FIN bor ?QUICER_SEND_FLAG_SYNC),
+start_completed(Stream, #{status := success, stream_id := StreamId} = P, S) ->
+    ?tp(debug, #{stream => Stream, event => start_completed, module => ?MODULE, props => P}),
     {ok, S#{stream_id => StreamId}};
+start_completed(_Stream, #{status := stream_limit_reached, stream_id := StreamId}, S) ->
+    %% BUG in msquic is_peer_accepted = true?
+    {ok, S#{steam_id => StreamId}};
+
 start_completed(_Stream, #{status := Other }, S) ->
     %% or we could retry
     {stop, {start_fail, Other}, S}.

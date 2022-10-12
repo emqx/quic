@@ -143,6 +143,7 @@ all() ->
   , tc_multi_streams
   , tc_multi_streams_example_server_1
   , tc_multi_streams_example_server_2
+  , tc_multi_streams_example_server_3
   ].
 
 %%--------------------------------------------------------------------
@@ -1466,6 +1467,165 @@ tc_multi_streams_example_server_2(Config) ->
                               #{ ?snk_kind := debug
                                , data := <<"ping_from_example">>
                                , dir := remote_unidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace))
+               end),
+  ok.
+
+tc_multi_streams_example_server_3(Config) ->
+  %% Client send data over unidir stream and get message echo back. (ping_from_example)
+  %% Client try to start bidir stream but get blocked (ping_from_example_2)
+  %% Client send "flow_control.enable_bidi" over unidir stream to ask server
+  %% Server unblock bidi stream
+  %% Client start yet another stream bidir streams (ping_from_example_3)
+  %% All bidir streams get echo messages (ping_from_example, ping_from_example2, ping_from_example3) back.
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 0},
+                  {peer_unidi_stream_count, 4} |
+                  proplists:delete(peer_bidi_stream_count, default_listen_opts(Config))],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 ClientConnOpts = [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
+                 {ok, ClientConnPid} = example_client_connection:start_link("localhost", Port,
+                                                                   {ClientConnOpts, default_stream_opts()}),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               },
+                              5000, 1000),
+                 %% First Attempt blocking,
+                 {ok, _}  = quicer_connection:stream_send(ClientConnPid, example_client_stream, <<"ping_from_example_2">>,
+                                                          ?QUIC_SEND_FLAG_NONE, #{ is_local => true
+                                                                                 , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
+                                                                                 , start_flag =>
+                                                                                     ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 }, infinity),
+                 %% 2nd Attempt success over unidir stream and ask server to unblock the bidir stream
+                 %% This must success
+                 {ok, _} = quicer_connection:stream_send(ClientConnPid, example_client_stream, <<"flow_control.enable_bidi">>,
+                                                         ?QUIC_SEND_FLAG_NONE, #{ is_local => true
+                                                                                , open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL
+                                                                                , start_flag => ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
+                                                                                    bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
+                                                                                    bor ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
+                                                                                , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                }, infinity),
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"flow_control.enable_bidi">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               }, 5000, 1000),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , bidir_cnt := 1 %% 2-1
+                               , conn := _Conn
+                               , event := streams_available
+                               , module := quicer_connection
+                               }, 5000, 1000),
+
+                 {ok, _}  = quicer_connection:stream_send(ClientConnPid, example_client_stream, <<"ping_from_example_3">>,
+                                                          ?QUIC_SEND_FLAG_NONE, #{ is_local => true
+                                                                                 , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
+                                                                                 , start_flag => ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 }, infinity),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , event := peer_accepted
+                               , module := quicer_stream
+                               }, 5000, 1000),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_2">>
+                               , module := example_client_stream
+                               }, 5000, 1000),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_3">>
+                               , module := example_client_stream
+                               }, 5000, 1000)
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace)),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"flow_control.enable_bidi">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               },
+                              #{ ?snk_kind := debug
+                                 , bidir_cnt := 1 %% 2-1
+                                 , conn := _Conn
+                                 , event := streams_available
+                                 , module := quicer_connection
+                               },
+                              Trace)),
+
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_2">>
+                               , dir := bidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_2">>
+                               , dir := local_bidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace)),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_3">>
+                               , dir := bidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_3">>
+                               , dir := local_bidir
                                , module := example_client_stream
                                , stream := _Stream2
                                },

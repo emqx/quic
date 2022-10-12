@@ -94,13 +94,19 @@ start_completed(_Stream, #{status := Other }, S) ->
     %% or we could retry
     {stop, {start_fail, Other}, S}.
 
+handle_stream_data(Stream, <<"flow_control.enable_bidi">> = Bin, _Flags, #{is_unidir := true, conn := Conn} = State) ->
+    ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
+    ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => 2}),
+    {ok, State};
 handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     %% for bidir stream, we just echo in place.
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => bidir}),
+    ct:pal("Server recv: ~p from ~p", [Bin, Stream] ),
     {ok, _} = quicer:send(Stream, Bin),
     {ok, State};
 handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, conn := Conn} = State) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
+    ct:pal("Server recv: ~p from ~p", [Bin, Stream] ),
     {ok, StreamProc} = quicer_stream:start_link(?MODULE, Conn,
                                                 [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
                                                 , {is_local, true}
