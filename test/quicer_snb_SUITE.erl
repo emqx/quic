@@ -618,7 +618,7 @@ tc_conn_idle_close(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
-                   , {idle_timeout_ms, 1000}
+                   , {idle_timeout_ms, 3000}
                    | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
                | default_stream_opts() ],
