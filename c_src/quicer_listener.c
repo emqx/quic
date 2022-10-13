@@ -91,11 +91,12 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                        &addrStr_remote);
 
       ERL_NIF_TERM eserver_name;
-      CxPlatCopyMemory(enif_make_new_binary(env,
-                                  Event->NEW_CONNECTION.Info->ServerNameLength,
-                                  &eserver_name),
-             Event->NEW_CONNECTION.Info->ServerName,
-             Event->NEW_CONNECTION.Info->ServerNameLength);
+      CxPlatCopyMemory(
+          enif_make_new_binary(env,
+                               Event->NEW_CONNECTION.Info->ServerNameLength,
+                               &eserver_name),
+          Event->NEW_CONNECTION.Info->ServerName,
+          Event->NEW_CONNECTION.Info->ServerNameLength);
 
       ERL_NIF_TERM ealpns;
       CxPlatCopyMemory(
@@ -106,11 +107,11 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       ERL_NIF_TERM eclient_alpns;
       CxPlatCopyMemory(enif_make_new_binary(
-                 env,
-                 Event->NEW_CONNECTION.Info->ClientAlpnListLength,
-                 &eclient_alpns),
-             Event->NEW_CONNECTION.Info->ClientAlpnList,
-             Event->NEW_CONNECTION.Info->ClientAlpnListLength);
+                           env,
+                           Event->NEW_CONNECTION.Info->ClientAlpnListLength,
+                           &eclient_alpns),
+                       Event->NEW_CONNECTION.Info->ClientAlpnList,
+                       Event->NEW_CONNECTION.Info->ClientAlpnListLength);
 
       ERL_NIF_TERM ecrypto_buffer;
       CxPlatCopyMemory(

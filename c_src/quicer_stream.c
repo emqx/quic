@@ -728,14 +728,15 @@ handle_stream_event_recv(HQUIC Stream,
       if (s_ctx->is_wait_for_data)
         { // Owner is waiting for data
           // notify owner to trigger async recv
-          if (!enif_send(NULL,
-                         &(s_ctx->owner->Pid),
-                         env,
-                         make_event(env,
-                                    ATOM_QUIC_STATUS_CONTINUE,
-                                    // @TODO eHandle is in env, no need to copy?
-                                    enif_make_copy(env, s_ctx->eHandle),
-                                    ATOM_UNDEFINED)))
+          if (!enif_send(
+                  NULL,
+                  &(s_ctx->owner->Pid),
+                  env,
+                  make_event(env,
+                             ATOM_QUIC_STATUS_CONTINUE,
+                             // @TODO eHandle is in env, no need to copy?
+                             enif_make_copy(env, s_ctx->eHandle),
+                             ATOM_UNDEFINED)))
             {
               // App down, shutdown stream
               MsQuic->StreamShutdown(Stream,
@@ -904,16 +905,24 @@ handle_stream_event_shutdown_complete(QuicerStreamCTX *s_ctx,
           (uintptr_t)s_ctx->Stream,
           Event->SHUTDOWN_COMPLETE.ConnectionShutdown);
   assert(env);
-  ERL_NIF_TERM props_name[] = { ATOM_IS_CONN_SHUTDOWN, ATOM_IS_APP_CLOSING };
+
+  ERL_NIF_TERM props_name[] = {
+    ATOM_IS_CONN_SHUTDOWN,   ATOM_IS_APP_CLOSING, ATOM_IS_SHUTDOWN_BY_APP,
+    ATOM_IS_CLOSED_REMOTELY, ATOM_ERROR,          ATOM_STATUS
+  };
   ERL_NIF_TERM props_value[]
       = { ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.ConnectionShutdown),
-          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.AppCloseInProgress) };
+          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.AppCloseInProgress),
+          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.ConnectionShutdownByApp),
+          ATOM_BOOLEAN(Event->SHUTDOWN_COMPLETE.ConnectionClosedRemotely),
+          enif_make_uint64(env, Event->SHUTDOWN_COMPLETE.ConnectionErrorCode),
+          ATOM_STATUS(Event->SHUTDOWN_COMPLETE.ConnectionCloseStatus) };
   report = make_event_with_props(env,
                                  ATOM_STREAM_CLOSED,
                                  enif_make_copy(env, s_ctx->eHandle),
                                  props_name,
                                  props_value,
-                                 2);
+                                 6);
   enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }

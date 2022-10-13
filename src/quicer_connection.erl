@@ -67,7 +67,7 @@
 %% Handle connection handshake done
 %%      callback is suggested to accept new streams @see quicer:accept_stream/3
 
--callback transport_shutdown(connection_handle(), Reason::atom(), cb_state()) -> cb_ret().
+-callback transport_shutdown(connection_handle(), transport_shutdown_info(), cb_state()) -> cb_ret().
 %% Handle connection shutdown due to transport error with error reason.
 %%
 %% NOTE: Cleanup is prefered to be handled in @see closed/3
@@ -335,13 +335,13 @@ handle_info({quic, connected, C, #{is_resumed := IsResumed} = Props},
     %% @TODO add option to unlink from supervisor
     default_cb_ret(M:connected(C, Props, CbState), State#{is_resumed => IsResumed});
 
-handle_info({quic, transport_shutdown, C, Reason},
+handle_info({quic, transport_shutdown, C, DownInfo},
             #{ conn := C
              , callback := M
              , callback_state := CbState
              } = State) ->
     ?tp(debug, #{module => ?MODULE, conn => C, event => transport_shutdown}),
-    default_cb_ret(M:transport_shutdown(C, Reason, CbState), State);
+    default_cb_ret(M:transport_shutdown(C, DownInfo, CbState), State);
 
 handle_info({quic, shutdown, C, ErrorCode},
             #{ conn := C
