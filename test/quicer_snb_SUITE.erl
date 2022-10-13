@@ -1550,6 +1550,10 @@ tc_multi_streams_example_server_3(Config) ->
                                                                                  , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
                                                                                  }, infinity),
 
+                 {SenderStm, ReceiverStm} = maps:get(master_stream_pair, quicer_connection:get_cb_state(ClientConnPid)),
+                 ?assert(is_process_alive(ReceiverStm)),
+                 ?assert(not is_process_alive(SenderStm)), % with FIN flag
+
                  {ok, _} = ?block_until(
                               #{ ?snk_kind := debug
                                , event := peer_accepted
@@ -1566,10 +1570,13 @@ tc_multi_streams_example_server_3(Config) ->
                               #{ ?snk_kind := debug
                                , data := <<"ping_from_example_3">>
                                , module := example_client_stream
-                               }, 5000, 1000)
+                               }, 5000, 1000),
+
+                 quicer_connection:get_handle(ClientConnPid)
                end,
-               fun(_Result, Trace) ->
+               fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
+                   ?assert(undefined =/= Result),
                    ?assert(?strict_causality(
                               #{ ?snk_kind := debug
                                , data := <<"ping_from_example">>

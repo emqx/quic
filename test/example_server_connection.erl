@@ -85,7 +85,7 @@ nst_received(_Conn, _Data, S) ->
 
 
 new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
-                             , stream_opts := SOpts} = CBState) ->
+                           , stream_opts := SOpts} = CBState) ->
     %% Spawn new stream
     case quicer_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->

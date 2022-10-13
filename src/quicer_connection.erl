@@ -110,7 +110,8 @@
          start_link/4, %% for server
          handoff_stream/2,
          get_cb_state/1,
-         stream_send/6
+         stream_send/6,
+         get_handle/1
         ]).
 
 %% gen_server callbacks
@@ -140,6 +141,7 @@ start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when 
 %% start_link/4
 %% @doc Server starts acceptors for new connection on the Listener
 %% Get `CallbackModule` from conn_opts, key:`conn_callback` if `CallbackModule` is undefined,
+%% this is the entry for supervised acceptor.
 %% @end
 -spec start_link(CallbackModule :: undefined | module(),
                  Listener ::quicer:listener_handle(),
@@ -148,6 +150,13 @@ start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when 
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
+start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_list(COpts)->
+    case proplists:get_value(conn_callback, COpts, undefined) of
+        undefined ->
+            {error, missing_conn_callback};
+        Callback ->
+            start_link(Callback, Listener, Opts, Sup)
+    end;
 start_link(CallbackModule, Listener, Opts, Sup) ->
     gen_server:start_link(?MODULE, [CallbackModule, Listener, Opts, Sup], []).
 
@@ -176,6 +185,11 @@ get_cb_state(ConnPid) ->
                  -> ok | {error, any()}.
 stream_send(ConnPid, Callback, Data, SendFlag, StreamOpts, Timeout) ->
     gen_server:call(ConnPid, {stream_send, Callback, Data, SendFlag, StreamOpts}, Timeout).
+
+%% @doc get connection handle from quic connection process
+-spec get_handle(pid()) -> undefined | connection_handle().
+get_handle(ConnPid) ->
+    gen_server:call(ConnPid, get_handle, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -221,13 +235,9 @@ init([CallbackModule, {Host, Port}, {COpts, SOpts}])
     end;
 
 %% For Server
-init([undefined, Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
-    init([undefined, Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
-init([undefined, Listener, {LOpts, #{conn_callback := CallbackModule} = COpts, SOpts}, Sup]) ->
-    init([CallbackModule, Listener, {LOpts, maps:without([conn_callback], COpts), SOpts}, Sup]);
 init([CallbackModule, Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
     init([CallbackModule, Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
-init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) ->
+init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) when CallbackModule =/= undefined ->
     process_flag(trap_exit, true),
     State0 = #{ listener => Listener
               , conn => undefined
@@ -263,6 +273,8 @@ init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) ->
           {stop, Reason :: term(), NewState :: term()}.
 handle_call(get_cb_state, _From, #{ callback_state := CbState } = State) ->
     {reply, CbState, State};
+handle_call(get_handle, _From, #{ conn := Connection } = State) ->
+    {reply, Connection, State};
 handle_call({stream_send, Callback, Data, SendFlags, Opts}, _From,
             #{ callback_state := _CbState, conn := Conn } = State) ->
     ?tp(debug, #{module => ?MODULE, event => stream_send, conn => Conn}),

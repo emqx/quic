@@ -58,7 +58,7 @@ init(#{conn := Conn, stream_opts := SOpts} = ConnOpts) when is_map(ConnOpts) ->
                                                    , open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL
                                                    }),
     {ok,_} = quicer_stream:send(Stream1, <<"ping_from_example">>, ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN),
-    {ok, ConnOpts#{stream_pids => #{send_stream => Stream1, recv_stream => Stream2}}}.
+    {ok, ConnOpts#{master_stream_pair => {Stream1, Stream2}}}.
 
 closed(_Conn, #{is_peer_acked := true}, S)->
     {stop, normal, S};

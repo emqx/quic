@@ -49,6 +49,8 @@
         , tc_get_listeners/1
         , tc_get_listener/1
 
+        , tc_start_acceptor_without_callback/1
+
         , tc_conn_basic/1
         , tc_conn_basic_slow_start/1
         , tc_conn_basic_verify_peer/1
@@ -186,7 +188,6 @@ init_per_group(_Groupname, Config) ->
   Config.
 
 end_per_group(_Groupname, _Config) ->
-
   ok.
 
 
@@ -328,6 +329,12 @@ tc_open_listener_bind_v6(Config) ->
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).
 
+tc_start_acceptor_without_callback(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  ?assertEqual({error, missing_conn_callback},
+               quicer_connection:start_link(undefined, L, {[],[],[]}, self())).
+
 tc_get_listeners(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -427,7 +434,7 @@ tc_conn_basic_slow_start(Config)->
       ct:fail("timeout")
   end.
 
-tc_conn_basic_verify_peer(Config)->
+tc_conn_basic_verify_peer(_Config)->
   {ok, Conn} = quicer:connect("google.com", 443,
                               [ {verify, verify_peer}
                               %, {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
@@ -454,7 +461,10 @@ tc_conn_basic_verify_peer_no_cacert(Config)->
                     [ {verify, verify_peer}
                     , {peer_unidi_stream_count, 3}
                     , {alpn, ["sample"]}], 5000),
-   ok.
+
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
 
 tc_conn_timeout(Config)->
   Port = select_port(),
@@ -1341,6 +1351,7 @@ tc_setopt_conn_local_addr(Config) ->
   SPid ! done,
   ensure_server_exit_normal(Ref).
 
+%% Disabled, not always working with MsQuic
 tc_setopt_conn_local_addr_in_use(Config) ->
   Port = select_port(),
   Owner = self(),
@@ -1375,7 +1386,7 @@ tc_setopt_conn_local_addr_in_use(Config) ->
   %% change local addr with a new port 5060
   ?assertEqual({error,address_in_use}, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
 
-  %gen_udp:close(ESocket),
+  gen_udp:close(ESocket),
 
   %% sleep is needed to finish migration at protocol level
   ct:pal("send after migration failed"),
