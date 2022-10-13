@@ -33,8 +33,8 @@ ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
-                                     HQUIC *Configuration,
-                                     bool Unsecure);
+                                     HQUIC *Configuration);
+
 bool load_alpn(ErlNifEnv *env,
                const ERL_NIF_TERM *option,
                unsigned *alpn_buffer_length,

@@ -42,6 +42,10 @@ cover:
 	lcov -c  --directory c_build/CMakeFiles/quicer_nif.dir/c_src/ \
 	--output-file ./coverage/lcov.info
 
+.PHONY: cover-html
+cover-html: cover
+	genhtml -o coverage/ coverage/lcov.info
+
 .PHONY: dialyzer
 dialyzer:
 	$(REBAR) dialyzer

@@ -34,7 +34,7 @@
 %% Starts the supervisor
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(ListenerH :: quicer:listener_handler(),
+-spec start_link(ListenerH :: quicer:listener_handle(),
                  ConnOpts::map()) -> {ok, Pid :: pid()} |
           {error, {already_started, Pid :: pid()}} |
           {error, {shutdown, term()}} |
@@ -66,8 +66,8 @@ init([ListenerH, Opts]) ->
                  period => 5},
 
     OneChild = #{id => ignored,
-                 start => {quicer_conn_acceptor, start_link,
-                           [ListenerH, Opts]},
+                 start => {quicer_connection, start_link,
+                           [undefined, ListenerH, Opts]},
                  restart => temporary,
                  shutdown => 5000,
                  type => worker

@@ -150,6 +150,7 @@ init_s_ctx()
   s_ctx->TotalBufferLength = 0;
   s_ctx->is_buff_ready = FALSE;
   s_ctx->is_closed = TRUE; // init
+  s_ctx->event_mask = 0;
   return s_ctx;
 }
 

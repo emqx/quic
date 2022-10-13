@@ -47,23 +47,23 @@ static ERL_NIF_TERM set_listener_opt(ErlNifEnv *env,
                                      ERL_NIF_TERM elevel);
 
 static ERL_NIF_TERM
-get_config_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname);
+get_config_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_config_opt(ErlNifEnv *env,
-                                   HQUIC Handler,
+                                   HQUIC Handle,
                                    ERL_NIF_TERM optname,
                                    ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
-get_tls_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname);
+get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_tls_opt(ErlNifEnv *env,
-                                HQUIC Handler,
+                                HQUIC Handle,
                                 ERL_NIF_TERM optname,
                                 ERL_NIF_TERM optval);
 
 static ERL_NIF_TERM
-get_global_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname);
+get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname);
 static ERL_NIF_TERM set_global_opt(ErlNifEnv *env,
-                                   HQUIC Handler,
+                                   HQUIC Handle,
                                    ERL_NIF_TERM optname,
                                    ERL_NIF_TERM optval);
 
@@ -192,8 +192,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
 ERL_NIF_TERM
 ClientLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option, // map
-                        HQUIC *Configuration,
-                        bool Unsecure)
+                        HQUIC *Configuration)
 {
   QUIC_SETTINGS Settings = { 0 };
   //
@@ -220,8 +219,34 @@ ClientLoadConfiguration(ErlNifEnv *env,
   CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
-  if (Unsecure)
+
+  ERL_NIF_TERM verify;
+  char cert_path[PATH_MAX + 1] = { 0 };
+  if (enif_get_map_value(env, *option, ATOM_VERIFY, &verify))
     {
+      if (ATOM_VERIFY_PEER == verify)
+        {
+          // verify peer
+          if (get_str_from_map(env, ATOM_CERT, option, cert_path, PATH_MAX + 1)
+              > 0)
+            {
+              QUIC_CERTIFICATE_FILE *CertFile
+                  = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+                      sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
+              CertFile->CertificateFile = cert_path;
+              CredConfig.CertificateFile = CertFile;
+              CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+            }
+        }
+      else if (ATOM_VERIFY_NONE == verify)
+        {
+          // verify none
+          CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+        }
+    }
+  else
+    {
+      // fallback to verify none
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
     }
 
@@ -250,8 +275,8 @@ ClientLoadConfiguration(ErlNifEnv *env,
     }
 
   //
-  // Loads the TLS credential part of the configuration. This is required even
-  // on client side, to indicate if a certificate is required or not.
+  // Loads the TLS credential part of the configuration. This is required
+  // even on client side, to indicate if a certificate is required or not.
   //
   if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(*Configuration,
                                                                &CredConfig)))
@@ -538,7 +563,7 @@ encode_parm_to_eterm(ErlNifEnv *env,
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerBidiStreamCount,
                            Settings->PeerBidiStreamCount),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount,
-                           Settings->PeerBidiStreamCount),
+                           Settings->PeerUnidiStreamCount),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_MaxOperationsPerDrain,
                            Settings->MaxOperationsPerDrain),
           PropTupleAtomBool(ATOM_QUIC_SETTINGS_SendBufferingEnabled,
@@ -1678,7 +1703,7 @@ Exit:
 }
 
 static ERL_NIF_TERM
-get_tls_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
+get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1707,7 +1732,7 @@ get_tls_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(Handler, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Handle, Param, &BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
       res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
@@ -1722,7 +1747,7 @@ Exit:
 
 static ERL_NIF_TERM
 set_tls_opt(ErlNifEnv *env,
-            HQUIC Handler,
+            HQUIC Handle,
             ERL_NIF_TERM optname,
             __unused_parm__ ERL_NIF_TERM optval)
 {
@@ -1753,7 +1778,7 @@ set_tls_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(Handler, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Handle, Param, BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
       res = ATOM_OK;
@@ -1767,7 +1792,7 @@ Exit:
 }
 
 static ERL_NIF_TERM
-get_global_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
+get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1868,7 +1893,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(Handler, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Handle, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1884,7 +1909,7 @@ Exit:
 
 static ERL_NIF_TERM
 set_global_opt(ErlNifEnv *env,
-               HQUIC Handler,
+               HQUIC Handle,
                ERL_NIF_TERM optname,
                ERL_NIF_TERM optval)
 {
@@ -1948,7 +1973,7 @@ set_global_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(Handler, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Handle, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -1963,7 +1988,7 @@ Exit:
 }
 
 static ERL_NIF_TERM
-get_config_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
+get_config_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
@@ -1985,7 +2010,7 @@ get_config_opt(ErlNifEnv *env, HQUIC Handler, ERL_NIF_TERM optname)
     }
 
   assert(Param);
-  status = MsQuic->GetParam(Handler, Param, &BufferLength, Buffer);
+  status = MsQuic->GetParam(Handle, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {
@@ -2001,7 +2026,7 @@ Exit:
 
 static ERL_NIF_TERM
 set_config_opt(ErlNifEnv *env,
-               HQUIC Handler,
+               HQUIC Handle,
                ERL_NIF_TERM optname,
                ERL_NIF_TERM optval)
 {
@@ -2029,7 +2054,7 @@ set_config_opt(ErlNifEnv *env,
     }
 
   assert(Param);
-  status = MsQuic->SetParam(Handler, Param, BufferLength, Buffer);
+  status = MsQuic->SetParam(Handle, Param, BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
     {

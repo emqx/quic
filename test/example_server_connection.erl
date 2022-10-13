@@ -1,5 +1,5 @@
 %%--------------------------------------------------------------------
-%% Copyright (c) 2020-2022 EMQ Technologies Co., Ltd. All Rights Reserved.
+%% Copyright (c) 2022 EMQ Technologies Co., Ltd. All Rights Reserved.
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -13,7 +13,18 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
--module(quicer_server_conn_callback).
+
+
+%% @doc example server connection
+%% Function Spec:
+%% 1. Spawn a control stream acceptor
+%% 2. finish handshake with Peer
+%% 3. Close connection when control stream is shutdown/abort/closed.
+%% 4. When Peer need more stream, spawn one stream acceptor and then
+%%    bump the number of stream with flow control.
+%% 5. Terminate only when connection is closed by both endpoints.
+%% @end
+-module(example_server_connection).
 
 -behavior(quicer_connection).
 
@@ -45,20 +56,23 @@ init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
 init(ConnOpts) when is_map(ConnOpts) ->
     {ok, ConnOpts}.
 
-closed(_Conn, #{} = _Flags, S)->
-    {ok, S}.
+closed(_Conn, #{is_peer_acked := true}, S)->
+    {stop, normal, S};
+closed(_Conn, #{is_peer_acked := false}, S)->
+    {stop, abnorml, S}.
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
-    %% @TODO configurable behavior of spawning stream acceptor
-    case quicer_stream:start_link(maps:get(stream_callback, SOpts), Conn, SOpts) of
+    case quicer_stream:start_link(example_server_stream, Conn, SOpts) of
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
             {ok, S#{ conn => Conn
-                     %% @TODO track the streams?
-                   , streams => [{Pid, accepting}]}};
+                   , streams => [{Pid, undefined}]}};
         {error, _} = Error ->
             Error
     end.
+
+connected(_Conn, _Flags, S) ->
+    {ok, S}.
 
 resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
   when is_function(ResumeFun) ->
@@ -69,12 +83,11 @@ resumed(_Conn, _Data, S) ->
 nst_received(_Conn, _Data, S) ->
     {stop, no_nst_for_server, S}.
 
-%% handles stream when there is no stream acceptors.
-new_stream(Stream, Flags, #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
+
+new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
+                           , stream_opts := SOpts} = CBState) ->
     %% Spawn new stream
-    case quicer_stream:start_link(maps:get(stream_callback, SOpts), Stream, Conn,
-                                  SOpts, Flags)
-    of
+    case quicer_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
             quicer_connection:handoff_stream(Stream, StreamOwner),
             {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
@@ -82,8 +95,7 @@ new_stream(Stream, Flags, #{conn := Conn, streams := Streams, stream_opts := SOp
             Other
     end.
 
-shutdown(Conn, _ErrorCode, S) ->
-    quicer:async_close_connection(Conn),
+shutdown(_Conn, _ErrorCode, S) ->
     {ok, S}.
 
 transport_shutdown(_C, _Reason, S) ->
@@ -95,26 +107,15 @@ peer_address_changed(_C, _NewAddr, S) ->
 local_address_changed(_C, _NewAddr, S) ->
     {ok, S}.
 
-streams_available(_C, {BidirCnt, UnidirCnt}, S) ->
-    {ok, S# { peer_unidi_stream_count => UnidirCnt
-            , peer_bidi_stream_count => BidirCnt}}.
+streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
+    {ok, S}.
 
-%% @doc May integrate with App flow control
+peer_needs_streams(C, #{unidi_streams := Current}, S) ->
+    ok = quicer:setopt(C, param_conn_settings, #{peer_unidi_stream_count => Current + 1}),
+    {ok, S};
+peer_needs_streams(C, #{bidi_streams := Current}, S) ->
+    ok = quicer:setopt(C, param_conn_settings, #{peer_bidi_stream_count => Current + 1}),
+    {ok, S};
+%% for https://github.com/microsoft/msquic/issues/3120
 peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
-
-connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
-                         , stream_callback := Callback} = S) ->
-    %% @TODO configurable behavior of spawing stream acceptor
-    quicer_stream:start_link(Callback, Conn, SOpts),
-    {ok, S#{conn => Conn}};
-connected(_Connecion, _Flags, S) ->
-    {ok, S}.
-
-
-%% Internals
-
--ifdef(EUNIT).
-
-
--endif.

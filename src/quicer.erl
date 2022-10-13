@@ -56,7 +56,9 @@
         , async_accept_stream/2
         , start_stream/2
         , send/2
+        , send/3
         , async_send/2
+        , async_send/3
         , recv/2
         , send_dgram/2
         , shutdown_stream/1
@@ -81,6 +83,10 @@
         , perf_counters/0
         ]).
 
+%% helpers
+-export([ %% Stream flags tester
+          is_unidirectional/1
+        ]).
 %% Exports for test
 -export([ get_conn_rid/1
         , get_stream_rid/1
@@ -90,7 +96,7 @@
         , stop_listener/1
         ]).
 
--type connection_opts() :: proplists:proplist() | quicer_conn_acceptor:opts().
+-type connection_opts() :: proplists:proplist() | quicer_connection:opts().
 -type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
 
 %% @doc Quicer library must be opened before any use.
@@ -159,7 +165,7 @@ stop_listener(AppName) ->
 
 %% @doc Start listen on Port or "HOST:PORT".
 %%
-%% listener_handler() is used for accepting new connection.
+%% listener_handle() is used for accepting new connection.
 %% notes,
 %%
 %% 1. Port binding is done in NIF context, thus you cannot see it from inet:i().
@@ -169,7 +175,7 @@ stop_listener(AppName) ->
 %% 3. There is no address binding even HOST is specified.
 %% @end
 -spec listen(listen_on(), listen_opts()) ->
-        {ok, listener_handler()} |
+        {ok, listener_handle()} |
         {error, listener_open_error,  atom_reason()} |
         {error, listener_start_error, atom_reason()}.
 listen(ListenOn, Opts) when is_list(Opts) ->
@@ -177,8 +183,8 @@ listen(ListenOn, Opts) when is_list(Opts) ->
 listen(ListenOn, Opts) when is_map(Opts) ->
   quicer_nif:listen(ListenOn, Opts).
 
-%% @doc close listener with listener handler
--spec close_listener(listener_handler()) -> ok.
+%% @doc close listener with listener handle
+-spec close_listener(listener_handle()) -> ok.
 close_listener(Listener) ->
   quicer_nif:close_listener(Listener).
 
@@ -190,7 +196,7 @@ close_listener(Listener) ->
 %% @end
 -spec connect(inet:hostname() | inet:ip_address(),
               inet:port_number(), conn_opts(), timeout()) ->
-          {ok, connection_handler()} |
+          {ok, connection_handle()} |
           {error, conn_open_error | config_error | conn_start_error} |
           {error, timeout}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
@@ -203,7 +209,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   case quicer_nif:async_connect(Host, Port, NewOpts) of
     {ok, H} ->
       receive
-        {quic, connected, H} ->
+        {quic, connected, H, _} ->
           {ok, H};
         {quic, transport_shutdown, H, Reason} when Reason == connection_timeout
                                                    orelse Reason == connection_idle ->
@@ -223,7 +229,7 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
 %% @end
 -spec async_connect(inet:hostname() | inet:ip_address(),
               inet:port_number(), conn_opts()) ->
-          {ok, connection_handler()} |
+          {ok, connection_handle()} |
           {error, conn_open_error | config_error | conn_start_error}.
 async_connect(Host, Port, Opts) when is_list(Opts) ->
   async_connect(Host, Port, maps:from_list(Opts));
@@ -239,50 +245,50 @@ async_connect(Host, Port, Opts) when is_map(Opts) ->
 %% @end
 %% @see accept/3
 %% @see handshake/2
--spec handshake(connection_handler()) -> ok | {error, any()}.
+-spec handshake(connection_handle()) -> ok | {error, any()}.
 handshake(Conn) ->
   handshake(Conn, 5000).
 
 %% @doc Complete TLS handshake after accepted a Connection
 %% @see handshake/2
 %% @see async_handshake/1
--spec handshake(connection_handler(), timeout()) -> ok | {error, any()}.
+-spec handshake(connection_handle(), timeout()) -> ok | {error, any()}.
 handshake(Conn, Timeout) ->
   case async_handshake(Conn) of
     {error, _} = E -> E;
     ok ->
       receive
-        {quic, connected, Conn} -> {ok, Conn};
-        {quic, closed, Conn} -> {error, closed}
+        {quic, connected, Conn, _} -> {ok, Conn};
+        {quic, closed, Conn, _Flags} -> {error, closed}
       after Timeout ->
           {error, timeout}
       end
   end.
 
 %% @doc Complete TLS handshake after accepted a Connection.
-%% Caller should expect to receive ```{quic, connected, connection_handler()}'''
+%% Caller should expect to receive ```{quic, connected, connection_handle()}'''
 %%
 %% @see handshake/2
--spec async_handshake(connection_handler()) -> ok | {error, any()}.
+-spec async_handshake(connection_handle()) -> ok | {error, any()}.
 async_handshake(Conn) ->
   quicer_nif:async_handshake(Conn).
 
 %% @doc Accept new Connection (Server)
 %%
-%% Accept new connection from listener_handler().
+%% Accept new connection from listener_handle().
 %%
 %% Calling process becomes the owner of the connection.
 %% @end.
--spec accept(listener_handler(), acceptor_opts()) ->
-        {ok, connection_handler()} | {error, any()}.
+-spec accept(listener_handle(), acceptor_opts()) ->
+        {ok, connection_handle()} | {error, any()}.
 accept(LSock, Opts) ->
   accept(LSock, Opts, infinity).
 
 
 %% @doc Accept new Connection (Server) with timeout
 %% @see accept/2
--spec accept(listener_handler(), acceptor_opts(), timeout()) ->
-        {ok, connection_handler()} |
+-spec accept(listener_handle(), acceptor_opts(), timeout()) ->
+        {ok, connection_handle()} |
         {error, badarg | param_error | not_enough_mem | badpid} |
         {error, timeout}.
 accept(LSock, Opts, Timeout) when is_list(Opts) ->
@@ -291,16 +297,16 @@ accept(LSock, Opts, Timeout) ->
   % non-blocking
   {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
   receive
-    {quic, new_conn, C} ->
+    {quic, new_conn, C, _} ->
       {ok, C};
-    {quic, connected, C} ->
+    {quic, connected, C, _} ->
       {ok, C}
   after Timeout ->
     {error, timeout}
   end.
 
--spec async_accept(listener_handler(), acceptor_opts()) ->
-        {ok, listener_handler()} |
+-spec async_accept(listener_handle(), acceptor_opts()) ->
+        {ok, listener_handle()} |
         {error, badarg | param_error | not_enough_mem | badpid}.
 async_accept(Listener, Opts) ->
   NewOpts = maps:merge(default_conn_opts(), Opts),
@@ -308,7 +314,7 @@ async_accept(Listener, Opts) ->
 
 %% @doc Starts the shutdown process on a connection and block until it is finished.
 %% @see shutdown_connection/4
--spec shutdown_connection(connection_handler()) -> ok | {error, timeout | closed}.
+-spec shutdown_connection(connection_handle()) -> ok | {error, timeout | closed}.
 shutdown_connection(Conn) ->
   shutdown_connection(Conn, 5000).
 
@@ -316,14 +322,14 @@ shutdown_connection(Conn) ->
 %% but with a timeout
 %% @end
 %% @see shutdown_connection/4
--spec shutdown_connection(connection_handler(), timeout()) ->
+-spec shutdown_connection(connection_handle(), timeout()) ->
         ok | {error, timeout | badarg}.
 shutdown_connection(Conn, Timeout) ->
   shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, Timeout).
 
 %% @doc Starts the shutdown process on a connection with shutdown flag
 %% and applications error with 5s timeout
--spec shutdown_connection(connection_handler(),
+-spec shutdown_connection(connection_handle(),
                        conn_shutdown_flag(),
                        app_errno()
                       ) -> ok | {error, timeout | badarg}.
@@ -336,7 +342,7 @@ shutdown_connection(Conn, Flags, ErrorCode) ->
 %% @see shutdown_connection/1
 %% @see shutdown_connection/2
 %% @see shutdown_connection/3
--spec shutdown_connection(connection_handler(),
+-spec shutdown_connection(connection_handle(),
                        conn_shutdown_flag(),
                        app_errno(),
                        timeout()) -> ok | {error, timeout | badarg}.
@@ -345,7 +351,7 @@ shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
   case async_shutdown_connection(Conn, Flags, ErrorCode) of
     ok ->
       receive
-        {quic, closed, Conn} ->
+        {quic, closed, Conn, _Flags} ->
           ok
       after Timeout ->
           {error, timeout}
@@ -357,19 +363,19 @@ shutdown_connection(Conn, Flags, ErrorCode, Timeout) ->
 %% @doc Async starts the shutdown process and caller should expect for
 %% connection down message {quic, close, Conn}
 %% @end
--spec async_shutdown_connection(connection_handler(),
+-spec async_shutdown_connection(connection_handle(),
                                 conn_shutdown_flag(),
                                 app_errno()) -> ok | {error, badarg | closed}.
 async_shutdown_connection(Conn, Flags, ErrorCode) ->
   quicer_nif:async_shutdown_connection(Conn, Flags, ErrorCode).
 
--spec close_connection(connection_handler()) -> ok | {error, badarg}.
+-spec close_connection(connection_handle()) -> ok | {error, badarg}.
 close_connection(Conn) ->
   close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0, 5000).
 
 %% @doc Close connection with flag specified and application reason code.
 %% @see shutdown_connection/3
--spec close_connection(connection_handler(),
+-spec close_connection(connection_handle(),
                        conn_shutdown_flag(),
                        app_errno()
                       ) -> ok | {error, badarg | timeout}.
@@ -378,20 +384,20 @@ close_connection(Conn, Flags, ErrorCode) ->
 
 %% @doc Close connection with flag specified and application reason code with timeout
 %% @see shutdown_connection/4
--spec close_connection(connection_handler(),
+-spec close_connection(connection_handle(),
                        conn_shutdown_flag(),
                        app_errno(),
                        timeout()) -> ok | {error, badarg | timeout}.
 close_connection(Conn, Flags, ErrorCode, Timeout) ->
   shutdown_connection(Conn, Flags, ErrorCode, Timeout).
 
--spec async_close_connection(connection_handler()) -> ok.
+-spec async_close_connection(connection_handle()) -> ok.
 async_close_connection(Conn) ->
   async_close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0).
 
 %% @doc Async variant of {@link close_connection/4}
 %% @see async_close_connection/3
--spec async_close_connection(connection_handler(),
+-spec async_close_connection(connection_handle(),
                              conn_shutdown_flag(),
                              app_errno()) -> ok.
 async_close_connection(Conn, Flags, ErrorCode) ->
@@ -404,8 +410,8 @@ async_close_connection(Conn, Flags, ErrorCode) ->
 %% Once the Calling process is dead, closing stream will be triggered. (@TODO may not be default)
 %%
 %% @end
--spec accept_stream(connection_handler(), stream_opts()) ->
-        {ok, stream_handler()} |
+-spec accept_stream(connection_handle(), stream_opts()) ->
+        {ok, stream_handle()} |
         {error, badarg | internal_error | bad_pid | owner_dead} |
         {erro, timeout}.
 accept_stream(Conn, Opts) ->
@@ -419,8 +425,8 @@ accept_stream(Conn, Opts) ->
 %%
 %% @end
 %% @see async_accept_stream/2
--spec accept_stream(connection_handler(), stream_opts(), timeout()) ->
-        {ok, stream_handler()} |
+-spec accept_stream(connection_handle(), stream_opts(), timeout()) ->
+        {ok, stream_handle()} |
         {error, badarg | internal_error | bad_pid | owner_dead} |
         {erro, timeout}.
 accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
@@ -432,7 +438,7 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
   case quicer_nif:async_accept_stream(Conn, NewOpts) of
     {ok, Conn} ->
       receive
-        {quic, new_stream, Stream} ->
+        {quic, new_stream, Stream, _StreamFlags} ->
           {ok, Stream}
       after Timeout ->
           {error, timeout}
@@ -449,35 +455,35 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
 %%
 %% Caller process should expect to receive
 %% ```
-%% {quic, new_stream, stream_handler()}
+%% {quic, new_stream, stream_handle(), stream_open_flags()}
 %% '''
 %%
 %% note, it returns
 %%
 %% ```
-%% {ok, connection_handler()}.
+%% {ok, connection_handle()}.
 %% '''
 %% NOT
 %% ```
-%% {ok, stream_handler()}.
+%% {ok, stream_handle()}.
 %% '''
 %% @end
 %% @see async_accept_stream/2
--spec async_accept_stream(connection_handler(), proplists:proplist() | map()) ->
-        {ok, connection_handler()} | {error, any()}.
+-spec async_accept_stream(connection_handle(), proplists:proplist() | map()) ->
+        {ok, connection_handle()} | {error, any()}.
 async_accept_stream(Conn, Opts) when is_list(Opts) ->
   async_accept_stream(Conn, maps:from_list(Opts));
 async_accept_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:async_accept_stream(Conn, maps:merge(default_stream_opts(), Opts)).
 
-%% @doc Start new stream in connection, return new stream handler.
+%% @doc Start new stream in connection, return new stream handle.
 %%
 %% Calling process becomes the owner of the stream.
 %%
 %% Both client and server could start the stream
 %% @end
--spec start_stream(connection_handler(), stream_opts()) ->
-        {ok, stream_handler()} |
+-spec start_stream(connection_handle(), stream_opts()) ->
+        {ok, stream_handle()} |
         {error, badarg | internal_error | bad_pid | owner_dead} |
         {error, stream_open_error, atom_reason()} |
         {error, stream_start_error, atom_reason()}.
@@ -488,35 +494,57 @@ start_stream(Conn, Opts) when is_map(Opts) ->
 
 %% @doc Send binary data over stream, blocking until send request is handled by the transport worker.
 %% either succeeded or cancelled
--spec send(stream_handler(), iodata()) ->
+-spec send(stream_handle(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, cancelled}                        |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 send(Stream, Data) ->
-  case quicer_nif:send(Stream, Data, _IsSync = 1) of
+  send(Stream, Data, ?QUICER_SEND_FLAG_SYNC).
+
+%% @doc Send binary data over stream with send flags
+%% either succeeded or cancelled
+-spec send(stream_handle(), iodata(), non_neg_integer()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, cancelled}                        |
+        {error, badarg | not_enough_mem | closed} |
+        {error, stream_send_error, atom_reason()}.
+send(Stream, Data, Flag) ->
+  %% This is an sync send, set flag ?QUICER_SEND_FLAG_SYNC
+  case quicer_nif:send(Stream, Data, Flag bor ?QUICER_SEND_FLAG_SYNC) of
     %% @todo make ref
     {ok, _Len} = OK ->
       receive
-        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_SUCCESS} ->
+        {quic, send_complete, Stream, false} ->
           OK;
-        {quic, send_completed, Stream, ?QUIC_SEND_COMPLETE_CANCELLED} ->
+        {quic, send_complete, Stream, true} ->
           {error, cancelled}
       end;
     E ->
       E
   end.
 
-%% @doc async variant of {@link send/2}
-%% Caller should expect to receive
-%% ```{quic, send_completed, Stream, send_complete_flag()}'''
+%% @doc async variant of {@link send/3}
+%% If QUICER_SEND_FLAG_SYNC is set , the caller should expect to receive
+%% ```{quic, send_complete, Stream, send_complete_flag()}```
 %% note, check send_complete_flag() to ensure it is delivered or not.
--spec async_send(stream_handler(), iodata()) ->
+-spec async_send(stream_handle(), iodata(), non_neg_integer()) ->
+        {ok, BytesSent :: pos_integer()}          |
+        {error, badarg | not_enough_mem | closed} |
+        {error, stream_send_error, atom_reason()}.
+async_send(Stream, Data, Flag) ->
+  quicer_nif:send(Stream, Data, Flag).
+
+%% @doc async variant of {@link send/2}
+%% Caller should NOT expect to receive
+%% ```{quic, send_complete, Stream, send_complete_flag()}'''
+%% note, check send_complete_flag() to ensure it is delivered or not.
+-spec async_send(stream_handle(), iodata()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 async_send(Stream, Data) ->
-  quicer_nif:send(Stream, Data, _IsSync = 0).
+  async_send(Stream, Data, ?QUIC_SEND_FLAG_NONE).
 
 %% @doc Recv Data (Passive mode)
 %% Passive recv data from stream.
@@ -530,7 +558,7 @@ async_send(Stream, Data) ->
 %%
 %% note, the requested Len cannot exceed the 'stream_recv_window_default' specified in connection opts
 %% otherwise the function will never return
--spec recv(stream_handler(), Count::non_neg_integer())
+-spec recv(stream_handle(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
 recv(Stream, Count) ->
   do_recv(Stream, Count).
@@ -541,7 +569,7 @@ do_recv(Stream, Count) ->
       %% Data is not ready yet but last call has been reg.
       receive
         %% @todo recv_mark
-        {quic, Stream, continue} ->
+        {quic, continue, Stream, undefined} ->
           recv(Stream, Count)
       end;
     {ok, Bin} ->
@@ -554,7 +582,7 @@ do_recv(Stream, Count) ->
 %%
 %% ref: [https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram]
 %% @see send/2
--spec send_dgram(connection_handler(), binary()) ->
+-spec send_dgram(connection_handle(), binary()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
         {error, dgram_send_error, atom_reason()}.
@@ -574,7 +602,7 @@ send_dgram(Conn, Data) ->
 %%
 %% ref: [https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram]
 %% @see send/2
--spec shutdown_stream(stream_handler()) -> ok | {error, badarg}.
+-spec shutdown_stream(stream_handle()) -> ok | {error, badarg}.
 shutdown_stream(Stream) ->
   shutdown_stream(Stream, infinity).
 
@@ -583,7 +611,7 @@ shutdown_stream(Stream) ->
 %% returns when both endpoints closed the stream
 %%
 %% @see shutdown_stream/4
--spec shutdown_stream(stream_handler(), timeout()) ->
+-spec shutdown_stream(stream_handle(), timeout()) ->
         ok |
         {error, badarg} |
         {error, timeout}.
@@ -597,7 +625,7 @@ shutdown_stream(Stream, Timeout) ->
 %% Flags could be used to control the behavior like half-close.
 %% @end
 %% @see async_shutdown_stream/4
--spec shutdown_stream(stream_handler(),
+-spec shutdown_stream(stream_handle(),
                       stream_shutdown_flags(),
                       app_errno(),
                       timeout()) ->
@@ -608,7 +636,7 @@ shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
   case async_shutdown_stream(Stream, Flags, ErrorCode) of
     ok ->
       receive
-        {quic, closed, Stream, _IsGraceful} ->
+        {quic, stream_closed, Stream, _Flags} ->
           ok
       after Timeout ->
           {error, timeout}
@@ -620,7 +648,7 @@ shutdown_stream(Stream, Flags, ErrorCode, Timeout) ->
 
 %% @doc async variant of {@link shutdown_stream/2}
 %% @see async_shutdown_stream/3
--spec async_shutdown_stream(stream_handler()) ->
+-spec async_shutdown_stream(stream_handle()) ->
         ok |
         {error, badarg | atom_reason()}.
 async_shutdown_stream(Stream) ->
@@ -629,9 +657,9 @@ async_shutdown_stream(Stream) ->
 
 %% @doc async variant of {@link shutdown_stream/4}
 %% Caller should expect to receive
-%% ```{quic, closed, Stream, _IsGraceful}'''
+%% ```{quic, stream_closed, Stream, Flags}'''
 %%
--spec async_shutdown_stream(stream_handler(),
+-spec async_shutdown_stream(stream_handle(),
                          stream_shutdown_flags(),
                          app_errno())
                         -> ok | {error, badarg}.
@@ -640,13 +668,13 @@ async_shutdown_stream(Stream, Flags, Reason) ->
 
 %% @doc Normal shutdown stream with infinity timeout.
 %% @see close_stream/2
--spec close_stream(stream_handler()) -> ok | {error, badarg | timeout}.
+-spec close_stream(stream_handle()) -> ok | {error, badarg | timeout}.
 close_stream(Stream) ->
   close_stream(Stream, infinity).
 
 %% @doc Normal shutdown (App errno=0) Stream gracefully with timeout.
 %% @see close_stream/4
--spec close_stream(stream_handler(), timeout())
+-spec close_stream(stream_handle(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Timeout) ->
   close_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0, Timeout).
@@ -654,7 +682,7 @@ close_stream(Stream, Timeout) ->
 %% @doc Another name of shutdown stream for migration from tcp/ssl.
 %% @see close_stream/1
 %% @see shutdown_stream/4
--spec close_stream(stream_handler(), stream_shutdown_flags(),
+-spec close_stream(stream_handle(), stream_shutdown_flags(),
                    app_errno(), timeout())
                   -> ok | {error, badarg | timeout}.
 close_stream(Stream, Flags, ErrorCode, Timeout) ->
@@ -663,32 +691,29 @@ close_stream(Stream, Flags, ErrorCode, Timeout) ->
 %% @doc async variant of {@link close_stream/1}, prefer to use async_shutdown_stream/4
 %% @see close_stream/4
 %% @see async_shutdown_stream/4
--spec async_close_stream(stream_handler()) -> ok | {error, badarg}.
+-spec async_close_stream(stream_handle()) -> ok | {error, badarg}.
 async_close_stream(Stream) ->
   async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0).
 
 %% @doc Get socket name
 %% mimic {@link ssl:sockname/1}
--spec sockname(listener_handler() | connection_handler() | stream_handler()) ->
+-spec sockname(listener_handle() | connection_handle() | stream_handle()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 sockname(Conn) ->
   quicer_nif:sockname(Conn).
 
 %% @doc Get connection/stream/listener opts
 %% mimic {@link ssl:getopts/2}
--spec getopt(Handle::connection_handler()
-                   | stream_handler()
-                   | listener_handler(),
-             optname()) ->
-        {ok, OptVal::any()} | {error, any()}.
+-spec getopt(Handle::handle(), optname()) ->
+        {ok, OptVal::any()} | {error, any() | not_found}.
 getopt(Handle, Opt) ->
   quicer_nif:getopt(Handle, Opt, false).
 
 %% @doc Get connection/stream/listener opts
 %% mimic {@link ssl:getopt/2}
--spec getopt(handler(), optname(), optlevel()) ->
+-spec getopt(handle(), optname(), optlevel()) ->
         not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
-        {ok, conn_settings()}   | %% when optname = param_conn_settings
+        {ok, [any()]}   | %% when optname = param_conn_settings
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 getopt(Handle, Opt, Optlevel) ->
@@ -696,7 +721,7 @@ getopt(Handle, Opt, Optlevel) ->
 
 %% @doc Set connection/stream/listener opts
 %% mimic {@link ssl:setopt/2}
--spec setopt(handler(), optname(), any()) ->
+-spec setopt(handle(), optname(), any()) ->
         ok |
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
@@ -707,15 +732,15 @@ setopt({_Conn, Stream}, active, Value) ->
 setopt(Handle, Opt, Value) ->
   quicer_nif:setopt(Handle, Opt, Value, false).
 
-%% @doc get stream id with stream handler
--spec get_stream_id(Stream::stream_handler()) ->
-        {ok, integer()} | {error, any()}.
+%% @doc get stream id with stream handle
+-spec get_stream_id(Stream::stream_handle()) ->
+        {ok, integer()} | {error, any()} | not_found.
 get_stream_id(Stream) ->
   quicer_nif:getopt(Stream, param_stream_id, false).
 
 %% @doc get connection state
 %% mimic {@link ssl:getstat/2}
--spec getstat(connection_handler(), [inet:stat_option()]) ->
+-spec getstat(connection_handle(), [inet:stat_option()]) ->
         {ok, list()} | {error, any()}.
 getstat(Conn, Cnts) ->
   case quicer_nif:getopt(Conn, param_conn_statistics, false) of
@@ -732,17 +757,22 @@ getstat(Conn, Cnts) ->
 
 %% @doc Peer name
 %% mimic {@link ssl:peername/1}
--spec peername(connection_handler()  | stream_handler()) ->
+-spec peername(connection_handle()  | stream_handle()) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 peername(Handle) ->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
 
--spec get_conn_rid(connection_handler()) ->
+%% @doc Return true if stream open flags has unidirectional flag set
+-spec is_unidirectional(stream_open_flags()) -> boolean().
+is_unidirectional(Flags) ->
+  Flags band ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL > 0.
+
+-spec get_conn_rid(connection_handle()) ->
         {ok, non_neg_integer()} | {error, any()}.
 get_conn_rid(Conn) ->
   quicer_nif:get_conn_rid(Conn).
 
--spec get_stream_rid(stream_handler()) ->
+-spec get_stream_rid(stream_handle()) ->
         {ok, non_neg_integer()} | {error, any()}.
 get_stream_rid(Stream) ->
   quicer_nif:get_stream_rid(Stream).
@@ -764,11 +794,11 @@ listener(Name) ->
 %% @doc set controlling process for Connection/Stream.
 %% mimic {@link ssl:controlling_process/2}
 %% @end
--spec controlling_process(connection_handler() | stream_handler(), pid()) ->
+-spec controlling_process(connection_handle() | stream_handle(), pid()) ->
         ok |
         {error, closed | badarg | owner_dead | not_owner}.
-controlling_process(Handler, Pid) ->
-  quicer_nif:controlling_process(Handler, Pid).
+controlling_process(Handle, Pid) ->
+  quicer_nif:controlling_process(Handle, Pid).
 
 
 %%% @doc get QUIC stack performance counters

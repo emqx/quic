@@ -102,114 +102,114 @@ reg_close() ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec listen(listen_on(), listen_opts()) ->
-        {ok, listener_handler()} |
+        {ok, listener_handle()} |
         {error, listener_open_error,  atom_reason()} |
         {error, listener_start_error, atom_reason()}.
 listen(_ListenOn, _Options) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec close_listener(listener_handler()) -> ok.
+-spec close_listener(listener_handle()) -> ok.
 close_listener(_Listener) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec async_connect(hostname(), inet:port_number(), conn_opts()) ->
-        {ok, connection_handler()} |
+        {ok, connection_handle()} |
         {error, conn_open_error | config_error | conn_start_error}.
 async_connect(_Host, _Port, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_accept(listener_handler(), acceptor_opts()) ->
-        {ok, listener_handler()} |
+-spec async_accept(listener_handle(), acceptor_opts()) ->
+        {ok, listener_handle()} |
         {error, badarg | param_error | not_enough_mem | badpid}.
 async_accept(_Listener, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_handshake(connection_handler()) ->
+-spec async_handshake(connection_handle()) ->
         ok | {error, badarg | atom_reason()}.
 async_handshake(_Connection) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_shutdown_connection(connection_handler(), conn_shutdown_flag(), app_errno()) ->
+-spec async_shutdown_connection(connection_handle(), conn_shutdown_flag(), app_errno()) ->
         ok | {error, badarg}.
 async_shutdown_connection(_Conn, _Flags, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_accept_stream(connection_handler(), stream_opts()) ->
-        {ok, connection_handler()} |
+-spec async_accept_stream(connection_handle(), stream_opts()) ->
+        {ok, connection_handle()} |
         {error, badarg | internal_error | bad_pid | owner_dead}.
 async_accept_stream(_Conn, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec start_stream(connection_handler(), stream_opts()) ->
-        {ok, stream_handler()} |
+-spec start_stream(connection_handle(), stream_opts()) ->
+        {ok, stream_handle()} |
         {error, badarg | internal_error | bad_pid | owner_dead | not_enough_mem} |
         {error, stream_open_error, atom_reason()} |
         {error, stream_start_error, atom_reason()}.
 start_stream(_Conn, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec send(stream_handler(), iodata(), send_flags()) ->
+-spec send(stream_handle(), iodata(), send_flags()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
 send(_Stream, _Data, _Flags) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec recv(stream_handler(), non_neg_integer()) ->
+-spec recv(stream_handle(), non_neg_integer()) ->
         {ok, binary()}     |
         {ok, not_ready}     |
         {error, badarg | einval | closed}.
 recv(_Stream, _Len) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec send_dgram(connection_handler(), iodata(), send_flags()) ->
+-spec send_dgram(connection_handle(), iodata(), send_flags()) ->
   {ok, BytesSent :: pos_integer()} |
   {error, badarg | not_enough_memory | closed} |
   {error, dgram_send_error, atom_reason()}.
 send_dgram(_Conn, _Data, _Flags) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec async_shutdown_stream(stream_handler(), stream_shutdown_flags(), app_errno()) ->
+-spec async_shutdown_stream(stream_handle(), stream_shutdown_flags(), app_errno()) ->
         ok |
         {error, badarg | atom_reason()}.
 async_shutdown_stream(_Stream, _Flags, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec sockname(connection_handler() | stream_handler()) ->
+-spec sockname(connection_handle() | stream_handle()) ->
         {ok, {inet:ip_address(), inet:port_number()}} |
         {error, badarg | sockname_error}.
 sockname(_Conn) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec getopt(handler(), optname(), optlevel()) ->
+-spec getopt(handle(), optname(), optlevel()) ->
         not_found | %% `optname' not found, or wrong `optlevel' must be a bug.
-        {ok, conn_settings()}   | %% when optname = param_conn_settings
+        {ok, any()}   | %% when optname = param_conn_settings
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 
 getopt(_Handle, _Optname, _IsRaw) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec setopt(handler(), optname(), any(), optlevel()) ->
+-spec setopt(handle(), optname(), any(), optlevel()) ->
         ok |
         {error, badarg | param_error | internal_error | not_enough_mem} |
         {error, atom_reason()}.
 setopt(_Handle, _Opt, _Value, _Level) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_conn_rid(connection_handler()) ->
+-spec get_conn_rid(connection_handle()) ->
         {ok, non_neg_integer()} |
         {error, badarg | internal_error}.
 get_conn_rid(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_stream_rid(stream_handler()) ->
+-spec get_stream_rid(stream_handle()) ->
         {ok, non_neg_integer()} |
         {error, badarg | internal_error}.
 get_stream_rid(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec controlling_process(connection_handler() | stream_handler(), pid()) ->
+-spec controlling_process(connection_handle() | stream_handle(), pid()) ->
         ok |
         {error, closed | badarg | owner_dead | not_owner}.
 controlling_process(_H, _P) ->

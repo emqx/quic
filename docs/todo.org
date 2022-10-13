@@ -5,34 +5,83 @@
 * Features List
 
 Feature todo list, priority descending
+
+** Notify acceptors when listener/connecion is closed.
+
+** Handoff stream with the other signals
+
+** Stream behavior should able to handle multiple streams
+One process could become the owner of multiple streams in the scenario
+that these streams are correlated.
+
 ** Impl ConfigurationLoadCredential
 Load QUIC_CREDENTIAL_CONFIG to configuration
+
+** quicer_stream proc should able to handle more streams
 
 ** Close configurations in resource destroy callback
 
 ** Check shutdown connection wait for peer to close or not
 
-** Hibernate connection owner process since connection process is mostly idling
+** DONE Hibernate connection owner process since connection process is mostly idling
+Doable via return value of callback fun.
 
 ** get Peer cert
 
 ** Get/Set Context
 with lock protection set/get the callback context.
 
+** New API: open_send(connection_handler(), Data, Flags)
+Open stream over this connection and send without starting the stream
+
 ** RegistrationShutdown
 API for registrationshutdown, shutdown all connections under registration
-** Stream recv FIN flag
-
-** Stream send flags
 
 ** Unintentional Transport Migration
 
 ** NIF Segfault recover
 
-** Stream unidirectional/bidirectional awareness
-
 ** Different Application Profile (low latency, high throughput)
 
 ** NIF Upgrade
 
-** 0RTT support
+* Improvements
+
+- Set stream to passive when handoff is needed.
+
+- send buffering
+
+- event masks
+
+  Not all the events are interested by application.
+
+- close handle in worker callback ctx to get less scheduler blockings
+
+- Use imm handle
+  Maybe very less performance gain but still worth to change it.
+
+- 0-RTT NST
+
+  stateful and stateless.
+
+- make sending NST configurable
+
+- check types.
+
+- refactor DATAGRAM handling
+
+- Report StreamID in event: `new_stream`
+
+- Level of APIs
+
+  Current API are designd to easily migrate from TCP.
+
+  QUIC can provide more detailed error info that a simple {error, Info} cannot hold.
+
+  QUIC can provide more flags while doing any calls
+
+  So we may need different levels of APIs.
+  Level 1: Simple and for ease of migration from TCP/TLS
+  Level 2: Expose details but with some common generic behaviors
+  Level 3: Pure NIF calls, application caller manages everything but also means
+           Quicer must be more transparent

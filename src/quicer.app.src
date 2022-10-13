@@ -10,12 +10,12 @@
   {env,[]},
   {modules, [ quicer
             , quicer_app
+            , quicer_lib
             , quicer_listener
             , quicer_listener_sup
-            , quicer_conn_acceptor
+            , quicer_connection
             , quicer_conn_acceptor_sup
             , quicer_server_conn_callback
-            , quicer_server_stream_callback
             , quicer_stream
             , quicer_sup
             , quicer_nif]},

@@ -78,7 +78,7 @@ LOptions = [ {cert, "cert.pem"}
 {ok, Conn} = quicer:accept(L, [], 120000),
 {ok, Conn} = quicer:handshake(Conn),
 {ok, Stm} = quicer:accept_stream(Conn, []),
-receive {quic, <<"ping">>, Stm, _, _, _} -> ok end,
+receive {quic, <<"ping">>, Stm, _Props} -> ok end,
 {ok, 4} = quicer:send(Stm, <<"pong">>),
 quicer:close_listener(L).
 ```
@@ -91,7 +91,7 @@ Port = 4567,
 {ok, Conn} = quicer:connect("localhost", Port, [{alpn, ["sample"]}], 5000),
 {ok, Stm} = quicer:start_stream(Conn, []),
 {ok, 4} = quicer:send(Stm, <<"ping">>),
-receive {quic, <<"pong">>, Stm, _, _, _} -> ok end,
+receive {quic, <<"pong">>, Stm, _Props} -> ok end,
 ok = quicer:close_connection(Conn).
 ```
 

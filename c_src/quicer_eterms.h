@@ -103,13 +103,14 @@ extern ERL_NIF_TERM ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_EXPIRED;
 extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
+extern ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_NO_CERT;
 
 // option keys
 extern ERL_NIF_TERM ATOM_CERT;
 extern ERL_NIF_TERM ATOM_KEY;
 extern ERL_NIF_TERM ATOM_PASSWORD;
 extern ERL_NIF_TERM ATOM_ALPN;
-extern ERL_NIF_TERM ATOM_HANDLER;
+extern ERL_NIF_TERM ATOM_HANDLE;
 
 /*-------------------------------------------------------*/
 /*         msquic  execution profile for registration    */
@@ -244,6 +245,8 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_StatelessOperationExpirationMs;
 /* QUIC_STREAM_OPTS starts                                  */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
+extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_OPEN_FLAG;
+extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_START_FLAG;
 /*----------------------------------------------------------*/
 /* QUIC_STREAM_OPTS ends                                    */
 /*----------------------------------------------------------*/
@@ -252,18 +255,27 @@ extern ERL_NIF_TERM ATOM_QUIC_STREAM_OPTS_ACTIVE;
 /* Terms for message sending                                */
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_CLOSED;
+extern ERL_NIF_TERM ATOM_STREAM_CLOSED;
 extern ERL_NIF_TERM ATOM_LISTENER_STOPPED;
 extern ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 extern ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
+extern ERL_NIF_TERM ATOM_PEER_RECEIVE_ABORTED;
+extern ERL_NIF_TERM ATOM_PEER_ADDRESS_CHANGED;
+extern ERL_NIF_TERM ATOM_SEND_SHUTDOWN_COMPLETE;
+extern ERL_NIF_TERM ATOM_PEER_ACCEPTED;
+extern ERL_NIF_TERM ATOM_LOCAL_ADDRESS_CHANGED;
+extern ERL_NIF_TERM ATOM_STREAMS_AVAILABLE;
+extern ERL_NIF_TERM ATOM_PEER_NEEDS_STREAMS;
+extern ERL_NIF_TERM ATOM_START_COMPLETE;
 extern ERL_NIF_TERM ATOM_SEND_COMPLETE;
 extern ERL_NIF_TERM ATOM_SEND_DGRAM_COMPLETE;
 extern ERL_NIF_TERM ATOM_EINVAL;
 extern ERL_NIF_TERM ATOM_QUIC;
 extern ERL_NIF_TERM ATOM_DGRAM;
 extern ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
-extern ERL_NIF_TERM ATOM_QUIC_PASSIVE;
+extern ERL_NIF_TERM ATOM_PASSIVE;
 extern ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
 extern ERL_NIF_TERM ATOM_NST_RECEIVED;
 extern ERL_NIF_TERM ATOM_NST;
@@ -271,6 +283,7 @@ extern ERL_NIF_TERM ATOM_DEBUG;
 extern ERL_NIF_TERM ATOM_ONCE;
 extern ERL_NIF_TERM ATOM_NEW_CONN;
 extern ERL_NIF_TERM ATOM_CONNECTED;
+extern ERL_NIF_TERM ATOM_CONN_RESUMED;
 extern ERL_NIF_TERM ATOM_NEW_STREAM;
 
 /*----------------------------------------------------------*/
@@ -297,7 +310,35 @@ extern ERL_NIF_TERM ATOM_SNABBKAFFE_NEMESIS;
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SSL_KEYLOGFILE_NAME;
 extern ERL_NIF_TERM ATOM_ALLOW_INSECURE;
+extern ERL_NIF_TERM ATOM_VERIFY;
+extern ERL_NIF_TERM ATOM_VERIFY_NONE;
+extern ERL_NIF_TERM ATOM_VERIFY_PEER;
 
+/*----------------------------------------------------------*/
+/* Used in messages to the owners */
+/*----------------------------------------------------------*/
+extern ERL_NIF_TERM ATOM_IS_RESUMED;
+extern ERL_NIF_TERM ATOM_ALPNS;
+extern ERL_NIF_TERM ATOM_IS_HANDSHAKE_COMPLETED;
+extern ERL_NIF_TERM ATOM_IS_PEER_ACKED;
+extern ERL_NIF_TERM ATOM_IS_APP_CLOSING;
+extern ERL_NIF_TERM ATOM_BIDI_STREAMS;
+extern ERL_NIF_TERM ATOM_UNIDI_STREAMS;
+extern ERL_NIF_TERM ATOM_STATUS;
+extern ERL_NIF_TERM ATOM_STREAM_ID;
+extern ERL_NIF_TERM ATOM_IS_PEER_ACCEPTED;
+extern ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
+extern ERL_NIF_TERM ATOM_ABS_OFFSET;
+extern ERL_NIF_TERM ATOM_LEN;
+extern ERL_NIF_TERM ATOM_FLAGS;
+extern ERL_NIF_TERM ATOM_VER;
+extern ERL_NIF_TERM ATOM_LOCAL_ADDR;
+extern ERL_NIF_TERM ATOM_REMOTE_ADDR;
+extern ERL_NIF_TERM ATOM_SERVER_NAME;
+extern ERL_NIF_TERM ATOM_CLIENT_ALPNS;
+extern ERL_NIF_TERM ATOM_CRYPTO_BUFFER;
+
+extern ERL_NIF_TERM ATOM_UNDEFINED;
 /*----------------------------------------------------------*/
 /* ATOMS ends here                                          */
 /*----------------------------------------------------------*/

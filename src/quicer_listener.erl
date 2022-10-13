@@ -30,7 +30,7 @@
 -define(SERVER, ?MODULE).
 
 -record(state, { name :: atom()
-               , listener :: quicer:listener_handler()
+               , listener :: quicer:listener_handle()
                , conn_sup :: pid()
                , alpn :: [string()]
                }).
@@ -52,7 +52,7 @@
                  ListenOn :: listen_on(),
                  Options ::
                    { listener_opts()
-                   , quicer_conn_acceptor:opts()
+                   , quicer_connection:opts()
                    , quicer_stream:stream_opts()
                    }
                 ) -> {ok, Pid :: pid()} |

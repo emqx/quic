@@ -27,11 +27,17 @@ else()
   set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
+if (DEFINED ENV{QUICER_USE_LTTNG} AND  DEFINED ENV{QUICER_USE_SNK})
+  message(FATAL_ERROR "QUICER_USE_LTTNG and QUICER_USE_SNK cannot be defined at same time")
+endif()
+
 if (DEFINED ENV{QUICER_USE_LTTNG})
+  message(STATUS "Test Build with LTTNG, some Snabbkaffe tests will fail")
   add_compile_options(-DQUICER_USE_LTTNG)
 endif()
 
 if (DEFINED ENV{QUICER_USE_SNK})
+  message(STATUS "Test Build with Snabbkaffe")
   add_compile_options(-DQUICER_USE_SNK)
 endif()
 

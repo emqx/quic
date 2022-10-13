@@ -136,8 +136,14 @@ all() ->
   , tc_conn_gc
   , tc_conn_resume_old
   , tc_conn_resume_nst
+  , tc_conn_resume_nst_with_stream
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
+    %% multistreams
+  , tc_multi_streams
+  , tc_multi_streams_example_server_1
+  , tc_multi_streams_example_server_2
+  , tc_multi_streams_example_server_3
   ].
 
 %%--------------------------------------------------------------------
@@ -323,9 +329,9 @@ tc_stream_owner_down(Config) ->
                                               , tag := "event"
                                               , mark := ?QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE
                                               },
-                                             #{ ?snk_kind := peer_send_aborted
-                                              , module := quicer_stream
-                                              , reason := 0
+                                             #{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , error_code := 0
                                               },
                                              Trace))
                      end),
@@ -367,7 +373,7 @@ tc_conn_owner_down(Config) ->
                                 tag := "event"}, 1000, 1000)),
                  ?assert(timeout =/=
                            ?block_until(
-                              #{?snk_kind := quic_closed, module := quicer_conn_acceptor}, 1000, 1000)),
+                              #{?snk_kind := debug, event := closed, module := quicer_connection}, 1000, 1000)),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt),
                  {ok, CRid} = quicer:get_conn_rid(Conn),
@@ -433,11 +439,13 @@ tc_conn_owner_down(Config) ->
                                               },
                                              Trace)),
                    %% check that client side immediate shutdown triggers a close at server side
-                   ?assert(?strict_causality( #{ ?snk_kind := quic_shutdown
-                                               , module := quicer_conn_acceptor
+                   ?assert(?strict_causality( #{ ?snk_kind := debug
+                                               , event := shutdown
+                                               , module := quicer_connection
                                                , '~meta' := #{pid := _PID}},
-                                              #{ ?snk_kind := quic_closed
-                                               , module := quicer_conn_acceptor
+                                              #{ ?snk_kind := debug
+                                               , event := closed
+                                               , module := quicer_connection
                                                ,'~meta' := #{pid := _PID}},
                                               Trace))
                end),
@@ -565,6 +573,11 @@ tc_stream_close_errno(Config) ->
                               #{?snk_kind := debug, context := "callback",
                                 function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
                                 tag := "event"}, 1000, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug
+                               , event :=  peer_send_aborted
+                               , error_code := 1234
+                               }, 1000, 1000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -580,7 +593,7 @@ tc_stream_close_errno(Config) ->
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
-                                              , function := "ServerStreamCallback"
+                                              , function := "handle_stream_event_peer_send_aborted"
                                               , tag := "peer_send_aborted"
                                               , mark := Errno
                                               },
@@ -591,9 +604,9 @@ tc_stream_close_errno(Config) ->
                                               , tag := "event"
                                               , mark := ?QUIC_STREAM_EVENT_PEER_SEND_ABORTED
                                               },
-                                             #{ ?snk_kind := peer_send_aborted
-                                              , module := quicer_stream
-                                              , reason := Errno
+                                             #{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , error_code := Errno
                                               },
                                              Trace))
                      end),
@@ -815,10 +828,10 @@ tc_conn_no_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 {ok, CRid}
+                 {ok, CRid, Conn}
 
                end,
-               fun({ok, CRid}, Trace) ->
+               fun({ok, CRid, Conn}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -838,7 +851,9 @@ tc_conn_no_gc(Config) ->
                    %% Check that there is no GC
                    ?assertEqual(0, length([ E || #{ function := "resource_conn_dealloc_callback"
                                                   , resource_id := Rid
-                                                  } = E <- Trace, Rid == CRid]))
+                                                  } = E <- Trace, Rid == CRid])),
+                 %% Just keep the ref till end
+                  ?assert(Conn =/= undefined)
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
@@ -867,14 +882,17 @@ tc_conn_no_gc_2(Config) ->
                  _Child = spawn_link(fun() ->
                                          {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, {alpn, ["sample"]}], 5000),
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-                                         Parent ! {PRef, Conn, Stm},
+                                         {ok, ConnRid} = quicer:get_conn_rid(Conn),
+                                         Parent ! {PRef, Conn, ConnRid, Stm},
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
-                 {ClientConn, _ClientStream} = receive
-                                {PRef, C, S} -> {C, S}
-                              end,
+                 {ClientConn, CRid, _ClientStream} =
+                   receive
+                     %% Get ConnRid from client for Matches exact shutdown complete event
+                     {PRef, C, ConnRid, S} -> {C, ConnRid, S}
+                   end,
                  %% Server Process
                  {ok, #{resource_id := _SRid}}
                    = ?block_until(#{ ?snk_kind := debug
@@ -889,6 +907,7 @@ tc_conn_no_gc_2(Config) ->
                                    , context := "callback"
                                    , function := "ClientConnectionCallback"
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , resource_id := CRid
                                    , tag := "event" },
                                   5000, 1000),
                  %% Give it time for GC of `Conn' that caused by dead client process.
@@ -1002,8 +1021,17 @@ tc_conn_resume_old(Config) ->
 %%% Resume connection with connection opt: `nst'
 tc_conn_resume_nst(Config) ->
   Port = select_port(),
+  %% @TODO test Non empty 'Resume Data'
+  ExpectedSessionData = false,
+  ServerResumeCBFun = fun(_Conn, Data, S) ->
+                          ct:pal("recv resume data: ~p", [Data]),
+                          Data =/= ExpectedSessionData andalso
+                            ct:fail("Unexpected session data: ~p", [Data]),
+                          {ok, S}
+                      end,
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {resumed_callback, ServerResumeCBFun}
                    , {stream_acceptors, 32}
                      | default_conn_opts()],
   StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
@@ -1071,6 +1099,77 @@ tc_conn_resume_nst(Config) ->
                end),
   ok.
 
+%%% Resume connection with connection opt: `nst' and open stream with 0RTT
+tc_conn_resume_nst_with_stream(Config) ->
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_0_RTT}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
+                 NST = receive
+                         {quic, nst_received, Conn, Ticket} ->
+                           Ticket
+                       after 1000 ->
+                           ct:fail("No ticket received")
+                       end,
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
+
+                 {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST} | default_conn_opts()], 5000),
+                 {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
+                 {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% 1. verify that for each success connect we send a resumption ticket
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , resource_id := _CRid1
+                                              },
+                                             Trace)),
+                   %% 2. verify that resumption ticket is received on client side
+                   %%    and client use it to resume success
+                     ?assert(?causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMED
+                                              , resource_id := _SRid1
+                                              },
+                                             Trace))
+               end),
+  ok.
 
 %%% Non-blocking connection resume, client could send app data without waiting for handshake done.
 tc_conn_resume_nst_async(Config) ->
@@ -1177,6 +1276,368 @@ tc_listener_no_acceptor(Config) ->
                                        , tag := "start"
                                        },
                                       Trace))
+               end),
+  ok.
+
+
+tc_multi_streams(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+                 receive
+                   {quic, <<"ping2">>, Stm2,  _} -> ok
+                 after 100 -> ct:fail("no ping2")
+                 end
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(
+                                   #{ ?snk_kind := debug
+                                    , event := handoff_stream
+                                    , module := quicer_connection
+                                    , stream := _STREAM0
+                                    },
+                                   #{ ?snk_kind := debug
+                                    , event := stream_owner_handoff_done
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                Trace))
+               end),
+  ok.
+
+tc_multi_streams_example_server_1(Config) ->
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 10},
+                  {peer_unidi_stream_count, 0} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+                 receive
+                   {quic, <<"ping2">>, Stm2,  _} -> ok
+                 after 100 -> ct:fail("no ping2")
+                 end,
+
+                 quicer:async_accept_stream(Conn, []),
+                 %% Now we open unidirectional stream
+                 {ok, Stm3Out} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                 quicer:async_send(Stm3Out, <<"ping3">>),
+                 Stm3In = receive
+                            {quic, new_stream, Incoming, Flag} ->
+                              ct:pal("incoming stream from server: ~p", [Incoming]),
+                              true = quicer:is_unidirectional(Flag),
+                              Incoming
+                          after 1000 ->
+                              %%ct:fail("no incoming stream")
+                              %% reenable the check when it is fixed.
+                              %% https://github.com/microsoft/msquic/issues/3120
+                              ok
+                          end,
+                 receive
+                   {quic, Data, Stm3In, DFlag} ->
+                     ct:pal("~p is received from ~p with flag: ~p", [Data, Stm3In, DFlag]),
+                     ?assertEqual(Data, <<"ping3">>)
+                 after 1000 ->
+                     %% ct:fail("no incoming data")
+                     %% reenable the check when it is fixed.
+                     %% https://github.com/microsoft/msquic/issues/3120
+                     ok
+                 end,
+                 quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
+                 receive
+                   {quic, closed, Conn, _} ->
+                     ct:pal("Connecion is closed")
+                 end
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(
+                                   #{ ?snk_kind := debug
+                                    , event := handoff_stream
+                                    , module := quicer_connection
+                                    , stream := _STREAM0
+                                    },
+                                   #{ ?snk_kind := debug
+                                    , event := stream_owner_handoff_done
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                   Trace)),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs( #{ ?snk_kind := debug
+                                              , event := handoff_stream
+                                              , module := quicer_connection
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "nif"
+                                              , function := "stream_controlling_process"
+                                              , tag := "enter"
+                                              },
+                                             Trace))
+               end),
+  ok.
+
+tc_multi_streams_example_server_2(Config) ->
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 0},
+                  {peer_unidi_stream_count, 1} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 ClientConnOpts = [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
+                 {ok, ClientConnPid} = example_client_connection:start_link("localhost", Port,
+                                                                   {ClientConnOpts, default_stream_opts()}),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               },
+                              5000, 1000),
+                 ok,
+                 ct:pal("status : ~p", [sys:get_status(ClientConnPid)])
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace))
+               end),
+  ok.
+
+tc_multi_streams_example_server_3(Config) ->
+  %% Client send data over unidir stream and get message echo back. (ping_from_example)
+  %% Client try to start bidir stream but get blocked (ping_from_example_2)
+  %% Client send "flow_control.enable_bidi" over unidir stream to ask server
+  %% Server unblock bidi stream
+  %% Client start yet another stream bidir streams (ping_from_example_3)
+  %% All bidir streams get echo messages (ping_from_example, ping_from_example2, ping_from_example3) back.
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 0},
+                  {peer_unidi_stream_count, 4} |
+                  proplists:delete(peer_bidi_stream_count, default_listen_opts(Config))],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 ClientConnOpts = [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
+                 {ok, ClientConnPid} = example_client_connection:start_link("localhost", Port,
+                                                                   {ClientConnOpts, default_stream_opts()}),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               },
+                              5000, 1000),
+                 %% First Attempt blocking,
+                 {ok, _}  = quicer_connection:stream_send(ClientConnPid, example_client_stream, <<"ping_from_example_2">>,
+                                                          ?QUIC_SEND_FLAG_NONE, #{ is_local => true
+                                                                                 , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
+                                                                                 , start_flag =>
+                                                                                     ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 }, infinity),
+                 %% 2nd Attempt success over unidir stream and ask server to unblock the bidir stream
+                 %% This must success
+                 {ok, _} = quicer_connection:stream_send(ClientConnPid, example_client_stream, <<"flow_control.enable_bidi">>,
+                                                         ?QUIC_SEND_FLAG_NONE, #{ is_local => true
+                                                                                , open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL
+                                                                                , start_flag => ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
+                                                                                    bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
+                                                                                    bor ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
+                                                                                , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                }, infinity),
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"flow_control.enable_bidi">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               }, 5000, 1000),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , bidir_cnt := 1 %% 2-1
+                               , conn := _Conn
+                               , event := streams_available
+                               , module := quicer_connection
+                               }, 5000, 1000),
+
+                 {ok, _}  = quicer_connection:stream_send(ClientConnPid, example_client_stream, <<"ping_from_example_3">>,
+                                                          ?QUIC_SEND_FLAG_NONE, #{ is_local => true
+                                                                                 , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
+                                                                                 , start_flag => ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 }, infinity),
+
+                 {SenderStm, ReceiverStm} = maps:get(master_stream_pair, quicer_connection:get_cb_state(ClientConnPid)),
+                 ?assert(is_process_alive(ReceiverStm)),
+                 ?assert(not is_process_alive(SenderStm)), % with FIN flag
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , event := peer_accepted
+                               , module := quicer_stream
+                               }, 5000, 1000),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_2">>
+                               , module := example_client_stream
+                               }, 5000, 1000),
+
+                 {ok, _} = ?block_until(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_3">>
+                               , module := example_client_stream
+                               }, 5000, 1000),
+
+                 quicer_connection:get_handle(ClientConnPid)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assert(undefined =/= Result),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example">>
+                               , dir := remote_unidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace)),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"flow_control.enable_bidi">>
+                               , dir := unidir
+                               , module := example_server_stream
+                               },
+                              #{ ?snk_kind := debug
+                                 , bidir_cnt := 1 %% 2-1
+                                 , conn := _Conn
+                                 , event := streams_available
+                                 , module := quicer_connection
+                               },
+                              Trace)),
+
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_2">>
+                               , dir := bidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_2">>
+                               , dir := local_bidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace)),
+                   ?assert(?strict_causality(
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_3">>
+                               , dir := bidir
+                               , module := example_server_stream
+                               , stream := _Stream1
+                               },
+
+                              #{ ?snk_kind := debug
+                               , data := <<"ping_from_example_3">>
+                               , dir := local_bidir
+                               , module := example_client_stream
+                               , stream := _Stream2
+                               },
+                              _Stream1 =/= _Stream2,
+                              Trace))
                end),
   ok.
 

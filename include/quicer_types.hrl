@@ -22,6 +22,8 @@
 -define(BIT(Bits), (1 bsl (Bits))).
 -define(MASK(Bits), (?BIT(Bits) - 1)).
 
+-export_type([handle/0]).
+
 %% Msquic Status Code Translation
 -type atom_reason() ::
         success             |
@@ -51,20 +53,20 @@
 -type app_errno() :: non_neg_integer().
 -type hostname() :: string().
 
--type listener_handler()   :: reference().
--type connection_handler() :: reference().
--type stream_handler()     :: reference().
--type conf_handler()       :: reference().
--type reg_handler()        :: reference().
--type global_handler()     :: quic_global.
+-type listener_handle()   :: reference().
+-type connection_handle() :: reference().
+-type stream_handle()     :: reference().
+-type conf_handle()       :: reference().
+-type reg_handle()        :: reference().
+-type global_handle()     :: quic_global.
 
--type handler() ::
-        global_handler()     |
-        listener_handler()   |
-        connection_handler() |
-        stream_handler()     |
-        conf_handler()       |
-        reg_handler().
+-type handle() ::
+        global_handle()     |
+        listener_handle()   |
+        connection_handle() |
+        stream_handle()     |
+        conf_handle()       |
+        reg_handle().
 
 -type listen_on() :: inet:port_number() | string().
 -type listen_opts() :: listen_security_opts() | quic_settings().
@@ -123,7 +125,21 @@
                               ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
 -type acceptor_opts() :: map(). %% @TODO expand
 
--type stream_opts() :: map(). %% @TODO expand
+-type stream_opts() :: #{ active := boolean() | once | integer()
+                        , open_flag => stream_open_flags()
+                        , start_flag => stream_start_flags()
+                        , event_mask => uint32()
+                        }. %% @TODO expand
+
+-type stream_open_flags() ::  ?QUIC_STREAM_OPEN_FLAG_NONE |
+                              ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL | %% Open unidirectional stream
+                              ?QUIC_STREAM_OPEN_FLAG_0_RTT.           %% The stream is opened via a 0-RTT packet
+-type stream_start_flags() :: ?QUIC_STREAM_START_FLAG_NONE |
+                              ?QUIC_STREAM_START_FLAG_IMMEDIATE |           %% Immediately informs peer that stream is open
+                              ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED |        %% If number of streams is rate limited, notify with event start_completed with status 'stream_limit_reached'
+                              ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL |    %% Shutdown the stream immediately after start failure
+                              ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT. %% Indicate PEER_ACCEPTED event if not accepted at start
+
 -type stream_shutdown_flags() :: ?QUIC_STREAM_SHUTDOWN_FLAG_NONE |
                                  ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL |
                                  ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND |
@@ -150,7 +166,7 @@
         optname_configuration() |
         optname_tls().
                                                               %% | GET | SET|
--type optname_conn() ::   %% with connection_handler()
+-type optname_conn() ::   %% with connection_handle()
         %% /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */|
         param_conn_quic_version                   |           %% |  X  |    |
         param_conn_local_address                  |           %% |  X  |    | @TODO
@@ -172,7 +188,7 @@
         param_conn_peer_certificate_valid         |           %% |     |  X | @TODO
         param_conn_local_interface.                           %% |     |  X | @TODO
 
--type optname_tls()   ::  %% with connection_handler()
+-type optname_tls()   ::  %% with connection_handle()
         param_tls_schannel_context_attribute_w    |           %% |  X  |    | @TODO
         param_tls_handshake_info                  |           %% |  X  |  X | @TODO
         param_tls_negotiated_alpn.                            %% |  X  |    | @TODO
@@ -185,7 +201,7 @@
         param_stream_ideal_send_buffer_size       |           %% |  X  |    | @TODO
         param_stream_priority.                                %% |     |    |
 
--type optname_global() ::                                     %% with `undefined' handler
+-type optname_global() ::                                     %% with `undefined' handle
         param_global_retry_memory_percent |                   %% |  X  | X  | @TODO
         param_global_supported_versions   |                   %% |  X  |    | @TODO
         param_global_load_balacing_mode   |                   %% |  X  | X  | @TODO
@@ -195,7 +211,7 @@
 
 -type optname_reg() :: param_registration_cid_prefix.         %% |  X  | X  | @TODO
 
--type optname_configuration() ::                              %% with config_handler()
+-type optname_configuration() ::                              %% with config_handle()
         param_configuration_settings        |                 %% |  X  | X  | @TODO
         param_configuration_ticket_keys.                      %% |     | X  | @TODO
 
@@ -236,5 +252,36 @@
         quic_execution_profile_type_max_throughput |
         quic_execution_profile_type_scavenger |
         quic_execution_profile_type_realtime.
+
+%% Connection Event Props
+-type new_conn_props() :: #{ version      := integer()
+                           , local_addr   := string()
+                           , remote_addr  := string()
+                           , server_name  := binary()
+                           , alpns        := binary()
+                           , client_alpns := binary()
+                           , crypto_buffer:= binary()
+                           }.
+
+-type connected_props() :: #{ is_resumed := boolean()
+                            , alpns := string() | undefined
+                            }.
+
+-type conn_closed_props() :: map().
+
+%% Stream Event Props
+-type stream_start_completed_props() :: map().
+-type stream_closed_props() :: map().
+
+%% @doc QUIC Application error code, not protocol error code.
+%% The app error code will be passed to the peer while shutdown the connection.
+%% 0 means no error
+-type app_error() :: non_neg_integer().
+
+
+-type error_code() :: non_neg_integer().
+
+%% @doc addr in quicer, IP and Port
+-type quicer_addr() :: string().
 
 -endif. %% QUICER_TYPES_HRL
