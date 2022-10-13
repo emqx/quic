@@ -1003,11 +1003,19 @@ handle_connection_event_shutdown_initiated_by_transport(
   assert(QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report
-      = make_event(env,
-                   ATOM_TRANS_SHUTDOWN,
-                   enif_make_resource(env, c_ctx),
-                   ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status));
+
+  ERL_NIF_TERM props_name[] = { ATOM_STATUS, ATOM_ERROR };
+  ERL_NIF_TERM props_value[] = {
+    ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status),
+    enif_make_uint64(env, Event->SHUTDOWN_INITIATED_BY_TRANSPORT.ErrorCode),
+  };
+
+  ERL_NIF_TERM report = make_event_with_props(env,
+                                              ATOM_TRANS_SHUTDOWN,
+                                              enif_make_resource(env, c_ctx),
+                                              props_name,
+                                              props_value,
+                                              2);
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }

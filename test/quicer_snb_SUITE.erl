@@ -1256,7 +1256,8 @@ tc_listener_no_acceptor(Config) ->
   ?check_trace(#{timetrap => 10000},
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
-                 {error, transport_down, connection_refused} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {error, transport_down, #{status := connection_refused}}
+                   = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt),
                  timer:sleep(5000)

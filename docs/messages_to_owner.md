@@ -155,6 +155,10 @@ Both endpoints of sending and receiving of the stream have been shut down.
 ```erlang
 {quic, stream_closed, stream_handler(), #{ is_conn_shutdown := boolean()
                                          , is_app_closing := boolean()
+                                         , is_shutdown_by_app := boolean()
+                                         , is_closed_remotely := boolean()
+                                         , status := atom_reason()
+                                         , error := error_code()
                                          }
 ```
 
@@ -217,7 +221,9 @@ This message notifies the connection owner that quic connection is established (
 Connection has been shutdown by the transport locally, such as idle timeout.
 
 ``` erlang
-{quic, transport_shutdown, connection_handler(), Status :: atom_status()}
+{quic, transport_shutdown, connection_handler(), #{ status := atom_reason()
+                                                  , error := error_code()
+                                                  }
 ```
 
 ### Shutdown initiated by PEER

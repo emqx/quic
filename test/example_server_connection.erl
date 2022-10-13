@@ -98,7 +98,7 @@ new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
 shutdown(_Conn, _ErrorCode, S) ->
     {ok, S}.
 
-transport_shutdown(_C, _Reason, S) ->
+transport_shutdown(_C, _DownInfo, S) ->
     {ok, S}.
 
 peer_address_changed(_C, _NewAddr, S) ->

@@ -108,5 +108,16 @@ passive(Stream, undefined, S)->
 handle_call(_Stream, _Request, _Opts, S) ->
     {error, not_impl, S}.
 
-stream_closed(_Stream, _Flags, S) ->
+stream_closed(_Stream, #{ is_conn_shutdown := IsConnShutdown
+                        , is_app_closing := IsAppClosing
+                        , is_shutdown_by_app := IsAppShutdown
+                        , is_closed_remotely := IsRemote
+                        , status := Status
+                        , error := Code
+                        }, S) when is_boolean(IsConnShutdown) andalso
+                                   is_boolean(IsAppClosing) andalso
+                                   is_boolean(IsAppShutdown) andalso
+                                   is_boolean(IsRemote) andalso
+                                   is_atom(Status) andalso
+                                   is_integer(Code) ->
     {stop, normal, S}.

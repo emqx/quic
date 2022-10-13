@@ -86,7 +86,7 @@ shutdown(Conn, _ErrorCode, S) ->
     quicer:async_close_connection(Conn),
     {ok, S}.
 
-transport_shutdown(_C, _Reason, S) ->
+transport_shutdown(_C, _DownInfo, S) ->
     {ok, S}.
 
 peer_address_changed(_C, _NewAddr, S) ->

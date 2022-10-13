@@ -456,11 +456,13 @@ tc_conn_basic_verify_peer_no_cacert(Config)->
   receive listener_ready -> ok end,
 
   %% ErrorCode is different per platform
-  {error, transport_down, {unknown_quic_status, _ErrorCode}} =
-     quicer:connect("localhost", Port,
-                    [ {verify, verify_peer}
-                    , {peer_unidi_stream_count, 3}
-                    , {alpn, ["sample"]}], 5000),
+  {error,transport_down,
+   #{error := _ErrorCode,
+     status := {unknown_quic_status, _}}} =
+    quicer:connect("localhost", Port,
+                   [ {verify, verify_peer}
+                   , {peer_unidi_stream_count, 3}
+                   , {alpn, ["sample"]}], 5000),
 
   SPid ! done,
   ensure_server_exit_normal(Ref),
@@ -476,7 +478,8 @@ tc_conn_timeout(Config)->
                    end),
   receive
     listener_ready ->
-      {error, timeout} = quicer:connect("localhost", Port, default_conn_opts(), TOut),
+      {error, transport_down, #{error := 1, status := connection_idle}}
+        = quicer:connect("localhost", Port, default_conn_opts(), TOut),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -486,7 +489,11 @@ tc_conn_timeout(Config)->
 tc_async_conn_timeout(Config)->
   Port = select_port(),
   Owner = self(),
-  Tout = 100,
+  %% The value set here might not be the one actual in use
+  %% because loss detection takes many facts into account
+  %% A minimal value will be selected rather than this one
+  %% for more, look for QuicLossDetectionComputeProbeTimeout
+  Tout = 1000,
   {SPid, Ref} = spawn_monitor(
                    fun() ->
                        simple_slow_conn_server(Owner, Config, Port, Tout*2)
@@ -498,8 +505,9 @@ tc_async_conn_timeout(Config)->
       receive
         {quic, transport_shutdown, H, Reason} ->
           %% silent local close
-          ?assertEqual(connection_idle, Reason)
-       after Tout * 5 ->
+          ?assertEqual(#{ error => 1
+                        , status => connection_idle}, Reason)
+       after Tout * 10 ->
            ct:fail("conn didn't timeout")
       end,
       SPid ! done,
@@ -1226,7 +1234,7 @@ tc_idle_timeout(Config) ->
       {ok, Stm0} = quicer:start_stream(Conn, []),
       {ok, 5} = quicer:send(Stm0, <<"ping0">>),
       receive
-        {echo_server_transport_shutdown,  connection_idle} ->
+        {echo_server_transport_shutdown, connection_idle} ->
           ok
       end,
       case quicer:start_stream(Conn, []) of
@@ -1649,7 +1657,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
   receive
     {quic, stream_closed, Stm, _} ->
       ct:failed("Stream ~p is closed but shouldn't since QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL is unset", [Stm]);
-    {quic, transport_shutdown, Conn, connection_idle} ->
+    {quic, transport_shutdown, Conn, #{status := connection_idle}} ->
       ct:pal("Connection ~p transport shutdown due to idle, stream isn't closed ahead", [Conn])
   end,
   receive
@@ -2053,7 +2061,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
       ct:pal("echo server peer_send_shutdown", []),
       quicer:close_stream(Stm),
       echo_server_stm_loop(L, Conn, Stms);
-    {quic, transport_shutdown, Conn, ErrorAtom} ->
+    {quic, transport_shutdown, Conn, #{status := ErrorAtom}} ->
       ct:pal("echo server transport_shutdown due to ~p", [ErrorAtom]),
       get(echo_server_test_coordinator) ! {echo_server_transport_shutdown, ErrorAtom},
       echo_server_stm_loop(L, Conn, Stms);

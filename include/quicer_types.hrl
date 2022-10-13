@@ -269,6 +269,14 @@
 
 -type conn_closed_props() :: map().
 
+-type transport_shutdown_info() :: #{ is_conn_shutdown := boolean()
+                                    , is_app_closing := boolean()
+                                    , is_shutdown_by_app := boolean()
+                                    , is_closed_remotely := boolean()
+                                    , status := atom_reason()
+                                    , error := error_code()
+                                    }.
+
 %% Stream Event Props
 -type stream_start_completed_props() :: map().
 -type stream_closed_props() :: map().
