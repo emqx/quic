@@ -968,8 +968,8 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
   if (alpn_size > 0 && alpn_buff)
     {
       CxPlatCopyMemory(enif_make_new_binary(c_ctx->env, alpn_size, &ealpns),
-             alpn_buff,
-             alpn_size);
+                       alpn_buff,
+                       alpn_size);
     }
   else
     {
@@ -1272,8 +1272,8 @@ handle_connection_event_resumed(QuicerConnCTX *c_ctx,
       unsigned char *binbuff = enif_make_new_binary(
           env, Event->RESUMED.ResumptionStateLength, &edata);
       CxPlatCopyMemory(binbuff,
-             Event->RESUMED.ResumptionState,
-             Event->RESUMED.ResumptionStateLength);
+                       Event->RESUMED.ResumptionState,
+                       Event->RESUMED.ResumptionStateLength);
     }
   else
     {
