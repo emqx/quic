@@ -411,7 +411,7 @@ tc_conn_owner_down(Config) ->
                    %% check that client side immediate shutdown triggers a stream shutdown
                    ?assert(?causality(#{ ?snk_kind := debug
                                        , function := "resource_conn_down_callback"
-                                       , tag := "end"
+                                       , tag := "start" %% as long as it is started. (ConnectionClose is sync call in non-callback)
                                        , resource_id := CRid
                                        },
                                       #{ ?snk_kind := debug
