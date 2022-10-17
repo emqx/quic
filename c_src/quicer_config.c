@@ -199,7 +199,6 @@ ClientLoadConfiguration(ErlNifEnv *env,
   char cert_path[PATH_MAX + 1] = { 0 };
   char key_path[PATH_MAX + 1] = { 0 };
   char password[256] = { 0 };
-  ERL_NIF_TERM tmp_term;
   ERL_NIF_TERM ret = ATOM_OK;
   //
   // Configures the client's idle timeout.
@@ -377,7 +376,6 @@ load_verify(ErlNifEnv *env,
             bool default_verify)
 {
   ERL_NIF_TERM verify_atom;
-  int verify_atom_length;
   if (!enif_get_map_value(env, *options, ATOM_VERIFY, &verify_atom))
     return default_verify;
 
