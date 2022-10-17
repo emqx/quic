@@ -453,13 +453,10 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE, expired_certificate);            \
   ATOM(ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE, unknown_certificate);            \
   ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, cert_expired);                          \
-  ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
-       atom_quic_status_cert_untrusted_root);                                 \
+  ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT, cert_untrusted_root);            \
   ATOM(ATOM_QUIC_STATUS_CERT_NO_CERT, cert_no_cert);                          \
-  ATOM(ATOM_QUIC_STATUS_CERT_REQUIRED,                                        \
-       atom_quic_status_cert_required);                                       \
-  ATOM(ATOM_QUIC_STATUS_CERT_UNOBTAINABLE,                                    \
-       atom_quic_status_cert_unobtainable);                                   \
+  ATOM(ATOM_QUIC_STATUS_CERT_REQUIRED, cert_required);                        \
+  ATOM(ATOM_QUIC_STATUS_CERT_UNOBTAINABLE, cert_unobtainable);                \
   /*-------------------------------------------------------*/                 \
   /*         msquic  execution profile for reg             */                 \
   /*-------------------------------------------------------*/                 \
@@ -1163,6 +1160,8 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
     default:
       if ((status & (TLS_ERROR_BASE)) == (TLS_ERROR_BASE))
         {
+          // These may be different on various OS and the
+          // list is not complete. Room for improvement.
           int tlserror = (int) (status-(TLS_ERROR_BASE));
           switch (tlserror)
             {

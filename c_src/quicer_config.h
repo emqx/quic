@@ -21,7 +21,7 @@ limitations under the License.
 #include "quicer_nif.h"
 #include <msquichelper.h>
 
-#define DEBUG 1
+#ifdef DEBUG
 #define dbg(fmt, ...) \
     do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt "\r\n", __FILE__,  \
                             __LINE__, __func__, __VA_ARGS__); } while (0)
@@ -30,6 +30,7 @@ limitations under the License.
     do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt "\r\n", __FILE__,  \
                             __LINE__, __func__); } while (0)
 
+#endif
 
 BOOLEAN ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *Config);
 QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
