@@ -143,6 +143,7 @@ all() ->
   , tc_conn_resume_nst_with_stream
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
+  , tc_conn_stop_notify_acceptor
     %% multistreams
   , tc_multi_streams
   , tc_multi_streams_example_server_1
@@ -1301,6 +1302,51 @@ tc_listener_no_acceptor(Config) ->
                end),
   ok.
 
+tc_conn_stop_notify_acceptor(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, Listener} = quicer:listen(Port, ListenerOpts),
+                 {SPid, Ref} = spawn_monitor(fun() ->
+                                                 {ok, Conn} = quicer:accept(Listener, []),
+                                                 Acceptors = lists:map(fun(_) ->
+                                                                           spawn(quicer, accept_stream, [Conn, []])
+                                                                       end, lists:seq(1, 100)),
+                                                 {ok, Conn} = quicer:handshake(Conn),
+                                                 {error, closed} = quicer:accept_stream(Conn, []),
+                                                 exit({normal, Acceptors})
+                                             end),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), infinity),
+                 quicer:shutdown_connection(Conn),
+
+                 receive
+                   {'DOWN', Ref, process, SPid, {normal, AccPids}} ->
+                     ct:pal("Server process exit normaly"),
+                     ok = wait_for_die(AccPids);
+                   {'DOWN', Ref, process, SPid, Other} ->
+                     ct:fail("Server process exit abnormaly: ~p", [Other])
+                 after
+                   1000 ->
+                     ct:fail("Server process blocking: ~p", [process_info(SPid, messages)])
+                   end
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   Byes = lists:filter(fun(#{tag := "acceptor_bye"}) -> true;
+                                          (_) -> false
+                                       end, Trace),
+                   ?assertEqual(101, length(Byes)),
+                   ?assertEqual(101, length(?of_kind(stream_acceptor_conn_closed, Trace)))
+               end).
 
 tc_multi_streams(Config) ->
   Port = select_port(),
@@ -1707,6 +1753,15 @@ quicer_start_listener(Name, Port, Options, N) ->
       Error
   end.
 
+wait_for_die([]) ->
+  ok;
+wait_for_die([Pid | T]) ->
+  Ref = monitor(process, Pid),
+  receive
+    {'DOWN', Ref, process, Pid, Info}
+      when Info =:= normal orelse Info =:= noproc ->
+      wait_for_die(T)
+  end.
 
 gen_ca(Path) ->
   %% Generate ca.pem and ca.key which will be used

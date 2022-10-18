@@ -164,6 +164,7 @@ init([Callback, Conn, StreamOpts]) ->
                     ?tp(new_stream_accept, #{module=>?MODULE, conn=>Conn}),
                     {ok, InitState#{ stream => undefined
                                    , is_owner => false
+                                   , is_local => false
                                    }};
                 {error, Reason} ->
                     {stop, Reason}
@@ -273,6 +274,13 @@ handle_cast(_Request, State) ->
           {noreply, state(), Timeout :: timeout()} |
           {noreply, state(), hibernate} |
           {stop, Reason :: normal | term(), state()}.
+handle_info({quic, closed, undefined, undefined},
+            #{ is_local := false
+             , stream := undefined
+             , conn := Conn
+             } = S) ->
+    ?tp(debug, acceptor_recv_conn_stop, #{conn => Conn, module => ?MODULE, pid => self()}),
+    {stop, normal, S};
 handle_info({quic, new_stream, Stream, Flags},
             #{ stream_opts := Options
              , stream := undefined
@@ -280,7 +288,7 @@ handle_info({quic, new_stream, Stream, Flags},
              , callback := CallbackModule
              , callback_state := undefined
              } = State) ->
-    ?tp(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
+    ?tp(debug, new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
     try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}, Conn) of
         {ok, CallbackState} ->
             {noreply, State#{stream := Stream, callback_state := CallbackState}};
