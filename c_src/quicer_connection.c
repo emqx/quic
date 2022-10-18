@@ -1400,7 +1400,6 @@ handle_connection_event_peer_certificate_received(
   // @TODO peer_certificate_received
   // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
   assert(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED == Event->Type);
-  // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
   // Validate against CA certificates using OpenSSL API:s
   X509 *cert =
       (X509*) Event->PEER_CERTIFICATE_RECEIVED.Certificate;
