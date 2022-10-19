@@ -33,6 +33,7 @@ init_l_ctx()
       = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
+  l_ctx->cacertfile = NULL;
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   return l_ctx;
@@ -71,6 +72,7 @@ init_c_ctx()
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
+  c_ctx->trusted = NULL;
   c_ctx->TlsSecrets = NULL;
   c_ctx->ResumptionTicket = NULL;
   c_ctx->event_mask = 0;
@@ -84,6 +86,11 @@ void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
   enif_free_env(c_ctx->env);
+  if (c_ctx->trusted != NULL)
+    {
+      X509_STORE_free(c_ctx->trusted);
+      c_ctx->trusted = NULL;
+    }
   if (c_ctx->config_resource)
     {
       enif_release_resource(c_ctx->config_resource);
@@ -97,6 +104,11 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
   // Since enif_release_resource is async call,
   // we should demon the owner now!
+  if (c_ctx->trusted != NULL)
+    {
+      X509_STORE_free(c_ctx->trusted);
+      c_ctx->trusted = NULL;
+    }
   enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   enif_release_resource(c_ctx);
 }

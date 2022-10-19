@@ -21,6 +21,17 @@ limitations under the License.
 #include "quicer_nif.h"
 #include <msquichelper.h>
 
+#ifdef DEBUG
+#define dbg(fmt, ...) \
+    do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt "\r\n", __FILE__,  \
+                            __LINE__, __func__, __VA_ARGS__); } while (0)
+
+#define dbg1(fmt) \
+    do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt "\r\n", __FILE__,  \
+                            __LINE__, __func__); } while (0)
+
+#endif
+
 BOOLEAN ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *Config);
 QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
                              QUIC_CREDENTIAL_CONFIG *config,
@@ -33,12 +44,16 @@ ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
-                                     HQUIC *Configuration);
+                                     HQUIC *Configuration,
+                                     bool HasCaCertFile);
 
 bool load_alpn(ErlNifEnv *env,
                const ERL_NIF_TERM *option,
                unsigned *alpn_buffer_length,
                QUIC_BUFFER alpn_buffers[]);
+bool load_verify(ErlNifEnv *env,
+                 const ERL_NIF_TERM *option,
+                 const bool default_verify);
 bool get_uint8_from_map(ErlNifEnv *env,
                         const ERL_NIF_TERM map,
                         ERL_NIF_TERM key,

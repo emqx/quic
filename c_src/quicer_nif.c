@@ -20,6 +20,9 @@ limitations under the License.
 
 #include "quicer_listener.h"
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
 static ERL_NIF_TERM connection_controlling_process(ErlNifEnv *env,
                                                    QuicerConnCTX *c_ctx,
                                                    const ErlNifPid *caller,
@@ -87,6 +90,7 @@ ERL_NIF_TERM ATOM_ERROR_USER_CANCELED;
 ERL_NIF_TERM ATOM_ERROR_ALPN_NEG_FAILURE;
 
 ERL_NIF_TERM ATOM_UNKNOWN_STATUS_CODE;
+ERL_NIF_TERM ATOM_UNKNOWN_TLS_STATUS_CODE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_SUCCESS;
 ERL_NIF_TERM ATOM_QUIC_STATUS_PENDING;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CONTINUE;
@@ -120,6 +124,8 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_EXPIRED;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
 ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_NO_CERT;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_REQUIRED;
+ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNOBTAINABLE;
 
 // option keys
 ERL_NIF_TERM ATOM_CERT;
@@ -127,6 +133,10 @@ ERL_NIF_TERM ATOM_KEY;
 ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
 ERL_NIF_TERM ATOM_HANDLE;
+ERL_NIF_TERM ATOM_VERIFY;
+ERL_NIF_TERM ATOM_PEER;
+ERL_NIF_TERM ATOM_NONE;
+ERL_NIF_TERM ATOM_CACERTFILE;
 
 /*-------------------------------------------------------*/
 /*         msquic  execution profile for registration    */
@@ -411,6 +421,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_ERROR_ALPN_NEG_FAILURE, alpn_neg_failure);                        \
                                                                               \
   ATOM(ATOM_UNKNOWN_STATUS_CODE, unknown_quic_status);                        \
+  ATOM(ATOM_UNKNOWN_TLS_STATUS_CODE, unknown_quic_tls_status);                \
   ATOM(ATOM_QUIC_STATUS_SUCCESS, success);                                    \
   ATOM(ATOM_QUIC_STATUS_PENDING, pending);                                    \
   ATOM(ATOM_QUIC_STATUS_CONTINUE, continue);                                  \
@@ -442,9 +453,10 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_STATUS_EXPIRED_CERTIFICATE, expired_certificate);            \
   ATOM(ATOM_QUIC_STATUS_UNKNOWN_CERTIFICATE, unknown_certificate);            \
   ATOM(ATOM_QUIC_STATUS_CERT_EXPIRED, cert_expired);                          \
-  ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT,                                  \
-       atom_quic_status_cert_untrusted_root);                                 \
+  ATOM(ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT, cert_untrusted_root);            \
   ATOM(ATOM_QUIC_STATUS_CERT_NO_CERT, cert_no_cert);                          \
+  ATOM(ATOM_QUIC_STATUS_CERT_REQUIRED, cert_required);                        \
+  ATOM(ATOM_QUIC_STATUS_CERT_UNOBTAINABLE, cert_unobtainable);                \
   /*-------------------------------------------------------*/                 \
   /*         msquic  execution profile for reg             */                 \
   /*-------------------------------------------------------*/                 \
@@ -595,6 +607,10 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_HANDLE, handle);                                                  \
+  ATOM(ATOM_VERIFY, verify);                                                  \
+  ATOM(ATOM_CACERTFILE, cacertfile);                                          \
+  ATOM(ATOM_PEER, peer);                                                      \
+  ATOM(ATOM_NONE, none);                                                      \
   ATOM(ATOM_CLOSED, closed);                                                  \
   ATOM(ATOM_STREAM_CLOSED, stream_closed);                                    \
   ATOM(ATOM_LISTENER_STOPPED, listener_stopped);                              \
@@ -713,6 +729,11 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
       // process is able to access the listener via any l_ctx
       MsQuic->ListenerClose(l_ctx->Listener);
     }
+
+  if (l_ctx->cacertfile) {
+      CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
+      l_ctx->cacertfile = NULL;
+  }
 
   deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
@@ -839,6 +860,7 @@ on_load(ErlNifEnv *env,
   }
   INIT_ATOMS
 #undef ATOM
+
 
   ErlNifResourceFlags flags
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
@@ -1112,6 +1134,9 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
     case QUIC_STATUS_TLS_ERROR:
       eterm = ATOM_QUIC_STATUS_TLS_ERROR;
       break;
+    case QUIC_STATUS_BAD_CERTIFICATE:
+      eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+      break;
     case QUIC_STATUS_USER_CANCELED:
       eterm = ATOM_QUIC_STATUS_USER_CANCELED;
       break;
@@ -1133,8 +1158,40 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
       break;
     */
     default:
-      eterm = enif_make_tuple2(
-          env, ATOM_UNKNOWN_STATUS_CODE, ETERM_UINT_64(status));
+      if ((status & (TLS_ERROR_BASE)) == (TLS_ERROR_BASE))
+        {
+          // These may be different on various OS and the
+          // list is not complete. Room for improvement.
+          int tlserror = (int) (status-(TLS_ERROR_BASE));
+          switch (tlserror)
+            {
+            case TLS1_AD_UNKNOWN_CA:
+              eterm = ATOM_QUIC_STATUS_CERT_UNTRUSTED_ROOT;
+              break;
+            case TLS13_AD_CERTIFICATE_REQUIRED:
+              eterm = ATOM_QUIC_STATUS_CERT_REQUIRED;
+              break;
+            case TLS1_AD_CERTIFICATE_UNOBTAINABLE:
+              eterm = ATOM_QUIC_STATUS_CERT_UNOBTAINABLE;
+              break;
+            case TLS1_AD_UNRECOGNIZED_NAME:
+              eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+              break;
+            case TLS1_AD_BAD_CERTIFICATE_STATUS_RESPONSE:
+              eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+              break;
+            case TLS1_AD_BAD_CERTIFICATE_HASH_VALUE:
+              eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+              break;
+            default:
+              eterm = enif_make_tuple2(env,
+                                       ATOM_UNKNOWN_TLS_STATUS_CODE,
+                                       ETERM_UINT_64(tlserror));
+            }
+        }
+      else
+        eterm = enif_make_tuple2(env, ATOM_UNKNOWN_STATUS_CODE,
+                                 ETERM_UINT_64(status));
     }
   return eterm;
 }

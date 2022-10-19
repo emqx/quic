@@ -39,6 +39,7 @@ limitations under the License.
 #define QUICER_CERTIFICATE_FILE_PROTECTED                                     \
   'B0rQ' // 'Qr0b'  QUICER_CERTIFICATE_FILE_PROTECTED
 #define QUICER_RESUME_TICKET 'C0rQ' // 'Qr0c'  QUICER_RESUME_TICKET
+#define QUICER_CACERTFILE 'D0rQ' // 'Qr0d'  QUICER_CACERTFILE
 
 typedef enum ACCEPTOR_RECV_MODE
 {

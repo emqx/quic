@@ -20,6 +20,7 @@ limitations under the License.
 #include "quicer_nif.h"
 #include "quicer_queue.h"
 #include <msquichelper.h>
+#include <openssl/x509.h>
 
 #define _CTX_CALLBACK_WRITE_
 #define _CTX_CALLBACK_READ_
@@ -35,7 +36,7 @@ typedef struct QuicerConfigCTX
   HQUIC Configuration;
 } QuicerConfigCTX;
 
-typedef struct
+typedef struct QuicerListenerCTX
 {
   // config_resource is allocated in 'init_l_ctx'
   QuicerConfigCTX *config_resource;
@@ -44,6 +45,7 @@ typedef struct
   ErlNifPid listenerPid;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  char *cacertfile;
   // Listener handle closed flag
   // false means the handle is invalid
   BOOLEAN is_closed;
@@ -66,6 +68,7 @@ typedef struct QuicerConnCTX
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+  X509_STORE *trusted;
   // Connection handle closed flag
   // false means the handle is invalid
   QUIC_TLS_SECRETS *TlsSecrets;
