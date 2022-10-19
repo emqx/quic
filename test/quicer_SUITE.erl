@@ -471,11 +471,13 @@ tc_conn_basic_verify_peer_no_cacert(Config)->
   %% ErrorCode is different per platform
   {error,transport_down,
    #{error := _ErrorCode,
-     status := cert_untrusted_root}} =
+     status := ErrorStatus}} =
     quicer:connect("localhost", Port,
                    [ {verify, verify_peer}
                    , {peer_unidi_stream_count, 3}
                    , {alpn, ["sample"]}], 5000),
+
+  ?assert(ErrorStatus =:= cert_untrusted_root orelse ErrorStatus =:= bad_certificate),
 
   SPid ! done,
   ensure_server_exit_normal(Ref),

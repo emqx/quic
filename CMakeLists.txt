@@ -102,6 +102,10 @@ if (DEFINED ENV{QUICER_TEST_COVER})
 endif()
 
 add_library(quicer_nif SHARED ${SOURCES})
+
+# for macOS Workaround to use opensslquic head files.
+target_include_directories(quicer_nif PUBLIC "c_build/_deps/opensslquic-build/openssl/include")
+
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
   target_link_libraries(quicer_nif PRIVATE quicer_static "-Wl,--no-gc-sections -pthread") # no gc because of erlang nif symbols
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
