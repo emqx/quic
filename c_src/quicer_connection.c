@@ -508,8 +508,10 @@ async_connect3(ErlNifEnv *env,
           c_ctx->trusted = trusted;
         }
 
-      if (trusted == NULL)
-          fprintf(stderr, "failed to set cacertfile");
+      if (trusted == NULL) {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Error;
+      }
     }
 
   // convert eoptions to Configuration
