@@ -399,10 +399,12 @@ tc_conn_owner_down(Config) ->
                                               , resource_id := CRid
                                               },
                                              Trace)),
-                   %% check that it triggers an immediate connection shutdown
+                   %% Check that it triggers an immediate connection shutdown
+                   %% and ensure Client Connection Shutdown complete must happen *after*
+                   %% resource_conn_down_callback is triggered
                    ?assert(?strict_causality(#{ ?snk_kind := debug
                                               , function := "resource_conn_down_callback"
-                                              , tag := "end"
+                                              , tag := "start"
                                               , resource_id := CRid
                                               },
                                              #{ ?snk_kind := debug
