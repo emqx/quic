@@ -1,6 +1,6 @@
 
 all:
-	erlc -I ~/quic/include *.erl
+	erlc *.erl
 
 clean:
 	rm -rf *.beam *~ lux_logs

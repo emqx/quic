@@ -2,10 +2,20 @@
 
 -export([s/0, c/0]).
 
--include("quicer.hrl").
+-include("../../include/quicer.hrl").
 
 %% Usage: run qt:s() in one window, and qt:c() in another window.
 %% Playaround with the client and do things like:
+
+%% Start server as: erl -pa ../../_build/default/lib/quicer/ebin -s qt s
+%% Start the client as:
+%% $ erl -pa ../../_build/default/lib/quicer/ebin
+%% Erlang/OTP 25 [erts-13.0.4] [source] [64-bit] [smp:12:12] [ds:12:12:10] [async-threads:1] [jit:ns]
+%%
+%% Eshell V13.0.4  (abort with ^G)
+%% 2> qt:c().
+%% -->
+
 
 
 %% 1> qt:c().
