@@ -134,7 +134,7 @@ recv_ping(S, N, CNo, SNo) ->
         {quic, <<"die">>, S,_} ->
             io:format("Got die from ~p:~p\n",[CNo, SNo]),
             die;
-        {quic, peer_send_shutdown, S} ->
+        {quic, peer_send_shutdown, S, _} ->
             io:format("Got peer shutdown from ~p:~p\n",[CNo, SNo]),
             quicer:close_stream(S),
             closed;
