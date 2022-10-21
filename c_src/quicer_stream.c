@@ -361,9 +361,12 @@ async_start_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
 
-  s_ctx->is_closed = FALSE;
   res = enif_make_copy(env, s_ctx->eHandle);
 
+  // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
+  // must be done in the worker callback (for QUICER_STREAM_EVENT_MASK_START_COMPLETE)
+  // to avoid race cond.
+  //
   return SUCCESS(res);
 
 ErrorExit:
@@ -815,6 +818,7 @@ handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
   assert(env);
   assert(QUIC_STREAM_EVENT_START_COMPLETE == Event->Type);
   // Only for Local initiated stream
+  s_ctx->is_closed = FALSE;
   if (s_ctx->event_mask & QUICER_STREAM_EVENT_MASK_START_COMPLETE)
     {
       ERL_NIF_TERM props_name[]
