@@ -648,7 +648,7 @@ tc_conn_idle_close(Config) ->
                    {quic, transport_shutdown, _Conn, Status} ->
                      ct:pal("conn trans_shutdown status ~p~n", [Status])
                  end,
-                 case quicer:async_send(Stm, <<"ping2">>) of
+                 case quicer:send(Stm, <<"ping2">>) of
                    {error, stm_send_error, invalid_state} -> ok;
                    {error, cancelled} -> ok
                  end,
