@@ -16,9 +16,9 @@ limitations under the License.
 #include "quicer_connection.h"
 #include "quicer_ctx.h"
 #include <assert.h>
-#include <unistd.h>
-#include <openssl/x509.h>
 #include <openssl/pem.h>
+#include <openssl/x509.h>
+#include <unistd.h>
 
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
@@ -481,8 +481,9 @@ async_connect3(ErlNifEnv *env,
   if (enif_get_map_value(env, eoptions, ATOM_CACERTFILE, &ecacertfile))
     {
       char cacertfile[PATH_MAX];
-      if (enif_get_string(env, ecacertfile, cacertfile,
-                          PATH_MAX, ERL_NIF_LATIN1) > 0)
+      if (enif_get_string(
+              env, ecacertfile, cacertfile, PATH_MAX, ERL_NIF_LATIN1)
+          > 0)
         {
           X509_LOOKUP *lookup = NULL;
           trusted = X509_STORE_new();
@@ -492,8 +493,8 @@ async_connect3(ErlNifEnv *env,
               lookup = X509_STORE_add_lookup(trusted, X509_LOOKUP_file());
               if (lookup != NULL)
                 {
-                  if (!X509_LOOKUP_load_file(lookup, cacertfile,
-                                             X509_FILETYPE_PEM))
+                  if (!X509_LOOKUP_load_file(
+                          lookup, cacertfile, X509_FILETYPE_PEM))
                     {
                       X509_STORE_free(trusted);
                       trusted = NULL;
@@ -508,17 +509,17 @@ async_connect3(ErlNifEnv *env,
           c_ctx->trusted = trusted;
         }
 
-      if (trusted == NULL) {
+      if (trusted == NULL)
+        {
           res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Error;
-      }
+        }
     }
 
   // convert eoptions to Configuration
   bool HasCaCertfile = trusted != NULL;
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
-      env, &eoptions, &(c_ctx->config_resource->Configuration),
-      HasCaCertfile);
+      env, &eoptions, &(c_ctx->config_resource->Configuration), HasCaCertfile);
 
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
@@ -1417,10 +1418,9 @@ handle_connection_event_peer_certificate_received(
   // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
   assert(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED == Event->Type);
   // Validate against CA certificates using OpenSSL API:s
-  X509 *cert =
-      (X509*) Event->PEER_CERTIFICATE_RECEIVED.Certificate;
-  X509_STORE_CTX *x509_ctx =
-      (X509_STORE_CTX*) Event->PEER_CERTIFICATE_RECEIVED.Chain;
+  X509 *cert = (X509 *)Event->PEER_CERTIFICATE_RECEIVED.Certificate;
+  X509_STORE_CTX *x509_ctx
+      = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;
   STACK_OF(X509) *untrusted = X509_STORE_CTX_get0_untrusted(x509_ctx);
 
   X509_STORE_CTX *ctx = X509_STORE_CTX_new();
@@ -1429,9 +1429,9 @@ handle_connection_event_peer_certificate_received(
   X509_STORE_CTX_free(ctx);
 
   if (res <= 0)
-      return  QUIC_STATUS_BAD_CERTIFICATE;
+    return QUIC_STATUS_BAD_CERTIFICATE;
   else
-      return  QUIC_STATUS_SUCCESS;
+    return QUIC_STATUS_SUCCESS;
 
   /* @TODO validate SNI */
 }

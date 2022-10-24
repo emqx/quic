@@ -364,8 +364,8 @@ async_start_stream2(ErlNifEnv *env,
   res = enif_make_copy(env, s_ctx->eHandle);
 
   // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
-  // must be done in the worker callback (for QUICER_STREAM_EVENT_MASK_START_COMPLETE)
-  // to avoid race cond.
+  // must be done in the worker callback (for
+  // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
   //
   return SUCCESS(res);
 

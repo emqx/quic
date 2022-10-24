@@ -225,15 +225,15 @@ ClientLoadConfiguration(ErlNifEnv *env,
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
 
-  if (get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1) &&
-      get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1))
+  if (get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1)
+      && get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1))
     {
       if (get_str_from_map(env, ATOM_PASSWORD, options, password, 256))
         {
           QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
-            = (QUIC_CERTIFICATE_FILE_PROTECTED *)
-            CXPLAT_ALLOC_NONPAGED(sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
-                                  QUICER_CERTIFICATE_FILE);
+              = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
+                  sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
+                  QUICER_CERTIFICATE_FILE);
 
           CertFile->CertificateFile = cert_path;
           CertFile->PrivateKeyFile = key_path;
@@ -244,9 +244,8 @@ ClientLoadConfiguration(ErlNifEnv *env,
       else
         {
           QUIC_CERTIFICATE_FILE *CertFile
-            = (QUIC_CERTIFICATE_FILE *)
-            CXPLAT_ALLOC_NONPAGED(sizeof(QUIC_CERTIFICATE_FILE),
-                                  QUICER_CERTIFICATE_FILE);
+              = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+                  sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
           CertFile->CertificateFile = cert_path;
           CertFile->PrivateKeyFile = key_path;
           CredConfig.CertificateFile = CertFile;
@@ -264,8 +263,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   else if (HasCaCertFile)
     {
       // Do own validation instead against provided ca certs in cacertfile
-      CredConfig.Flags |=
-        QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
 
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
     }
@@ -309,7 +307,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
       goto done;
     }
 
- done:
+done:
 
   // Cleanup CredConfig
   if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
@@ -318,7 +316,8 @@ ClientLoadConfiguration(ErlNifEnv *env,
     }
   else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == CredConfig.Type)
     {
-      CxPlatFree(CredConfig.CertificateFile, QUICER_CERTIFICATE_FILE_PROTECTED);
+      CxPlatFree(CredConfig.CertificateFile,
+                 QUICER_CERTIFICATE_FILE_PROTECTED);
     }
 
   return ret;
@@ -371,9 +370,7 @@ load_alpn(ErlNifEnv *env,
 }
 
 bool
-load_verify(ErlNifEnv *env,
-            const ERL_NIF_TERM *options,
-            bool default_verify)
+load_verify(ErlNifEnv *env, const ERL_NIF_TERM *options, bool default_verify)
 {
   ERL_NIF_TERM verify_atom;
   if (!enif_get_map_value(env, *options, ATOM_VERIFY, &verify_atom))
