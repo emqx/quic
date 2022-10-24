@@ -18,9 +18,8 @@ limitations under the License.
 #include "quicer_config.h"
 #include "quicer_tp.h"
 #include <netinet/in.h>
-#include <openssl/x509.h>
 #include <openssl/pem.h>
-
+#include <openssl/x509.h>
 
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
@@ -65,9 +64,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
               lookup = X509_STORE_add_lookup(trusted, X509_LOOKUP_file());
               if (lookup != NULL)
                 {
-                  if (!X509_LOOKUP_load_file(lookup,
-                                             l_ctx->cacertfile,
-                                             X509_FILETYPE_PEM))
+                  if (!X509_LOOKUP_load_file(
+                          lookup, l_ctx->cacertfile, X509_FILETYPE_PEM))
                     {
                       X509_STORE_free(trusted);
                       trusted = NULL;
@@ -346,10 +344,13 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       unsigned len;
       if (enif_get_list_length(env, ecacertfile, &len))
         {
-          l_ctx->cacertfile =
-            (char *) CXPLAT_ALLOC_NONPAGED(len+1, QUICER_CACERTFILE);
-          if (!enif_get_string(env, ecacertfile, l_ctx->cacertfile,
-                               len+1, ERL_NIF_LATIN1))
+          l_ctx->cacertfile
+              = (char *)CXPLAT_ALLOC_NONPAGED(len + 1, QUICER_CACERTFILE);
+          if (!enif_get_string(env,
+                               ecacertfile,
+                               l_ctx->cacertfile,
+                               len + 1,
+                               ERL_NIF_LATIN1))
             {
               CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
               l_ctx->cacertfile = NULL;
@@ -365,7 +366,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   bool Verify = load_verify(env, &options, false);
 
   if (!Verify)
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+    CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
   else
     {
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
@@ -373,10 +374,9 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         {
           // We do our own certificate verification agains the certificates
           // in cacertfile
-          CredConfig.Flags |=
-            QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
-          CredConfig.Flags |=
-            QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+          CredConfig.Flags
+              |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+          CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
         }
     }
 

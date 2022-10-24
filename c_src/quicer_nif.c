@@ -730,10 +730,11 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
       MsQuic->ListenerClose(l_ctx->Listener);
     }
 
-  if (l_ctx->cacertfile) {
+  if (l_ctx->cacertfile)
+    {
       CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
       l_ctx->cacertfile = NULL;
-  }
+    }
 
   deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
@@ -860,7 +861,6 @@ on_load(ErlNifEnv *env,
   }
   INIT_ATOMS
 #undef ATOM
-
 
   ErlNifResourceFlags flags
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
@@ -1162,7 +1162,7 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
         {
           // These may be different on various OS and the
           // list is not complete. Room for improvement.
-          int tlserror = (int) (status-(TLS_ERROR_BASE));
+          int tlserror = (int)(status - (TLS_ERROR_BASE));
           switch (tlserror)
             {
             case TLS1_AD_UNKNOWN_CA:
@@ -1184,14 +1184,13 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
               eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
               break;
             default:
-              eterm = enif_make_tuple2(env,
-                                       ATOM_UNKNOWN_TLS_STATUS_CODE,
-                                       ETERM_UINT_64(tlserror));
+              eterm = enif_make_tuple2(
+                  env, ATOM_UNKNOWN_TLS_STATUS_CODE, ETERM_UINT_64(tlserror));
             }
         }
       else
-        eterm = enif_make_tuple2(env, ATOM_UNKNOWN_STATUS_CODE,
-                                 ETERM_UINT_64(status));
+        eterm = enif_make_tuple2(
+            env, ATOM_UNKNOWN_STATUS_CODE, ETERM_UINT_64(status));
     }
   return eterm;
 }
