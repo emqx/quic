@@ -345,6 +345,16 @@ The `NST` could be used by Client for 0-RTT handshake with a connection opt
 {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST}], 5000),
 ```
 
+### Stream's connection is closed
+
+**Acceptor Only** 
+Indicating the connection that the stream acceptor is accepting is closed.
+The stream acceptor will no longer get new incoming stream.
+
+```erlang
+{quic, closed, undefined, undefined}
+```
+
 ## Messages to Listener Owner
 
 ### New incoming connection

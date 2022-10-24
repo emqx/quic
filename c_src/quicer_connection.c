@@ -1095,6 +1095,8 @@ handle_connection_event_shutdown_complete(
   // For Server Only
   assert(QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE == Event->Type);
   assert(c_ctx->Connection);
+  assert(c_ctx->acceptor_queue);
+  ACCEPTOR *acc = NULL;
   ErlNifEnv *env = c_ctx->env;
   TP_CB_3(shutdown_complete,
           (uintptr_t)c_ctx->Connection,
@@ -1114,6 +1116,18 @@ handle_connection_event_shutdown_complete(
                                               props_value,
                                               3);
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+
+  //
+  // Now inform the stream acceptors
+  //
+  assert(c_ctx->acceptor_queue);
+  while ((acc = AcceptorDequeue(c_ctx->acceptor_queue)))
+    {
+      TP_CB_3(acceptor_bye, (uintptr_t)c_ctx->Connection, 0);
+      report = make_event(env, ATOM_CLOSED, ATOM_UNDEFINED, ATOM_UNDEFINED);
+      enif_send(NULL, &acc->Pid, NULL, report);
+      AcceptorDestroy(acc);
+    }
   return QUIC_STATUS_SUCCESS;
 }
 

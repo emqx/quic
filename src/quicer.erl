@@ -439,7 +439,10 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
     {ok, Conn} ->
       receive
         {quic, new_stream, Stream, _StreamFlags} ->
-          {ok, Stream}
+          {ok, Stream};
+        {quic, closed, undefined, undefined} ->
+          ?tp(debug, stream_acceptor_conn_closed, #{ conn => Conn }),
+          {error, closed}
       after Timeout ->
           {error, timeout}
       end;
