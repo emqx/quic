@@ -74,6 +74,9 @@
         , tc_stream_client_async_send/1
 
         , tc_stream_passive_receive/1
+        , tc_stream_passive_receive_shutdown/1
+        , tc_stream_passive_receive_closed/1
+        , tc_stream_passive_receive_aborted/1
         , tc_stream_passive_receive_buffer/1
         , tc_stream_passive_receive_large_buffer_1/1
         , tc_stream_passive_receive_large_buffer_2/1
@@ -950,6 +953,64 @@ tc_stream_passive_receive(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       quicer:close_stream(Stm),
+      quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_passive_receive_shutdown(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, <<"pong">>} = quicer:recv(Stm, 0),
+      {ok, 4} = quicer:send(Stm, <<"ping">>, ?QUIC_SEND_FLAG_FIN),
+      {ok, <<"pong">>} = quicer:recv(Stm, 0),
+      {error, peer_send_shutdown} = quicer:recv(Stm, 0),
+      quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_passive_receive_closed(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, <<"pong">>} = quicer:recv(Stm, 0),
+      quicer:async_shutdown_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND, 1),
+      {error, closed} = quicer:recv(Stm, 0),
+      quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+tc_stream_passive_receive_aborted(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, <<"ping">>} = quicer:recv(Stm, 0),
+      {ok, 5} = quicer:send(Stm, <<"Abort">>),
+      {error, peer_send_aborted} = quicer:recv(Stm, 0),
       quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -2184,6 +2245,9 @@ echo_server(Owner, Config, Port)->
 
 echo_server_stm_loop(L, Conn, Stms) ->
   receive
+    {quic, <<"Abort">>, Stm, #{flags := _Flag}} ->
+      quicer:async_shutdown_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 1),
+      echo_server_stm_loop(L, Conn, Stms);
     {quic, Bin, Stm, #{flags := Flag}} when is_binary(Bin) ->
       SendFlag = case (Flag band ?QUIC_RECEIVE_FLAG_FIN) > 0 of
                    true -> ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN;
