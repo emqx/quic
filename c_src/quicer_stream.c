@@ -545,20 +545,25 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // We have checked that the Stream is not closed/closing
   // it is safe to use the s_ctx->Stream in following MsQuic API calls
 
-  if (s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0
+  if (s_ctx->is_recv_pending && s_ctx->TotalBufferLength > 0
       && (0 == size_req || size_req <= s_ctx->TotalBufferLength))
-    { // buffer is ready to consume
+    {
+      //
+      // Buffer is ready and has enough data to consume
+      //
       uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
 
       s_ctx->is_wait_for_data = FALSE;
 
+      // call only when is_recv_pending is TRUE
       MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
 
       if (size_consumed != s_ctx->TotalBufferLength)
         {
-          // explicit enable recv since we have some data left unconusmed
           //
-          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
+          // explicit enable recv since we have some data left unconsumed
+          //
+          //MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
         }
 
       if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
@@ -571,7 +576,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           s_ctx->Buffers[1].Length = 0;
 
           s_ctx->TotalBufferLength = 0;
-          s_ctx->is_buff_ready = FALSE;
+          s_ctx->is_recv_pending = FALSE;
         }
       else
         {
@@ -581,7 +586,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           s_ctx->Buffers[1].Buffer = NULL;
           s_ctx->Buffers[1].Length = 0;
 
-          s_ctx->is_buff_ready = FALSE;
+          s_ctx->is_recv_pending = FALSE;
           s_ctx->TotalBufferLength = 0;
         }
 
@@ -591,16 +596,19 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     { // want more data in buffer
       s_ctx->is_wait_for_data = TRUE;
 
-      // let msquic buffer more and explicit enable recv
-      //
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-
+      if (s_ctx->is_recv_pending)
+      {
+        // This is in response to a `QUIC_STREAM_EVENT_RECEIVE` event.
+        MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+      }
+      // Ensure stream recv is enabled while it is in passive mode.
+      // because we are waiting for more data
       if (QUIC_FAILED(status
                       = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))
-        {
-          res = ERROR_TUPLE_2(ATOM_STATUS(status));
-          goto Exit;
-        }
+      {
+        res = ERROR_TUPLE_2(ATOM_STATUS(status));
+        goto Exit;
+      }
 
       // NIF caller will get {ok, not_ready}
       // this is an ack to its call
@@ -695,6 +703,7 @@ handle_stream_event_recv(HQUIC Stream,
   ErlNifEnv *env = s_ctx->env;
   ErlNifBinary bin;
 
+  assert(QUIC_STREAM_EVENT_RECEIVE == Event->Type);
   assert(NULL != Event->RECEIVE.Buffers[0].Buffer);
   assert(Event->RECEIVE.BufferCount > 0
          || Event->RECEIVE.Flags == QUIC_RECEIVE_FLAG_FIN);
@@ -725,7 +734,7 @@ handle_stream_event_recv(HQUIC Stream,
          trigger event and handle event in a loop
       */
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 0);
-      s_ctx->is_buff_ready = TRUE;
+      s_ctx->is_recv_pending = TRUE;
       status = QUIC_STATUS_PENDING;
 
       if (s_ctx->is_wait_for_data)
@@ -789,6 +798,12 @@ handle_stream_event_recv(HQUIC Stream,
           if (s_ctx->owner->active_count == 0)
             {
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+
+              // *async* disable the recv callback, so you might still get recv
+              // callback after this call to put stream back to active mode,
+              // you should call 1) MsQuic->StreamReceiveSetEnabled 2)
+              // MsQuic->StreamReceiveComplete
+              MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, FALSE);
 
               ERL_NIF_TERM report_passive
                   = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);

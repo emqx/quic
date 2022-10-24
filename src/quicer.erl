@@ -573,7 +573,13 @@ do_recv(Stream, Count) ->
       receive
         %% @todo recv_mark
         {quic, continue, Stream, undefined} ->
-          recv(Stream, Count)
+          recv(Stream, Count);
+        {quic, peer_send_shutdown, Stream, undefined} ->
+          {error, peer_send_shutdown};
+        {quic, peer_receive_aborted, Stream, undefined} ->
+          {error, peer_receive_aborted};
+        {quic, stream_closed, Stream, _Props} ->
+          {error, closed}
       end;
     {ok, Bin} ->
       {ok, Bin};

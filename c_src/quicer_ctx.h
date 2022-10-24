@@ -101,7 +101,7 @@ typedef struct QuicerStreamCTX
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
   _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint32_t BufferCount;
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
-  _CTX_CALLBACK_WRITE_ BOOLEAN is_buff_ready;
+  _CTX_CALLBACK_WRITE_ BOOLEAN is_recv_pending;
   BOOLEAN is_closed;
   uint32_t event_mask;
   void *reserved1;
