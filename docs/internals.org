@@ -469,17 +469,15 @@ is blocked form receiving the data. Quicer will send a 'recv continue' msg as be
 
 *** quicer:recv/2 call in Passive Mode
 
-The NIF (`quicer_nif:recv/2`) first check if `is_recv_pending` is set and there are enough bytes required.
+The NIF (`quicer_nif:recv/2`) first check if `is_recv_pending` is set.
 
 If TRUE, NIF will copy the data it needs and call `StreamReceiveComplete` to mark handled data and return the binary to the caller.
 The side effect of calling `StreamReceiveComplete` is it completes the *async recv* handling and reenables the recv callback if all
 data in the recv buffer is consumed. If it is partially consumed, the stream receving will be left disabled as it is in passive mode.
-NOTE, duplicate `StreamReceiveComplete` calls could cause undefined behaviors.
+NOTE, duplicate `StreamReceiveComplete` calls could cause undefined behaviors. see [MsQuic/docs/Streams.md]
 
 If FALSE, NIF will mark `is_wait_for_data` in stream ctx and return `{error, not_ready}` to the caller and the caller should
-wait for recv `continue` message mentioned above. NIF also calls `StreamReceiveComplete` with 0 consumed data iff `is_recv_pending`
-is SET in order to complete the *async recv* and then reenabling the recv callback by calling `StreamReceiveSetEnabled` because of
-zero consumed data. see [MsQuic/docs/Streams.md]
+wait for recv `continue` message mentioned above.
 
 *** quicer:recv/2 call in Active Mode
 
