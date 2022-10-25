@@ -534,6 +534,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
   enif_mutex_lock(s_ctx->lock);
 
   if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
@@ -552,19 +553,12 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       // Buffer is ready and has enough data to consume
       //
       uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
+      TP_NIF_3(consume, (uintptr_t)s_ctx->Stream, size_consumed);
 
       s_ctx->is_wait_for_data = FALSE;
 
       // call only when is_recv_pending is TRUE
       MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
-
-      if (size_consumed != s_ctx->TotalBufferLength)
-        {
-          //
-          // explicit enable recv since we have some data left unconsumed
-          //
-          //MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
-        }
 
       if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
         {
@@ -594,25 +588,49 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   else
     { // want more data in buffer
+      assert(0 != size_req);
       s_ctx->is_wait_for_data = TRUE;
+      TP_NIF_3(more, (uintptr_t)s_ctx->Stream, size_req);
+      if (s_ctx->is_recv_pending && s_ctx->TotalBufferLength > 0)
+        {
+          // Take whatever we have in the buffer
+          uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, 0);
+          // This is in response to a `QUIC_STREAM_EVENT_RECEIVE` event.
+          TP_NIF_3(consume, (uintptr_t)s_ctx->Stream, size_consumed);
+          assert(size_consumed == s_ctx->TotalBufferLength);
 
-      if (s_ctx->is_recv_pending)
-      {
-        // This is in response to a `QUIC_STREAM_EVENT_RECEIVE` event.
-        MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-      }
-      // Ensure stream recv is enabled while it is in passive mode.
-      // because we are waiting for more data
-      if (QUIC_FAILED(status
-                      = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))
-      {
-        res = ERROR_TUPLE_2(ATOM_STATUS(status));
-        goto Exit;
-      }
+          MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
 
-      // NIF caller will get {ok, not_ready}
-      // this is an ack to its call
-      res = SUCCESS(ATOM_ERROR_NOT_READY);
+          s_ctx->Buffers[0].Buffer = NULL;
+          s_ctx->Buffers[0].Length = 0;
+          s_ctx->Buffers[1].Buffer = NULL;
+          s_ctx->Buffers[1].Length = 0;
+
+          s_ctx->is_recv_pending = FALSE;
+          s_ctx->TotalBufferLength = 0;
+          res = SUCCESS(enif_make_binary(env, &bin));
+        }
+      else
+        {
+
+          //
+          // Ensure stream recv is enabled while it is in passive mode.
+          // because we are waiting for more data
+          //
+          res = SUCCESS(ATOM_ERROR_NOT_READY);
+          if (QUIC_FAILED(status = MsQuic->StreamReceiveSetEnabled(
+                              s_ctx->Stream, TRUE)))
+            {
+              res = ERROR_TUPLE_2(ATOM_STATUS(status));
+              goto Exit;
+            }
+          else
+            {
+              // NIF caller will get {ok, not_ready}
+              // this is an ack to its call
+              res = SUCCESS(ATOM_ERROR_NOT_READY);
+            }
+        }
     }
 
 Exit:
@@ -740,6 +758,7 @@ handle_stream_event_recv(HQUIC Stream,
       if (s_ctx->is_wait_for_data)
         { // Owner is waiting for data
           // notify owner to trigger async recv
+          //
           if (!enif_send(
                   NULL,
                   &(s_ctx->owner->Pid),

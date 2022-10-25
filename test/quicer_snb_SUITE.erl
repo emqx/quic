@@ -149,6 +149,7 @@ all() ->
   , tc_multi_streams_example_server_1
   , tc_multi_streams_example_server_2
   , tc_multi_streams_example_server_3
+  , tc_passive_recv_1
   ].
 
 %%--------------------------------------------------------------------
@@ -1708,6 +1709,59 @@ tc_multi_streams_example_server_3(Config) ->
                                },
                               _Stream1 =/= _Stream2,
                               Trace))
+               end),
+  ok.
+
+tc_passive_recv_1(Config) ->
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 10},
+                  {peer_unidi_stream_count, 0} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, false}]), %% passive
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+                 {ok, <<"p">>} = quicer:recv(Stm2, 1),
+                 {ok, <<"in">>} = quicer:recv(Stm2, 2),
+                 {ok, <<"g">>} = quicer:recv(Stm2, 1),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
+                 {ok, <<"2ping">>} = quicer:recv(Stm2, 5), %% left <<"3">> in buffer
+                 {error, _} = quicer:recv(Stm2, 888)
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   Res = lists:filter(fun(#{ context := "nif", function := "recv2", tag := "consume"}) -> true;
+                                         (_) -> false
+                                      end, Trace),
+                   ct:pal("Res is ~p", [Res]),
+                   %% Check we consume in this order
+                   ConsumeOrder = ?projection(mark, Res),
+                   ?assert(ConsumeOrder == [1, 2, 1, 1, 4, 1]
+                           orelse ConsumeOrder == [1, 2, 1, 5, 1]),
+
+                   %% Check we only do one call
+                   ?assertEqual(1, length([ X || #{ context := "nif", function := "recv2", tag := "more"
+                                                  , mark := 887 } = X <- Trace]))
                end),
   ok.
 

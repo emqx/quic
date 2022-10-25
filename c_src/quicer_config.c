@@ -1130,8 +1130,7 @@ set_stream_opt(ErlNifEnv *env,
       enif_mutex_lock(s_ctx->lock);
 
       if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
-          && ! IS_SAME_TERM(ATOM_FALSE, optval)
-          && s_ctx->is_recv_pending
+          && !IS_SAME_TERM(ATOM_FALSE, optval) && s_ctx->is_recv_pending
           && s_ctx->TotalBufferLength > 0)
         {
           // Trigger callback of event recv.
