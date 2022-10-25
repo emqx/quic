@@ -57,6 +57,8 @@ static QUIC_STATUS
 handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
                                            QUIC_STREAM_EVENT *Event);
 
+static void reset_stream_recv(QuicerStreamCTX *s_ctx);
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
@@ -534,6 +536,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
   enif_mutex_lock(s_ctx->lock);
 
   if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
@@ -545,66 +548,52 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   // We have checked that the Stream is not closed/closing
   // it is safe to use the s_ctx->Stream in following MsQuic API calls
 
-  if (s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0
-      && (0 == size_req || size_req <= s_ctx->TotalBufferLength))
-    { // buffer is ready to consume
-      uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req);
+  if (s_ctx->is_recv_pending && s_ctx->TotalBufferLength > 0)
+    {
+      //
+      // Buffer is ready
+      //
+      uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req > s_ctx->TotalBufferLength ?
+                                                s_ctx->TotalBufferLength : size_req);
+      TP_NIF_3(consume, (uintptr_t)s_ctx->Stream, size_consumed);
+      reset_stream_recv(s_ctx);
 
-      s_ctx->is_wait_for_data = FALSE;
+      if (size_consumed > 0 )
+      {
+        s_ctx->is_wait_for_data = FALSE;
+      }
 
+      // call only when is_recv_pending is TRUE
       MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
-
-      if (size_consumed != s_ctx->TotalBufferLength)
-        {
-          // explicit enable recv since we have some data left unconusmed
-          //
-          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, true);
-        }
-
-      if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
-        {
-          // Buffer has perfect bytes consumed
-
-          s_ctx->Buffers[0].Buffer = NULL;
-          s_ctx->Buffers[0].Length = 0;
-          s_ctx->Buffers[1].Buffer = NULL;
-          s_ctx->Buffers[1].Length = 0;
-
-          s_ctx->TotalBufferLength = 0;
-          s_ctx->is_buff_ready = FALSE;
-        }
-      else
-        {
-          // Buffer has more data than we need
-          s_ctx->Buffers[0].Buffer = NULL;
-          s_ctx->Buffers[0].Length = 0;
-          s_ctx->Buffers[1].Buffer = NULL;
-          s_ctx->Buffers[1].Length = 0;
-
-          s_ctx->is_buff_ready = FALSE;
-          s_ctx->TotalBufferLength = 0;
-        }
 
       res = SUCCESS(enif_make_binary(env, &bin));
     }
   else
     { // want more data in buffer
+      TP_NIF_3(more, (uintptr_t)s_ctx->Stream, size_req);
       s_ctx->is_wait_for_data = TRUE;
 
-      // let msquic buffer more and explicit enable recv
+      // Finish the stream recv callback
+      if (s_ctx->is_recv_pending)
+      {
+        MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+      }
       //
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-
+      // Ensure stream recv is enabled while it is in passive mode.
+      // because we are waiting for more data
+      //
       if (QUIC_FAILED(status
                       = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))
         {
           res = ERROR_TUPLE_2(ATOM_STATUS(status));
           goto Exit;
         }
-
-      // NIF caller will get {ok, not_ready}
-      // this is an ack to its call
-      res = SUCCESS(ATOM_ERROR_NOT_READY);
+      else
+        {
+          // NIF caller will get {ok, not_ready}
+          // this is an ack to its call
+          res = SUCCESS(ATOM_ERROR_NOT_READY);
+        }
     }
 
 Exit:
@@ -695,6 +684,7 @@ handle_stream_event_recv(HQUIC Stream,
   ErlNifEnv *env = s_ctx->env;
   ErlNifBinary bin;
 
+  assert(QUIC_STREAM_EVENT_RECEIVE == Event->Type);
   assert(NULL != Event->RECEIVE.Buffers[0].Buffer);
   assert(Event->RECEIVE.BufferCount > 0
          || Event->RECEIVE.Flags == QUIC_RECEIVE_FLAG_FIN);
@@ -725,12 +715,13 @@ handle_stream_event_recv(HQUIC Stream,
          trigger event and handle event in a loop
       */
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 0);
-      s_ctx->is_buff_ready = TRUE;
+      s_ctx->is_recv_pending = TRUE;
       status = QUIC_STATUS_PENDING;
 
       if (s_ctx->is_wait_for_data)
         { // Owner is waiting for data
           // notify owner to trigger async recv
+          //
           if (!enif_send(
                   NULL,
                   &(s_ctx->owner->Pid),
@@ -789,6 +780,12 @@ handle_stream_event_recv(HQUIC Stream,
           if (s_ctx->owner->active_count == 0)
             {
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+
+              // *async* disable the recv callback, so you might still get recv
+              // callback after this call to put stream back to active mode,
+              // you should call 1) MsQuic->StreamReceiveSetEnabled 2)
+              // MsQuic->StreamReceiveComplete
+              MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, FALSE);
 
               ERL_NIF_TERM report_passive
                   = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);
@@ -1011,6 +1008,18 @@ get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
     }
 
   return SUCCESS(enif_make_ulong(env, (unsigned long)s_ctx->Stream));
+}
+
+static void
+reset_stream_recv(QuicerStreamCTX *s_ctx)
+{
+  s_ctx->Buffers[0].Buffer = NULL;
+  s_ctx->Buffers[0].Length = 0;
+  s_ctx->Buffers[1].Buffer = NULL;
+  s_ctx->Buffers[1].Length = 0;
+
+  s_ctx->is_recv_pending = FALSE;
+  s_ctx->TotalBufferLength = 0;
 }
 
 ///_* Emacs

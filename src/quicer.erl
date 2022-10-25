@@ -564,19 +564,29 @@ async_send(Stream, Data) ->
 -spec recv(stream_handle(), Count::non_neg_integer())
           -> {ok, binary()} | {error, any()}.
 recv(Stream, Count) ->
-  do_recv(Stream, Count).
+  do_recv(Stream, Count, []).
 
-do_recv(Stream, Count) ->
+do_recv(Stream, Count, Buff) ->
   case quicer_nif:recv(Stream, Count) of
     {ok, not_ready} ->
       %% Data is not ready yet but last call has been reg.
       receive
         %% @todo recv_mark
         {quic, continue, Stream, undefined} ->
-          recv(Stream, Count)
+          do_recv(Stream, Count, Buff);
+        {quic, peer_send_shutdown, Stream, undefined} ->
+          {error, peer_send_shutdown};
+        {quic, peer_send_aborted, Stream, _ErrorCode} ->
+          {error, peer_send_aborted};
+        {quic, stream_closed, Stream, _Props} ->
+          {error, closed}
       end;
-    {ok, Bin} ->
+    {ok, Bin} when (Count == 0 orelse byte_size(Bin) == Count) andalso Buff == [] ->
       {ok, Bin};
+    {ok, Bin} when byte_size(Bin) == Count ->
+      {ok, iolist_to_binary(lists:reverse([Bin | Buff]))};
+    {ok, Bin} when byte_size(Bin) < Count->
+      do_recv(Stream, Count - byte_size(Bin), [ Bin | Buff ]);
     {error, _} = E ->
       E
    end.
@@ -601,10 +611,9 @@ send_dgram(Conn, Data) ->
       E
   end.
 
-%% @doc
+%% @doc Shutdown stream gracefully, with infinity timeout
 %%
-%% ref: [https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram]
-%% @see send/2
+%% @see shutdown_stream/1
 -spec shutdown_stream(stream_handle()) -> ok | {error, badarg}.
 shutdown_stream(Stream) ->
   shutdown_stream(Stream, infinity).

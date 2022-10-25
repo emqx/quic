@@ -409,3 +409,89 @@ In quicer, for best practice, you could use quicer_* modules to manage the liste
 
   Example callback module for handle *server* connections.
 
+* Active/Passive receive
+
+** Function
+
+Stream owner (the controlling process) gets the ordered stream binary actively or
+passively depends on the stream recv modes:
+
+- Active Mode:
+
+  Binary is delivered to the stream owner process mailbox in the msg format of
+
+  #+begin_src erlang
+  {quic, binary(), stream_handle(), other_props()}.
+  #+end_src
+
+- Passive Mode:
+
+  Call
+  #+begin_src erlang
+  quicer:recv(stream_handle(), number_of_bytes()).
+  #+end_src
+
+The recv mode could be set via stream opt `active` when starting the stream locally or accepting the remote stream
+and get changed afterward via
+
+#+begin_src erlang
+quicer:setopts(stream(), active, Mode).
+#+end_src
+
+The active *Mode* is compatible with inet:setopts/2 as in https://www.erlang.org/doc/man/inet.html#setopts-2
+
+** Implementations
+
+*** Callback handle `QUIC_STREAM_EVENT_RECEIVE` with received binary in Active mode
+
+The whole recv bytes will be delivered to the owner process. The integer `N` in {active, N} will be decreased by 1.
+If it becomes 0, `{quic, passive, stream_handle(), undefined}` will be sent to the owner as well and stream recv mode
+becomes passive.
+
+If `N` is once, the stream recv mode will become passive mode and no `{quic, passive, stream_handle(), undefined}`
+will be delivered to the owner.
+
+When the stream enters passive mode the MsQuic receiving callback is disabled.
+
+*** Callback handle `QUIC_STREAM_EVENT_RECEIVE` in Passive mode
+
+Quicer utilize the "Asynchronous receive" and "Partial Data Acceptance" functionalities provided by MsQuic.
+
+In passive mode, stream *recv callback* returns `QUIC_STATUS_PENDING` to enable "Asynchronous receive", this pauses the further
+receiving callbacks until `quicer:recv` is called. The `is_recv_pending` of stream ctx is set to mark the recv is pending and wait for
+a `StreamReceiveComplete` to complete the receive.
+
+If `quicer:recv` is called before recv callback (is_recv_pending is not set) which means the application
+is blocked from receiving the data. Quicer will send a 'recv continue' msg as below to the stream owner to unblock the owner.
+#+begin_src erlang
+{quic, continue, stream_handle(), undefined}
+#+end_src
+
+*** quicer:recv/2 call in Passive Mode
+
+The NIF (`quicer_nif:recv/2`) first check if `is_recv_pending` is set.
+
+If TRUE, NIF will copy the data it needs and call `StreamReceiveComplete` to mark handled data and return the binary to the caller.
+The side effect of calling `StreamReceiveComplete` is it completes the *async recv* handling and reenables the recv callback if all
+data in the recv buffer is consumed. If it is partially consumed, the stream receving will be left disabled as it is in passive mode.
+NOTE, duplicate `StreamReceiveComplete` calls could cause undefined behaviors. see [MsQuic/docs/Streams.md]
+
+If FALSE, NIF will mark `is_wait_for_data` in stream ctx and return `{error, not_ready}` to the caller and the caller should
+wait for recv `continue` message mentioned above.
+
+*** quicer:recv/2 call in Active Mode
+
+Should return error.
+
+*** Mode switching
+
+**** From passive to active
+
+Call `StreamReceiveComplete` if `is_recv_pending` is set to complete the async recv.
+
+and then call `StreamReceiveSetEnabled` to enable the recv.
+
+**** From active to passive
+
+After set to {active, false}, owner should remember to  handle the binary data in message box before
+active false takes effect.

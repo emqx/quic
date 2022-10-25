@@ -1130,9 +1130,10 @@ set_stream_opt(ErlNifEnv *env,
       enif_mutex_lock(s_ctx->lock);
 
       if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
-          && s_ctx->is_buff_ready && s_ctx->TotalBufferLength > 0)
+          && !IS_SAME_TERM(ATOM_FALSE, optval) && s_ctx->is_recv_pending
+          && s_ctx->TotalBufferLength > 0)
         {
-          // trigger callback of event recv.
+          // Trigger callback of event recv.
           MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
           MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
         }
