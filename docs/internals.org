@@ -483,8 +483,15 @@ wait for recv `continue` message mentioned above.
 
 Should return error.
 
-*** Mode switching from passive to active
+*** Mode switching
 
-call `StreamReceiveComplete` if `is_recv_pending` is set to complete the async recv.
+**** From passive to active
+
+Call `StreamReceiveComplete` if `is_recv_pending` is set to complete the async recv.
 
 and then call `StreamReceiveSetEnabled` to enable the recv.
+
+**** From active to passive
+
+After set to {active, false}, owner should remember to  handle the binary data in message box before
+active false takes effect.
