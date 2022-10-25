@@ -699,18 +699,23 @@ run_tc_conn_client_bad_cert(Config)->
                      "localhost", Port,
                      default_conn_opts_bad_client_cert(Config, "ca"),
                      5000),
-      {ok, Stm} = quicer:start_stream(Conn, []),
-      {ok, 4} = quicer:send(Stm, <<"ping">>),
-      receive
-        {quic, transport_shutdown, _Ref,
-         #{error := _ErrorCode, status := bad_certificate}} ->
-          _ = flush([])
-      after
-        2000 ->
-          Other = flush([]),
-          ct:fail("Unexpected Msg ~p", [Other])
-      end,
-      ensure_server_exit_normal(Ref)
+      case quicer:start_stream(Conn, []) of
+        {error, stm_open_error, aborted} ->
+          %% Depending on the timing, connection open could fail already.
+          ok;
+        {ok, Stm} ->
+          {ok, 4} = quicer:send(Stm, <<"ping">>),
+          receive
+            {quic, transport_shutdown, _Ref,
+             #{error := _ErrorCode, status := bad_certificate}} ->
+              _ = flush([])
+          after
+            2000 ->
+              Other = flush([]),
+              ct:fail("Unexpected Msg ~p", [Other])
+          end,
+          ensure_server_exit_normal(Ref)
+      end
   after 1000 ->
       ct:fail("timeout")
   end.

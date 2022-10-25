@@ -607,10 +607,9 @@ send_dgram(Conn, Data) ->
       E
   end.
 
-%% @doc
+%% @doc Shutdown stream gracefully, with infinity timeout
 %%
-%% ref: [https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram]
-%% @see send/2
+%% @see shutdown_stream/1
 -spec shutdown_stream(stream_handle()) -> ok | {error, badarg}.
 shutdown_stream(Stream) ->
   shutdown_stream(Stream, infinity).
