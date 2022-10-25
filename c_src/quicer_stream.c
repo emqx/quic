@@ -415,7 +415,11 @@ async_accept_stream2(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
-  acceptor->active = IS_SAME_TERM(active_val, ATOM_TRUE);
+  if (!set_owner_recv_mode(acceptor, env, active_val))
+    {
+      CXPLAT_FREE(acceptor, QUICER_ACCEPTOR);
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+    }
 
   AcceptorEnqueue(c_ctx->acceptor_queue, acceptor);
   ERL_NIF_TERM connectionHandle = enif_make_resource(env, c_ctx);
@@ -553,15 +557,18 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       //
       // Buffer is ready
       //
-      uint64_t size_consumed = recvbuffer_flush(s_ctx, &bin, size_req > s_ctx->TotalBufferLength ?
-                                                s_ctx->TotalBufferLength : size_req);
+      uint64_t size_consumed = recvbuffer_flush(
+          s_ctx,
+          &bin,
+          size_req > s_ctx->TotalBufferLength ? s_ctx->TotalBufferLength
+                                              : size_req);
       TP_NIF_3(consume, (uintptr_t)s_ctx->Stream, size_consumed);
       reset_stream_recv(s_ctx);
 
-      if (size_consumed > 0 )
-      {
-        s_ctx->is_wait_for_data = FALSE;
-      }
+      if (size_consumed > 0)
+        {
+          s_ctx->is_wait_for_data = FALSE;
+        }
 
       // call only when is_recv_pending is TRUE
       MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
@@ -575,9 +582,9 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
       // Finish the stream recv callback
       if (s_ctx->is_recv_pending)
-      {
-        MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-      }
+        {
+          MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+        }
       //
       // Ensure stream recv is enabled while it is in passive mode.
       // because we are waiting for more data
@@ -743,6 +750,7 @@ handle_stream_event_recv(HQUIC Stream,
     { // active receive
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 1);
       recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
+      BOOLEAN is_report_passive = FALSE;
       ERL_NIF_TERM eHandle = enif_make_copy(env, s_ctx->eHandle);
       ERL_NIF_TERM props_name[] = { ATOM_ABS_OFFSET, ATOM_LEN, ATOM_FLAGS };
       ERL_NIF_TERM props_value[]
@@ -757,18 +765,10 @@ handle_stream_event_recv(HQUIC Stream,
                                   props_value,
                                   3);
 
-      if (!enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_active))
-        {
-          // App down, shutdown stream
-          MsQuic->StreamShutdown(Stream,
-                                 QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
-                                 QUIC_STATUS_UNREACHABLE);
-          return status;
-        }
-
-      // report passive
+      assert(ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active);
       if (ACCEPTOR_RECV_MODE_ONCE == s_ctx->owner->active)
         {
+          s_ctx->owner->active_count = 0;
           s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
         }
       else if (ACCEPTOR_RECV_MODE_MULTI == s_ctx->owner->active)
@@ -781,24 +781,23 @@ handle_stream_event_recv(HQUIC Stream,
             {
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
 
+              is_report_passive = TRUE;
+
               // *async* disable the recv callback, so you might still get recv
               // callback after this call to put stream back to active mode,
               // you should call 1) MsQuic->StreamReceiveSetEnabled 2)
               // MsQuic->StreamReceiveComplete
               MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, FALSE);
-
-              ERL_NIF_TERM report_passive
-                  = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);
-
-              if (!enif_send(
-                      NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive))
-                {
-                  MsQuic->StreamShutdown(Stream,
-                                         QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
-                                         QUIC_STATUS_UNREACHABLE);
-                  return status;
-                }
             }
+        }
+
+      enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_active);
+
+      if (is_report_passive)
+        {
+          ERL_NIF_TERM report_passive
+              = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);
+          enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive);
         }
     }
 

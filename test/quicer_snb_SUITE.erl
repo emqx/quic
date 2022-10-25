@@ -144,6 +144,7 @@ all() ->
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
   , tc_conn_stop_notify_acceptor
+  , tc_accept_stream_active_once
     %% multistreams
   , tc_multi_streams
   , tc_multi_streams_example_server_1
@@ -1350,6 +1351,152 @@ tc_conn_stop_notify_acceptor(Config) ->
                    ?assertEqual(101, length(Byes)),
                    ?assertEqual(101, length(?of_kind(stream_acceptor_conn_closed, Trace)))
                end).
+
+tc_accept_stream_active_once(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  ListenerOpts = [{conn_acceptors, 32}, {peer_unidi_stream_count, 1} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
+
+                 %% Accept remote unidir stream from server
+                 {ok, Conn} = quicer:async_accept_stream(Conn, [{active, once}]),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+
+                 Stm3 = receive
+                          {quic, new_stream, StmFromServer, _StreamFlags} ->
+                            case quicer:getopt(StmFromServer, active) of
+                              {ok, once}  -> ok;
+                              {ok, false} -> ok %% it recv incoming data already
+                            end,
+                            StmFromServer
+                        after 100 ->
+                            ct:fail("No unidi stream from server")
+                        end,
+                 receive
+                   {quic, <<"ping2">>, Stm3,  _} ->
+                     {ok, false} = quicer:getopt(Stm3, active)
+                 after 100 -> ct:fail("no ping2")
+                 end
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(
+                                   #{ ?snk_kind := debug
+                                    , event := handoff_stream
+                                    , module := quicer_connection
+                                    , stream := _STREAM0
+                                    },
+                                   #{ ?snk_kind := debug
+                                    , event := stream_owner_handoff_done
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                Trace))
+               end),
+  ok.
+
+tc_accept_stream_active_N(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  ListenerOpts = [{conn_acceptors, 32}, {peer_unidi_stream_count, 1} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+
+                 {ok, Stm3} = quicer:accept_stream(Conn, [{active, 2}]), %% Set active to 2
+                 receive
+                   {quic, <<"ping2">>, Stm3,  _} -> ok
+                 after 100 -> ct:fail("no ping2")
+                 end,
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
+                 receive
+                   {quic, <<"ping3">>, Stm3,  _} -> ok
+                 after 100 -> ct:fail("no ping3")
+                 end,
+                 %% We should get a passive
+                 receive
+                   {quic, passive, Stm3, _} -> ok
+                 after 500 -> ct:fail("No passive received")
+                 end,
+
+                {ok, false} = quicer:getopt(Stm3, active),
+
+                %% Test set active false
+                ok = quicer:setopt(Stm3, active, false),
+                {ok, false} = quicer:getopt(Stm3, active),
+
+                %% Test set active -100
+                ok = quicer:setopt(Stm3, active, -100),
+                {ok, false} = quicer:getopt(Stm3, active),
+
+                %% Test set active 1-100
+                ok = quicer:setopt(Stm3, active, 2),
+                {ok, 2} = quicer:getopt(Stm3, active),
+                ok = quicer:setopt(Stm3, active, -100),
+                {ok, false} = quicer:getopt(Stm3, active)
+
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch([{pair, _, _}],
+                                ?find_pairs(
+                                   #{ ?snk_kind := debug
+                                    , event := handoff_stream
+                                    , module := quicer_connection
+                                    , stream := _STREAM0
+                                    },
+                                   #{ ?snk_kind := debug
+                                    , event := stream_owner_handoff_done
+                                    , module := quicer_stream
+                                    , stream := _STREAM0
+                                    },
+                                Trace))
+               end),
+  ok.
 
 tc_multi_streams(Config) ->
   Port = select_port(),
