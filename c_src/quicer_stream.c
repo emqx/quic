@@ -57,6 +57,8 @@ static QUIC_STATUS
 handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
                                            QUIC_STREAM_EVENT *Event);
 
+static void reset_stream_recv(QuicerStreamCTX *s_ctx);
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
@@ -560,35 +562,12 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       // call only when is_recv_pending is TRUE
       MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
 
-      if (0 == s_ctx->TotalBufferLength - size_consumed || 0 == size_req)
-        {
-          // Buffer has perfect bytes consumed
-
-          s_ctx->Buffers[0].Buffer = NULL;
-          s_ctx->Buffers[0].Length = 0;
-          s_ctx->Buffers[1].Buffer = NULL;
-          s_ctx->Buffers[1].Length = 0;
-
-          s_ctx->TotalBufferLength = 0;
-          s_ctx->is_recv_pending = FALSE;
-        }
-      else
-        {
-          // Buffer has more data than we need
-          s_ctx->Buffers[0].Buffer = NULL;
-          s_ctx->Buffers[0].Length = 0;
-          s_ctx->Buffers[1].Buffer = NULL;
-          s_ctx->Buffers[1].Length = 0;
-
-          s_ctx->is_recv_pending = FALSE;
-          s_ctx->TotalBufferLength = 0;
-        }
-
+      reset_stream_recv(s_ctx);
       res = SUCCESS(enif_make_binary(env, &bin));
     }
   else
     { // want more data in buffer
-      assert(0 != size_req);
+      assert(0 != size_req || s_ctx->is_recv_pending);
       s_ctx->is_wait_for_data = TRUE;
       TP_NIF_3(more, (uintptr_t)s_ctx->Stream, size_req);
       if (s_ctx->is_recv_pending && s_ctx->TotalBufferLength > 0)
@@ -600,14 +579,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           assert(size_consumed == s_ctx->TotalBufferLength);
 
           MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
-
-          s_ctx->Buffers[0].Buffer = NULL;
-          s_ctx->Buffers[0].Length = 0;
-          s_ctx->Buffers[1].Buffer = NULL;
-          s_ctx->Buffers[1].Length = 0;
-
-          s_ctx->is_recv_pending = FALSE;
-          s_ctx->TotalBufferLength = 0;
+          reset_stream_recv(s_ctx);
           res = SUCCESS(enif_make_binary(env, &bin));
         }
       else
@@ -1045,6 +1017,18 @@ get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
     }
 
   return SUCCESS(enif_make_ulong(env, (unsigned long)s_ctx->Stream));
+}
+
+static void
+reset_stream_recv(QuicerStreamCTX *s_ctx)
+{
+  s_ctx->Buffers[0].Buffer = NULL;
+  s_ctx->Buffers[0].Length = 0;
+  s_ctx->Buffers[1].Buffer = NULL;
+  s_ctx->Buffers[1].Length = 0;
+
+  s_ctx->is_recv_pending = FALSE;
+  s_ctx->TotalBufferLength = 0;
 }
 
 ///_* Emacs
