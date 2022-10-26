@@ -44,8 +44,8 @@
 s() ->
   application:ensure_all_started(quicer),
   Port = 4567,
-  LOptions = [ {cert, "cert.pem"}
-             , {key,  "key.pem"}
+  LOptions = [ {cert, "./server.pem"}
+             , {key,  "./server.key"}
              , {verify, none}
              , {handshake_idle_timeout_ms, 3 * ?INTERVAL}
              , {keep_alive_interval_ms, ?INTERVAL}
@@ -67,7 +67,6 @@ listener(L) ->
         end),
   receive {P, more} -> ok end,
   listener(L).
-
 
 acceptor(Top, L) ->
   io:format("Call accept ~p\n", [self()]),
@@ -177,6 +176,7 @@ client(Conns, Streams, CNo, SNo) ->
       %% connect one
       case quicer:connect("localhost", Port,
                           [{alpn, ["sample"]},
+                           {verify, none},
                            {keep_alive_interval_ms, ?INTERVAL},
                            {handshake_idle_timeout_ms, 3 * ?INTERVAL},
                            {idle_timeout_ms, 3 * ?INTERVAL}],
@@ -195,6 +195,7 @@ client(Conns, Streams, CNo, SNo) ->
                  case quicer:connect(
                         "localhost", Port,
                         [{alpn, ["sample"]},
+                         {verify, none},
                          {keep_alive_interval_ms, ?INTERVAL},
                          {handshake_idle_timeout_ms, 3 * ?INTERVAL},
                          {idle_timeout_ms, 3 * ?INTERVAL}

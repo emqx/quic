@@ -1,7 +1,7 @@
 
-all:	certs
+all:
 	erlc *.erl
-
+	make certs
 
 certs:
 	erlc ../certs.erl
