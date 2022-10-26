@@ -100,12 +100,10 @@ accept_stream_loop(Conn) ->
         {H, continue} ->
           accept_stream_loop(Conn)
       end;
-    {error, connection_closed} ->
-      io:format("Connection closed \n",[]),
-      ok;
+
     Err ->
-      io:format("Failed to accept_stream ~p \n",[Err]),
-      accept_stream_loop(Conn)
+      io:format("Failed to accept_stream ~p leaving accept stream\n",[Err]),
+      ok
   end.
 
 stream_owner(Top, Stream) ->
