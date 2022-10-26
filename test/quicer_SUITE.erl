@@ -180,11 +180,11 @@ groups() ->
 %%%===================================================================
 init_per_suite(Config) ->
   DataDir = ?config(data_dir, Config),
-  _ = gen_ca(DataDir, "ca"),
-  _ = gen_host_cert("server", "ca", DataDir),
-  _ = gen_host_cert("client", "ca", DataDir),
-  _ = gen_ca(DataDir, "other-ca"),
-  _ = gen_host_cert("other-client", "other-ca", DataDir),
+  _ = certs:gen_ca(DataDir, "ca"),
+  _ = certs:gen_host_cert("server", "ca", DataDir),
+  _ = certs:gen_host_cert("client", "ca", DataDir),
+  _ = certs:gen_ca(DataDir, "other-ca"),
+  _ = certs:gen_host_cert("other-client", "other-ca", DataDir),
   application:ensure_all_started(quicer),
   Config.
 
@@ -2630,71 +2630,11 @@ receive_all(Res)->
       Res
   end.
 
-gen_ca(Path, Name) ->
-  %% Generate ca.pem and ca.key which will be used to generate certs
-  %% for hosts server and clients
-  ECKeyFile = filename(Path, "~s-ec.key", [Name]),
-  os:cmd("openssl ecparam -name secp256r1 > " ++ ECKeyFile),
-  Cmd = lists:flatten(
-          io_lib:format("openssl req -new -x509 -nodes "
-                        "-newkey ec:~s "
-                        "-keyout ~s -out ~s -days 3650 "
-                        "-subj \"/C=SE/O=Internet Widgits Pty Ltd CA\"",
-                        [ECKeyFile, ca_key_name(Path, Name),
-                         ca_cert_name(Path, Name)])),
-  os:cmd(Cmd).
-
-ca_cert_name(Path, Name) ->
-  filename(Path, "~s.pem", [Name]).
-ca_key_name(Path, Name) ->
-  filename(Path, "~s.key", [Name]).
-
-gen_host_cert(H, CaName, Path) ->
-  ECKeyFile = filename(Path, "~s-ec.key", [CaName]),
-  CN = str(H),
-  HKey = filename(Path, "~s.key", [H]),
-  HCSR = filename(Path, "~s.csr", [H]),
-  HPEM = filename(Path, "~s.pem", [H]),
-  HEXT = filename(Path, "~s.extfile", [H]),
-  CSR_Cmd =
-    lists:flatten(
-      io_lib:format(
-        "openssl req -new -nodes -newkey ec:~s "
-        "-keyout ~s -out ~s "
-        "-addext \"subjectAltName=DNS:~s\" "
-        "-addext keyUsage=digitalSignature,keyAgreement "
-        "-subj \"/C=SE/O=Internet Widgits Pty Ltd/CN=~s\"",
-        [ECKeyFile, HKey, HCSR, CN, CN])),
-  create_file(HEXT,
-              "keyUsage=digitalSignature,keyAgreement\n"
-              "subjectAltName=DNS:~s\n", [CN]),
-  CERT_Cmd =
-    lists:flatten(
-      io_lib:format(
-        "openssl x509 -req "
-        "-extfile ~s "
-        "-in ~s -CA ~s -CAkey ~s -CAcreateserial "
-        "-out ~s -days 500",
-        [HEXT, HCSR, ca_cert_name(Path, CaName), ca_key_name(Path, CaName),
-         HPEM])),
-  os:cmd(CSR_Cmd),
-  os:cmd(CERT_Cmd),
-  file:delete(HEXT).
-
 filename(Path, F, A) ->
   filename:join(Path, str(io_lib:format(F, A))).
-
 str(Arg) ->
   binary_to_list(iolist_to_binary(Arg)).
 
-create_file(Filename, Fmt, Args) ->
-  {ok, F} = file:open(Filename, [write]),
-  try
-    io:format(F, Fmt, Args)
-  after
-    file:close(F)
-  end,
-  ok.
 
 
 %%%_* Emacs ====================================================================
