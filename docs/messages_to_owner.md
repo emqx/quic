@@ -267,12 +267,16 @@ Connection peer addr is changed.
 ### New stream started from peer
 
 ``` erlang
-{quic, new_stream, stream_handler(), stream_open_flags()}
+{quic, new_stream, stream_handler(), #{ flags := stream_open_flags()
+                                      , is_orphan := boolean()
+                                      }}
 ```
 
-This message is sent to notify the process which is accepting new incoming streams.
+This message is sent to notify the process that the process becomes the owner of the stream.
 
-The process becomes the owner of the stream.
+When `is_orphan` is false, the process is selected as the owner because it is in the new stream acceptor list.
+
+When `is_orphan` is true, the connection owner process is selected because there is no available stream acceptor.
 
 ### Streams available
 

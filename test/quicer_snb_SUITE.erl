@@ -1439,7 +1439,7 @@ tc_multi_streams_example_server_1(Config) ->
                  {ok, Stm3Out} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
                  quicer:async_send(Stm3Out, <<"ping3">>),
                  Stm3In = receive
-                            {quic, new_stream, Incoming, Flag} ->
+                            {quic, new_stream, Incoming, #{flags := Flag}} ->
                               ct:pal("incoming stream from server: ~p", [Incoming]),
                               true = quicer:is_unidirectional(Flag),
                               Incoming

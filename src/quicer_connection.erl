@@ -97,7 +97,7 @@
 %% Handle connection is resumed with 0-RTT
 %% SessionData contains session data was sent in 0-RTT
 
--callback new_stream(stream_handle(), stream_open_flags(), cb_state()) -> cb_ret().
+-callback new_stream(stream_handle(), new_stream_props(), cb_state()) -> cb_ret().
 %% Handle new stream from peer which has no owner assigned, or stream acceptor
 %% didn't accept the stream on time
 %% NOTE: The connection could start stream handoff procedure
@@ -371,7 +371,7 @@ handle_info({quic, peer_address_changed, C, NewAddr},
     ?tp(debug, #{module => ?MODULE, conn => C, event => peer_address_changed, new_addr => NewAddr}),
     default_cb_ret(M:peer_address_changed(C, NewAddr, CbState), State);
 
-handle_info({quic, new_stream, Stream, Flags},
+handle_info({quic, new_stream, Stream, Props},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) when C =/= undefined->
@@ -382,7 +382,7 @@ handle_info({quic, new_stream, Stream, Flags},
     %% note, by desgin, control stream doesn't have to be the first stream initiated.
     %% here, it handles new stream when there is no available stream acceptor for the connection.
     ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event => new_stream}),
-    default_cb_ret(M:new_stream(Stream, Flags, CbState), State);
+    default_cb_ret(M:new_stream(Stream, Props, CbState), State);
 
 handle_info({quic, streams_available, C, #{ bidi_streams := BidirStreams
                                           , unidi_streams := UnidirStreams}},

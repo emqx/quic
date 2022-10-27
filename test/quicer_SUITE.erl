@@ -2031,7 +2031,7 @@ tc_stream_start_flag_indicate_peer_accept_2(Config) ->
 
   %% Now we expect server initiat an Server -> Stream unidirectional stream
   receive
-    {quic, new_stream, Stm1, Flags} ->
+    {quic, new_stream, Stm1, #{ flags := Flags }} ->
       ?assert(quicer:is_unidirectional(Flags)),
       %% We also expect server send reply over new stream
       receive
@@ -2230,13 +2230,13 @@ echo_server(Owner, Config, Port)->
       {ok, Conn} = quicer:handshake(Conn),
       ct:pal("echo server conn accepted", []),
       receive
-        {quic, new_stream, Stm, _Flags} ->
+        {quic, new_stream, Stm, _Props} ->
           {ok, Conn} = quicer:async_accept_stream(Conn, []);
         {flow_ctl, BidirCount, UniDirCount} ->
           ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [BidirCount, UniDirCount]),
           quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => BidirCount,
                                                      peer_unidi_stream_count => UniDirCount}),
-          receive {quic, new_stream, Stm, _Flag} ->
+          receive {quic, new_stream, Stm, _Props} ->
               {ok, Conn} = quicer:async_accept_stream(Conn, [])
           end
       end,
@@ -2308,7 +2308,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
                                                  peer_unidi_stream_count => UniDirCount}),
       {ok, Conn} = quicer:async_accept_stream(Conn, []),
       echo_server_stm_loop(L, Conn, Stms);
-    {quic, new_stream, NewStm, Flags} ->
+    {quic, new_stream, NewStm, #{flags := Flags}} ->
       NewStmList = case quicer:is_unidirectional(Flags) of
                      true ->
                        ct:pal("echo server: new incoming unidirectional stream"),
@@ -2333,7 +2333,7 @@ ping_pong_server(Owner, Config, Port) ->
       {ok, Conn} = quicer:async_accept_stream(Conn, []),
       {ok, Conn} = quicer:handshake(Conn),
       receive
-        {quic, new_stream, Stm, _Flags} ->
+        {quic, new_stream, Stm, _Props} ->
           {ok, Conn} = quicer:async_accept_stream(Conn, [])
       end,
       ping_pong_server_stm_loop(L, Conn, Stm);
@@ -2491,7 +2491,7 @@ simple_stream_server(Owner, Config, Port) ->
   {ok, Conn} = quicer:async_accept_stream(Conn, []),
   {ok, Conn} = quicer:handshake(Conn),
   receive
-    {quic, new_stream, Stream, _Flag} ->
+    {quic, new_stream, Stream, _Props} ->
       {ok, StreamId} = quicer:get_stream_id(Stream),
       ct:pal("New StreamID: ~p", [StreamId]),
       receive

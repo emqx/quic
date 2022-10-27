@@ -347,6 +347,7 @@ ERL_NIF_TERM ATOM_IS_PEER_ACKED;
 ERL_NIF_TERM ATOM_IS_APP_CLOSING;
 ERL_NIF_TERM ATOM_IS_SHUTDOWN_BY_APP;
 ERL_NIF_TERM ATOM_IS_CLOSED_REMOTELY;
+ERL_NIF_TERM ATOM_IS_ORPHAN;
 ERL_NIF_TERM ATOM_BIDI_STREAMS;
 ERL_NIF_TERM ATOM_UNIDI_STREAMS;
 ERL_NIF_TERM ATOM_STATUS;
@@ -668,6 +669,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_IS_APP_CLOSING, is_app_closing);                                  \
   ATOM(ATOM_IS_SHUTDOWN_BY_APP, is_shutdown_by_app);                          \
   ATOM(ATOM_IS_CLOSED_REMOTELY, is_closed_remotely);                          \
+  ATOM(ATOM_IS_ORPHAN, is_orphan);                                            \
   ATOM(ATOM_BIDI_STREAMS, bidi_streams);                                      \
   ATOM(ATOM_UNIDI_STREAMS, unidi_streams);                                    \
   ATOM(ATOM_STATUS, status);                                                  \

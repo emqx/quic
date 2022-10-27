@@ -33,7 +33,7 @@
 
 -export([handle_stream_data/4]).
 
-init_handoff(Stream, StreamOpts, Conn, Flags) ->
+init_handoff(Stream, StreamOpts, Conn, #{is_orphan := true, flags := Flags}) ->
     InitState = #{ stream => Stream
                  , conn => Conn
                  , is_local => false

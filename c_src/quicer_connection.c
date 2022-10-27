@@ -1180,6 +1180,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   ErlNifPid *acc_pid = NULL;
 
   QuicerStreamCTX *s_ctx = init_s_ctx();
+  BOOLEAN is_orphan = FALSE;
   enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
@@ -1195,6 +1196,8 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
     {
       // If we don't have available process
       // fallback to the connection owner
+      TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
+      is_orphan = TRUE;
       acc = AcceptorAlloc();
       if (!acc)
         {
@@ -1219,11 +1222,17 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   s_ctx->owner = acc;
   s_ctx->is_closed = FALSE;
 
-  ERL_NIF_TERM report
-      = make_event(env,
-                   ATOM_NEW_STREAM,
-                   enif_make_resource(env, s_ctx),
-                   enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags));
+  ERL_NIF_TERM props_name[] = { ATOM_FLAGS, ATOM_IS_ORPHAN };
+  ERL_NIF_TERM props_value[]
+      = { enif_make_int(env, Event->PEER_STREAM_STARTED.Flags),
+          ATOM_BOOLEAN(is_orphan) };
+
+  ERL_NIF_TERM report = make_event_with_props(env,
+                                              ATOM_NEW_STREAM,
+                                              enif_make_resource(env, s_ctx),
+                                              props_name,
+                                              props_value,
+                                              2);
   if (enif_send(NULL, acc_pid, NULL, report))
     {
       MsQuic->SetCallbackHandler(

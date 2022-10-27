@@ -40,7 +40,7 @@ init_handoff(_Stream, _StreamOpts, _Conn, _Flags) ->
     %% stream owner already set while starts.
     {stop, not_impl, #{}}.
 
-new_stream(Stream, #{open_flags := Flags}, Conn) ->
+new_stream(Stream, #{flags := Flags}, Conn) ->
     {ok, #{ stream => Stream, conn => Conn, is_local => false
           , is_unidir => quicer:is_unidirectional(Flags)}}.
 
