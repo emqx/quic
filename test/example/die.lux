@@ -1,0 +1,34 @@
+
+
+[include simple.inc]
+
+[shell client]
+    !{die, 1}.
+    ?-->
+
+
+[shell server]
+    [timeout 30]
+    ?Leaving stream_Owner
+
+
+
+[shell pcheck]
+    !erl_call -s -a 'qt check_processes' -n s
+    ?ok_procs
+
+
+[shell client]
+    [sleep 1]
+    [loop _ 1 .. 20]
+"""@(?s)
+Stream 1 closed
+"""
+   !flush.
+   ?-->
+   [sleep 1]
+   [endloop]
+   !{stream, 1}.
+   ?-->
+   !{ping, 2}.
+   ?pong

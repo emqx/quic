@@ -396,10 +396,10 @@ flush(Conns, Streams) ->
       {value, {Stm, _ , SNumber}} = lists:keysearch(Stm, 1, Streams),
       io:format("Stream ~p closed ~p\n",[SNumber, X]),
       flush(Conns, lists:keydelete(Stm, 1, Streams));
-    X ->
+    X when is_tuple(X), element(1, X) == quic ->
       io:format("OTHER: ~p~n", [X]),
       flush(Conns, Streams)
-  after 1 ->
+  after 10 ->
       {Conns, Streams}
   end.
 

@@ -1,0 +1,18 @@
+
+
+[include simple.inc]
+
+[shell client]
+    !exit.
+
+
+
+[shell server]
+    ?Leaving stream_Owner
+    ?leaving accept stream
+
+
+
+[shell pcheck]
+    !erl_call -s -a 'qt check_processes' -n s
+    ?ok_procs
