@@ -36,7 +36,7 @@
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
-init_handoff(Stream, StreamOpts, Conn, Flags) ->
+init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
     InitState = #{ stream => Stream
                  , conn => Conn
                  , is_local => false
@@ -45,7 +45,7 @@ init_handoff(Stream, StreamOpts, Conn, Flags) ->
     ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
     {ok, InitState}.
 
-new_stream(Stream, #{open_flags := Flags}, Conn) ->
+new_stream(Stream, #{flags := Flags}, Conn) ->
     InitState = #{ stream => Stream
                   , conn => Conn
                   , is_local => false

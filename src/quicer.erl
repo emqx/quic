@@ -438,7 +438,7 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
   case quicer_nif:async_accept_stream(Conn, NewOpts) of
     {ok, Conn} ->
       receive
-        {quic, new_stream, Stream, _StreamFlags} ->
+        {quic, new_stream, Stream, _StreamProps} ->
           {ok, Stream};
         {quic, closed, undefined, undefined} ->
           ?tp(debug, stream_acceptor_conn_closed, #{ conn => Conn }),
@@ -458,7 +458,7 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
 %%
 %% Caller process should expect to receive
 %% ```
-%% {quic, new_stream, stream_handle(), stream_open_flags()}
+%% {quic, new_stream, stream_handle(), new_stream_props()}
 %% '''
 %%
 %% note, it returns

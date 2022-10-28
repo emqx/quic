@@ -323,10 +323,10 @@ QUIC_TRACE_API_COUNT // 26
 | QUIC_CONNECTION_EVENT_CONNECTED                       | {quic, connected, connection_handler()}  @TODO more flags                  |
 | QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT | {quic, transport_shutdown, connection_handler(), atom_status()}            |
 | QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER      | {quic, shutdown, connection_handler(), ErrorCode::integer()}               |
-| QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE               | {quic, closed, connection_handler(), Flags::map()}              |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE               | {quic, closed, connection_handler(), Flags::map()}                         |
 | QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED           | {quic, local_address_changed, connection_handler(), addr_str()}            |
 | QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED            | {quic, peer_address_changed, connection_handler(), addr_str()}             |
-| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handler(), stream_open_flag()} stream            |
+| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handler(), new_stream_props()} stream            |
 | QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE               | {quic, streams_available, connection_handler(), BidirStmCnt, UniDirStmCnt} |
 | QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS              | {quic, peer_needs_streams, connection_handler()}                           |
 | QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED         | -                                                                          |

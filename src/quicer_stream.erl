@@ -21,10 +21,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Stream Callbacks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--callback init_handoff(stream_handle(), stream_opts(), connection_handle(), stream_start_flags()) -> cb_ret().
+-callback init_handoff(stream_handle(), stream_opts(), connection_handle(), new_stream_props()) -> cb_ret().
 %% Prepare callback state before ownership handoff
 
--callback new_stream(stream_handle(), stream_open_flags(), connection_handle()) -> cb_ret().
+-callback new_stream(stream_handle(), new_stream_props(), connection_handle()) -> cb_ret().
 %% Stream accepter is assigned to the owner of the new stream
 
 -callback start_completed(stream_handle(), stream_start_completed_props(), cb_state()) -> cb_ret().
@@ -115,13 +115,13 @@ start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
                  Stream :: quicer:connection_handle(),
                  Conn :: quicer:connection_handle(),
                  StreamOpts :: map(),
-                 StreamOpenFlags :: stream_open_flags()
+                 Props :: new_stream_props()
                 ) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(Callback, Stream, Conn, StreamOpts, StreamOpenFlags) when is_atom(Callback) ->
-    gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, StreamOpenFlags], []).
+start_link(Callback, Stream, Conn, StreamOpts, Props) when is_atom(Callback) ->
+    gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, Props], []).
 
 send(StreamProc, Data) ->
     send(StreamProc, Data, ?QUICER_SEND_FLAG_SYNC).
@@ -193,13 +193,13 @@ init([Callback, Conn, StreamOpts]) ->
     end;
 
 %% After conn handshake, with stream handle for remote stream
-init([Callback, Stream, Conn, StreamOpts, Flags]) when is_list(StreamOpts) ->
+init([Callback, Stream, Conn, StreamOpts, Props]) when is_list(StreamOpts) ->
     ?tp(new_stream_2, #{module=>?MODULE, stream=>Stream}),
-    init([Callback, Stream, Conn, maps:from_list(StreamOpts), Flags]);
-init([Callback, Stream, Conn, StreamOpts, Flags]) ->
+    init([Callback, Stream, Conn, maps:from_list(StreamOpts), Props]);
+init([Callback, Stream, Conn, StreamOpts, Props]) ->
     ?tp(new_stream_3, #{module=>?MODULE, stream=>Stream, opts => StreamOpts}),
     process_flag(trap_exit, true),
-    case Callback:init_handoff(Stream, StreamOpts, Conn, Flags) of
+    case Callback:init_handoff(Stream, StreamOpts, Conn, Props) of
         {ok, CBState} ->
             State = #{ is_owner => false
                      , stream_opts => StreamOpts
@@ -281,7 +281,9 @@ handle_info({quic, closed, undefined, undefined},
              } = S) ->
     ?tp(debug, acceptor_recv_conn_stop, #{conn => Conn, module => ?MODULE, pid => self()}),
     {stop, normal, S};
-handle_info({quic, new_stream, Stream, Flags},
+
+%% For acceptor
+handle_info({quic, new_stream, Stream, #{flags := Flags, is_orphan := false} = Props},
             #{ stream_opts := Options
              , stream := undefined
              , conn := Conn
@@ -289,7 +291,7 @@ handle_info({quic, new_stream, Stream, Flags},
              , callback_state := undefined
              } = State) ->
     ?tp(debug, new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
-    try CallbackModule:new_stream(Stream, Options#{open_flags => Flags}, Conn) of
+    try CallbackModule:new_stream(Stream, maps:merge(Options, Props), Conn) of
         {ok, CallbackState} ->
             {noreply, State#{stream := Stream, callback_state := CallbackState}};
         {error, Reason} ->

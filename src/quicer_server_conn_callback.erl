@@ -70,10 +70,11 @@ nst_received(_Conn, _Data, S) ->
     {stop, no_nst_for_server, S}.
 
 %% handles stream when there is no stream acceptors.
-new_stream(Stream, Flags, #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
+new_stream(Stream, #{is_orphan := true} = StreamProps,
+           #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
     %% Spawn new stream
     case quicer_stream:start_link(maps:get(stream_callback, SOpts), Stream, Conn,
-                                  SOpts, Flags)
+                                  SOpts, StreamProps)
     of
         {ok, StreamOwner} ->
             quicer_connection:handoff_stream(Stream, StreamOwner),

@@ -149,6 +149,10 @@
 
 -type send_flags() :: non_neg_integer(). %% is sync send or not
 
+-type new_stream_props() :: #{ is_orphan := boolean()
+                             , flags := stream_open_flags()
+                             }.
+
 -type send_complete_flag() :: ?QUIC_SEND_COMPLETE_SUCCESS |
                               ?QUIC_SEND_COMPLETE_CANCELLED.
 
