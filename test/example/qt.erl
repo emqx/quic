@@ -123,7 +123,7 @@ stream_owner(Top, Stream) ->
 
 recv_ping(S, N, CNo, SNo) ->
   receive
-    {quic_passive, S} ->
+    {quic, passive, S, _} ->
       ok = quicer:setopt(S, active, 20),
       recv_ping(S, N, CNo, SNo);
     {quic, <<"ping">>, S,_} ->
@@ -153,7 +153,7 @@ rec_pong(N, S) ->
     {quic, <<"pong">>, S,_} ->
       io:format("Got pong ~p\n",[N]),
       send_ping(N-1, S);
-    {quic_passive, S} ->
+    {quic, passive, S, _} ->
       ok = quicer:setopt(S, active, 30),
       rec_pong(N, S);
     {quic, stream_closed, S, _} ->
@@ -424,11 +424,11 @@ check_processes() ->
 
 certs() ->
   DataDir = ".",
-    _ = certs:gen_ca(DataDir, "ca"),
-  _ = certs:gen_host_cert("server", "ca", DataDir),
-  _ = certs:gen_host_cert("client", "ca", DataDir),
-  _ = certs:gen_ca(DataDir, "other-ca"),
-  _ = certs:gen_host_cert("other-client", "other-ca", DataDir),
+    _ = quicer_test_lib:gen_ca(DataDir, "ca"),
+  _ = quicer_test_lib:gen_host_cert("server", "ca", DataDir),
+  _ = quicer_test_lib:gen_host_cert("client", "ca", DataDir),
+  _ = quicer_test_lib:gen_ca(DataDir, "other-ca"),
+  _ = quicer_test_lib:gen_host_cert("other-client", "other-ca", DataDir),
   erlang:halt().
 
 

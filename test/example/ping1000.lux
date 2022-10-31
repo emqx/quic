@@ -1,0 +1,18 @@
+
+
+[include simple.inc]
+
+[shell client]
+    !{ping, 1, 1000}.
+    ?Got pong 1
+    ?-->
+    !{close_connection, 1}.
+
+
+[shell server]
+    ?Leaving stream_Owner
+
+
+[shell pcheck]
+    !erl_call -s -a 'qt check_processes' -n s
+    ?ok_procs

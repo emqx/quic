@@ -180,11 +180,11 @@ groups() ->
 %%%===================================================================
 init_per_suite(Config) ->
   DataDir = ?config(data_dir, Config),
-  _ = certs:gen_ca(DataDir, "ca"),
-  _ = certs:gen_host_cert("server", "ca", DataDir),
-  _ = certs:gen_host_cert("client", "ca", DataDir),
-  _ = certs:gen_ca(DataDir, "other-ca"),
-  _ = certs:gen_host_cert("other-client", "other-ca", DataDir),
+  _ = quicer_test_lib:gen_ca(DataDir, "ca"),
+  _ = quicer_test_lib:gen_host_cert("server", "ca", DataDir),
+  _ = quicer_test_lib:gen_host_cert("client", "ca", DataDir),
+  _ = quicer_test_lib:gen_ca(DataDir, "other-ca"),
+  _ = quicer_test_lib:gen_host_cert("other-client", "other-ca", DataDir),
   application:ensure_all_started(quicer),
   Config.
 

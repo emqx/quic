@@ -4,7 +4,7 @@ all:
 	make certs
 
 certs:
-	erlc ../certs.erl
+	erlc ../quicer_test_lib.erl
 	erl -noshell -s qt certs
 
 clean:

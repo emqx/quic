@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
--module(certs).
+-module(quicer_test_lib).
 -include_lib("kernel/include/file.hrl").
 
 
