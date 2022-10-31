@@ -124,6 +124,7 @@ stream_owner(Top, Stream) ->
 recv_ping(S, N, CNo, SNo) ->
   receive
     {quic, passive, S, _} ->
+      io:format("Setting active 20\n",[]),
       ok = quicer:setopt(S, active, 20),
       recv_ping(S, N, CNo, SNo);
     {quic, <<"ping">>, S,_} ->
@@ -154,6 +155,7 @@ rec_pong(N, S) ->
       io:format("Got pong ~p\n",[N]),
       send_ping(N-1, S);
     {quic, passive, S, _} ->
+      io:format("Setting active 30 \n",[]),
       ok = quicer:setopt(S, active, 30),
       rec_pong(N, S);
     {quic, stream_closed, S, _} ->
