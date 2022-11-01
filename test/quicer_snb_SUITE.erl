@@ -42,9 +42,9 @@ init_per_suite(Config) ->
   %% dbg:p(all,c),
   %% dbg:tpl(snabbkaffe, do_find_pairs, cx),
   DataDir = ?config(data_dir, Config),
-  _ = gen_ca(DataDir),
-  _ = gen_host_cert("server", DataDir),
-  _ = gen_host_cert("client", DataDir),
+  _ = quicer_test_lib:gen_ca(DataDir, ?MODULE),
+  _ = quicer_test_lib:gen_host_cert("server", ?MODULE, DataDir),
+  _ = quicer_test_lib:gen_host_cert("client", ?MODULE, DataDir),
   application:ensure_all_started(quicer),
   application:ensure_all_started(snabbkaffe),
   Config.
@@ -1965,70 +1965,6 @@ wait_for_die([Pid | T]) ->
       when Info =:= normal orelse Info =:= noproc ->
       wait_for_die(T)
   end.
-
-gen_ca(Path) ->
-  %% Generate ca.pem and ca.key which will be used
-  %% to generate certs for server and clients
-  ECKeyFile = filename(Path, "ec.key", []),
-  os:cmd("openssl ecparam -name secp256r1 > " ++ ECKeyFile),
-  Cmd = lists:flatten(
-          io_lib:format("openssl req -new -x509 -nodes "
-                        "-newkey ec:~s "
-                        "-keyout ~s -out ~s -days 3650 "
-                        "-subj \"/C=SE/O=Internet Widgits Pty Ltd CA\"",
-                        [ECKeyFile, ca_key_name(Path), ca_cert_name(Path)])),
-  os:cmd(Cmd).
-
-ca_cert_name(Path) ->
-  filename(Path, "ca.pem", []).
-ca_key_name(Path) ->
-  filename(Path, "ca.key", []).
-
-gen_host_cert(H, Path) ->
-  ECKeyFile = filename(Path, "ec.key", []),
-  CN = str(H),
-  HKey = filename(Path, "~s.key", [H]),
-  HCSR = filename(Path, "~s.csr", [H]),
-  HPEM = filename(Path, "~s.pem", [H]),
-  HEXT = filename(Path, "~s.extfile", [H]),
-  CSR_Cmd =
-    lists:flatten(
-      io_lib:format(
-        "openssl req -new -nodes -newkey ec:~s "
-        "-keyout ~s -out ~s "
-        "-addext \"subjectAltName=DNS:~s\" "
-        "-addext keyUsage=digitalSignature,keyAgreement "
-        "-subj \"/C=SE/O=Internet Widgits Pty Ltd/CN=~s\"",
-        [ECKeyFile, HKey, HCSR, CN, CN])),
-  create_file(HEXT,
-              "keyUsage=digitalSignature,keyAgreement\n"
-              "subjectAltName=DNS:~s\n", [CN]),
-  CERT_Cmd =
-    lists:flatten(
-      io_lib:format(
-        "openssl x509 -req "
-        "-extfile ~s "
-        "-in ~s -CA ~s -CAkey ~s -CAcreateserial "
-        "-out ~s -days 500",
-        [HEXT, HCSR, ca_cert_name(Path), ca_key_name(Path), HPEM])),
-  os:cmd(CSR_Cmd),
-  os:cmd(CERT_Cmd),
-  file:delete(HEXT).
-
-filename(Path, F, A) ->
-  filename:join(Path, str(io_lib:format(F, A))).
-
-str(Arg) ->
-  binary_to_list(iolist_to_binary(Arg)).
-
-create_file(Filename, Fmt, Args) ->
-  {ok, F} = file:open(Filename, [write]),
-  try
-    io:format(F, Fmt, Args)
-  after
-    file:close(F)
-  end,
-  ok.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
