@@ -1,0 +1,20 @@
+
+
+[include simple.inc]
+
+[shell client]
+    !$_CTRL_C_
+    ?BREAK
+    !a
+
+
+
+[shell server]
+    [timeout 30]
+    ?leaving accept stream
+
+
+
+[shell pcheck]
+    !erl_call -s -a 'qt check_processes' -n s
+    ?ok_procs
