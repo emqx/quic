@@ -112,6 +112,7 @@ bool
 set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM term)
 {
   int i = 0;
+  // term is user input, we must use IS_SAME_TERM for validation.
   if (IS_SAME_TERM(term, ATOM_FALSE))
     {
       owner->active_count = 0;
@@ -130,16 +131,20 @@ set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM term)
   else if (enif_get_int(env, term, &i) && i <= INT16_MAX
            && i >= INT16_MIN) // note, i<0 is possible
     {
-      if ((i + owner->active_count) > INT16_MAX)
+      if (i < 0 && (abs(i) > owner->active_count))
         {
-          return FALSE; // follow otp behavior
+          owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+          owner->active_count = 0;
         }
       else
         {
-          owner->active = ACCEPTOR_RECV_MODE_MULTI;
+          if (owner->active_count + i > INT16_MAX)
+            {
+              // overflow
+              return FALSE;
+            }
           owner->active_count += i;
-          if (owner->active_count == 0)
-            owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+          owner->active = ACCEPTOR_RECV_MODE_MULTI;
         }
     }
   else // unsupported arg

@@ -39,6 +39,7 @@
 init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
     InitState = #{ stream => Stream
                  , conn => Conn
+                 , peer_stream => undefined
                  , is_local => false
                  , is_unidir => quicer:is_unidirectional(Flags)
                  },
@@ -48,6 +49,7 @@ init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
 new_stream(Stream, #{flags := Flags}, Conn) ->
     InitState = #{ stream => Stream
                   , conn => Conn
+                  , peer_stream => undefined
                   , is_local => false
                   , is_unidir => quicer:is_unidirectional(Flags)},
     {ok, InitState}.
@@ -104,15 +106,22 @@ handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     ct:pal("Server recv: ~p from ~p", [Bin, Stream] ),
     {ok, _} = quicer:send(Stream, Bin),
     {ok, State};
-handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, conn := Conn} = State) ->
+handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, peer_stream := PeerStream, conn := Conn} = State) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
     ct:pal("Server recv: ~p from ~p", [Bin, Stream] ),
-    {ok, StreamProc} = quicer_stream:start_link(?MODULE, Conn,
-                                                [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
-                                                , {is_local, true}
-                                                ]),
-    {ok, _} = quicer_stream:send(StreamProc, Bin),
-    {ok, State}.
+
+    case PeerStream of
+        undefined ->
+            {ok, StreamProc} = quicer_stream:start_link(?MODULE, Conn,
+                                                        [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                                        , {is_local, true}
+                                                        ]),
+            {ok, _} = quicer_stream:send(StreamProc, Bin),
+            {ok, State#{peer_stream := StreamProc}};
+        StreamProc when is_pid(StreamProc) ->
+            {ok, _} = quicer_stream:send(StreamProc, Bin),
+            {ok, State}
+    end.
 
 passive(_Stream, undefined, S)->
     ct:fail("Steam go into passive mode"),

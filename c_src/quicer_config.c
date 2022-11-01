@@ -1065,13 +1065,20 @@ get_stream_opt(ErlNifEnv *env,
     }
   else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
     {
-      if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active)
+      switch (s_ctx->owner->active)
         {
+        case ACCEPTOR_RECV_MODE_PASSIVE:
           res = SUCCESS(ATOM_FALSE);
-        }
-      else
-        {
+          break;
+        case ACCEPTOR_RECV_MODE_MULTI:
+          res = SUCCESS(enif_make_int(env, s_ctx->owner->active_count));
+          break;
+        case ACCEPTOR_RECV_MODE_ONCE:
+          res = SUCCESS(ATOM_ONCE);
+          break;
+        case ACCEPTOR_RECV_MODE_ACTIVE:
           res = SUCCESS(ATOM_TRUE);
+          break;
         }
       goto Exit;
     }
@@ -1153,23 +1160,11 @@ set_stream_opt(ErlNifEnv *env,
       goto Exit;
     }
 
-  else if (ATOM_QUIC_PARAM_STREAM_ID == optname)
+  else if (IS_SAME_TERM(ATOM_QUIC_PARAM_STREAM_ID, optname))
     {
       Param = QUIC_PARAM_STREAM_ID;
       BufferLength = sizeof(uint64_t);
       Buffer = &BuffUint64;
-    }
-  else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
-    {
-      if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active)
-        {
-          res = SUCCESS(ATOM_FALSE);
-        }
-      else
-        {
-          res = SUCCESS(ATOM_TRUE);
-        }
-      goto Exit;
     }
   else if (ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH == optname)
     {
