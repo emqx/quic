@@ -67,7 +67,7 @@
 %% Handle connection handshake done
 %%      callback is suggested to accept new streams @see quicer:accept_stream/3
 
--callback transport_shutdown(connection_handle(), transport_shutdown_info(), cb_state()) -> cb_ret().
+-callback transport_shutdown(connection_handle(), transport_shutdown_props(), cb_state()) -> cb_ret().
 %% Handle connection shutdown due to transport error with error reason.
 %%
 %% NOTE: Cleanup is prefered to be handled in @see closed/3
@@ -133,7 +133,7 @@
 %%--------------------------------------------------------------------
 
 %% start_link/3
-%% @doc spawn Client spawstart connection
+%% @doc spawn Client connection
 -spec start_link(atom(), {hostname(), inet:port_number()}, {conn_opts(), stream_opts()}) -> gen_server:start_ret().
 start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when is_atom(CallbackModule) ->
     gen_server:start_link(?MODULE, [CallbackModule, Peer, Opts], []).
@@ -150,8 +150,10 @@ start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when 
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_list(COpts)->
-    case proplists:get_value(conn_callback, COpts, undefined) of
+start_link(undefined, Listener, {LOpts, COpts, SOpts}, Sup) when is_list(COpts)->
+    start_link(undefined, Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup);
+start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_map(COpts)->
+    case maps:get(conn_callback, COpts, undefined) of
         undefined ->
             {error, missing_conn_callback};
         Callback ->
@@ -230,7 +232,7 @@ init([CallbackModule, {Host, Port}, {COpts, SOpts}])
             {ok, State1#{callback_state => CBState}};
         {ok, CBState, Action} ->
             {ok, State1#{callback_state => CBState}, Action};
-         Other -> %% ignore, {stop, Reason} ...
+        Other -> %% ignore, {stop, Reason} ...
             Other
     end;
 
@@ -423,7 +425,7 @@ handle_info({quic, nst_received, C, TicketBin},
 %%       Event =:= peer_send_complete orelse
 %%       Event =:= peer_send_aborted orelse
 %%       Event =:= peer_receive_aborted orelse
-%%       Event =:= peer_shutdown_complete orelse
+%%       Event =:= send_shutdown_complete orelse
 %%       Event =:= stream_closed orelse
 %%       Event =:= peer_accepted orelse
 %%       Event =:= passive ->

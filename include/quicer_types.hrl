@@ -153,6 +153,10 @@
                              , flags := stream_open_flags()
                              }.
 
+-type streams_available_props() :: #{ unidi_streams := non_neg_integer()
+                                    , bidi_streams := non_neg_integer()
+                                    }.
+
 -type send_complete_flag() :: ?QUIC_SEND_COMPLETE_SUCCESS |
                               ?QUIC_SEND_COMPLETE_CANCELLED.
 
@@ -271,19 +275,36 @@
                             , alpns := string() | undefined
                             }.
 
--type conn_closed_props() :: map().
+-type conn_closed_props() :: #{ is_handshake_completed := boolean()
+                              , is_peer_acked := boolean()
+                              , is_app_closing := boolean()
+                              }.
 
--type transport_shutdown_info() :: #{ is_conn_shutdown := boolean()
-                                    , is_app_closing := boolean()
-                                    , is_shutdown_by_app := boolean()
-                                    , is_closed_remotely := boolean()
-                                    , status := atom_reason()
-                                    , error := error_code()
-                                    }.
+-type transport_shutdown_props() :: #{ is_conn_shutdown := boolean()
+                                     , is_app_closing := boolean()
+                                     , is_shutdown_by_app := boolean()
+                                     , is_closed_remotely := boolean()
+                                     , status := atom_reason()
+                                     , error := error_code()
+                                     }.
 
 %% Stream Event Props
--type stream_start_completed_props() :: map().
+-type stream_start_completed_props() :: #{ status := atom()
+                                         , stream_id := integer()
+                                         , is_peer_accepted := boolean() }.
 -type stream_closed_props() :: map().
+
+-type peer_accepted_props() :: #{ is_conn_shutdown := boolean()
+                                , is_app_closing := boolean()
+                                , is_shutdown_by_app := boolean()
+                                , is_closed_remotely := boolean()
+                                , status := atom_reason()
+                                , error := error_code()
+                                }.
+
+-type recv_data_props() :: #{ absolute_offset := integer()
+                            , len := integer()
+                            , flags := integer()}.
 
 %% @doc QUIC Application error code, not protocol error code.
 %% The app error code will be passed to the peer while shutdown the connection.
