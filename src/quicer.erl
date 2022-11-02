@@ -432,8 +432,6 @@ accept_stream(Conn, Opts) ->
 accept_stream(Conn, Opts, Timeout) when is_list(Opts) ->
   accept_stream(Conn, maps:from_list(Opts), Timeout);
 accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
-  % @todo make_ref
-  % @todo error handling
   NewOpts = maps:merge(default_stream_opts(), Opts),
   case quicer_nif:async_accept_stream(Conn, NewOpts) of
     {ok, Conn} ->

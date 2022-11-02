@@ -28,7 +28,9 @@
 
 -behaviour(gen_server).
 
--export_type([cb_state/0]).
+-export_type([ cb_state/0
+             , cb_ret/0
+             ]).
 
 -type cb_state() :: quicer_lib:cb_state().
 
