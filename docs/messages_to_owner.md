@@ -276,7 +276,8 @@ This message is sent to notify the process that the process becomes the owner of
 
 When `is_orphan` is false, the process is selected as the owner because it is in the new stream acceptor list.
 
-When `is_orphan` is true, the connection owner process is selected because there is no available stream acceptor.
+When `is_orphan` is true, the connection owner process is selected because there is no available stream acceptor
+and the stream active mode is set to false (passive mode). 
 
 ### Streams available
 

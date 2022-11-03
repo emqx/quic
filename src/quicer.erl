@@ -80,6 +80,8 @@
         , listeners/0
         , listener/1
         , controlling_process/2
+        , wait_for_handoff/2
+        , handoff_stream/2
         , perf_counters/0
         ]).
 
@@ -803,6 +805,7 @@ listener(Name) ->
 
 %% @doc set controlling process for Connection/Stream.
 %% mimic {@link ssl:controlling_process/2}
+%% @see wait_for_handoff/2
 %% @end
 -spec controlling_process(connection_handle() | stream_handle(), pid()) ->
         ok |
@@ -810,6 +813,33 @@ listener(Name) ->
 controlling_process(Handle, Pid) ->
   quicer_nif:controlling_process(Handle, Pid).
 
+%% @doc Helper function that handoff messages from process message box
+%% to the new owner.
+%% Use this for handoff the orphan stream *only*.
+%% @see controlling_process/2
+%% @end
+-spec wait_for_handoff(From::pid(), stream_handle()) ->
+           {quic, _, _, _,_} | undefined | owner_down.
+wait_for_handoff(From, Stream)->
+  quicer_stream:wait_for_handoff(From, Stream).
+
+-spec handoff_stream(stream_handle(), pid()) -> ok | {error, any()}.
+handoff_stream(Stream, NewOwner) ->
+  ?tp(debug, #{event=>?FUNCTION_NAME , module=>?MODULE, stream=>Stream, owner=>NewOwner}),
+  case quicer:getopt(Stream, active) of
+    {ok, ActiveN} ->
+      ActiveN =/= false andalso quicer:setopt(Stream, active, false),
+      Res = case forward_stream_msgs(Stream, NewOwner) of
+              ok ->
+                quicer:controlling_process(Stream, NewOwner);
+              {error, _} = Other ->
+                Other
+            end,
+      ActiveN =/= false andalso quicer:setopt(Stream, active, ActiveN),
+      Res;
+    {error, _} = E ->
+      E
+  end.
 
 %%% @doc get QUIC stack performance counters
 -spec perf_counters() -> {ok, list({atom(), integer()})} | {error, any()}.
@@ -874,6 +904,26 @@ default_conn_opts() ->
   #{ peer_bidi_stream_count => 1
    , peer_unidi_stream_count => 1
    }.
+
+%% @doc Forward all erl msgs of the Stream to the Stream Owner
+%% Stream Owner should block for the handoff_done
+-spec forward_stream_msgs(stream_handle(), pid()) -> ok | {error, owner_down}.
+forward_stream_msgs(Stream, Owner) when is_pid(Owner) ->
+    do_forward_stream_msgs(Stream, Owner, erlang:monitor(process, Owner)).
+do_forward_stream_msgs(Stream, Owner, MRef) ->
+    receive
+        {quic, _EventOrData, Stream, _Props} = Msg ->
+            Owner ! Msg,
+            do_forward_stream_msgs(Stream, Owner, MRef);
+        {'DOWN', MRef, process, Owner, _} ->
+            ?tp(debug, do_forward_stream_msg_fail, #{stream => Stream, owner => Owner}),
+            {error, owner_down}
+    after 0 ->
+            ?tp(debug, do_forward_stream_msg_done, #{stream => Stream, owner => Owner}),
+            Owner ! handoff_done,
+            ok
+    end.
+
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t

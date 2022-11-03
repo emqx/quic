@@ -75,6 +75,9 @@
         , send/3
         ]).
 
+%% Helpers
+-export([wait_for_handoff/2]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          handle_continue/2,
@@ -110,7 +113,10 @@
 start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
     gen_server:start_link(?MODULE, [Callback, Conn, StreamOpts], []).
 
-%% Accepted stream
+%%--------------------------------------------------------------------
+%% @doc Start a new stream owner process and
+%% then handoff ownership to this process
+%%--------------------------------------------------------------------
 -spec start_link(Callback :: module(),
                  Stream :: quicer:connection_handle(),
                  Conn :: quicer:connection_handle(),
@@ -120,14 +126,32 @@ start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(Callback, Stream, Conn, StreamOpts, Props) when is_atom(Callback) ->
-    gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, Props], []).
+start_link(Callback, Stream, Conn, StreamOpts, Props)
+  when Callback =/= undefined
+       andalso is_atom(Callback)
+       andalso is_map(Props) ->
+    gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, Props, self()], []).
 
+-spec send(pid(), binary()) -> {ok, Length::non_neg_integer()} | {error, any()}.
 send(StreamProc, Data) ->
     send(StreamProc, Data, ?QUICER_SEND_FLAG_SYNC).
 
 send(StreamProc, Data, Flag) ->
     gen_server:call(StreamProc, {send, Data, Flag}, infinity).
+
+wait_for_handoff(FromOwner, Stream) ->
+    MRef = erlang:monitor(process, FromOwner),
+    receive
+        handoff_done ->
+            ?tp(debug, #{event=>stream_owner_handoff_done,
+                         module=>?MODULE, stream=>Stream
+                        }),
+            ok;
+        {'DOWN', MRef, process, FromOwner, _Info} ->
+            ?tp(debug, handoff_exit_down),
+            owner_down
+    %% For correctness we should never add timeout
+    end.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -193,10 +217,10 @@ init([Callback, Conn, StreamOpts]) ->
     end;
 
 %% After conn handshake, with stream handle for remote stream
-init([Callback, Stream, Conn, StreamOpts, Props]) when is_list(StreamOpts) ->
+init([Callback, Stream, Conn, StreamOpts, Props, PrevOwner]) when is_list(StreamOpts) ->
     ?tp(new_stream_2, #{module=>?MODULE, stream=>Stream}),
-    init([Callback, Stream, Conn, maps:from_list(StreamOpts), Props]);
-init([Callback, Stream, Conn, StreamOpts, Props]) ->
+    init([Callback, Stream, Conn, maps:from_list(StreamOpts), Props, PrevOwner]);
+init([Callback, Stream, Conn, StreamOpts, Props, PrevOwner]) ->
     ?tp(new_stream_3, #{module=>?MODULE, stream=>Stream, opts => StreamOpts}),
     process_flag(trap_exit, true),
     case Callback:init_handoff(Stream, StreamOpts, Conn, Props) of
@@ -208,7 +232,7 @@ init([Callback, Stream, Conn, StreamOpts, Props]) ->
                      , callback => Callback
                      , callback_state => CBState
                      },
-            {ok,  State, {continue , ?post_init}};
+            {ok,  State, {continue , {?post_init, PrevOwner}}};
         {error, _} = E ->
             {stop, E}
     end.
@@ -390,20 +414,16 @@ handle_info({quic, passive, Stream, undefined},
           {noreply, state(), Timeout :: timeout()} |
           {noreply, state(), hibernate} |
           {stop, Reason :: normal | term(), state()}.
-handle_continue(?post_init, #{ is_owner := false, stream := Stream} = State) ->
+handle_continue({?post_init, PrevOwner}, #{ is_owner := false, stream := Stream} = State) ->
     ?tp(debug, #{event=>?post_init, module=>?MODULE, stream=>Stream}),
-    case wait_for_handoff(Stream) of
-        undefined ->
-            ?tp(debug, #{event=>post_init_undef , module=>?MODULE, stream=>Stream}),
+    case wait_for_handoff(PrevOwner, Stream) of
+        ok ->
+            quicer:setopt(Stream, active, true),
             {noreply, State#{is_owner => true}};
-        {BinList, Len, Flag} ->
-            ?tp(debug, #{event=>post_init_data, module=>?MODULE, stream=>Stream}),
-            %% @TODO first data from the stream, offset 0,
-            Msg = {quic, iolist_to_binary(lists:reverse(BinList)), Stream,
-                   #{absolute_offset => 0, len => Len, flags => Flag}},
-            handle_info(Msg, State#{is_owner => true})
+        owner_down ->
+            {stop, owner_down}
     end;
-handle_continue(?post_init, #{ is_owner := true } = State) ->
+handle_continue({?post_init, _}, #{ is_owner := true } = State) ->
     logger:error("post_init when is owner"),
     {stop, internal_error, State}.
 
@@ -464,12 +484,3 @@ maybe_log_stracetrace(ST) ->
     logger:error("~p~n", [ST]),
     ok.
 
-%% handoff must happen
-wait_for_handoff(Stream) ->
-    %% @TODO 1. Monitor Conn Proc and handle EXIT
-    receive
-        {stream_owner_handoff, Stream, _From, Msg} ->
-            ?tp(debug, #{event=>stream_owner_handoff_done, module=>?MODULE, stream=>Stream}),
-            Msg
-    %% For correctness we should never add timeout
-    end.

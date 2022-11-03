@@ -77,8 +77,12 @@ new_stream(Stream, #{is_orphan := true} = StreamProps,
                                   SOpts, StreamProps)
     of
         {ok, StreamOwner} ->
-            quicer_connection:handoff_stream(Stream, StreamOwner),
-            {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
+            case quicer:handoff_stream(Stream, StreamOwner) of
+                ok ->
+                    {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
+                {error, _} = E ->
+                    E
+            end;
         Other ->
             Other
     end.

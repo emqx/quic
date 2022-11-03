@@ -110,7 +110,6 @@
 %% API
 -export([start_link/3, %% for client
          start_link/4, %% for server
-         handoff_stream/2,
          get_cb_state/1,
          stream_send/6,
          get_handle/1
@@ -163,22 +162,6 @@ start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_map
     end;
 start_link(CallbackModule, Listener, Opts, Sup) ->
     gen_server:start_link(?MODULE, [CallbackModule, Listener, Opts, Sup], []).
-
-%% @doc
-%%  handoff stream to another proc
-%%  1) change stream owner to the new pid
-%%  2) forward all data to new pid
-%%  3) @TODO also handoff signals
-%% @end
--spec handoff_stream(stream_handle(), pid()) -> ok.
-handoff_stream(Stream, Owner) ->
-    ?tp(debug, #{event=>?FUNCTION_NAME , module=>?MODULE, stream=>Stream, owner => Owner}),
-    case quicer:controlling_process(Stream, Owner) of
-        ok ->
-            forward_stream_msgs(Stream, Owner, _ACC = []);
-        {error, _Reason} = E->
-            E
-    end.
 
 -spec get_cb_state(ConnPid :: pid()) -> {ok, cb_state()} | {error, any()}.
 get_cb_state(ConnPid) ->
@@ -492,26 +475,3 @@ format_status(_Opt, Status) ->
 %%% Internal functions
 %%%===================================================================
 
-%% @doc Forward all erl msgs of the Stream to the Stream Owner
-%% Stream Owner should block for the {owner_handoff, Msg} and then 'flush_done' msg,
--spec forward_stream_msgs(stream_handle(), pid(), list()) -> ok.
-forward_stream_msgs(Stream, Owner, Acc) ->
-    receive
-        {quic, Data, Stream, _Props} = Msg when is_binary(Data)  ->
-            forward_stream_msgs(Stream, Owner, [Msg | Acc]);
-        {quic, _, Stream, _} ->
-            %% @TODO We should not drop
-            forward_stream_msgs(Stream, Owner, Acc)
-    after 0 ->
-            Owner ! {stream_owner_handoff, Stream, self(), aggr_stream_data(Acc)},
-            ok
-    end.
-
-aggr_stream_data([]) ->
-    undefined;
-aggr_stream_data(Acc) ->
-    %% Maybe assert offset is 0
-    lists:foldl(fun({quic, Bin, _Stream, #{len := Len, flags := Flag}},
-                    {BinAcc, LenAcc, FlagAcc}) ->
-                        {[Bin | BinAcc], LenAcc + Len, FlagAcc bor Flag}
-                end, {[], _Len = 0, _Flag = 0}, Acc).
