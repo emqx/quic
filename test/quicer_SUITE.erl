@@ -705,7 +705,10 @@ run_tc_conn_client_bad_cert(Config)->
           %% Depending on the timing, connection open could fail already.
           ok;
         {ok, Stm} ->
-          {ok, 4} = quicer:send(Stm, <<"ping">>),
+          case quicer:send(Stm, <<"ping">>) of
+            {ok, 4} -> ok;
+            {error, cancelled} -> ok
+          end,
           receive
             {quic, transport_shutdown, _Ref,
              #{error := _ErrorCode, status := bad_certificate}} ->
