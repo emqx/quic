@@ -61,6 +61,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         otp:
           # Disable OTP 23 for now
