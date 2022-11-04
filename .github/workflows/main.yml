@@ -63,7 +63,10 @@ jobs:
     strategy:
       matrix:
         otp:
-          - 23.3.4.5
+          # Disable OTP 23 for now
+          # core dump due to OTP-18027
+          # We need 23.3.4.14+
+          # - 23.3.4.5
           - 24.3.3
           - 25.0.4
         build_type:
