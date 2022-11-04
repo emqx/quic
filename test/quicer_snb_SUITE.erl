@@ -15,7 +15,45 @@
 %%--------------------------------------------------------------------
 -module(quicer_snb_SUITE).
 
--compile(export_all).
+
+%% API
+-export([all/0,
+         suite/0,
+         groups/0,
+         init_per_suite/1,
+         end_per_suite/1,
+         init_per_group/2,
+         end_per_group/2,
+         init_per_testcase/2,
+         end_per_testcase/2]).
+
+%% test cases
+-export([ tc_app_echo_server/1,
+          tc_slow_conn/1,
+          tc_stream_owner_down/1,
+          tc_conn_owner_down/1,
+          tc_conn_close_flag_1/1,
+          tc_conn_close_flag_2/1,
+          tc_stream_close_errno/1,
+          tc_conn_idle_close/1,
+          tc_conn_gc/1,
+          tc_conn_no_gc/1,
+          tc_conn_no_gc_2/1,
+          tc_conn_resume_old/1,
+          tc_conn_resume_nst/1,
+          tc_conn_resume_nst_with_stream/1,
+          tc_conn_resume_nst_async/1,
+          tc_listener_no_acceptor/1,
+          tc_conn_stop_notify_acceptor/1,
+          tc_accept_stream_active_once/1,
+          tc_accept_stream_active_N/1,
+          tc_multi_streams/1,
+          tc_multi_streams_example_server_1/1,
+          tc_multi_streams_example_server_2/1,
+          tc_multi_streams_example_server_3/1,
+          tc_passive_recv_1/1
+        ]).
+
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -145,6 +183,7 @@ all() ->
   , tc_listener_no_acceptor
   , tc_conn_stop_notify_acceptor
   , tc_accept_stream_active_once
+  , tc_accept_stream_active_N
     %% multistreams
   , tc_multi_streams
   , tc_multi_streams_example_server_1
@@ -1438,6 +1477,7 @@ tc_accept_stream_active_N(Config) ->
                                              [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
                  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                 {ok, Conn} = quicer:async_accept_stream(Conn, [{active, 2}]), %% Set active to 2
                  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
                  ct:pal("ping1 sent"),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
@@ -1447,7 +1487,12 @@ tc_accept_stream_active_N(Config) ->
                  after 100 -> ct:fail("no ping1")
                  end,
 
-                 {ok, Stm3} = quicer:accept_stream(Conn, [{active, 2}]), %% Set active to 2
+                 Stm3 = receive
+                          {quic, new_stream, StreamFromServer, #{is_orphan := false}} ->
+                            StreamFromServer
+                        after 100 ->
+                            ct:fail("accept Stm3 from server fail")
+                        end,
                  receive
                    {quic, <<"ping2">>, Stm3,  _} -> ok
                  after 100 -> ct:fail("no ping2")
@@ -1460,10 +1505,18 @@ tc_accept_stream_active_N(Config) ->
                  %% We should get a passive
                  receive
                    {quic, passive, Stm3, _} -> ok
-                 after 500 -> ct:fail("No passive received")
+                 after 100 -> ct:fail("No passive received")
                  end,
 
                 {ok, false} = quicer:getopt(Stm3, active),
+
+                %% set active after passive
+                ok = quicer:setopt(Stm3, active, 20),
+                {ok, _} = quicer:async_send(Stm2, <<"ping4">>),
+                receive
+                   {quic, <<"ping4">>, Stm3,  _} -> ok
+                after 100 -> ct:fail("no ping4")
+                end,
 
                 %% Test set active false
                 ok = quicer:setopt(Stm3, active, false),
