@@ -777,6 +777,8 @@ handle_stream_event_recv(HQUIC Stream,
 
           s_ctx->owner->active_count--;
 
+          TP_CB_3(is_report_passive, (uintptr_t)s_ctx->Stream, s_ctx->owner->active_count);
+
           if (s_ctx->owner->active_count == 0)
             {
               s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
