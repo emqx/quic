@@ -1,0 +1,12 @@
+
+
+[include simple.inc]
+
+[shell client]
+    !{connect_stream, 1000}.
+    ?Stream 1
+    ?Stream 100
+    ?Stream 1000
+    ?-->
+
+

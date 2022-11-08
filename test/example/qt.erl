@@ -90,28 +90,24 @@ accept_stream_loop(Conn) ->
   case quicer:accept_stream(Conn, [{active, false}], infinity) of
     {ok, Stm} ->
       io:format("accept stream -> ~p\n",[Stm]),
-
       Self = self(),
       H = proc_lib:spawn_link(
             fun() -> stream_owner(Self, Stm) end),
       ok = quicer:controlling_process(Stm, H),
-
-      receive
-        {H, continue} ->
-          accept_stream_loop(Conn)
-      end;
-
+      H ! {self(), continue},
+      accept_stream_loop(Conn);
     Err ->
       io:format("Failed to accept_stream ~p leaving accept stream\n",[Err]),
       ok
   end.
 
 stream_owner(Top, Stream) ->
-  Top ! {self(), continue},
+  receive {Top, continue} ->
+      ok
+  end,
   case server_negotiate(Stream) of
     {ok, CNo, SNo} ->
       io:format("Enter recv_ping for ~p:~p\n",[CNo, SNo]),
-
       ok = quicer:setopt(Stream, active, 20),
       recv_ping(Stream, 1, CNo, SNo),
       io:format("Leaving stream_Owner \n",[]);
@@ -209,6 +205,30 @@ client(Conns, Streams, CNo, SNo) ->
                  end
              end, lists:seq(CNo, CNo+N-1)),
       client(CC ++ Conns, Streams, CNo+N, SNo);
+
+    {ok, {connect_stream, N}} ->
+      %% Create N connections, with a stream associated to each conn
+      L = lists:map(
+            fun(NN) ->
+                {ok, Conn} = quicer:connect(
+                               "localhost", Port,
+                               [{alpn, ["sample"]},
+                                {verify, none},
+                                {keep_alive_interval_ms, ?INTERVAL},
+                                {handshake_idle_timeout_ms, 3 * ?INTERVAL},
+                                {idle_timeout_ms, 3 * ?INTERVAL}
+                               ], 10000),
+                %% Some kind of timing bug here
+                %timer:sleep(20),
+                {ok, Stm} = quicer:start_stream(Conn, [{active, 30}]),
+                ok = client_negotiate(Stm, NN, NN),
+                io:format("Stream ~p~n", [NN]),
+                {Conn, Stm}
+            end, lists:seq(CNo, CNo+N-1)),
+      NewConns = [element(1, C) || C <- L],
+      NewStreams = [element(2, C) || C <- L],
+      client(NewConns, NewStreams, N, N);
+
 
     {ok, mstream} ->
       %% Create a stream on all connections
