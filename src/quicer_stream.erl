@@ -24,6 +24,9 @@
 -callback init_handoff(stream_handle(), stream_opts(), connection_handle(), new_stream_props()) -> cb_ret().
 %% Prepare callback state before ownership handoff
 
+-callback post_handoff(stream_handle(), PostInfo::term(), cb_state()) -> cb_ret().
+%% Post handoff with PostData if any. Most common action is to set the stream mode to active.
+
 -callback new_stream(stream_handle(), new_stream_props(), connection_handle()) -> cb_ret().
 %% Stream accepter is assigned to the owner of the new stream
 
@@ -55,6 +58,18 @@
 
 -callback passive(stream_handle(), undefined, cb_state()) -> cb_ret().
 %% Stream now in 'passive' mode.
+
+
+-callback handle_call(Req::term(), gen_server:from(), cb_state()) -> cb_ret().
+%% Handle API call with callback state.
+
+-callback handle_continue(Cont::term(), cb_state()) -> cb_ret().
+%% Handle continue from other callbacks with callback state.
+
+-callback handle_info(Info::term(), cb_state()) -> cb_ret().
+%% Handle unhandled info with callback state.
+
+-optional_callbacks([post_handoff/3, handle_call/3, handle_info/2, handle_continue/2]).
 
 -import(quicer_lib, [default_cb_ret/2]).
 
@@ -142,14 +157,15 @@ send(StreamProc, Data, Flag) ->
 wait_for_handoff(FromOwner, Stream) ->
     MRef = erlang:monitor(process, FromOwner),
     receive
-        handoff_done ->
+        {handoff_done, PostInfo}->
             ?tp(debug, #{event=>stream_owner_handoff_done,
-                         module=>?MODULE, stream=>Stream
+                         module=>?MODULE, stream=>Stream,
+                         post_info=> PostInfo
                         }),
-            ok;
+            {ok, PostInfo};
         {'DOWN', MRef, process, FromOwner, _Info} ->
-            ?tp(debug, handoff_exit_down),
-            owner_down
+            ?tp(debug, handoff_exit_owner_down),
+            {error, owner_down}
     %% For correctness we should never add timeout
     end.
 
@@ -259,19 +275,11 @@ handle_call({send, Data, Flag}, _From,
     Res = quicer:async_send(Stream, Data, Flag),
     {reply, Res, State};
 
-handle_call(Request, _From,
-            #{stream := Stream,
+handle_call(Request, From,
+            #{stream := _Stream,
               callback := CallbackModule,
-              stream_opts := Options, callback_state := CallbackState} = State) ->
-    try CallbackModule:handle_call(Stream, Request, Options, CallbackState) of
-        {ok, Reply, NewCallbackState} ->
-            {reply, Reply, State#{ callback_state := NewCallbackState
-                                 , stream_opts := Options
-                                 }}
-    catch _:Reason:ST ->
-            maybe_log_stracetrace(ST),
-            {reply, {callback_error, Reason}, State}
-    end.
+              callback_state := CallbackState} = State) ->
+    default_cb_ret(CallbackModule:handle_call(Request, From, CallbackState), State).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -326,20 +334,11 @@ handle_info({quic, new_stream, Stream, #{flags := Flags, is_orphan := false} = P
             {stop, {new_stream_crash, Reason}, State#{stream := Stream}}
     end;
 handle_info({quic, Bin, Stream, #{flags := Flags}},
-            #{ stream := Stream, callback := CallbackModule
+            #{ stream := Stream, callback := M
              , callback_state := CallbackState } = State)
   when is_binary(Bin) ->
     ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream}),
-    try CallbackModule:handle_stream_data(Stream, Bin, Flags, CallbackState) of
-        {ok, NewCallbackState} ->
-            {noreply, State#{callback_state := NewCallbackState}};
-        {error, Reason, NewCallbackState} ->
-            {noreply, Reason, State#{callback_state := NewCallbackState}}
-    catch
-        _:Reason:ST ->
-            maybe_log_stracetrace(ST),
-            {stop, {handle_stream_data_crash, Reason}, State}
-    end;
+    default_cb_ret(M:handle_stream_data(Stream, Bin, Flags, CallbackState), State);
 
 handle_info({quic, start_completed, Stream,
              #{ status := _AtomStatus
@@ -398,7 +397,12 @@ handle_info({quic, passive, Stream, undefined},
             #{ callback := M
              , callback_state := CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => passive}),
-    default_cb_ret(M:passive(Stream, CBState), State).
+    default_cb_ret(M:passive(Stream, CBState), State);
+handle_info(Info,
+            #{ callback := M
+             , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event => info}),
+    default_cb_ret(M:handle_info(Info, CBState), State).
 
 %% @TODO  handle_info({EXIT....
 
@@ -414,19 +418,25 @@ handle_info({quic, passive, Stream, undefined},
           {noreply, state(), Timeout :: timeout()} |
           {noreply, state(), hibernate} |
           {stop, Reason :: normal | term(), state()}.
-handle_continue({?post_init, PrevOwner}, #{ is_owner := false, stream := Stream} = State) ->
+handle_continue({?post_init, PrevOwner}, #{ is_owner := false, stream := Stream
+                                          , callback_state := CBState
+                                          , callback := M} = State) ->
     ?tp(debug, #{event=>?post_init, module=>?MODULE, stream=>Stream}),
     case wait_for_handoff(PrevOwner, Stream) of
-        ok ->
-            quicer:setopt(Stream, active, true),
-            {noreply, State#{is_owner => true}};
-        owner_down ->
+        {ok, PostInfo}->
+            case erlang:function_exported(M, post_handoff, 3) of
+                true ->
+                    default_cb_ret(M:post_handoff(Stream, PostInfo, CBState), State#{is_owner => true});
+                false ->
+                    {noreply, State#{is_owner => true}}
+            end;
+        {error, owner_down} ->
             {stop, owner_down}
     end;
-handle_continue({?post_init, _}, #{ is_owner := true } = State) ->
-    logger:error("post_init when is owner"),
-    {stop, internal_error, State}.
-
+handle_continue(Other, #{ callback := M
+                        , callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event=>continue, stream=>maps:get(stream, State)}),
+    default_cb_ret(M:handle_continue(Other, CBState), State).
 %%--------------------------------------------------------------------
 %% @private
 %% @doc

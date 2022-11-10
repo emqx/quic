@@ -82,6 +82,7 @@
         , controlling_process/2
         , wait_for_handoff/2
         , handoff_stream/2
+        , handoff_stream/3
         , perf_counters/0
         ]).
 
@@ -529,8 +530,9 @@ send(Stream, Data, Flag) ->
 
 %% @doc async variant of {@link send/3}
 %% If QUICER_SEND_FLAG_SYNC is set , the caller should expect to receive
-%% ```{quic, send_complete, Stream, send_complete_flag()}```
+%% `{quic, send_complete, Stream, send_complete_flag()}'
 %% note, check send_complete_flag() to ensure it is delivered or not.
+%% @end
 -spec async_send(stream_handle(), iodata(), non_neg_integer()) ->
         {ok, BytesSent :: pos_integer()}          |
         {error, badarg | not_enough_mem | closed} |
@@ -813,25 +815,50 @@ listener(Name) ->
 controlling_process(Handle, Pid) ->
   quicer_nif:controlling_process(Handle, Pid).
 
-%% @doc Helper function that handoff messages from process message box
-%% to the new owner.
+%% @doc Used by new stream owner to wait for stream handoff complete.
 %% Use this for handoff the orphan stream *only*.
+%%
+%% @see handoff_stream/3
 %% @see controlling_process/2
 %% @end
 -spec wait_for_handoff(From::pid(), stream_handle()) ->
-           {quic, _, _, _,_} | undefined | owner_down.
+           {error, owner_down} | {ok, PostInfo :: term()}.
 wait_for_handoff(From, Stream)->
   quicer_stream:wait_for_handoff(From, Stream).
 
+
+%% @doc handoff_stream without post handoff data.
+%% see handoff_stream/3
+%% @end
 -spec handoff_stream(stream_handle(), pid()) -> ok | {error, any()}.
 handoff_stream(Stream, NewOwner) ->
+  handoff_stream(Stream, NewOwner, undefined).
+
+%% @doc Used by Old stream owner to handoff to the new stream owner.
+%%      1. The Stream will be put into passive mode.
+%%      2. Stream messages in the current owners process messages queue will
+%%         be forwarded to the New Owner's mailbox in the same recv order.
+%%      3. Set the control process of the stream to the new owner.
+%%      4. A signal msg `{handoff_done, PostHandoff}' will be sent to the new owner.
+%%         The new owner should block for this message before handle any stream data to
+%%         ensure the ordering.
+%%      5. Revert stream active mode whatever handoff fail or success.
+%% also @see wait_for_handoff/2
+%% @end
+-spec handoff_stream(stream_handle(), pid(), term()) -> ok | {error, any()}.
+handoff_stream(_Stream, NewOwner, HandoffData) when NewOwner == self() ->
+  NewOwner ! {handoff_done, HandoffData},
+  ok;
+handoff_stream(Stream, NewOwner, HandoffData) ->
   ?tp(debug, #{event=>?FUNCTION_NAME , module=>?MODULE, stream=>Stream, owner=>NewOwner}),
   case quicer:getopt(Stream, active) of
     {ok, ActiveN} ->
       ActiveN =/= false andalso quicer:setopt(Stream, active, false),
       Res = case forward_stream_msgs(Stream, NewOwner) of
               ok ->
-                quicer:controlling_process(Stream, NewOwner);
+                quicer:controlling_process(Stream, NewOwner),
+                NewOwner ! {handoff_done, HandoffData},
+                ok;
               {error, _} = Other ->
                 Other
             end,
@@ -905,7 +932,7 @@ default_conn_opts() ->
    , peer_unidi_stream_count => 1
    }.
 
-%% @doc Forward all erl msgs of the Stream to the Stream Owner
+%% @doc Forward all erl msgs of the Stream to the New Stream Owner
 %% Stream Owner should block for the handoff_done
 -spec forward_stream_msgs(stream_handle(), pid()) -> ok | {error, owner_down}.
 forward_stream_msgs(Stream, Owner) when is_pid(Owner) ->
@@ -920,7 +947,6 @@ do_forward_stream_msgs(Stream, Owner, MRef) ->
             {error, owner_down}
     after 0 ->
             ?tp(debug, do_forward_stream_msg_done, #{stream => Stream, owner => Owner}),
-            Owner ! handoff_done,
             ok
     end.
 

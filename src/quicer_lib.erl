@@ -18,20 +18,31 @@
 
 -export_type([ cb_ret/0
              ]).
-
+-type cb_ret() :: cb_ret_noreply() | cb_ret_reply().
 -type cb_state() :: term().
--type cb_ret() :: {ok, cb_state()}                    %% ok and update cb_state
-                | {error, Reason::term(), cb_state()} %% error handling per callback
-                | {hibernate, cb_state()}           %% ok but also hibernate process
-                | {{continue, Continue :: term()}, cb_state()}  %% split callback work with Continue
-                | {timeout(), cb_state()}           %% ok but also hibernate process
-                | {stop, Reason :: term(), cb_state()}.            %% terminate with reason
+
+-type cb_ret_reply() :: {reply, Reply::term(), cb_state()} |
+                        {reply, Reply::term(), cb_state(), action()} |
+                        cb_ret_stop_reply().
+
+-type cb_ret_noreply() :: {ok, cb_state()}                    %% ok and update cb_state
+                        | {error, Reason::term(), cb_state()} %% error handling per callback
+                        | {action(), cb_state()}
+                        | cb_ret_stop_noreply().
+
+-type cb_ret_stop_noreply() :: {stop, Reason :: term(), cb_state()}.
+-type cb_ret_stop_reply()   :: {stop, Reason :: term(), Reply :: term(), cb_state()}.
+
+-type action() :: hibernate | timeout() | {continue, Continue :: term()}.
 
 -export([default_cb_ret/2]).
 
 -spec default_cb_ret(cb_ret(), State::term()) ->
+          {reply, NewState :: term()} |
+          {reply, NewState :: term(), action()} |
           {noreply, NewState :: term()} |
-          {noreply, NewState :: term(), timeout() | hibernate | {continue, term()}} |
+          {noreply, NewState :: term(), action()} |
+          {stop, Reason :: term(), Reply::term(), NewState :: term()} |
           {stop, Reason :: term(), NewState :: term()}.
 default_cb_ret({ok, NewCBState}, State) ->
     %% ok
@@ -47,4 +58,8 @@ default_cb_ret({{continue, _} = Continue, NewCBState}, State) ->
     {noreply, State#{callback_state := NewCBState}, Continue};
 default_cb_ret({stop, Reason, NewCBState}, State) ->
     %% stop
-    {stop, Reason, State#{callback_state := NewCBState}}.
+    {stop, Reason, State#{callback_state := NewCBState}};
+default_cb_ret({reply, Reply, NewCBState, Action}, State) ->
+    {reply, Reply, State#{callback_state := NewCBState}, Action};
+default_cb_ret({reply, Reply, NewCBState}, State) ->
+    {reply, Reply, State#{callback_state := NewCBState}}.

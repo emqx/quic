@@ -107,6 +107,17 @@
 -callback nst_received(connection_handle(), TicketBin :: binary(), cb_state()) -> cb_ret().
 %% Client only, New session ticket received,
 
+-callback handle_call(Req::term(), From::gen_server:from(), cb_state()) -> cb_ret().
+
+-callback handle_info(Info::term(), cb_state()) -> cb_ret().
+%% handle unhandled info with callback state.
+
+-callback handle_continue(Cont::term(), cb_state()) -> cb_ret().
+%% Handle continue from other callbacks with callback state.
+
+-optional_callbacks([handle_call/3, handle_info/2, handle_continue/2]).
+%% Handle API call with callback state.
+
 %% API
 -export([start_link/3, %% for client
          start_link/4, %% for server
@@ -116,7 +127,7 @@
         ]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, handle_continue/2,
          terminate/2, code_change/3, format_status/2]).
 
 -import(quicer_lib, [default_cb_ret/2]).
@@ -129,21 +140,19 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts the server
+%% Spawn Client connection or Start connection acceptor at server side
 %% @end
 %%--------------------------------------------------------------------
 
 %% start_link/3
-%% @doc spawn Client connection
 -spec start_link(atom(), {hostname(), inet:port_number()}, {conn_opts(), stream_opts()}) -> gen_server:start_ret().
 start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when is_atom(CallbackModule) ->
     gen_server:start_link(?MODULE, [CallbackModule, Peer, Opts], []).
 
 %% start_link/4
-%% @doc Server starts acceptors for new connection on the Listener
+%% Server starts acceptors for new connection on the Listener
 %% Get `CallbackModule` from conn_opts, key:`conn_callback` if `CallbackModule` is undefined,
 %% this is the entry for supervised acceptor.
-%% @end
 -spec start_link(CallbackModule :: undefined | module(),
                  Listener ::quicer:listener_handle(),
                  ConnOpts :: term(),
@@ -276,10 +285,8 @@ handle_call({stream_send, Callback, Data, SendFlags, Opts}, _From,
         {error, Reason} ->
             {reply, {error, {start_stream, Reason}}, State}
     end;
-
-handle_call(_Request, _From, State) ->
-    Reply = {error, unimpl},
-    {reply, Reply, State}.
+handle_call(Request, From, #{ callback_state := CBState, callback := M} = State) ->
+    default_cb_ret(M:handle_call(Request, From, CBState), State).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -400,23 +407,6 @@ handle_info({quic, nst_received, C, TicketBin},
     default_cb_ret(M:nst_received(C, TicketBin, CBState), State);
 
 %%% ==============================================================
-%%% Handle messages from streams,
-%%% @TODO, remove when we have stream signal handoff
-%%% !!! note, we don't handle recv event
-%%% ==============================================================
-%% handle_info({quic, Event, _Stream, _Props} = Msg, State) when
-%%       Event =:= start_completed orelse
-%%       Event =:= send_complete orelse
-%%       Event =:= peer_send_complete orelse
-%%       Event =:= peer_send_aborted orelse
-%%       Event =:= peer_receive_aborted orelse
-%%       Event =:= send_shutdown_complete orelse
-%%       Event =:= stream_closed orelse
-%%       Event =:= peer_accepted orelse
-%%       Event =:= passive ->
-%%     quicer_stream:handle_info(Msg, State);
-
-%%% ==============================================================
 %%% Handle messages for link/monitor
 %%% ==============================================================
 handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
@@ -429,8 +419,20 @@ handle_info({'EXIT', _Pid, {shutdown, _Other}}, State) ->
 
 handle_info({'EXIT', _Pid, normal}, State) ->
     %% @todo
-    {noreply, State}.
+    {noreply, State};
+handle_info(OtherInfo, #{callback := M,
+                         callback_state := CBState} = State) ->
+    default_cb_ret(M:handle_info(OtherInfo, CBState), State).
 
+-spec handle_continue(Cont::term(), State::term()) ->
+          {noreply, NewState :: term()} |
+          {noreply, NewState :: term(), Timeout :: timeout()} |
+          {noreply, NewState :: term(), hibernate} |
+          {stop, Reason :: normal | term(), NewState :: term()}.
+handle_continue(Cont, #{callback := M,
+                        callback_state := CBState} = State) ->
+    ?tp(debug, #{module=>?MODULE, event=>continue, stream=>maps:get(stream, State)}),
+    default_cb_ret(M:handle_continue(Cont, CBState), State).
 %%--------------------------------------------------------------------
 %% @private
 %% @doc

@@ -18,6 +18,7 @@
 -behavior(quicer_stream).
 
 -export([ init_handoff/4
+        , post_handoff/3
         , new_stream/3
         , start_completed/3
         , send_complete/3
@@ -42,6 +43,10 @@ init_handoff(Stream, StreamOpts, Conn, #{is_orphan := true, flags := Flags}) ->
                  },
     ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
     {ok, InitState}.
+
+post_handoff(Stream, _PostData, State) ->
+    quicer:setopt(Stream, active, true),
+    {ok, State}.
 
 new_stream(_, _, _) ->
     InitState = #{sent_bytes => 0},
