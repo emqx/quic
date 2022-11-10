@@ -1,0 +1,23 @@
+
+[global fail_pattern=[Ee][Rr][Rr][Oo][Rr]]
+[global eprompt=\d*>]
+
+[shell server]
+    !erl -pa ../../_build/default/lib/quicer/ebin
+    ?$eprompt
+    !Top = rev:start().
+    ?$eprompt
+    !Top ! connect.
+    ?Got pong 5
+    ?Got pong 1
+    ?Stream closed
+    ?$eprompt
+
+    # Adding a second call to the code, fails, thus
+    # commenting out the code below, the test works
+
+    !Top ! connect.
+    ?Got pong 5
+    ?Got pong 1
+    ?Stream closed
+    ?$eprompt
