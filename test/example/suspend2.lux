@@ -11,13 +11,13 @@
     -
     [timeout 60]
 
-    [loop _ 1 .. 30 ]
+    [loop _ 1..30 ]
       @Connection 1 closed
       !flush.
       ?-->
       [sleep 10]
     [endloop]
-    [loop _ 1 .. 20]
+    [loop _ 1..20]
 """@(?s)
 Conns = []
 Streams = []
