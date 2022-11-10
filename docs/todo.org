@@ -6,9 +6,7 @@
 
 Feature todo list, priority descending
 
-** Notify acceptors when listener/connecion is closed.
-
-** Handoff stream with the other signals
+** Notify acceptors when listener is closed.
 
 ** Stream behavior should able to handle multiple streams
 One process could become the owner of multiple streams in the scenario
@@ -46,8 +44,6 @@ API for registrationshutdown, shutdown all connections under registration
 ** NIF Upgrade
 
 * Improvements
-
-- Set stream to passive when handoff is needed.
 
 - send buffering
 
