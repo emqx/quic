@@ -850,7 +850,7 @@ handoff_stream(_Stream, NewOwner, HandoffData) when NewOwner == self() ->
   NewOwner ! {handoff_done, HandoffData},
   ok;
 handoff_stream(Stream, NewOwner, HandoffData) ->
-  ?tp(debug, #{event=>?FUNCTION_NAME , module=>?MODULE, stream=>Stream, owner=>NewOwner}),
+  ?tp(debug, #{event=>?FUNCTION_NAME, module=>?MODULE, stream=>Stream, owner=>NewOwner}),
   case quicer:getopt(Stream, active) of
     {ok, ActiveN} ->
       ActiveN =/= false andalso quicer:setopt(Stream, active, false),

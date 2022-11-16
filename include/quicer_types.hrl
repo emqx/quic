@@ -291,7 +291,8 @@
 %% Stream Event Props
 -type stream_start_completed_props() :: #{ status := atom()
                                          , stream_id := integer()
-                                         , is_peer_accepted := boolean() }.
+                                         , is_peer_accepted := boolean()
+                                         }.
 -type stream_closed_props() :: map().
 
 -type peer_accepted_props() :: #{ is_conn_shutdown := boolean()
@@ -304,7 +305,8 @@
 
 -type recv_data_props() :: #{ absolute_offset := integer()
                             , len := integer()
-                            , flags := integer()}.
+                            , flags := integer()
+                            }.
 
 %% @doc QUIC Application error code, not protocol error code.
 %% The app error code will be passed to the peer while shutdown the connection.
