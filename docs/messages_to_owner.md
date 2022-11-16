@@ -64,7 +64,7 @@ Otherwise, start stream will be queued. Also see [peer_accepted](#peer_accepted)
 
 ```erlang
 {quic, start_complete, stream_handler(), #{ status := atom_status()
-                                          , stream_id := integer(), 
+                                          , stream_id := integer()
                                           , is_peer_accepted := boolean() }
 ```
 
@@ -75,7 +75,7 @@ Data received in binary format.
 
 ```erlang
 {quic, binary(), stream_handler(), #{ absolute_offset := integer() 
-                                    , len := integer()  
+                                    , len := integer()
                                     , flags := integer()} }
 ```
 
@@ -231,7 +231,7 @@ Connection has been shutdown by the transport locally, such as idle timeout.
 Peer side initiated connection shutdown.
 
 ``` erlang
-{quic, shutdown, connection_handler(), ErrorCode :: integer()}
+{quic, shutdown, connection_handler(), ErrorCode :: error_code()}
 ```
 
 ### Shutdown Complete
@@ -240,7 +240,7 @@ The connection has completed the shutdown process and is ready to be
 safely cleaned up.
 
 ``` erlang
-{quic, closed, connection_handler(), #{ is_handshake_completed := boolean()}
+{quic, closed, connection_handler(), #{ is_handshake_completed := boolean()
                                       , is_peer_acked := boolean()
                                       , is_app_closing := boolean()
                                       }} 
@@ -276,7 +276,8 @@ This message is sent to notify the process that the process becomes the owner of
 
 When `is_orphan` is false, the process is selected as the owner because it is in the new stream acceptor list.
 
-When `is_orphan` is true, the connection owner process is selected because there is no available stream acceptor.
+When `is_orphan` is true, the connection owner process is selected because there is no available stream acceptor
+and the stream active mode is set to false (passive mode). 
 
 ### Streams available
 

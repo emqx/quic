@@ -89,8 +89,12 @@ new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
     %% Spawn new stream
     case quicer_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
-            quicer_connection:handoff_stream(Stream, StreamOwner),
-            {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
+            case quicer:handoff_stream(Stream, StreamOwner) of
+                ok ->
+                    {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams ] }};
+                false ->
+                    {error, handoff_fail}
+            end;
         Other ->
             Other
     end.

@@ -735,10 +735,14 @@ async_accept2(ErlNifEnv *env,
   ERL_NIF_TERM listener = argv[0];
   ERL_NIF_TERM conn_opts = argv[1];
   QuicerListenerCTX *l_ctx = NULL;
+  ERL_NIF_TERM active_val = ATOM_TRUE;
   if (!enif_get_resource(env, listener, ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
+
+  // Set parm active is optional
+  enif_get_map_value(env, conn_opts, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val);
 
   ACCEPTOR *acceptor = AcceptorAlloc();
   if (!acceptor)
@@ -748,8 +752,15 @@ async_accept2(ErlNifEnv *env,
 
   if (!enif_self(env, &(acceptor->Pid)))
     {
+      AcceptorDestroy(acceptor);
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
+
+  if (!set_owner_recv_mode(acceptor, env, active_val))
+  {
+    AcceptorDestroy(acceptor);
+    return ERROR_TUPLE_2(ATOM_BADARG);
+  }
 
   if (!create_settings(env, &conn_opts, &acceptor->Settings))
     {
@@ -1207,13 +1218,9 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
       // in resource dealloc callbacks (for Stream and Connection)
       CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
 
-      // @TODO we could set it to passive and let new owner set it to
-      // active
-      //  then old owner and new owner do not need to do handoff
-      //  but that will buffer more in quic stack and hit limit control
-      //  credit unsure what is the better solution.
-
-      // acc->active = ACCEPTOR_RECV_MODE_PASSIVE;
+      // We set it to passive and let new owner set it to active after handoff
+      // but that will buffer more in msquic stack and hit control limit.
+      acc->active = ACCEPTOR_RECV_MODE_PASSIVE;
     }
 
   assert(acc);

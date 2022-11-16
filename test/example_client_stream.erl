@@ -18,6 +18,7 @@
 -behavior(quicer_stream).
 
 -export([ init_handoff/4
+        , post_handoff/3
         , new_stream/3
         , start_completed/3
         , send_complete/3
@@ -28,7 +29,7 @@
         , stream_closed/3
         , peer_accepted/3
         , passive/3
-        , handle_call/4
+        , handle_call/3
         ]).
 
 -export([handle_stream_data/4]).
@@ -39,6 +40,10 @@
 init_handoff(_Stream, _StreamOpts, _Conn, _Flags) ->
     %% stream owner already set while starts.
     {stop, not_impl, #{}}.
+
+post_handoff(Stream, _PostData, State) ->
+    ok = quicer:setopt(Stream, active, true),
+    {ok, State}.
 
 new_stream(Stream, #{flags := Flags}, Conn) ->
     {ok, #{ stream => Stream, conn => Conn, is_local => false
@@ -105,8 +110,8 @@ passive(Stream, undefined, S)->
     ct:fail("Steam ~p go into passive mode", [Stream]),
     {ok, S}.
 
-handle_call(_Stream, _Request, _Opts, S) ->
-    {error, not_impl, S}.
+handle_call(_Request, _From, S) ->
+    {reply, {error, not_impl}, S}.
 
 stream_closed(_Stream, #{ is_conn_shutdown := IsConnShutdown
                         , is_app_closing := IsAppClosing

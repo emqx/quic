@@ -130,6 +130,7 @@
         , tc_stream_start_flag_indicate_peer_accept_2/1
 
         , tc_stream_send_with_fin/1
+        , tc_stream_send_with_fin_passive/1
         , tc_stream_send_shutdown_complete/1
 
         %% insecure, msquic only
@@ -704,7 +705,10 @@ run_tc_conn_client_bad_cert(Config)->
           %% Depending on the timing, connection open could fail already.
           ok;
         {ok, Stm} ->
-          {ok, 4} = quicer:send(Stm, <<"ping">>),
+          case quicer:send(Stm, <<"ping">>) of
+            {ok, 4} -> ok;
+            {error, cancelled} -> ok
+          end,
           receive
             {quic, transport_shutdown, _Ref,
              #{error := _ErrorCode, status := bad_certificate}} ->
@@ -2083,6 +2087,56 @@ tc_stream_send_with_fin(Config) ->
   SPid ! done,
   ensure_server_exit_normal(Ref).
 
+tc_stream_send_with_fin_passive(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
+  {ok, Conn} = quicer:connect("127.0.0.1", Port,
+                              default_conn_opts() ++ [{peer_unidi_stream_count, 1}], 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, false}]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>, ?QUIC_SEND_FLAG_FIN),
+  receive {quic, send_shutdown_complete, Stm0, true} -> ok end,
+  %% Since socket is passive we shall not get the stream data and stream close
+  receive
+    {quic, <<"ping1">>, Stm0, #{flags := Flag0}} ->
+      ct:fail("ping1 recvd with flag ~p ", [Flag0]);
+    {quic, _, Stm0, _} = Msg ->
+      ct:fail("recv unexpected msg: ~p", [Msg])
+  after 1000 ->
+      ct:pal("ping1 not received")
+  end,
+
+  quicer:setopt(Stm0, active, true),
+  receive
+    {quic, <<"ping1">>, Stm0, #{flags := Flag}} ->
+      ct:pal("ping1 recvd with flag ~p ", [Flag]),
+      ?assert(Flag band ?QUIC_RECEIVE_FLAG_FIN > 0);
+    {quic, _, Stm0, _} = Msg2 ->
+      ct:fail("recv unexpected msg: ~p", [Msg2])
+  after 1000 ->
+      ct:pal("ping1 not received")
+  end,
+
+  %% Check that stream close isn't caused by conn close.
+  receive
+    {quic, stream_closed, Stm0, #{is_conn_shutdown := IsConn}} ->
+      ?assert(not IsConn)
+  after 1000 ->
+      ct:fail("stream didn't close")
+  end,
+
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
+
 tc_stream_send_shutdown_complete(Config) ->
   Port = select_port(),
   Owner = self(),
@@ -2368,18 +2422,24 @@ ping_pong_server_dgram(Owner, Config, Port) ->
     {ok, L} ->
       Owner ! listener_ready,
       {ok, Conn} = quicer:accept(L, [], 5000),
+      {ok, Conn} = quicer:async_accept_stream(Conn, []),
       {ok, Conn} = quicer:handshake(Conn),
-      {ok, Stm} = quicer:accept_stream(Conn, []),
-      ping_pong_server_dgram_loop(L, Conn, Stm);
+      ping_pong_server_dgram_loop(L, Conn);
     {error, listener_start_error, R} ->
       ct:pal("Failed to start listener:~p , retry ...", [R]),
       timer:sleep(100),
       ping_pong_server_dgram(Owner, Config, Port)
   end.
 
+ping_pong_server_dgram_loop(L, Conn) ->
+  receive
+    {quic, new_stream, Stm, _} ->
+      ping_pong_server_dgram_loop(L, Conn, Stm)
+  end.
+
 ping_pong_server_dgram_loop(L, Conn, Stm) ->
   receive
-    {quic, <<"ping">>, _, _} ->
+    {quic, <<"ping">>, Stm, _} ->
       ct:pal("send stream pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);

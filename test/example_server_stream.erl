@@ -18,6 +18,7 @@
 -behavior(quicer_stream).
 
 -export([ init_handoff/4
+        , post_handoff/3
         , new_stream/3
         , start_completed/3
         , send_complete/3
@@ -28,10 +29,11 @@
         , stream_closed/3
         , peer_accepted/3
         , passive/3
-        , handle_call/4
         ]).
 
 -export([handle_stream_data/4]).
+
+-export([handle_call/3]).
 
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
@@ -45,6 +47,10 @@ init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
                  },
     ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
     {ok, InitState}.
+
+post_handoff(Stream, _PostData, State) ->
+    ok = quicer:setopt(Stream, active, true),
+    {ok, State}.
 
 new_stream(Stream, #{flags := Flags}, Conn) ->
     InitState = #{ stream => Stream
@@ -127,9 +133,6 @@ passive(_Stream, undefined, S)->
     ct:fail("Steam go into passive mode"),
     {ok, S}.
 
-handle_call(_Stream, _Request, _Opts, S) ->
-    {error, not_impl, S}.
-
 stream_closed(_Stream, #{ is_conn_shutdown := IsConnShutdown
                         , is_app_closing := IsAppClosing
                         , is_shutdown_by_app := IsAppShutdown
@@ -143,3 +146,6 @@ stream_closed(_Stream, #{ is_conn_shutdown := IsConnShutdown
                                    is_atom(Status) andalso
                                    is_integer(Code) ->
     {stop, normal, S}.
+
+handle_call(_Request, _From, S) ->
+    {reply, {error, not_impl}, S}.

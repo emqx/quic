@@ -1445,7 +1445,7 @@ tc_accept_stream_active_once(Config) ->
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
                                     , event := handoff_stream
-                                    , module := quicer_connection
+                                    , module := quicer
                                     , stream := _STREAM0
                                     },
                                    #{ ?snk_kind := debug
@@ -1539,7 +1539,7 @@ tc_accept_stream_active_N(Config) ->
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
                                     , event := handoff_stream
-                                    , module := quicer_connection
+                                    , module := quicer
                                     , stream := _STREAM0
                                     },
                                    #{ ?snk_kind := debug
@@ -1588,7 +1588,7 @@ tc_multi_streams(Config) ->
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
                                     , event := handoff_stream
-                                    , module := quicer_connection
+                                    , module := quicer
                                     , stream := _STREAM0
                                     },
                                    #{ ?snk_kind := debug
@@ -1671,7 +1671,7 @@ tc_multi_streams_example_server_1(Config) ->
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
                                     , event := handoff_stream
-                                    , module := quicer_connection
+                                    , module := quicer
                                     , stream := _STREAM0
                                     },
                                    #{ ?snk_kind := debug
@@ -1683,7 +1683,7 @@ tc_multi_streams_example_server_1(Config) ->
                    ?assertMatch([{pair, _, _}],
                                 ?find_pairs( #{ ?snk_kind := debug
                                               , event := handoff_stream
-                                              , module := quicer_connection
+                                              , module := quicer
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "nif"
