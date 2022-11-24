@@ -799,7 +799,7 @@ handle_stream_event_recv(HQUIC Stream,
         {
           ERL_NIF_TERM report_passive
               = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);
-          enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive);
+          enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_passive);
         }
     }
 
