@@ -51,3 +51,6 @@ If you don't agree with the decision or causing issue, please refer to the chapt
     - It also requires in the Erlang process not to keep the unused/closed resources in the stack/heap, 
        otherwise it will cause memory leaks.
 
+## Send message to the owner
+
+1. Messages with boxed types are copied to the owner's mailbox. 

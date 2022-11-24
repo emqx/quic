@@ -278,7 +278,7 @@ tc_lib_registration_1(_Config) ->
   ok =quicer:reg_close(),
   {error, badarg} = quicer:reg_open(foo),
   ok = quicer:reg_open(quic_execution_profile_low_latency),
-  ok =quicer:reg_close(),
+  ok = quicer:reg_close(),
   ok = quicer:reg_open(quic_execution_profile_type_real_time),
   ok = quicer:reg_close(),
   ok = quicer:reg_open(quic_execution_profile_type_max_throughput),

@@ -459,8 +459,13 @@ async_connect3(ErlNifEnv *env,
   QuicerConnCTX *c_ctx = init_c_ctx();
 
   // allocate config_resource for client connection
-  c_ctx->config_resource
-      = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
+  if (NULL
+      == (c_ctx->config_resource
+          = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX))))
+    {
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto Error;
+    }
 
   if ((c_ctx->owner = AcceptorAlloc()) == NULL)
     {
@@ -742,7 +747,8 @@ async_accept2(ErlNifEnv *env,
     }
 
   // Set parm active is optional
-  enif_get_map_value(env, conn_opts, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val);
+  enif_get_map_value(
+      env, conn_opts, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val);
 
   ACCEPTOR *acceptor = AcceptorAlloc();
   if (!acceptor)
@@ -757,10 +763,10 @@ async_accept2(ErlNifEnv *env,
     }
 
   if (!set_owner_recv_mode(acceptor, env, active_val))
-  {
-    AcceptorDestroy(acceptor);
-    return ERROR_TUPLE_2(ATOM_BADARG);
-  }
+    {
+      AcceptorDestroy(acceptor);
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
 
   if (!create_settings(env, &conn_opts, &acceptor->Settings))
     {
@@ -1231,7 +1237,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
 
   ERL_NIF_TERM props_name[] = { ATOM_FLAGS, ATOM_IS_ORPHAN };
   ERL_NIF_TERM props_value[]
-      = { enif_make_int(env, Event->PEER_STREAM_STARTED.Flags),
+      = { enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags),
           ATOM_BOOLEAN(is_orphan) };
 
   ERL_NIF_TERM report = make_event_with_props(env,
@@ -1440,7 +1446,7 @@ handle_connection_event_peer_certificate_received(
   STACK_OF(X509) *untrusted = X509_STORE_CTX_get0_untrusted(x509_ctx);
 
   if (cert == NULL)
-      return QUIC_STATUS_BAD_CERTIFICATE;
+    return QUIC_STATUS_BAD_CERTIFICATE;
 
   X509_STORE_CTX *ctx = X509_STORE_CTX_new();
   X509_STORE_CTX_init(ctx, c_ctx->trusted, cert, untrusted);
