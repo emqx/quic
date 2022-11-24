@@ -13,9 +13,6 @@
     ?Stream closed
     ?$eprompt
 
-    # Adding a second call to the code, fails, thus
-    # commenting out the code below, the test works
-
     !Top ! connect.
     ?Got pong 5
     ?Got pong 1

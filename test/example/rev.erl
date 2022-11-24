@@ -19,7 +19,6 @@
 -define(INTERVAL, 3000).
 
 
-
 start() ->
     application:ensure_all_started(quicer),
     _C = proc_lib:spawn_link(fun() ->
@@ -27,11 +26,11 @@ start() ->
                              end),
 
     Top = proc_lib:spawn_link(fun() ->
-                                      listener()
+                                      top_site()
                               end),
     Top.
 
-listener() ->
+top_site() ->
     Port = 4567,
     LOptions = [ {cert, "./server.pem"}
                , {key,  "./server.key"}
@@ -57,8 +56,7 @@ r_loop(Conn) ->
             ok = quicer:setopt(S, active, 20),
             ok = send_ping(5, S),
             io:format("Closing stream \n",[]),
-            %ok = quicer:close_stream(S),
-            ok = quicer:async_close_stream(S),
+            ok = quicer:close_stream(S),
             io:format("Stream closed \n",[])
     end,
     r_loop(Conn).
@@ -69,6 +67,7 @@ nat_site() ->
     case quicer:connect("localhost", Port,
                         [{alpn, ["sample"]},
                          {verify, none},
+                         {peer_bidi_stream_count, 64000},
                          {keep_alive_interval_ms, ?INTERVAL},
                          {handshake_idle_timeout_ms, 3 * ?INTERVAL},
                          {idle_timeout_ms, 3 * ?INTERVAL}],
@@ -110,6 +109,10 @@ stream_handler(S, N) ->
             io:format("Handler got ping ~p \n",[N]),
             {ok, 4} = quicer:send(S, <<"pong">>),
             stream_handler(S, N+1);
+        {quic, peer_send_shutdown, S, _} ->
+            io:format("Handler got peer send shutdown \n",[]),
+            quicer:shutdown_stream(S),
+            closed;
         {quic, stream_closed, S, _X} ->
             io:format("Handler got close stream \n",[]),
             quicer:async_close_stream(S),

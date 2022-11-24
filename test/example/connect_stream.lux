@@ -3,10 +3,10 @@
 [include simple.inc]
 
 [shell client]
-    !{connect_stream, 1000}.
+    !{connect_stream, 400}.
     ?Stream 1
     ?Stream 100
-    ?Stream 1000
+    ?Stream 400
     ?-->
 
 
