@@ -8,7 +8,7 @@ certs:
 	erl -noshell -s qt certs
 
 clean:
-	rm -rf *.beam *~ lux_logs *.key *.pem *.csr *.srl
+	rm -rf *.beam *~ lux_logs *.key *.pem *.csr *.srl *.dump
 
 lux:
 	lux .

@@ -20,7 +20,7 @@
 
 [shell client]
     [sleep 1]
-    [loop _ 1 .. 20]
+    [loop _ 1..20]
 """@(?s)
 Stream 1 closed
 """
