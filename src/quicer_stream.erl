@@ -157,14 +157,18 @@ send(StreamProc, Data, Flag) ->
 wait_for_handoff(FromOwner, Stream) ->
     MRef = erlang:monitor(process, FromOwner),
     receive
-        {handoff_done, PostInfo}->
+        {handoff_done, Stream, PostInfo} ->
             ?tp(debug, #{event=>stream_owner_handoff_done,
-                         module=>?MODULE, stream=>Stream,
-                         post_info=> PostInfo
+                         stream=>Stream,
+                         module=>?MODULE,
+                         post_info=>PostInfo
                         }),
             {ok, PostInfo};
         {'DOWN', MRef, process, FromOwner, _Info} ->
-            ?tp(debug, handoff_exit_owner_down),
+            ?tp(debug, #{event=>handoff_exit_owner_down,
+                         stream=>Stream,
+                         module=>?MODULE
+                        }),
             {error, owner_down}
     %% For correctness we should never add timeout
     end.
@@ -431,7 +435,7 @@ handle_continue({?post_init, PrevOwner}, #{ is_owner := false, stream := Stream
                     {noreply, State#{is_owner => true}}
             end;
         {error, owner_down} ->
-            {stop, owner_down}
+            {stop, owner_down, State}
     end;
 handle_continue(Other, #{ callback := M
                         , callback_state := CBState} = State) ->
