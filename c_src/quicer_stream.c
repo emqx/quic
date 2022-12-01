@@ -732,7 +732,7 @@ handle_stream_event_recv(HQUIC Stream,
           if (!enif_send(
                   NULL,
                   &(s_ctx->owner->Pid),
-                  env,
+                  NULL,
                   make_event(env,
                              ATOM_QUIC_STATUS_CONTINUE,
                              // @TODO eHandle is in env, no need to copy?
@@ -777,7 +777,9 @@ handle_stream_event_recv(HQUIC Stream,
 
           s_ctx->owner->active_count--;
 
-          TP_CB_3(is_report_passive, (uintptr_t)s_ctx->Stream, s_ctx->owner->active_count);
+          TP_CB_3(is_report_passive,
+                  (uintptr_t)s_ctx->Stream,
+                  s_ctx->owner->active_count);
 
           if (s_ctx->owner->active_count == 0)
             {
@@ -793,13 +795,13 @@ handle_stream_event_recv(HQUIC Stream,
             }
         }
 
-      enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_active);
+      enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_active);
 
       if (is_report_passive)
         {
           ERL_NIF_TERM report_passive
               = make_event(env, ATOM_PASSIVE, eHandle, ATOM_UNDEFINED);
-          enif_send(NULL, &(s_ctx->owner->Pid), s_ctx->env, report_passive);
+          enif_send(NULL, &(s_ctx->owner->Pid), NULL, report_passive);
         }
     }
 
