@@ -8,7 +8,7 @@ default: build-nif
 
 .PHONY: build-nif
 build-nif:
-	./build.sh 'v2.1.3'
+	./build.sh 'v2.1.5'
 
 compile:
 	$(REBAR) compile
