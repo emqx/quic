@@ -839,15 +839,15 @@ handoff_stream(Stream, NewOwner) ->
 %%      2. Stream messages in the current owners process messages queue will
 %%         be forwarded to the New Owner's mailbox in the same recv order.
 %%      3. Set the control process of the stream to the new owner.
-%%      4. A signal msg `{handoff_done, PostHandoff}' will be sent to the new owner.
+%%      4. A signal msg `{handoff_done, Stream, PostHandoff}' will be sent to the new owner.
 %%         The new owner should block for this message before handle any stream data to
 %%         ensure the ordering.
 %%      5. Revert stream active mode whatever handoff fail or success.
 %% also @see wait_for_handoff/2
 %% @end
 -spec handoff_stream(stream_handle(), pid(), term()) -> ok | {error, any()}.
-handoff_stream(_Stream, NewOwner, HandoffData) when NewOwner == self() ->
-  NewOwner ! {handoff_done, HandoffData},
+handoff_stream(Stream, NewOwner, HandoffData) when NewOwner == self() ->
+  NewOwner ! {handoff_done, Stream, HandoffData},
   ok;
 handoff_stream(Stream, NewOwner, HandoffData) ->
   ?tp(debug, #{event=>?FUNCTION_NAME, module=>?MODULE, stream=>Stream, owner=>NewOwner}),
@@ -857,7 +857,7 @@ handoff_stream(Stream, NewOwner, HandoffData) ->
       Res = case forward_stream_msgs(Stream, NewOwner) of
               ok ->
                 quicer:controlling_process(Stream, NewOwner),
-                NewOwner ! {handoff_done, HandoffData},
+                NewOwner ! {handoff_done, Stream, HandoffData},
                 ok;
               {error, _} = Other ->
                 Other
