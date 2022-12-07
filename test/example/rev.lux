@@ -1,0 +1,19 @@
+
+[global fail_pattern=[Ee][Rr][Rr][Oo][Rr]]
+[global eprompt=\d+>]
+
+[shell sh]
+    !erl -pa ../../_build/default/lib/quicer/ebin -s rev start
+    ?Entering site loop
+    !rev:d_test(5).
+    ?Got pong 1
+    ?Got pong 1
+    ?Got pong 1
+    ?Got pong 1
+    ?Got pong 1
+    !rev:u_test(5).
+    ?Got pong 1
+    ?Got pong 1
+    ?Got pong 1
+    ?Got pong 1
+    ?Got pong 1
