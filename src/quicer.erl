@@ -947,6 +947,7 @@ do_forward_stream_msgs(Stream, Owner, MRef) ->
             {error, owner_down}
     after 0 ->
             ?tp(debug, do_forward_stream_msg_done, #{stream => Stream, owner => Owner}),
+            erlang:demonitor(MRef),
             ok
     end.
 

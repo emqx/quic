@@ -97,8 +97,7 @@ top_loop2(Conn) ->
       io:format("X = ~p~n", [X]),
       H = proc_lib:spawn_link(
             fun() -> stream_handler0(Stream) end),
-      ok = quicer:controlling_process(Stream, H),
-      H ! continue,
+      ok = quicer:handoff_stream(Stream, H),
       top_loop(Conn);
     {From, get_down_stream} ->
       io:format("Starting stream downwards \n",[]),
@@ -107,7 +106,7 @@ top_loop2(Conn) ->
           Conn,
           [{active, false},
            {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}]),
-      quicer:controlling_process(Stream, From),
+      quicer:handoff_stream(Stream, From),
       From ! {top_site, Stream},
       top_loop2(Conn);
     {quic, closed, Conn, _} ->
@@ -121,7 +120,7 @@ top_loop2(Conn) ->
 get_down_stream() ->
   top_site ! {self(), get_down_stream},
   receive
-    {top_site, Stream} ->
+    {handoff_done, Stream, _} ->
       ok = quicer:setopt(Stream, active, 2),
       Stream
   end.
@@ -158,8 +157,7 @@ site_loop2(Conn) ->
       P = proc_lib:spawn_link(fun() ->
                                   stream_handler0(Stream)
                               end),
-      ok = quicer:controlling_process(Stream, P),
-      P ! continue,
+      ok = quicer:handoff_stream(Stream, P),
       site_loop(Conn);
     {From, new_up_stream} ->
       {ok, UpStream} =
@@ -169,8 +167,7 @@ site_loop2(Conn) ->
            {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}
           ]),
       quicer:send(UpStream, <<"kalle">>),
-      ok = quicer:controlling_process(UpStream, From),
-      From ! {nat_site, UpStream},
+      ok = quicer:handoff_stream(UpStream, From),
       site_loop2(Conn);
     {quic, closed, Conn, _} ->
       io:format("Conn closed \n",[]);
@@ -181,7 +178,7 @@ site_loop2(Conn) ->
 get_up_stream() ->
   nat_site ! { self(), new_up_stream},
   receive
-    {nat_site, Stream} ->
+    {handoff_done, Stream, _} ->
       ok = quicer:setopt(Stream, active, 2),
       Stream
   end.
@@ -194,7 +191,7 @@ get_up_stream() ->
 stream_handler0(Stream) ->
   io:format("Entering stream handler for ~p\n",[Stream]),
   receive
-    continue ->
+    {handoff_done, Stream, _} ->
       ok = quicer:setopt(Stream, active, 2),
       stream_handler(Stream, 0),
       io:format("Leaving stream handler \n",[]),

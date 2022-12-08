@@ -90,19 +90,18 @@ accept_stream_loop(Conn) ->
   case quicer:accept_stream(Conn, [{active, false}], infinity) of
     {ok, Stm} ->
       io:format("accept stream -> ~p\n",[Stm]),
-      Self = self(),
       H = proc_lib:spawn_link(
-            fun() -> stream_owner(Self, Stm) end),
-      ok = quicer:controlling_process(Stm, H),
-      H ! {self(), continue},
+            fun() -> stream_owner(Stm) end),
+      ok = quicer:handoff_stream(Stm, H),
       accept_stream_loop(Conn);
     Err ->
       io:format("Failed to accept_stream ~p leaving accept stream\n",[Err]),
       ok
   end.
 
-stream_owner(Top, Stream) ->
-  receive {Top, continue} ->
+stream_owner(Stream) ->
+  receive
+    {handoff_done, Stream, _} ->
       ok
   end,
   case server_negotiate(Stream) of
