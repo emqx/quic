@@ -9,7 +9,7 @@ jobs:
         os:
           - macos-11
         otp:
-          - 24
+          - 25
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -64,12 +64,8 @@ jobs:
       fail-fast: false
       matrix:
         otp:
-          # Disable OTP 23 for now
-          # core dump due to OTP-18027
-          # We need 23.3.4.14+
-          # - 23.3.4.5
-          - 24.3.3
-          - 25.0.4
+          - 24.3.4
+          - 25.1.2
         build_type:
           - RelWithDebInfo
           - Debug

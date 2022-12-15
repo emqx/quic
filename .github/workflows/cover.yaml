@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         otp:
-          - 24.3.3
+          - 25.1.2
         build_type:
           - RelWithDebInfo
         logging:
