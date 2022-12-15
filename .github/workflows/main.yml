@@ -13,11 +13,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Configure Homebrew cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/Library/Caches/Homebrew/
@@ -76,10 +76,10 @@ jobs:
           - x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: gleam-lang/setup-erlang@v1.1.2
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
       - name: release build with debug log off
@@ -125,7 +125,7 @@ jobs:
           fi
 
       - name: Archive CT Logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
           name: linux-ct-logs
