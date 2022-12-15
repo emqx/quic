@@ -714,7 +714,8 @@ run_tc_conn_client_bad_cert(Config)->
         {ok, Stm} ->
           case quicer:send(Stm, <<"ping">>) of
             {ok, 4} -> ok;
-            {error, cancelled} -> ok
+            {error, cancelled} -> ok;
+            {error, stm_send_error, aborted} -> ok
           end,
           receive
             {quic, transport_shutdown, _Ref,
