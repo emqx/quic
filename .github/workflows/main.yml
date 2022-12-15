@@ -9,6 +9,7 @@ jobs:
         os:
           - macos-11
         otp:
+          - 24
           - 25
     runs-on: ${{ matrix.os }}
     steps:
