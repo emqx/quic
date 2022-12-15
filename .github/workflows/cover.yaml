@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         otp:
-          - 24.3.3
+          - 25.1.2
         build_type:
           - RelWithDebInfo
         logging:
@@ -19,9 +19,9 @@ jobs:
           - x86_64
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
-    - uses: gleam-lang/setup-erlang@v1.1.2
+    - uses: erlef/setup-beam@v1
       with:
         otp-version: ${{ matrix.otp }}
 
