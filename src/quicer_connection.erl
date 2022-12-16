@@ -115,7 +115,12 @@
 -callback handle_continue(Cont::term(), cb_state()) -> cb_ret().
 %% Handle continue from other callbacks with callback state.
 
--optional_callbacks([handle_call/3, handle_info/2, handle_continue/2]).
+-optional_callbacks([ handle_call/3
+                    , handle_info/2
+                    , handle_continue/2
+                    , peer_needs_streams/3 %% require newer MsQuic
+                    , nst_received/3       %% client only
+                    ]).
 %% Handle API call with callback state.
 
 %% API
