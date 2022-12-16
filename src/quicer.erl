@@ -216,8 +216,10 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
           {ok, H};
         {quic, transport_shutdown, H, Reason} when Reason == connection_timeout
                                                    orelse Reason == connection_idle ->
+          flush(closed, H),
           {error, timeout};
-        {quic, transport_shutdown, _, Reason} ->
+        {quic, transport_shutdown, H, Reason} ->
+          flush(closed, H),
           {error, transport_down, Reason}
       end;
     {error, _} = Err ->
@@ -950,6 +952,14 @@ do_forward_stream_msgs(Stream, Owner, MRef) ->
             erlang:demonitor(MRef),
             ok
     end.
+
+%% @doc garbage collect some quic event that is useless to the caller.
+-spec flush(atom(), handle()) -> ok.
+flush(QuicEventName, Handle) when is_atom(QuicEventName) ->
+  receive
+    {quic, QuicEventName, Handle, _} -> ok
+  %% Event must come, do not timeout
+  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

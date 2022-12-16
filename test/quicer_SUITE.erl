@@ -483,6 +483,13 @@ tc_conn_basic_verify_peer_no_cacert(Config)->
 
   ?assert(ErrorStatus =:= cert_untrusted_root orelse ErrorStatus =:= bad_certificate),
 
+  receive
+    {quic, closed, _, _} ->
+      ct:fail("closed should be flushed")
+  after 500 ->
+      ok
+  end,
+
   SPid ! done,
   ensure_server_exit_normal(Ref),
   ok.
@@ -707,7 +714,8 @@ run_tc_conn_client_bad_cert(Config)->
         {ok, Stm} ->
           case quicer:send(Stm, <<"ping">>) of
             {ok, 4} -> ok;
-            {error, cancelled} -> ok
+            {error, cancelled} -> ok;
+            {error, stm_send_error, aborted} -> ok
           end,
           receive
             {quic, transport_shutdown, _Ref,
