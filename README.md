@@ -86,7 +86,7 @@ quicer:close_listener(L).
 ``` erlang
 application:ensure_all_started(quicer),
 Port = 4567,
-{ok, Conn} = quicer:connect("localhost", Port, [{alpn, ["sample"]}], 5000),
+{ok, Conn} = quicer:connect("localhost", Port, [{alpn, ["sample"]}, {verify, none}], 5000),
 {ok, Stm} = quicer:start_stream(Conn, []),
 {ok, 4} = quicer:send(Stm, <<"ping">>),
 receive {quic, <<"pong">>, Stm, _Props} -> ok end,

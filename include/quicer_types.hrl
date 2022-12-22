@@ -120,7 +120,23 @@
                           }.
 -type alpn() :: string().
 
--type conn_opts() :: map(). %% @TODO expand
+-type conn_opts() :: quic_settings() |  #{ alpns := [atom()]
+                                         , cert => filelib:filename()
+                                         , key => filelib:filename()
+                                         , password => string()
+                                         , verify => none | peer
+                                         , handle => connection_handle() %% get NST from last connection, for reconnect.
+                                         , nst => binary()
+                                         , cacertfile => filelib:filename()
+                                         , sslkeylogfile => filelib:filename()
+                                         , peer_bidi_stream_count => uint16()
+                                         , peer_unidi_stream_count => uint16()
+                                         , handshake_idle_timeout_ms => non_neg_integer()
+                                         , quic_event_mask => uint32()
+                                         , param_conn_disable_1rtt_encryption => boolean()
+                                           %% Not working well
+                                         , param_conn_local_address => string()
+                                         }.
 -type conn_shutdown_flag() :: ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE |
                               ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
 -type acceptor_opts() :: map(). %% @TODO expand
