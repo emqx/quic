@@ -57,6 +57,7 @@
         , start_stream/2
         , send/2
         , send/3
+        , async_csend/4
         , async_send/2
         , async_send/3
         , recv/2
@@ -497,6 +498,18 @@ start_stream(Conn, Opts) when is_list(Opts) ->
   start_stream(Conn, maps:from_list(Opts));
 start_stream(Conn, Opts) when is_map(Opts) ->
   quicer_nif:start_stream(Conn, maps:merge(default_stream_opts(), Opts)).
+
+%% @doc Send data over a new local stream in the connection, return new stream handle if success.
+-spec async_csend(connection_handle(), iodata(), stream_opts(), send_flags()) ->
+        {ok, stream_handle()} |
+        {error, any()} |
+        {error, stm_open_error, atom_reason()} |
+        {error, stream_send_error, atom_reason()}.
+
+async_csend(Conn, IoData, Opts, SendFlags) when is_list(Opts) ->
+  async_csend(Conn, IoData, maps:from_list(Opts), SendFlags);
+async_csend(Conn, IoData, Opts, SendFlags) ->
+  quicer_nif:csend(Conn, IoData, Opts, SendFlags).
 
 %% @doc Send binary data over stream, blocking until send request is handled by the transport worker.
 %% either succeeded or cancelled

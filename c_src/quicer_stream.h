@@ -40,6 +40,8 @@ async_accept_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM
 async_start_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
+ERL_NIF_TERM csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 ERL_NIF_TERM send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
