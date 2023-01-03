@@ -32,6 +32,10 @@ jobs:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
 
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: 24.3.4
+
       - name: Build cpp
         run: make build-nif
 
