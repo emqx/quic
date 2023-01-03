@@ -26,7 +26,7 @@ jobs:
           key: brew-${{ matrix.os }}-${{ matrix.otp  }}
       - name: prepare
         run: |
-          brew update
+          #brew update
           brew install erlang@${{ matrix.otp }}
       - name: install rebar3
         run: |

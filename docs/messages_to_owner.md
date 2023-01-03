@@ -52,7 +52,7 @@ Some events could be enabled/disabled by either:
 
 ## Messages to Stream Owner
 
-### start_complete
+### start_completed
 
 The stream initiated locally is started regardless of success/fail or sync/async.
 
@@ -63,9 +63,9 @@ get this event with status 'stream_limit_reached' if peer has flow control preve
 Otherwise, start stream will be queued. Also see [peer_accepted](#peer_accepted) 
 
 ```erlang
-{quic, start_complete, stream_handler(), #{ status := atom_status()
-                                          , stream_id := integer()
-                                          , is_peer_accepted := boolean() }
+{quic, start_completed, stream_handler(), #{ status := atom_status()
+                                           , stream_id := integer()
+                                           , is_peer_accepted := boolean() }
 ```
 
 ### active received data
