@@ -106,7 +106,7 @@
 -define(QUICER_CONNECTION_EVENT_MASK_NST                            , 16#00000001).
 
 %% QUICER_STREAM_EVENT_MASKS
--define(QUICER_STREAM_EVENT_MASK_SEND_COMPLETE                      , 16#00000001).
+-define(QUICER_STREAM_EVENT_MASK_START_COMPLETE                      , 16#00000001).
 
 %% QUIC SEND FLAGS
 -define(QUIC_SEND_FLAG_NONE                     , 16#0000).

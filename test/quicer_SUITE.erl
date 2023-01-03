@@ -1857,7 +1857,7 @@ tc_stream_open_flag_unidirectional(Config) ->
 tc_stream_start_flag_fail_blocked(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
-  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                  | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
@@ -1869,7 +1869,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED}
-                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                                         ]),
   {ok, Rid} = quicer:get_stream_rid(Stm),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
@@ -1901,7 +1901,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
 tc_stream_start_flag_immediate(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
-  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                  | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
@@ -1913,7 +1913,7 @@ tc_stream_start_flag_immediate(Config) ->
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}
-                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                                         ]),
   {ok, Rid} = quicer:get_stream_rid(Stm),
   %% We don't need to send anything, we should get start_completed even it is flow controlled
@@ -1931,7 +1931,7 @@ tc_stream_start_flag_immediate(Config) ->
 tc_stream_start_flag_shutdown_on_fail(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
-  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                  | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
@@ -1945,7 +1945,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
                                                         bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
                                                        }
-                                          , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                          , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                                         ]),
   {ok, Rid} = quicer:get_stream_rid(Stm),
   case quicer:async_send(Stm, <<"ping1">>) of
@@ -1980,7 +1980,7 @@ tc_stream_start_flag_indicate_peer_accept_1(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
   %% We don't enable flow control
-  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+  ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                  | default_listen_opts(Config)],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
                    , {stream_acceptors, 32}
@@ -1992,7 +1992,7 @@ tc_stream_start_flag_indicate_peer_accept_1(Config) ->
   {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT}
-                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}
+                                        , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                                         ]),
   quicer:async_send(Stm, <<"ping1">>),
   {ok, Rid} = quicer:get_stream_rid(Stm),
@@ -2259,7 +2259,7 @@ tc_event_start_compl(Config) ->
                               [{param_conn_disable_1rtt_encryption, true} |
                                default_conn_opts()], 5000),
   %% Stream 1 enabled
-  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}]),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
   %% Stream 1 disabled
   {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
@@ -2299,14 +2299,14 @@ tc_direct_send_over_conn(Config) ->
                                     [{param_conn_disable_1rtt_encryption, true} |
                                      default_conn_opts()]),
   %% Stream 1 enabled
-  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}]),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
   %% Stream 1 disabled
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
 
-  {ok, Stm2} = quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}],
+  {ok, Stm2} = quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}],
                                   ?QUIC_SEND_FLAG_NONE),
   %% Stream 3 is one shot, shutdown after send
-  {ok, Stm3} = quicer:async_csend(Conn, <<"ping3">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}],
+  {ok, Stm3} = quicer:async_csend(Conn, <<"ping3">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}],
                                   ?QUIC_SEND_FLAG_START bor ?QUIC_SEND_FLAG_FIN),
   receive
     {quic, start_completed, Stm,

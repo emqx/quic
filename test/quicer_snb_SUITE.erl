@@ -1787,7 +1787,7 @@ tc_multi_streams_example_server_3(Config) ->
                                                                                  , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
                                                                                  , start_flag =>
                                                                                      ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
-                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_START_COMPLETE
                                                                                  }, infinity),
                  %% 2nd Attempt success over unidir stream and ask server to unblock the bidir stream
                  %% This must success
@@ -1797,7 +1797,7 @@ tc_multi_streams_example_server_3(Config) ->
                                                                                 , start_flag => ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
                                                                                     bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
                                                                                     bor ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
-                                                                                , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_START_COMPLETE
                                                                                 }, infinity),
                  {ok, _} = ?block_until(
                               #{ ?snk_kind := debug
@@ -1818,7 +1818,7 @@ tc_multi_streams_example_server_3(Config) ->
                                                           ?QUIC_SEND_FLAG_NONE, #{ is_local => true
                                                                                  , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
                                                                                  , start_flag => ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
-                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_START_COMPLETE
                                                                                  }, infinity),
 
                  {SenderStm, ReceiverStm} = maps:get(master_stream_pair, quicer_connection:get_cb_state(ClientConnPid)),
