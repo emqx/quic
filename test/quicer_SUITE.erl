@@ -2262,7 +2262,7 @@ tc_event_start_compl(Config) ->
                                default_conn_opts()], 5000),
   %% Stream 1 enabled
   {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
-  %% Stream 1 disabled
+  %% Stream 2 disabled
   {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
@@ -2302,7 +2302,6 @@ tc_direct_send_over_conn(Config) ->
                                      default_conn_opts()]),
   %% Stream 1 enabled
   {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
-  %% Stream 1 disabled
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
 
   {ok, Stm2} = quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}],
@@ -2369,7 +2368,6 @@ tc_direct_send_over_conn_block(Config) ->
                                      default_conn_opts()]),
   %% Stream 1 enabled
   {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
-  %% Stream 1 disabled
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
 
   {ok, Stm2} = quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
@@ -2427,7 +2425,6 @@ tc_direct_send_over_conn_fail(Config) ->
                                      default_conn_opts()]),
   %% Stream 1 enabled
   {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
-  %% Stream 1 disabled
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
 
   quicer:shutdown_connection(Conn),
@@ -2441,7 +2438,8 @@ tc_direct_send_over_conn_fail(Config) ->
     {quic, start_completed, Stm0,
      #{status := StartStatus, stream_id := StreamId2}} ->
       ct:pal("Stream id: ~p started: ~p", [StreamId2, StartStatus]),
-      ?assertEqual(invalid_state, StartStatus),
+      %% Depends on the timing of closing connection, for stream 1, it can be either success or fail
+      ?assert(invalid_state =:= StartStatus orelse success =:= StartStatus),
       ?assertEqual(Stm, Stm0)
   end,
 
