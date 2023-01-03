@@ -73,6 +73,8 @@
 
 -import(quicer_lib, [default_cb_ret/2]).
 
+-export_type([cb_state/0, cb_ret/0]).
+
 -type cb_state() :: term().
 -type cb_ret() :: {ok, cb_state()}                    %% ok and update cb_state
                 | {error, Reason::term(), cb_state()} %% error handling per callback
