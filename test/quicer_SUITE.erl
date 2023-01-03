@@ -144,6 +144,8 @@
 
         %% API: csend
         , tc_direct_send_over_conn/1
+        , tc_direct_send_over_conn_block/1
+        , tc_direct_send_over_conn_fail/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -2347,6 +2349,109 @@ tc_direct_send_over_conn(Config) ->
 
   quicer:close_connection(Conn),
   ok.
+
+
+tc_direct_send_over_conn_block(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:async_connect("localhost", Port,
+                                    [{param_conn_disable_1rtt_encryption, true} |
+                                     default_conn_opts()]),
+  %% Stream 1 enabled
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  %% Stream 1 disabled
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+
+  {ok, Stm2} = quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                                      {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                                     ], ?QUIC_SEND_FLAG_NONE),
+  receive
+    {quic, start_completed, Stm,
+     #{status := success, stream_id := StreamId, is_peer_accepted := _}} ->
+      ct:pal("Stream1 ~p started", [StreamId]);
+    {quic, start_completed, Stm,
+     #{status := Reason, stream_id := StreamId}} ->
+      ct:fail("Stream ~p failed to start: ~p", [StreamId, Reason])
+  end,
+  receive
+    {quic, start_completed, Stm2,
+     #{status := success, stream_id := StreamId2}} ->
+      ct:pal("Stream ~p started", [StreamId2])
+  end,
+
+  receive {quic,streams_available, Conn,
+           #{bidi_streams := _, unidi_streams := NoUni}} ->
+      ct:pal("Server allows ~p unidi_streams!", [NoUni]),
+      %% Assert server allows 0 unidi_streams
+      ?assertEqual(0, NoUni)
+  end,
+
+  receive
+    {quic, <<"ping1">>, Stm, _} ->
+      ct:pal("Get ping from stream1")
+  end,
+
+  receive
+    {quic, <<"ping2">>, Stm2, _} ->
+      ct:fail("Get ping from stream2")
+  after 100 ->
+      ct:pal("No resp from unidi Stm2")
+  end,
+  ok.
+
+tc_direct_send_over_conn_fail(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:async_connect("localhost", Port,
+                                    [{param_conn_disable_1rtt_encryption, true} |
+                                     default_conn_opts()]),
+  %% Stream 1 enabled
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  %% Stream 1 disabled
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+
+  quicer:shutdown_connection(Conn),
+
+  %% csend over a closed conn
+  {error, stm_open_error, invalid_state} =
+    quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                           {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                          ], ?QUIC_SEND_FLAG_ALLOW_0_RTT),
+  receive
+    {quic, start_completed, Stm0,
+     #{status := StartStatus, stream_id := StreamId2}} ->
+      ct:pal("Stream id: ~p started: ~p", [StreamId2, StartStatus]),
+      ?assertEqual(invalid_state, StartStatus),
+      ?assertEqual(Stm, Stm0)
+  end,
+
+  receive
+    {quic, start_completed, StmX,
+     #{status := StartStatusX, stream_id := StreamIdX}} ->
+      ct:fail("Stream id: ~p started: ~p", [StreamIdX, StartStatusX])
+  after 100 ->
+      ok
+  end.
 
 %%% ====================
 %%% Internal helpers

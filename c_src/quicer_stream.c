@@ -529,7 +529,6 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
-
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
   if (!send_ctx)
     {
@@ -583,17 +582,20 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   // note, SendBuffer as sendcontext, free the buffer while message is sent
   // confirmed.
-  if (QUIC_FAILED(Status = MsQuic->StreamSend(
-                      Stream, &send_ctx->Buffer, 1, sendflags | QUIC_SEND_FLAG_START, send_ctx)))
+  if (QUIC_FAILED(Status = MsQuic->StreamSend(Stream,
+                                              &send_ctx->Buffer,
+                                              1,
+                                              sendflags | QUIC_SEND_FLAG_START,
+                                              send_ctx)))
     {
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       goto SendErrorExit;
     }
   else
-  {
-    // last
-    res = SUCCESS(enif_make_copy(env, s_ctx->eHandle));
-  }
+    {
+      // last
+      res = SUCCESS(enif_make_copy(env, s_ctx->eHandle));
+    }
 
   enif_mutex_unlock(s_ctx->lock);
   return res;
@@ -603,7 +605,7 @@ SendErrorExit:
   // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
   // must be done in the worker callback (for
   // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
-  enif_mutex_unlock(s_ctx->lock);//
+  enif_mutex_unlock(s_ctx->lock); //
 ErrorExit:
   destroy_s_ctx(s_ctx);
   return res;
