@@ -427,6 +427,42 @@ ServerConnectionCallback(HQUIC Connection,
 
   return status;
 }
+/*
+** Open connection handle only
+** No ownership, No monitoring.
+*/
+ERL_NIF_TERM
+open_connection0(ErlNifEnv *env,
+                 __unused_parm__ int argc,
+                 __unused_parm__ const ERL_NIF_TERM argv[])
+{
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM eHandle;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+
+  assert(argc == 0);
+
+  QuicerConnCTX *c_ctx = init_c_ctx();
+  if (!c_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
+  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
+                                                  ClientConnectionCallback,
+                                                  c_ctx,
+                                                  &(c_ctx->Connection))))
+    {
+      destroy_c_ctx(c_ctx);
+      res = ERROR_TUPLE_2(ATOM_STATUS(Status));
+    }
+  else
+    {
+      eHandle = enif_make_resource(env, c_ctx);
+      res = SUCCESS(eHandle);
+    }
+  return res;
+}
 
 ERL_NIF_TERM
 async_connect3(ErlNifEnv *env,
@@ -438,10 +474,14 @@ async_connect3(ErlNifEnv *env,
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
+  ERL_NIF_TERM eHandle = ATOM_UNDEFINED;
   ERL_NIF_TERM NST; // New Session Ticket
   // Usually we should not get this error
   // If we get it is internal logic error
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+
+  QuicerConnCTX *c_ctx = NULL;
+  BOOLEAN is_reuse_handle = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -456,7 +496,24 @@ async_connect3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  QuicerConnCTX *c_ctx = init_c_ctx();
+  if (enif_get_map_value(env, eoptions, ATOM_HANDLE, &eHandle))
+    {
+      // Reuse c_ctx from existing connecion handle
+      //
+      if (enif_get_resource(env, eHandle, ctx_connection_t, (void **)&c_ctx))
+        {
+          assert(c_ctx->is_closed);
+          is_reuse_handle = TRUE;
+        }
+      else
+        {
+          return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+        }
+    }
+  else // we create new c_ctx
+    {
+      c_ctx = init_c_ctx();
+    }
 
   // allocate config_resource for client connection
   if (NULL
@@ -532,15 +589,17 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
-                                                  ClientConnectionCallback,
-                                                  c_ctx,
-                                                  &(c_ctx->Connection))))
+  if (!is_reuse_handle)
     {
-      res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
-      goto Error;
+      if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
+                                                      ClientConnectionCallback,
+                                                      c_ctx,
+                                                      &(c_ctx->Connection))))
+        {
+          res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+          goto Error;
+        }
     }
-
   ERL_NIF_TERM essl_keylogfile;
   if (enif_get_map_value(
           env, eoptions, ATOM_SSL_KEYLOGFILE_NAME, &essl_keylogfile))
@@ -608,34 +667,7 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  if (enif_get_map_value(env, eoptions, ATOM_HANDLE, &NST))
-    {
-      // Resume connection with Old Connection Handle
-      //
-      QuicerConnCTX *old_c_ctx = NULL;
-      if (!enif_get_resource(env, NST, ctx_connection_t, (void **)&old_c_ctx))
-        {
-          return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-        }
-      else
-        {
-          // lock it, we need go to Error in case of Error to release the lock
-          enif_mutex_lock(old_c_ctx->lock);
-          QUIC_BUFFER *ticket = old_c_ctx->ResumptionTicket;
-          if (QUIC_FAILED(Status
-                          = MsQuic->SetParam(c_ctx->Connection,
-                                             QUIC_PARAM_CONN_RESUMPTION_TICKET,
-                                             ticket->Length,
-                                             ticket->Buffer)))
-            {
-              res = ERROR_TUPLE_3(ATOM_ERROR_NOT_FOUND, ATOM_STATUS(Status));
-              enif_mutex_unlock(old_c_ctx->lock);
-              goto Error;
-            }
-          enif_mutex_unlock(old_c_ctx->lock);
-        }
-    }
-  else if (enif_get_map_value(env, eoptions, ATOM_NST, &NST))
+  if (enif_get_map_value(env, eoptions, ATOM_NST, &NST))
     {
       // Resume connection with NST binary
       //
@@ -678,7 +710,7 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
   c_ctx->is_closed = FALSE; // connection started
-  ERL_NIF_TERM eHandle = enif_make_resource(env, c_ctx);
+  eHandle = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandle);
 
