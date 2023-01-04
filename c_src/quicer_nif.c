@@ -1369,6 +1369,7 @@ static ErlNifFunc nif_funcs[] = {
   { "async_accept_stream", 2, async_accept_stream2, 0},
   { "start_stream", 2, async_start_stream2, 0},
   { "send", 3, send3, 0},
+  { "csend", 4, csend4, 0},
   { "recv", 2, recv2, 0},
   { "send_dgram", 3, send_dgram, 0},
   { "async_shutdown_stream", 3, shutdown_stream3, 0},

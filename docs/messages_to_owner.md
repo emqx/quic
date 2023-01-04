@@ -44,7 +44,7 @@ Some events could be enabled/disabled by either:
 1. Use the **quic_event_mask**, set in mask to enable receiving.
 
 ```erlang
-{quicer:start_stream(Conn, [{active, 3}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE}]),
+{quicer:start_stream(Conn, [{active, 3}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
 
 ```
 

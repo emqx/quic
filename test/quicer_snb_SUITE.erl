@@ -43,6 +43,7 @@
           tc_conn_resume_nst/1,
           tc_conn_resume_nst_with_stream/1,
           tc_conn_resume_nst_async/1,
+          tc_conn_resume_nst_with_data/1,
           tc_listener_no_acceptor/1,
           tc_conn_stop_notify_acceptor/1,
           tc_accept_stream_active_once/1,
@@ -179,6 +180,7 @@ all() ->
   , tc_conn_resume_old
   , tc_conn_resume_nst
   , tc_conn_resume_nst_with_stream
+  , tc_conn_resume_nst_with_data
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
   , tc_conn_stop_notify_acceptor
@@ -1308,6 +1310,96 @@ tc_conn_resume_nst_async(Config) ->
                end),
   ok.
 
+tc_conn_resume_nst_with_data(Config) ->
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:async_connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()]),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
+                 NST = receive
+                         {quic, nst_received, Conn, Ticket} ->
+                           Ticket
+                       after 1000 ->
+                           ct:fail("No ticket received")
+                       end,
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
+
+                 {ok, ConnResumed} = quicer:async_connect("localhost", Port, [{nst, NST} | default_conn_opts()]),
+                 %% Send data over new stream in the resumed connection
+                 {ok, Stm2} = quicer:async_csend(ConnResumed, <<"ping3">>, [{active, false}], ?QUIC_SEND_FLAG_ALLOW_0_RTT),
+                 {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% 1. verify that for each success connect we send a resumption ticket
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , resource_id := _CRid1
+                                              },
+                                             Trace)),
+                   %% 2. Verify that data is received in 0-RTT with QUIC_RECEIVE_FLAG_0_RTT set
+                   %% note, it is not always the case depends on the timing.
+                   %% @NOTE, this is not always triggered, disable the check for now
+                   %% ?assert(?causality(#{ ?snk_kind := debug
+                   %%                     , context := "callback"
+                   %%                     , function := "ServerStreamCallback"
+                   %%                     , mark := ?QUIC_STREAM_EVENT_RECEIVE
+                   %%                     , tag := "event"
+                   %%                     , resource_id := _SRid1
+                   %%                     },
+                   %%                    #{ ?snk_kind := debug
+                   %%                     , context := "callback"
+                   %%                     , function := "handle_stream_event_recv"
+                   %%                     , tag := "event_recv_flag"
+                   %%                     , mark := ?QUIC_RECEIVE_FLAG_0_RTT
+                   %%                     , resource_id := _SRid1
+                   %%                     },
+                   %%                    Trace)),
+
+                   %% 3. verify that resumption ticket is received on client side
+                   %%    and client use it to resume success
+                   ?assert(?causality(#{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ClientConnectionCallback"
+                                       , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                       , tag := "event"
+                                       , resource_id := _CRid1
+                                       },
+                                      #{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ServerConnectionCallback"
+                                       , tag := "event"
+                                       , mark := ?QUIC_CONNECTION_EVENT_RESUMED
+                                       , resource_id := _SRid1
+                                       },
+                                      Trace))
+               end),
+  ok.
+
 tc_listener_no_acceptor(Config) ->
   Port = select_port(),
   ListenerOpts = [{conn_acceptors, 0} | default_listen_opts(Config)],
@@ -1787,7 +1879,7 @@ tc_multi_streams_example_server_3(Config) ->
                                                                                  , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
                                                                                  , start_flag =>
                                                                                      ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
-                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_START_COMPLETE
                                                                                  }, infinity),
                  %% 2nd Attempt success over unidir stream and ask server to unblock the bidir stream
                  %% This must success
@@ -1797,7 +1889,7 @@ tc_multi_streams_example_server_3(Config) ->
                                                                                 , start_flag => ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
                                                                                     bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
                                                                                     bor ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
-                                                                                , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_START_COMPLETE
                                                                                 }, infinity),
                  {ok, _} = ?block_until(
                               #{ ?snk_kind := debug
@@ -1818,7 +1910,7 @@ tc_multi_streams_example_server_3(Config) ->
                                                           ?QUIC_SEND_FLAG_NONE, #{ is_local => true
                                                                                  , open_flag => ?QUIC_STREAM_OPEN_FLAG_NONE
                                                                                  , start_flag => ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT
-                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_SEND_COMPLETE
+                                                                                 , quic_event_mask => ?QUICER_STREAM_EVENT_MASK_START_COMPLETE
                                                                                  }, infinity),
 
                  {SenderStm, ReceiverStm} = maps:get(master_stream_pair, quicer_connection:get_cb_state(ClientConnPid)),
