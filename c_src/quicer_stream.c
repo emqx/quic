@@ -446,20 +446,22 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM eHandle = argv[0];
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
-  ERL_NIF_TERM eFlags = argv[3];
+  ERL_NIF_TERM eFlags = argv[3]; // Send flags
 
+  // Check connection handle
   if (!enif_get_resource(env, eHandle, ctx_connection_t, (void **)&c_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  // Check active mode, mandatory
   if (!enif_get_map_value(
           env, eoptions, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  // optional open_flag,
+  // Check stream open flag
   if (enif_get_map_value(
           env, eoptions, ATOM_QUIC_STREAM_OPTS_OPEN_FLAG, &eopen_flag))
     {
@@ -468,9 +470,9 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           // if set must be valid.
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
-      // @TODO set event mask for some flags
     }
 
+  // Disallow stream start flag
   if (enif_get_map_value(
           env, eoptions, ATOM_QUIC_STREAM_OPTS_START_FLAG, &estart_flag))
     {
@@ -478,21 +480,24 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  //
-  // note, s_ctx is not shared yet, thus no locking is needed.
-  //
+  // Allocate ctxs
   QuicerStreamCTX *s_ctx = init_s_ctx();
-
   if (!s_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  // This is optional
-  get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &s_ctx->event_mask);
-
+  // release in resource_stream_dealloc_callback
   enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
+
+  QuicerStreamSendCTX *send_ctx = init_send_ctx();
+
+  if (!send_ctx)
+    {
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto ErrorExit;
+    }
 
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -503,11 +508,38 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto ErrorExit;
     }
 
+  send_ctx->s_ctx = s_ctx;
+
+  // unlikely to fail
   if (!enif_self(env, &(s_ctx->owner->Pid)))
     {
       res = ERROR_TUPLE_2(ATOM_BAD_PID);
       goto ErrorExit;
     }
+
+  enif_self(env, &send_ctx->caller);
+
+  // SYNC/ASYNC send
+  if (enif_get_uint(env, eFlags, &sendflags))
+    {
+      if ((sendflags & QUICER_SEND_FLAGS_SYNC) > 0)
+        {
+          send_ctx->is_sync = TRUE;
+          sendflags &= ~QUICER_SEND_FLAGS_SYNC;
+        }
+      else
+        {
+          send_ctx->is_sync = FALSE;
+        }
+    }
+  else
+    {
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto ErrorExit;
+    }
+
+  // Optional event mask
+  get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &s_ctx->event_mask);
 
   if (!set_owner_recv_mode(s_ctx->owner, env, active_val))
     {
@@ -515,6 +547,9 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto ErrorExit;
     }
 
+  ErlNifBinary *bin = &send_ctx->bin;
+
+  // Open stream
   if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
                                               open_flag,
                                               ClientStreamCallback,
@@ -529,85 +564,55 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
-  QuicerStreamSendCTX *send_ctx = init_send_ctx();
-  if (!send_ctx)
-    {
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-    }
-
-  ErlNifBinary *bin = &send_ctx->bin;
-
-  if (enif_get_uint(env, eFlags, &sendflags))
-    {
-      enif_self(env, &send_ctx->caller);
-
-      if ((sendflags & QUICER_SEND_FLAGS_SYNC) > 0)
-        {
-          send_ctx->is_sync = TRUE;
-          sendflags &= ~QUICER_SEND_FLAGS_SYNC;
-        }
-      else
-        {
-          send_ctx->is_sync = FALSE;
-        }
-    }
-  else
-    {
-      destroy_send_ctx(send_ctx);
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
   ebin = enif_make_copy(send_ctx->env, ebin);
-  if (!(enif_inspect_iolist_as_binary(send_ctx->env, ebin, bin)
-        || enif_inspect_binary(send_ctx->env, ebin, bin))
-      || bin->size > UINT32_MAX)
-    {
-      destroy_send_ctx(send_ctx);
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  enif_mutex_lock(s_ctx->lock);
-
-  send_ctx->s_ctx = s_ctx;
-
-  HQUIC Stream = s_ctx->Stream;
 
   //
   // Allocates and builds the buffer to send over the stream.
   //
+  if (!(enif_inspect_iolist_as_binary(send_ctx->env, ebin, bin)
+        || enif_inspect_binary(send_ctx->env, ebin, bin))
+      || bin->size > UINT32_MAX)
+    {
+
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto ErrorExit;
+    }
 
   assert(bin->data != NULL);
   send_ctx->Buffer.Buffer = (uint8_t *)bin->data;
   send_ctx->Buffer.Length = (uint32_t)bin->size;
 
+  enif_mutex_lock(s_ctx->lock);
   // note, SendBuffer as sendcontext, free the buffer while message is sent
   // confirmed.
-  if (QUIC_FAILED(Status = MsQuic->StreamSend(Stream,
+  if (QUIC_FAILED(Status = MsQuic->StreamSend(s_ctx->Stream,
                                               &send_ctx->Buffer,
                                               1,
+                                              // must set QUIC_SEND_FLAG_START
                                               sendflags | QUIC_SEND_FLAG_START,
                                               send_ctx)))
     {
+      enif_mutex_unlock(s_ctx->lock);
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
-      goto SendErrorExit;
+      goto ErrorExit;
     }
   else
     {
-      // last
+      // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
+      // must be done in the worker callback (for
+      // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
       res = SUCCESS(enif_make_copy(env, s_ctx->eHandle));
     }
 
   enif_mutex_unlock(s_ctx->lock);
   return res;
 
-SendErrorExit:
-  destroy_send_ctx(send_ctx);
-  // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
-  // must be done in the worker callback (for
-  // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
-  enif_mutex_unlock(s_ctx->lock); //
 ErrorExit:
+  destroy_send_ctx(send_ctx);
   destroy_s_ctx(s_ctx);
+  // Do not close the stream here, it will be done
+  // in resource_stream_dealloc_callback triggered by
+  // destroy_s_ctx
   return res;
 }
 
