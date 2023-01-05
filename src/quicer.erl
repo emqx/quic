@@ -94,6 +94,7 @@
 %% Exports for test
 -export([ get_conn_rid/1
         , get_stream_rid/1
+        , open_connection/0
         ]).
 
 -export([ start_listener/3 %% start application over quic
@@ -487,7 +488,7 @@ async_accept_stream(Conn, Opts) when is_map(Opts) ->
 %%
 %% Calling process becomes the owner of the stream.
 %%
-%% Both client and server could start the stream
+%% Both client and server could start the stream.
 %% @end
 -spec start_stream(connection_handle(), stream_opts()) ->
         {ok, stream_handle()} |
@@ -805,6 +806,10 @@ get_conn_rid(Conn) ->
         {ok, non_neg_integer()} | {error, any()}.
 get_stream_rid(Stream) ->
   quicer_nif:get_stream_rid(Stream).
+
+-spec open_connection() -> {ok, connection_handle()} | {error, atom_reason()}.
+open_connection() ->
+  quicer_nif:open_connection().
 
 %% @doc list all listeners
 -spec listeners() -> [{{ quicer_listener:listener_name()

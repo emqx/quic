@@ -42,6 +42,9 @@
         , get_stream_rid/1
         ]).
 
+%% For tests only
+-export([open_connection/0]).
+
 -on_load(init/0).
 
 -include_lib("kernel/include/file.hrl").
@@ -111,6 +114,10 @@ listen(_ListenOn, _Options) ->
 
 -spec close_listener(listener_handle()) -> ok.
 close_listener(_Listener) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec open_connection() -> {ok, connection_handle()} | {error, atom_reason()}.
+open_connection() ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec async_connect(hostname(), inet:port_number(), conn_opts()) ->
