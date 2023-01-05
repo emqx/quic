@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: prepare
         run: |
-          brew update
+          # brew update
           brew install curl zip unzip gnu-sed kerl
           echo "/usr/local/bin" >> $GITHUB_PATH
           git config --global credential.helper store
