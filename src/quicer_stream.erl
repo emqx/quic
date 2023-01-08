@@ -402,7 +402,7 @@ handle_info({quic, passive, Stream, undefined},
             #{ callback := M
              , callback_state := CBState} = State) ->
     ?tp(debug, #{module=>?MODULE, event => passive}),
-    default_cb_ret(M:passive(Stream, CBState), State);
+    default_cb_ret(M:passive(Stream, undefined, CBState), State);
 handle_info(Info,
             #{ callback := M
              , callback_state := CBState} = State) ->
