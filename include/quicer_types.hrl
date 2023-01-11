@@ -73,8 +73,13 @@
 -type listen_security_opts() :: #{ alpn := [alpn()]
                                  , cert := file:filename()
                                  , key := file:filename()
+                                 , verify => none | peer
+                                 , cacertfile => filelib:filename()
+                                 , password => string()
+                                 , sslkeylogfile => filelib:filename()
                                  , allow_insecure => boolean()
                                  }.
+
 
 -type uint64() :: 0..?MASK(64).
 -type uint32() :: 0..?MASK(32).
@@ -120,7 +125,7 @@
                           }.
 -type alpn() :: string().
 
--type conn_opts() :: quic_settings() |  #{ alpns := [atom()]
+-type conn_opts() :: quic_settings() |  #{ alpn := [string()]
                                          , cert => filelib:filename()
                                          , key => filelib:filename()
                                          , password => string()

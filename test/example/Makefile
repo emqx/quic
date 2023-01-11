@@ -18,3 +18,6 @@ server:
 	erl -sname s -pa ../../_build/default/lib/quicer/ebin -s qt s
 client:
 	erl -sname c -pa ../../_build/default/lib/quicer/ebin
+
+rev:
+	erl -pa ../../_build/default/lib/quicer/ebin -s rev

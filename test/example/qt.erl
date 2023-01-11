@@ -44,15 +44,15 @@
 s() ->
   application:ensure_all_started(quicer),
   Port = 4567,
-  LOptions = [ {cert, "./server.pem"}
-             , {key,  "./server.key"}
-             , {verify, none}
-             , {handshake_idle_timeout_ms, 3 * ?INTERVAL}
-             , {keep_alive_interval_ms, ?INTERVAL}
-             , {alpn, ["sample"]}
-             , {idle_timeout_ms, 3 *?INTERVAL}
-             , {peer_bidi_stream_count, 64000}
-             ],
+  LOptions = #{cert => "./server.pem",
+               key => "./server.key",
+               verify => none,
+               handshake_idle_timeout_ms => 3 * ?INTERVAL,
+               keep_alive_interval_ms => ?INTERVAL,
+               idle_timeout_ms => 3 * ?INTERVAL,
+               peer_bidi_stream_count => 64000,
+               alpn => ["sample"]
+              },
   proc_lib:spawn_link(fun() ->
                           {ok, L} = quicer:listen(Port, LOptions),
                           listener(L)
@@ -70,14 +70,14 @@ listener(L) ->
 
 acceptor(Top, L) ->
   io:format("Call accept ~p\n", [self()]),
-  {ok, Conn} = quicer:accept(L, [], infinity),
+  {ok, Conn} = quicer:accept(L, #{}, infinity),
 
   Top ! {self(), more},
 
   io:format("accept -> ~p\n",[Conn]),
 
   case quicer:handshake(Conn) of
-    {ok, Conn} ->
+    {ok, _Conn} ->
       io:format("Handshake ok\n",[]),
       accept_stream_loop(Conn);
     Err ->
@@ -87,7 +87,7 @@ acceptor(Top, L) ->
 
 
 accept_stream_loop(Conn) ->
-  case quicer:accept_stream(Conn, [{active, false}], infinity) of
+  case quicer:accept_stream(Conn, #{active => false}, infinity) of
     {ok, Stm} ->
       io:format("accept stream -> ~p\n",[Stm]),
       H = proc_lib:spawn_link(
@@ -161,6 +161,13 @@ rec_pong(N, S) ->
 
 %% The client
 
+c_opts() ->
+  #{alpn => ["sample"],
+    verify => none,
+    keep_alive_interval_ms => ?INTERVAL,
+    handshake_idle_timeout_ms => 3 * ?INTERVAL,
+    idle_timeout_ms => 3 * ?INTERVAL}.
+
 c() ->
   application:ensure_all_started(quicer),
   client([], [], 1, 1).
@@ -169,13 +176,9 @@ client(Conns, Streams, CNo, SNo) ->
   case io:read("--> ") of
     {ok, connect} ->
       %% connect one
-      case quicer:connect("localhost", Port,
-                          [{alpn, ["sample"]},
-                           {verify, none},
-                           {keep_alive_interval_ms, ?INTERVAL},
-                           {handshake_idle_timeout_ms, 3 * ?INTERVAL},
-                           {idle_timeout_ms, 3 * ?INTERVAL}],
-                          10000) of
+
+
+      case quicer:connect("localhost", Port, c_opts(), 10000) of
         {ok, Conn} ->
           io:format("Connection # ~p~n", [CNo]),
           client([{Conn, CNo} | Conns], Streams, CNo+1, SNo);
@@ -188,13 +191,7 @@ client(Conns, Streams, CNo, SNo) ->
       CC = lists:zf(
              fun(NN) ->
                  case quicer:connect(
-                        "localhost", Port,
-                        [{alpn, ["sample"]},
-                         {verify, none},
-                         {keep_alive_interval_ms, ?INTERVAL},
-                         {handshake_idle_timeout_ms, 3 * ?INTERVAL},
-                         {idle_timeout_ms, 3 * ?INTERVAL}
-                        ], 10000) of
+                        "localhost", Port, c_opts(), 10000) of
                    {ok, Conn} ->
                      io:format("Connection # ~p~n", [NN]),
                      {true, {Conn, NN}};
@@ -210,16 +207,8 @@ client(Conns, Streams, CNo, SNo) ->
       L = lists:map(
             fun(NN) ->
                 {ok, Conn} = quicer:connect(
-                               "localhost", Port,
-                               [{alpn, ["sample"]},
-                                {verify, none},
-                                {keep_alive_interval_ms, ?INTERVAL},
-                                {handshake_idle_timeout_ms, 3 * ?INTERVAL},
-                                {idle_timeout_ms, 3 * ?INTERVAL}
-                               ], 10000),
-                %% Some kind of timing bug here
-                %timer:sleep(20),
-                {ok, Stm} = quicer:start_stream(Conn, [{active, 30}]),
+                               "localhost", Port, c_opts(), 10000),
+                {ok, Stm} = quicer:start_stream(Conn, #{active => 30}),
                 ok = client_negotiate(Stm, NN, NN),
                 io:format("Stream ~p~n", [NN]),
                 {Conn, Stm}
@@ -236,7 +225,7 @@ client(Conns, Streams, CNo, SNo) ->
       L = lists:zip(Conns, NewStreamNos),
       S2 = lists:zf(
              fun({{Conn, CNumber}, SNumber}) ->
-                 case quicer:start_stream(Conn, [{active, 30}]) of
+                 case quicer:start_stream(Conn, #{active => 30}) of
                    {ok, Stm} ->
                      case client_negotiate(Stm, CNumber,
                                            SNumber) of
@@ -267,7 +256,7 @@ client(Conns, Streams, CNo, SNo) ->
       L = lists:zip(Conns2, NewStreamNos),
       S2 = lists:zf(
              fun({{Conn, CNumber}, SNumber}) ->
-                 case quicer:start_stream(Conn, [{active, 30}]) of
+                 case quicer:start_stream(Conn, #{active =>30}) of
                    {ok, Stm} ->
                      case client_negotiate(Stm, CNumber,
                                            SNumber) of
@@ -298,7 +287,7 @@ client(Conns, Streams, CNo, SNo) ->
     {ok, {stream, CNumber}} ->
       %% Create a stream on connection CNumber
       {value, {Conn, CNumber}} = lists:keysearch(CNumber, 2, Conns),
-      case quicer:start_stream(Conn, [{active, 30}]) of
+      case quicer:start_stream(Conn, #{active => 30}) of
         {ok, Stm} ->
           case client_negotiate(Stm, CNumber, SNo) of
             ok ->
@@ -320,7 +309,7 @@ client(Conns, Streams, CNo, SNo) ->
       {value, {Conn, CNumber}} = lists:keysearch(CNumber, 2, Conns),
       S2 = lists:map(
              fun(N) ->
-                 case quicer:start_stream(Conn, [{active, 30}]) of
+                 case quicer:start_stream(Conn, #{active => 30}) of
                    {ok, Stm} ->
                      case client_negotiate(Stm, CNumber, N) of
                        ok ->
