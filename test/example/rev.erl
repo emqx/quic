@@ -64,37 +64,43 @@ u_test(N) ->
 
 
 
+send_and_close() ->
+  S = get_down_stream(),
+  quicer:send(S, <<"kalle ">>),
+  quicer:async_close_stream(S),
+  S2 = get_up_stream(),
+  quicer:send(S2, <<"pelle ">>),
+  quicer:async_close_stream(S2).
+
+
 %% Top site code
 %%
 
 top_site() ->
   Port = 4567,
-  LOptions = [ {cert, "./server.pem"}
-             , {key,  "./server.key"}
-             , {verify, none}
-             , {active, false}
-             , {handshake_idle_timeout_ms, 3 * ?INTERVAL}
-             , {keep_alive_interval_ms, ?INTERVAL}
-             , {alpn, ["sample"]}
-             , {idle_timeout_ms, 3 *?INTERVAL}
-             , {peer_bidi_stream_count, 64000}
-             ],
+  LOptions = #{cert => "./server.pem",
+               key => "./server.key",
+               verify => none,
+               handshake_idle_timeout_ms => 3 * ?INTERVAL,
+               keep_alive_interval_ms => ?INTERVAL,
+               idle_timeout_ms => 3 * ?INTERVAL,
+               peer_bidi_stream_count => 64000,
+               alpn => ["sample"]
+              },
 
   {ok, L} = quicer:listen(Port, LOptions),
-  {ok, Conn} = quicer:accept(L, [{active, false}], infinity),
+  {ok, Conn} = quicer:accept(L, #{active => false}, infinity),
   {ok, Conn} = quicer:handshake(Conn),
   top_loop(Conn).
 
 
 top_loop(Conn) ->
-  {ok, Conn} = quicer:async_accept_stream(Conn, [{active, false}]),
+  {ok, Conn} = quicer:async_accept_stream(Conn, #{active => false}),
   top_loop2(Conn).
 
 top_loop2(Conn) ->
   receive
     {quic, new_stream, Stream, _} ->
-      X = quicer:recv(Stream, 0),
-      io:format("X = ~p~n", [X]),
       H = proc_lib:spawn_link(
             fun() -> stream_handler0(Stream) end),
       ok = quicer:handoff_stream(Stream, H),
@@ -104,8 +110,8 @@ top_loop2(Conn) ->
       {ok, Stream} =
         quicer:start_stream(
           Conn,
-          [{active, false},
-           {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}]),
+          #{active => false,
+            start_flag => ?QUIC_STREAM_START_FLAG_IMMEDIATE}),
       quicer:handoff_stream(Stream, From),
       From ! {top_site, Stream},
       top_loop2(Conn);
@@ -128,16 +134,17 @@ get_down_stream() ->
 %%%% site code
 %%%%
 
+c_opts() ->
+  #{alpn => ["sample"],
+    verify => none,
+    keep_alive_interval_ms => ?INTERVAL,
+    peer_bidi_stream_count => 64000,
+    handshake_idle_timeout_ms => 3 * ?INTERVAL,
+    idle_timeout_ms => 3 * ?INTERVAL}.
+
 nat_site() ->
   Port = 4567,
-  case quicer:connect("localhost", Port,
-                      [{alpn, ["sample"]},
-                       {verify, none},
-                       {peer_bidi_stream_count, 64000},
-                       {keep_alive_interval_ms, ?INTERVAL},
-                       {handshake_idle_timeout_ms, 3 * ?INTERVAL},
-                       {idle_timeout_ms, 3 * ?INTERVAL}],
-                      10000) of
+  case quicer:connect("localhost", Port, c_opts(), 10000) of
     {ok, Conn} ->
       io:format("Entering site loop Conn = ~p\n",[Conn]),
       site_loop(Conn);
@@ -147,7 +154,7 @@ nat_site() ->
   end.
 
 site_loop(Conn) ->
-  {ok, Conn} = quicer:async_accept_stream(Conn, [{active, false}]),
+  {ok, Conn} = quicer:async_accept_stream(Conn, #{active => false}),
   site_loop2(Conn).
 
 site_loop2(Conn) ->
@@ -162,11 +169,8 @@ site_loop2(Conn) ->
     {From, new_up_stream} ->
       {ok, UpStream} =
         quicer:start_stream(
-          Conn,
-          [{active, false},
-           {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}
-          ]),
-      quicer:send(UpStream, <<"kalle">>),
+          Conn, #{active => false,
+                  start_flag => ?QUIC_STREAM_START_FLAG_IMMEDIATE}),
       ok = quicer:handoff_stream(UpStream, From),
       site_loop2(Conn);
     {quic, closed, Conn, _} ->
@@ -208,6 +212,9 @@ stream_handler(S, N) ->
       io:format("Handler got ping ~p \n",[N]),
       {ok, 4} = quicer:send(S, <<"pong">>),
       stream_handler(S, N+1);
+    {quic, Data, S, _} when is_binary(Data) ->
+      io:format("Handler got data ~p \n",[Data]),
+      stream_handler(S, N);
     {quic, peer_send_shutdown, S, _} ->
       io:format("Handler got peer send shutdown \n",[]),
       quicer:async_shutdown_stream(S),

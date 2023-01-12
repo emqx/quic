@@ -252,14 +252,16 @@ async_connect(Host, Port, Opts) when is_map(Opts) ->
 %% @end
 %% @see accept/3
 %% @see handshake/2
--spec handshake(connection_handle()) -> ok | {error, any()}.
+-spec handshake(connection_handle()) -> {ok, connection_handle()} |
+                                        {error, any()}.
 handshake(Conn) ->
   handshake(Conn, 5000).
 
 %% @doc Complete TLS handshake after accepted a Connection
 %% @see handshake/2
 %% @see async_handshake/1
--spec handshake(connection_handle(), timeout()) -> ok | {error, any()}.
+-spec handshake(connection_handle(), timeout()) -> {ok, connection_handle()} |
+                                                   {error, any()}.
 handshake(Conn, Timeout) ->
   case async_handshake(Conn) of
     {error, _} = E -> E;
