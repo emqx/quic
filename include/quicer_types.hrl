@@ -24,6 +24,9 @@
 
 -export_type([handle/0]).
 
+%% @doc Other user defined opts may be used in callbacks
+-type user_opts() :: #{ _ => _}.
+
 %% Msquic Status Code Translation
 -type atom_reason() ::
         success             |
@@ -78,6 +81,7 @@
                                  , password => string()
                                  , sslkeylogfile => filelib:filename()
                                  , allow_insecure => boolean()
+                                 , conn_acceptors => non_neg_integer()
                                  }.
 
 
@@ -126,6 +130,7 @@
 -type alpn() :: string().
 
 -type conn_opts() :: quic_settings() |  #{ alpn := [string()]
+                                         , conn_callback => module()
                                          , cert => filelib:filename()
                                          , key => filelib:filename()
                                          , password => string()
