@@ -159,7 +159,10 @@ reg_close() ->
   quicer_nif:reg_close().
 
 -spec start_listener(Appname :: atom(), listen_on(),
-                     {listener_opts(), connection_opts(), stream_opts()}) ->
+                     {listener_opts(),
+                      connection_opts(),
+                      stream_opts() | user_opts()}
+                    ) ->
         {ok, pid()} | {error, any()}.
 start_listener(AppName, Port, Options) ->
   quicer_listener:start_listener(AppName, Port, Options).

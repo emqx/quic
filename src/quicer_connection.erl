@@ -44,10 +44,10 @@
                   , is_resumed := boolean()
                   }.
 
--type cb_init_args() :: [ listener_handle() |
-                          [ {listen_opts(), conn_opts(), stream_opts()}
-                          | [Supervisor :: undefined | pid() ]]
-                        ].
+-type cb_init_args() :: #{ stream_opts => stream_opts() | user_opts()
+                         , conn => connection_handle()
+                         } | conn_opts().
+
 
 -type cb_ret() :: quicer_lib:cb_ret().
 

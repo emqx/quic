@@ -30,7 +30,7 @@
 -callback send_complete(stream_handle(), IsCanceled::boolean(), cb_state()) -> cb_ret().
 %% Handle send completed.
 
--callback peer_send_shutdown(stream_handle(), error_code(), cb_state()) -> cb_ret().
+-callback peer_send_shutdown(stream_handle(), undefined, cb_state()) -> cb_ret().
 %% Handle stream peer_send_shutdown.
 
 -callback peer_send_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
@@ -39,7 +39,7 @@
 -callback peer_receive_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle stream peer_receive_aborted
 
--callback send_shutdown_complete(stream_handle(), error_code(), cb_state()) -> cb_ret().
+-callback send_shutdown_complete(stream_handle(), IsGraceful::boolean(), cb_state()) -> cb_ret().
 %% Handle stream send_shutdown_complete.
 %% Happen immediately on an abortive send or after a graceful send has been acknowledged by the peer.
 
