@@ -49,6 +49,9 @@
 -callback passive(stream_handle(), undefined, cb_state()) -> cb_ret().
 %% Stream now in 'passive' mode.
 
+-callback handle_stream_data(stream_handle(), binary(), recv_data_props(), cb_state() ) -> cb_ret().
+%% Stream handle data
+
 -callback handle_call(Req::term(), gen_server:from(), cb_state()) -> cb_ret().
 %% Handle API call with callback state.
 
@@ -62,6 +65,7 @@
                     , post_handoff/3
                     , new_stream/3
                     , send_complete/3
+                    , handle_stream_data/4
                     , handle_call/3
                     , handle_info/2
                     , handle_continue/2
