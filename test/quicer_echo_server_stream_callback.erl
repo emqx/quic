@@ -87,4 +87,4 @@ handle_call(_Stream, _Request, _Opts, _CBState) ->
     ok.
 
 stream_closed(_Stream, _Flags, S) ->
-    {ok, S}.
+    {stop, normal, S}.
