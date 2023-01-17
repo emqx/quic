@@ -59,6 +59,8 @@
 -callback passive(stream_handle(), undefined, cb_state()) -> cb_ret().
 %% Stream now in 'passive' mode.
 
+-callback handle_stream_data(stream_handle(), binary(), recv_data_props(), cb_state() ) -> cb_ret().
+%% Stream handle data
 
 -callback handle_call(Req::term(), gen_server:from(), cb_state()) -> cb_ret().
 %% Handle API call with callback state.
@@ -69,7 +71,7 @@
 -callback handle_info(Info::term(), cb_state()) -> cb_ret().
 %% Handle unhandled info with callback state.
 
--optional_callbacks([post_handoff/3, handle_call/3, handle_info/2, handle_continue/2]).
+-optional_callbacks([post_handoff/3, handle_stream_data/4, handle_call/3, handle_info/2, handle_continue/2]).
 
 -import(quicer_lib, [default_cb_ret/2]).
 
@@ -338,12 +340,12 @@ handle_info({quic, new_stream, Stream, #{flags := Flags, is_orphan := false} = P
             maybe_log_stracetrace(ST),
             {stop, {new_stream_crash, Reason}, State#{stream := Stream}}
     end;
-handle_info({quic, Bin, Stream, #{flags := Flags}},
+handle_info({quic, Bin, Stream, Props},
             #{ stream := Stream, callback := M
              , callback_state := CallbackState } = State)
   when is_binary(Bin) ->
     ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream}),
-    default_cb_ret(M:handle_stream_data(Stream, Bin, Flags, CallbackState), State);
+    default_cb_ret(M:handle_stream_data(Stream, Bin, Props, CallbackState), State);
 
 handle_info({quic, start_completed, Stream,
              #{ status := _AtomStatus
