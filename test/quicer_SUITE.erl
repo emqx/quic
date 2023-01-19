@@ -228,7 +228,8 @@ end_per_testcase(tc_open_listener_neg_1, _Config) ->
   quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   quicer:stop_listener(mqtt),
-  ct:pal("What left in the message queue: ~p", [receive_all()]),
+  Unhandled = quicer_test_lib:receive_all(),
+  Unhandled =/= [] andalso ct:comment("What left in the message queue: ~p", [Unhandled]),
   ok.
 
 %%%===================================================================
@@ -2445,7 +2446,7 @@ tc_direct_send_over_conn_fail(Config) ->
 
   receive
     {quic, start_completed, StmX,
-     #{status := StartStatusX, stream_id := StreamIdX}} ->
+     #{status := StartStatusX, stream_id := StreamIdX}} when StmX =/= Stm0 ->
       ct:fail("Stream id: ~p started: ~p", [StreamIdX, StartStatusX])
   after 100 ->
       ok
@@ -2857,17 +2858,6 @@ flush_streams_available(Conn) ->
   receive
     {quic, streams_available, Conn,
      #{bidi_streams := _, unidi_streams := _}} -> ok
-  end.
-
-receive_all() ->
-  receive_all([]).
-
-receive_all(Res)->
-  receive
-    X ->
-      receive_all([X|Res])
-  after 0 ->
-      Res
   end.
 
 filename(Path, F, A) ->

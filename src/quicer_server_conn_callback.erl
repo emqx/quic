@@ -46,7 +46,7 @@ init(ConnOpts) when is_map(ConnOpts) ->
     {ok, ConnOpts}.
 
 closed(_Conn, #{} = _Flags, S)->
-    {ok, S}.
+    {stop, normal, S}.
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
     %% @TODO configurable behavior of spawning stream acceptor

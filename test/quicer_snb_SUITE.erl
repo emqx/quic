@@ -138,6 +138,8 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, _Config) ->
   quicer:stop_listener(mqtt),
   snabbkaffe:cleanup(),
+  Unhandled = quicer_test_lib:receive_all(),
+  Unhandled =/= [] andalso ct:comment("What left in the message queue: ~p", [Unhandled]),
   ok.
 
 %%--------------------------------------------------------------------
@@ -1056,6 +1058,7 @@ tc_conn_resume_nst(Config) ->
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
+                 quicer:shutdown_connection(Conn),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -1128,6 +1131,7 @@ tc_conn_resume_nst_with_stream(Config) ->
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
+                 quicer:shutdown_connection(ConnResumed),
                  ct:pal("stop listener"),
                  ok = quicer:stop_listener(mqtt)
                end,
@@ -1201,6 +1205,7 @@ tc_conn_resume_nst_async(Config) ->
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  ct:pal("stop listener"),
+                 quicer:shutdown_connection(ConnResumed),
                  ok = quicer:stop_listener(mqtt)
                end,
                fun(Result, Trace) ->
@@ -1471,7 +1476,8 @@ tc_accept_stream_active_once(Config) ->
                  receive
                    {quic, <<"ping2">>, Stm3,  _} ->
                      {ok, false} = quicer:getopt(Stm3, active)
-                 after 100 -> ct:fail("no ping2")
+                 after 100 -> ct:fail("no ping2"),
+                 quicer:shutdown_connection(Conn)
                  end
                end,
                fun(_Result, Trace) ->
@@ -1565,8 +1571,8 @@ tc_accept_stream_active_N(Config) ->
                 ok = quicer:setopt(Stm3, active, 2),
                 {ok, 2} = quicer:getopt(Stm3, active),
                 ok = quicer:setopt(Stm3, active, -100),
-                {ok, false} = quicer:getopt(Stm3, active)
-
+                {ok, false} = quicer:getopt(Stm3, active),
+                quicer:shutdown_connection(Conn)
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1615,7 +1621,8 @@ tc_multi_streams(Config) ->
                  receive
                    {quic, <<"ping2">>, Stm2,  _} -> ok
                  after 100 -> ct:fail("no ping2")
-                 end
+                 end,
+                 quicer:shutdown_connection(Conn)
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1698,7 +1705,8 @@ tc_multi_streams_example_server_1(Config) ->
                  receive
                    {quic, closed, Conn, _} ->
                      ct:pal("Connecion is closed")
-                 end
+                 end,
+                 quicer:shutdown_connection(Conn)
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1758,7 +1766,8 @@ tc_multi_streams_example_server_2(Config) ->
                                },
                               5000, 1000),
                  ok,
-                 ct:pal("status : ~p", [sys:get_status(ClientConnPid)])
+                 ct:pal("status : ~p", [sys:get_status(ClientConnPid)]),
+                 gen_server:stop(ClientConnPid)
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1878,7 +1887,9 @@ tc_multi_streams_example_server_3(Config) ->
                                , module := example_client_stream
                                }, 5000, 1000),
 
-                 quicer_connection:get_handle(ClientConnPid)
+                 H = quicer_connection:get_handle(ClientConnPid),
+                 gen_server:stop(ClientConnPid),
+                 H
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1981,7 +1992,8 @@ tc_passive_recv_1(Config) ->
                  {ok, <<"g">>} = quicer:recv(Stm2, 1),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"2ping">>} = quicer:recv(Stm2, 5), %% left <<"3">> in buffer
-                 {error, _} = quicer:recv(Stm2, 888)
+                 {error, _} = quicer:recv(Stm2, 888),
+                 quicer:shutdown_connection(Conn)
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),

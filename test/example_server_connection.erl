@@ -56,10 +56,8 @@ init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
 init(ConnOpts) when is_map(ConnOpts) ->
     {ok, ConnOpts}.
 
-closed(_Conn, #{is_peer_acked := true}, S)->
-    {stop, normal, S};
-closed(_Conn, #{is_peer_acked := false}, S)->
-    {stop, abnorml, S}.
+closed(_Conn, _CloseProp, S) ->
+    {stop, normal, S}.
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
     case quicer_stream:start_link(example_server_stream, Conn, SOpts) of
