@@ -19,7 +19,9 @@
 
 
 -export([gen_ca/2,
-         gen_host_cert/3]).
+         gen_host_cert/3,
+         receive_all/0
+        ]).
 
 gen_ca(Path, Name) ->
   %% Generate ca.pem and ca.key which will be used to generate certs
@@ -87,6 +89,16 @@ create_file(Filename, Fmt, Args) ->
   end,
   ok.
 
+receive_all() ->
+  receive_all([]).
+
+receive_all(Res)->
+  receive
+    X ->
+      receive_all([X|Res])
+  after 0 ->
+      lists:reverse(Res)
+  end.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
