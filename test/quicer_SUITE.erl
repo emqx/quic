@@ -62,6 +62,7 @@
         , tc_conn_other_port/1
         , tc_conn_with_localaddr/1
         , tc_conn_controlling_process/1
+        , tc_conn_controlling_process_demon/1
 
         , tc_conn_custom_ca/1
         , tc_conn_custom_ca_other/1
@@ -89,6 +90,7 @@
         , tc_stream_passive_switch_to_active/1
         , tc_stream_active_switch_to_passive/1
         , tc_stream_controlling_process/1
+        , tc_stream_controlling_process_demon/1
 
         , tc_dgram_client_send/1
 
@@ -132,6 +134,7 @@
         , tc_stream_send_with_fin/1
         , tc_stream_send_with_fin_passive/1
         , tc_stream_send_shutdown_complete/1
+        , tc_conn_and_stream_shared_owner/1
 
         %% insecure, msquic only
         , tc_insecure_traffic/1
@@ -1177,6 +1180,48 @@ tc_stream_controlling_process(Config) ->
       ct:fail("timeout")
   end.
 
+%% @doc Check that old owner down will not shutdown the stream
+tc_stream_controlling_process_demon(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      Parent = self(),
+      {Old, MonRef} = spawn_monitor(
+                             fun() ->
+                                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                                 Res = quicer:controlling_process(Stm, Parent),
+                                 exit({Res, Stm})
+                             end),
+      receive
+        {'DOWN', MonRef, process, NewOwner, {Res, Stm}} ->
+          ct:pal("Set controlling_process res: ~p", [Res])
+      end,
+      ok = quicer:setopt(Stm, active, true),
+      {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
+      receive
+        {quic, <<"owner_changed">>, Stm, _} ->
+          ok
+      end,
+      %% Set controlling_process again
+      {NewOwner2, MonRef2} = spawn_monitor(fun() -> receive stop -> ok end
+                                           end),
+      %?assertEqual({error, owner_dead}, quicer:controlling_process(Stm, NewOwner)),
+      ok = quicer:controlling_process(Stm, NewOwner2),
+      NewOwner2 ! stop,
+      receive
+        {'DOWN', MonRef2, process, NewOwner2, normal} ->
+          ok
+      end,
+      ?assertNotMatch({ok, _}, quicer:send(Stm, <<"owner_changed">>)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
 tc_dgram_client_send(Config) ->
   Port = select_port(),
   Owner = self(),
@@ -1240,6 +1285,72 @@ tc_conn_controlling_process(Config) ->
   after 6000 ->
       ct:fail("timeout")
   end.
+
+%% @doc check old owner is demonitored.
+tc_conn_controlling_process_demon(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      Parent = self(),
+      {OldOwner, MonRef} = spawn_monitor(
+                             fun() ->
+                                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                                 Res = quicer:controlling_process(Conn, Parent),
+                                 exit({Res, Conn})
+                             end),
+      Conn = receive
+               {'DOWN', MonRef, process, OldOwner, {Res, TheConn}} ->
+                 ct:pal("Old Owner is down, mon res: ~p", [Res]),
+                 TheConn
+             end,
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+      {ok, _} = quicer:recv(Stm, 11),
+      quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
+      SPid ! done,
+      {NewOwner2, MonRef2} = spawn_monitor(fun() ->
+                                               receive stop -> ok end
+                                           end),
+      ok = quicer:controlling_process(Conn, NewOwner2),
+      NewOwner2 ! stop,
+      receive
+        {'DOWN', MonRef2, process, NewOwner2, normal} -> ok
+      end,
+      ?assertNotMatch({ok, _Stm}, quicer:start_stream(Conn, [{active, false}])),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 6000 ->
+      ct:fail("timeout")
+  end.
+
+%% @doc test conn and stream share the same owner.
+tc_conn_and_stream_shared_owner(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive listener_ready -> ok end,
+  TestFun = fun() ->
+                {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+                {ok, _} = quicer:recv(Stm, 11),
+                receive stop -> ok end,
+                exit({Conn, Stm})
+            end,
+  {ChildPid, ChildMRef} = spawn_monitor(TestFun),
+  ChildPid ! stop,
+  receive
+    {'DOWN', ChildMRef, process, ChildPid, {Conn, Stm}} ->
+      timer:sleep(100),
+      %% Send over old stream
+      ?assertNotMatch({ok, _}, quicer:send(Stm, <<"some data">>)),
+      %% Try start new stream
+      ?assertNotMatch({ok, _}, quicer:start_stream(Conn, [{active, false}]))
+  end,
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
 
 %% tc_getopt_raw(Config) ->
 %%   Parm = param_conn_quic_version,
