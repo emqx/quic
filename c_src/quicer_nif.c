@@ -1263,6 +1263,9 @@ connection_controlling_process(ErlNifEnv *env,
       != enif_monitor_process(
           env, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon))
     {
+      // rollback, must success
+      enif_self(env, &c_ctx->owner->Pid);
+      enif_monitor_process(env, c_ctx, caller, &c_ctx->owner_mon);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
@@ -1295,6 +1298,9 @@ stream_controlling_process(ErlNifEnv *env,
       != enif_monitor_process(
           env, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon))
     {
+      // rollback, must success
+      enif_self(env, &s_ctx->owner->Pid);
+      enif_monitor_process(env, s_ctx, caller, &s_ctx->owner_mon);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 

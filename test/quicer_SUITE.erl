@@ -1199,6 +1199,7 @@ tc_stream_controlling_process_demon(Config) ->
         {'DOWN', MonRef, process, NewOwner, {Res, Stm}} ->
           ct:pal("Set controlling_process res: ~p", [Res])
       end,
+      ?assertEqual({error, owner_dead}, quicer:controlling_process(Stm, NewOwner)),
       ok = quicer:setopt(Stm, active, true),
       {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
       receive
@@ -1208,7 +1209,6 @@ tc_stream_controlling_process_demon(Config) ->
       %% Set controlling_process again
       {NewOwner2, MonRef2} = spawn_monitor(fun() -> receive stop -> ok end
                                            end),
-      %?assertEqual({error, owner_dead}, quicer:controlling_process(Stm, NewOwner)),
       ok = quicer:controlling_process(Stm, NewOwner2),
       NewOwner2 ! stop,
       receive
@@ -1305,11 +1305,15 @@ tc_conn_controlling_process_demon(Config) ->
                  ct:pal("Old Owner is down, mon res: ~p", [Res]),
                  TheConn
              end,
+      %% Try set owner back to dead previous owner, should fail
+      ?assertEqual({error, owner_dead}, quicer:controlling_process(Conn, OldOwner)),
+      %% rollback to this owner.
+
       {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
       {ok, 11} = quicer:send(Stm, <<"ping_active">>),
       {ok, _} = quicer:recv(Stm, 11),
-      quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
       SPid ! done,
+
       {NewOwner2, MonRef2} = spawn_monitor(fun() ->
                                                receive stop -> ok end
                                            end),
@@ -1318,7 +1322,8 @@ tc_conn_controlling_process_demon(Config) ->
       receive
         {'DOWN', MonRef2, process, NewOwner2, normal} -> ok
       end,
-      ?assertNotMatch({ok, _Stm}, quicer:start_stream(Conn, [{active, false}])),
+      ?assertNotMatch({ok, _},  quicer:send(Stm, <<"ping_active">>)),
+      quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 6000 ->
