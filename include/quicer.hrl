@@ -123,4 +123,10 @@
 -define(QUIC_RECEIVE_FLAG_0_RTT                 , 16#0001).
 -define(QUIC_RECEIVE_FLAG_FIN                   , 16#0002).
 
+-record(quic_data, {
+    offset :: non_neg_integer(),
+    size :: non_neg_integer(),
+    bin :: binary()
+}).
+
 -endif. %% QUICER_HRL

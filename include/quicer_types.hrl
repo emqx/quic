@@ -345,4 +345,18 @@
 %% @doc addr in quicer, IP and Port
 -type quicer_addr() :: string().
 
+%% @doc quic_data fragment with offset index
+-type ifrag() :: {Index::non_neg_integer(), quic_data()}.
+
+
+-type quic_data_buffer() :: ordsets:ordset(ifrag()).
+
+%% @doc future packet buffer
+-type fpbuffer() :: #{ next_offset := non_neg_integer()
+                     , buffer := quic_data_buffer()
+                     }.
+
+%% @doc binary data with offset and size info
+-type quic_data() :: #quic_data{}.
+
 -endif. %% QUICER_TYPES_HRL
