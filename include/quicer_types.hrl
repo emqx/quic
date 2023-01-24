@@ -155,6 +155,7 @@
                         , open_flag => stream_open_flags()
                         , start_flag => stream_start_flags()
                         , event_mask => uint32()
+                        , disable_fpbuffer => boolean()
                         }. %% @TODO expand
 
 -type stream_open_flags() ::  ?QUIC_STREAM_OPEN_FLAG_NONE |

@@ -90,7 +90,10 @@
 %% helpers
 -export([ %% Stream flags tester
           is_unidirectional/1
-          %% forward buffering
+          %% Future Packets Buffering
+        , quic_data/1
+        , new_fpbuffer/0
+        , new_fpbuffer/1
         , update_fpbuffer/2
         , defrag_fpbuffer/2
         ]).
@@ -938,6 +941,17 @@ perf_counters() ->
       Error
   end.
 
+%% @doc Convert quic data event to quic_data for fpbuffer
+-spec quic_data({quic, binary(), stream_handle(), recv_data_props()}) -> quic_data().
+quic_data({quic, Bin, _Handle, #{absolute_offset := Offset, len := Len}})
+          when is_binary(Bin) ->
+  #quic_data{offset = Offset, size = Len, bin = Bin}.
+
+-spec new_fpbuffer() -> fpbuffer().
+new_fpbuffer() ->
+  new_fpbuffer(0).
+new_fpbuffer(StartOffset) ->
+  #{next_offset => StartOffset, buffer => ordsets:new()}.
 
 %% @doc update fpbuffer and return *next* continuous data.
 -spec update_fpbuffer(quic_data(), fpbuffer()) -> {list(quic_data()), NewBuff :: fpbuffer()}.

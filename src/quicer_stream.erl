@@ -202,6 +202,7 @@ init([Callback, Conn, StreamOpts]) ->
                  , conn => Conn
                  , callback => Callback
                  , callback_state => undefined
+                 , fpbuffer => maybe_buffer(StreamOpts)
                  },
     case IsLocal of
         false ->
@@ -254,6 +255,7 @@ init([Callback, Stream, Conn, StreamOpts, Props, PrevOwner]) ->
                      , stream => Stream
                      , callback => Callback
                      , callback_state => CBState
+                     , fpbuffer => maybe_buffer(StreamOpts)
                      },
             {ok,  State, {continue , {?post_init, PrevOwner}}};
         {error, _} = E ->
@@ -341,12 +343,28 @@ handle_info({quic, new_stream, Stream, #{flags := Flags, is_orphan := false} = P
             {stop, {new_stream_crash, Reason}, State#{stream := Stream}}
     end;
 handle_info({quic, Bin, Stream, Props},
-            #{ stream := Stream, callback := M
+            #{ fpbuffer := disabled
+             , stream := Stream, callback := M
              , callback_state := CallbackState } = State)
   when is_binary(Bin) ->
+    %% FPbuffer is disabled, callback module should handle out of order delivery
     ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream}),
     default_cb_ret(M:handle_stream_data(Stream, Bin, Props, CallbackState), State);
-
+handle_info({quic, Bin, Stream, Props} = Evt,
+            #{ stream := Stream, callback := M
+             , fpbuffer := Buffer
+             , callback_state := CallbackState } = State)
+  when is_binary(Bin) andalso Buffer =/= disabled ->
+    %% FPbuffer is enabled, callback module get ordered data
+    ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream, buffer => Buffer}),
+    case quicer:update_fpbuffer(quicer:quic_data(Evt), Buffer) of
+        {[], NewBuffer} ->
+            {noreply, State#{ fpbuffer := NewBuffer} };
+        {DataList, NewBuffer} ->
+            AppData = iolist_to_binary(lists:map(fun(#quic_data{bin = B}) -> B end, DataList)),
+            default_cb_ret(M:handle_stream_data(Stream, AppData, Props#{len := byte_size(AppData)}, CallbackState),
+                           State#{fpbuffer := NewBuffer})
+    end;
 handle_info({quic, start_completed, Stream,
              #{ status := _AtomStatus
               , stream_id := _StreamId
@@ -475,3 +493,8 @@ maybe_log_stracetrace(ST) ->
     logger:error("~p~n", [ST]),
     ok.
 
+maybe_buffer(#{disable_fpbuffer := true}) ->
+    disabled;
+maybe_buffer(_) ->
+    %% Default enable
+    quicer:new_fpbuffer().
