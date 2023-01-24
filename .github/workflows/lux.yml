@@ -1,0 +1,35 @@
+name: lux
+on: [push, pull_request]
+
+jobs:
+  run-lux-tests:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        otp:
+          - 24.3.4
+          - 25.1.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+
+      - name: build lux
+        run: |
+          git clone https://github.com/hawk/lux.git
+          cd lux
+          autoconf
+          ./configure
+          make
+          sudo make install
+
+      - name: run example tests
+        run: |
+          which lux
+          make
+          cd test/example
+          make all lux
