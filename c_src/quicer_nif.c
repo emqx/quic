@@ -766,15 +766,12 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 void
 resource_conn_down_callback(__unused_parm__ ErlNifEnv *env,
                             void *ctx,
-                            __unused_parm__ ErlNifPid *pid,
+                            ErlNifPid *DeadPid,
                             __unused_parm__ ErlNifMonitor *mon)
 {
   QuicerConnCTX *c_ctx = ctx;
-  if (!ctx)
-    {
-      return;
-    }
-  else
+  if (c_ctx && c_ctx->owner && DeadPid
+      && !enif_compare_pids(&c_ctx->owner->Pid, DeadPid))
     {
       TP_CB_3(start, (uintptr_t)c_ctx->Connection, (uintptr_t)ctx);
       MsQuic->ConnectionShutdown(
@@ -804,30 +801,29 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 void
 resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
                               void *ctx,
-                              __unused_parm__ ErlNifPid *pid,
+                              ErlNifPid *DeadPid,
                               __unused_parm__ ErlNifMonitor *mon)
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   QuicerStreamCTX *s_ctx = ctx;
 
-  if (!ctx)
+  if (s_ctx && s_ctx->owner && DeadPid
+      && !enif_compare_pids(&s_ctx->owner->Pid, DeadPid))
     {
-      return;
-    }
-
-  TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
-  if (QUIC_FAILED(status = MsQuic->StreamShutdown(
-                      s_ctx->Stream,
-                      QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE
-                          | QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE
-                          | QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND,
-                      0)))
-    {
-      TP_CB_3(shutdown_fail, (uintptr_t)s_ctx->Stream, status);
-    }
-  else
-    {
-      TP_CB_3(shutdown_success, (uintptr_t)s_ctx->Stream, status);
+      TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
+      if (QUIC_FAILED(status = MsQuic->StreamShutdown(
+                          s_ctx->Stream,
+                          QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE
+                              | QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE
+                              | QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND,
+                          0)))
+        {
+          TP_CB_3(shutdown_fail, (uintptr_t)s_ctx->Stream, status);
+        }
+      else
+        {
+          TP_CB_3(shutdown_success, (uintptr_t)s_ctx->Stream, status);
+        }
     }
 }
 
@@ -1267,6 +1263,9 @@ connection_controlling_process(ErlNifEnv *env,
       != enif_monitor_process(
           env, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon))
     {
+      // rollback, must success
+      enif_self(env, &c_ctx->owner->Pid);
+      enif_monitor_process(env, c_ctx, caller, &c_ctx->owner_mon);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
@@ -1299,6 +1298,9 @@ stream_controlling_process(ErlNifEnv *env,
       != enif_monitor_process(
           env, s_ctx, &s_ctx->owner->Pid, &s_ctx->owner_mon))
     {
+      // rollback, must success
+      enif_self(env, &s_ctx->owner->Pid);
+      enif_monitor_process(env, s_ctx, caller, &s_ctx->owner_mon);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
 
