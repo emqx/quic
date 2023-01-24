@@ -21,11 +21,11 @@
 %% 1> rev:start().
 
 %% To test new streams going "down"
-%% 2> rev:d_test().
+%% 2> rev:d_test_run().
 
 
 %% To test new streams going "up"
-%% 3> rev:u_test().
+%% 3> rev:u_test_run().
 
 
 
@@ -39,8 +39,7 @@ start() ->
 
 
 %% Test code
-
-d_test() ->
+d_test_run() ->
   d_test(1).
 
 d_test(N) ->
@@ -52,7 +51,7 @@ d_test(N) ->
   io:format("Streams closed \n",[]).
 
 
-u_test() ->
+u_test_run() ->
   u_test(1).
 u_test(N) ->
   L = lists:seq(1, N),
@@ -61,7 +60,6 @@ u_test(N) ->
   io:format("Closing streams \n",[]),
   [ok = quicer:close_stream(U) || U <- Streams],
   io:format("Streams closed \n",[]).
-
 
 
 send_and_close() ->

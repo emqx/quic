@@ -1440,7 +1440,8 @@ tc_accept_stream_active_once(Config) ->
   ConnectionOpts = [ {conn_callback, ServerConnCallback}
                    , {stream_acceptors, 32}
                      | default_conn_opts()],
-  StreamOpts = [ {stream_callback, ServerStreamCallback}
+  StreamOpts = [ {stream_callback, ServerStreamCallback},
+                 {disable_fpbuffer, true}
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),

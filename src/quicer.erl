@@ -90,6 +90,13 @@
 %% helpers
 -export([ %% Stream flags tester
           is_unidirectional/1
+          %% Future Packets Buffering
+        , quic_data/1
+        , merge_quic_datalist/1
+        , new_fpbuffer/0
+        , new_fpbuffer/1
+        , update_fpbuffer/2
+        , defrag_fpbuffer/2
         ]).
 %% Exports for test
 -export([ get_conn_rid/1
@@ -935,7 +942,52 @@ perf_counters() ->
       Error
   end.
 
+%% @doc Convert quic data event to quic_data for fpbuffer
+-spec quic_data({quic, binary(), stream_handle(), recv_data_props()}) -> quic_data().
+quic_data({quic, Bin, _Handle, #{absolute_offset := Offset, len := Len,
+                                 flags := Flags }}) when is_binary(Bin) ->
+  #quic_data{offset = Offset, size = Len, bin = Bin, flags = Flags}.
+
+-spec merge_quic_datalist([quic_data()]) -> {iolist(), Size :: non_neg_integer(), Flag :: integer()}.
+merge_quic_datalist(QuicDataList) ->
+    lists:foldr(fun(#quic_data{bin = B, size = Size, flags = Flags}, {Acc, TotalSize, AFlags}) ->
+                  {[B | Acc], Size + TotalSize, AFlags bor Flags}
+                end, {[], 0, 0}, QuicDataList).
+
+-spec new_fpbuffer() -> fpbuffer().
+new_fpbuffer() ->
+  new_fpbuffer(0).
+new_fpbuffer(StartOffset) ->
+  #{next_offset => StartOffset, buffer => ordsets:new()}.
+
+%% @doc update fpbuffer and return *next* continuous data.
+-spec update_fpbuffer(quic_data(), fpbuffer()) -> {list(quic_data()), NewBuff :: fpbuffer()}.
+update_fpbuffer(#quic_data{offset = Offset, size = Size} = Data, #{next_offset := Offset, buffer := []} = This) ->
+  %% Fast Path:. Offset is expected offset and buffer is empty.
+  {[Data], This#{next_offset := Offset + Size}};
+update_fpbuffer(#quic_data{} = Data, #{next_offset := NextOffset, buffer := Buffer} = This) ->
+  Buffer1 = ordsets:add_element(ifrag(Data), Buffer),
+  {NewOffset, NewBuffer, NewData} = defrag_fpbuffer(NextOffset, Buffer1),
+  {NewData, This#{next_offset := NewOffset, buffer := NewBuffer}}.
+
+%% @doc Pop out continuous data from the buffer start from the offset.
+-spec defrag_fpbuffer(Offset :: non_neg_integer(), quic_data_buffer()) ->
+    {NewOffset :: non_neg_integer(), NewBuffer :: quic_data_buffer(), Res :: [quic_data()]}.
+defrag_fpbuffer(Offset, Buffer) ->
+    defrag_fpbuffer(Offset, Buffer, []).
+defrag_fpbuffer(Offset, [{Offset, Data} | T], Res) ->
+    defrag_fpbuffer(Offset + Data#quic_data.size, T, [Data | Res]);
+defrag_fpbuffer(Offset, [], Res) ->
+    {Offset, [], lists:reverse(Res)};
+defrag_fpbuffer(Offset, [{HeadOffset, _Data} | _T] = Buffer, Res) when HeadOffset >= Offset ->
+    % Nomatch
+    {Offset, Buffer, lists:reverse(Res)}.
+
 %%% Internal helpers
+-spec ifrag(quic_data()) -> ifrag().
+ifrag(#quic_data{offset = Offset} = Data) ->
+    {Offset, Data}.
+
 stats_map(recv_cnt) ->
   "Recv.TotalPackets";
 stats_map(recv_oct) ->
@@ -983,6 +1035,110 @@ flush(QuicEventName, Handle) when is_atom(QuicEventName) ->
     {quic, QuicEventName, Handle, _} -> ok
   %% Event must come, do not timeout
   end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+update_fpbuffer_test_() ->
+  Frag0 = #quic_data{offset = 0, size = 1, bin = <<1>>},
+  Frag1 = #quic_data{offset = 1, size = 2, bin = <<2, 3>>},
+  Frag3 = #quic_data{offset = 3, size = 3, bin = <<4, 5, 6>>},
+  Frag6 = #quic_data{offset = 6, size = 6, bin = <<7, 8, 9, 10, 11, 12>>},
+  FPBuffer1 = #{next_offset => 0, buffer => []},
+  FPBuffer1_3 = #{next_offset => 0, buffer => [ifrag(Frag1)]},
+  FPBuffer1_3_6 = #{next_offset => 0, buffer => [ifrag(Frag1), ifrag(Frag3), ifrag(Frag6)]},
+  FPBuffer1_6 = #{next_offset => 0, buffer => [ifrag(Frag1), ifrag(Frag6)]},
+  FPBuffer2 = #{next_offset => 1, buffer => []},
+  FPBuffer3 = #{next_offset => 3, buffer => []},
+  FPBuffer6 = #{next_offset => 3, buffer => [ifrag(Frag6)]},
+  FPBufferEnd = #{next_offset => 12, buffer => []},
+  [ ?_assertEqual({[Frag0], FPBuffer2}, update_fpbuffer(Frag0, FPBuffer1))
+  , ?_assertEqual({[Frag1], FPBuffer3}, update_fpbuffer(Frag1, FPBuffer2))
+  , ?_assertEqual({[], FPBuffer1_3}, update_fpbuffer(Frag1, FPBuffer1))
+  , ?_assertEqual(FPBuffer1_3_6, lists:foldl(fun(Frag, Acc) ->
+                                                 {[], NewAcc} = update_fpbuffer(Frag, Acc),
+                                                 NewAcc
+                                             end,
+                                             FPBuffer1,
+                                             [Frag1, Frag3, Frag6]
+                                            ))
+  , ?_assertEqual(FPBuffer1_3_6, lists:foldl(fun(Frag, Acc) ->
+                                                 {[], NewAcc} = update_fpbuffer(Frag, Acc),
+                                                 NewAcc
+                                             end,
+                                             FPBuffer1,
+                                             [Frag6, Frag3, Frag1]
+                                            ))
+  , ?_assertEqual({[Frag0, Frag1, Frag3, Frag6], FPBufferEnd}, update_fpbuffer(Frag0, FPBuffer1_3_6))
+  , ?_assertEqual({[Frag0, Frag1], FPBuffer6}, update_fpbuffer(Frag0, FPBuffer1_6))
+  ].
+
+defrag_fpbuffer_test_() ->
+    Frag0 = #quic_data{offset = 0, size = 1, bin = <<1>>},
+    Frag1 = #quic_data{offset = 1, size = 2, bin = <<2, 3>>},
+    Frag3 = #quic_data{offset = 3, size = 3, bin = <<4, 5, 6>>},
+    Frag6 = #quic_data{offset = 6, size = 6, bin = <<7, 8, 9, 10, 11, 12>>},
+
+    Buffer1 = orddict:from_list([ifrag(Frag0)]),
+    Buffer2 = orddict:from_list([ifrag(Frag0), ifrag(Frag3)]),
+    Buffer3 = orddict:from_list([ifrag(Frag0), ifrag(Frag3), ifrag(Frag6)]),
+    Buffer4 = orddict:from_list([ifrag(Frag0), ifrag(Frag1), ifrag(Frag6)]),
+    Buffer5 = orddict:from_list([ifrag(Frag1), ifrag(Frag0), ifrag(Frag6), ifrag(Frag3)]),
+    Buffer6 = orddict:from_list([ifrag(Frag1), ifrag(Frag6), ifrag(Frag3)]),
+    Buffer7 = orddict:from_list([ifrag(Frag1), ifrag(Frag6)]),
+    [
+        ?_assertEqual(
+            {1, [], [Frag0]},
+            defrag_fpbuffer(0, Buffer1)
+        ),
+        ?_assertEqual(
+            {1, [ifrag(Frag3)], [Frag0]},
+            defrag_fpbuffer(0, Buffer2)
+        ),
+        ?_assertEqual(
+            {1, [ifrag(Frag3), ifrag(Frag6)], [Frag0]},
+            defrag_fpbuffer(0, Buffer3)
+        ),
+        ?_assertEqual(
+            {3, [ifrag(Frag6)], [Frag0, Frag1]},
+            defrag_fpbuffer(0, Buffer4)
+        ),
+        ?_assertEqual(
+            {12, [], [Frag0, Frag1, Frag3, Frag6]},
+            defrag_fpbuffer(0, Buffer5)
+        ),
+        ?_assertEqual(
+            {0, Buffer6, []},
+            defrag_fpbuffer(0, Buffer6)
+        ),
+        ?_assertEqual(
+            {12, [], [Frag1, Frag3, Frag6]},
+            defrag_fpbuffer(1, Buffer6)
+        ),
+        ?_assertEqual(
+            {3, [ifrag(Frag6)], [Frag1]},
+            defrag_fpbuffer(1, Buffer7)
+        )
+    ].
+
+merge_quic_datalist_test_() ->
+  Frag0 = #quic_data{offset = 0, size = 1, flags = ?QUIC_RECEIVE_FLAG_0_RTT, bin = <<1>>},
+  Frag1 = #quic_data{offset = 1, size = 2, bin = <<2, 3>>},
+  Frag3 = #quic_data{offset = 3, size = 3, bin = <<4, 5, 6>>},
+  Frag6 = #quic_data{offset = 6, size = 6, flags = ?QUIC_RECEIVE_FLAG_FIN, bin = <<7, 8, 9, 10, 11, 12>>},
+  [ ?_assertEqual({[], 0, 0}, merge_quic_datalist([]))
+  , ?_assertEqual({[<<1>>], 1, ?QUIC_RECEIVE_FLAG_0_RTT}, merge_quic_datalist([Frag0]))
+  , ?_assertEqual({[<<1>>, <<2, 3>>], 3, ?QUIC_RECEIVE_FLAG_0_RTT}, merge_quic_datalist([Frag0, Frag1]))
+  , ?_assertEqual({[<<2,3>>, <<4, 5, 6>>], 5, 0}, merge_quic_datalist([Frag1, Frag3]))
+  , ?_assertEqual({[<<7, 8, 9, 10, 11, 12>>], 6, ?QUIC_RECEIVE_FLAG_FIN}, merge_quic_datalist([Frag6]))
+  , ?_assertEqual({[<<2,3>>, <<4, 5, 6>>, <<7, 8, 9, 10, 11, 12>>], 11, ?QUIC_RECEIVE_FLAG_FIN},
+                  merge_quic_datalist([Frag1, Frag3, Frag6]))
+  , ?_assertEqual({[<<1>>, <<2,3>>, <<4, 5, 6>>, <<7, 8, 9, 10, 11, 12>>], 12, ?QUIC_RECEIVE_FLAG_FIN bor ?QUIC_RECEIVE_FLAG_0_RTT},
+                  merge_quic_datalist([Frag0, Frag1, Frag3, Frag6]))
+  ].
+% TEST
+-endif.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
