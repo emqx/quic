@@ -124,8 +124,9 @@
 -define(QUIC_RECEIVE_FLAG_FIN                   , 16#0002).
 
 -record(quic_data, {
-    offset :: non_neg_integer(),
-    size :: non_neg_integer(),
+    offset = 0 :: non_neg_integer(),
+    size = 0 :: non_neg_integer(),
+    flags = 0 :: integer(),
     bin :: binary()
 }).
 

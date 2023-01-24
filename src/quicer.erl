@@ -92,6 +92,7 @@
           is_unidirectional/1
           %% Future Packets Buffering
         , quic_data/1
+        , merge_quic_datalist/1
         , new_fpbuffer/0
         , new_fpbuffer/1
         , update_fpbuffer/2
@@ -943,9 +944,15 @@ perf_counters() ->
 
 %% @doc Convert quic data event to quic_data for fpbuffer
 -spec quic_data({quic, binary(), stream_handle(), recv_data_props()}) -> quic_data().
-quic_data({quic, Bin, _Handle, #{absolute_offset := Offset, len := Len}})
-          when is_binary(Bin) ->
-  #quic_data{offset = Offset, size = Len, bin = Bin}.
+quic_data({quic, Bin, _Handle, #{absolute_offset := Offset, len := Len,
+                                 flags := Flags }}) when is_binary(Bin) ->
+  #quic_data{offset = Offset, size = Len, bin = Bin, flags = Flags}.
+
+-spec merge_quic_datalist([quic_data()]) -> {iolist(), Size :: non_neg_integer(), Flag :: integer()}.
+merge_quic_datalist(QuicDataList) ->
+    lists:foldr(fun(#quic_data{bin = B, size = Size, flags = Flags}, {Acc, TotalSize, AFlags}) ->
+                  {[B | Acc], Size + TotalSize, AFlags bor Flags}
+                end, {[], 0, 0}, QuicDataList).
 
 -spec new_fpbuffer() -> fpbuffer().
 new_fpbuffer() ->
@@ -1115,6 +1122,21 @@ defrag_fpbuffer_test_() ->
         )
     ].
 
+merge_quic_datalist_test_() ->
+  Frag0 = #quic_data{offset = 0, size = 1, flags = ?QUIC_RECEIVE_FLAG_0_RTT, bin = <<1>>},
+  Frag1 = #quic_data{offset = 1, size = 2, bin = <<2, 3>>},
+  Frag3 = #quic_data{offset = 3, size = 3, bin = <<4, 5, 6>>},
+  Frag6 = #quic_data{offset = 6, size = 6, flags = ?QUIC_RECEIVE_FLAG_FIN, bin = <<7, 8, 9, 10, 11, 12>>},
+  [ ?_assertEqual({[], 0, 0}, merge_quic_datalist([]))
+  , ?_assertEqual({[<<1>>], 1, ?QUIC_RECEIVE_FLAG_0_RTT}, merge_quic_datalist([Frag0]))
+  , ?_assertEqual({[<<1>>, <<2, 3>>], 3, ?QUIC_RECEIVE_FLAG_0_RTT}, merge_quic_datalist([Frag0, Frag1]))
+  , ?_assertEqual({[<<2,3>>, <<4, 5, 6>>], 5, 0}, merge_quic_datalist([Frag1, Frag3]))
+  , ?_assertEqual({[<<7, 8, 9, 10, 11, 12>>], 6, ?QUIC_RECEIVE_FLAG_FIN}, merge_quic_datalist([Frag6]))
+  , ?_assertEqual({[<<2,3>>, <<4, 5, 6>>, <<7, 8, 9, 10, 11, 12>>], 11, ?QUIC_RECEIVE_FLAG_FIN},
+                  merge_quic_datalist([Frag1, Frag3, Frag6]))
+  , ?_assertEqual({[<<1>>, <<2,3>>, <<4, 5, 6>>, <<7, 8, 9, 10, 11, 12>>], 12, ?QUIC_RECEIVE_FLAG_FIN bor ?QUIC_RECEIVE_FLAG_0_RTT},
+                  merge_quic_datalist([Frag0, Frag1, Frag3, Frag6]))
+  ].
 % TEST
 -endif.
 

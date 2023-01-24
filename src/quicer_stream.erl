@@ -361,8 +361,11 @@ handle_info({quic, Bin, Stream, Props} = Evt,
         {[], NewBuffer} ->
             {noreply, State#{ fpbuffer := NewBuffer} };
         {DataList, NewBuffer} ->
-            AppData = iolist_to_binary(lists:map(fun(#quic_data{bin = B}) -> B end, DataList)),
-            default_cb_ret(M:handle_stream_data(Stream, AppData, Props#{len := byte_size(AppData)}, CallbackState),
+            {IoListData, NewSize, NewFlag} = quicer:merge_quic_datalist(DataList),
+            AppData = iolist_to_binary(IoListData),
+            default_cb_ret(M:handle_stream_data(Stream, AppData,
+                                                Props#{len := NewSize, flags := NewFlag},
+                                                CallbackState),
                            State#{fpbuffer := NewBuffer})
     end;
 handle_info({quic, start_completed, Stream,
