@@ -202,6 +202,31 @@ client(Conns, Streams, CNo, SNo) ->
              end, lists:seq(CNo, CNo+N-1)),
       client(CC ++ Conns, Streams, CNo+N, SNo);
 
+    {ok, p_connect} ->
+      %% Use controlling process
+      Self = self(),
+      _P = proc_lib:spawn_link(
+            fun() ->
+                case quicer:connect("localhost", Port, c_opts(), 5000) of
+                  {ok, Conn} ->
+                    ok = quicer:controlling_process(Conn, Self),
+                    timer:sleep(400),
+                    Self ! {connection, Conn};
+                  Err ->
+                    Self ! {connection_err, Err}
+                end
+            end),
+      receive
+        {connection, Conn} ->
+          io:format("Connection # ~p~n", [CNo]),
+          client([{Conn, CNo} | Conns], Streams, CNo+1, SNo);
+
+        {connection_err, Err} ->
+          io:format("Failed to connect ~p~n", [Err]),
+          client(Conns, Streams, CNo, SNo)
+      end;
+
+
     {ok, {connect_stream, N}} ->
       %% Create N connections, with a stream associated to each conn
       L = lists:map(
