@@ -1475,10 +1475,11 @@ handle_connection_event_peer_certificate_received(
   X509 *cert = (X509 *)Event->PEER_CERTIFICATE_RECEIVED.Certificate;
   X509_STORE_CTX *x509_ctx
       = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;
-  STACK_OF(X509) *untrusted = X509_STORE_CTX_get0_untrusted(x509_ctx);
 
   if (cert == NULL)
     return QUIC_STATUS_BAD_CERTIFICATE;
+
+  STACK_OF(X509) *untrusted = X509_STORE_CTX_get0_untrusted(x509_ctx);
 
   X509_STORE_CTX *ctx = X509_STORE_CTX_new();
   X509_STORE_CTX_init(ctx, c_ctx->trusted, cert, untrusted);
