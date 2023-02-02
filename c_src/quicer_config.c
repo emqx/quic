@@ -376,9 +376,9 @@ load_verify(ErlNifEnv *env, const ERL_NIF_TERM *options, bool default_verify)
   if (!enif_get_map_value(env, *options, ATOM_VERIFY, &verify_atom))
     return default_verify;
 
-  if (verify_atom == ATOM_PEER)
+  if (verify_atom == ATOM_PEER || verify_atom == ATOM_VERIFY_PEER)
     return true;
-  else if (verify_atom == ATOM_NONE)
+  else if (verify_atom == ATOM_NONE || verify_atom == ATOM_VERIFY_NONE)
     return false;
   else
     return default_verify;

@@ -76,7 +76,7 @@
 -type listen_security_opts() :: #{ alpn := [alpn()]
                                  , cert := file:filename()
                                  , key := file:filename()
-                                 , verify => none | peer
+                                 , verify => none | peer | verify_peer | verify_none
                                  , cacertfile => filelib:filename()
                                  , password => string()
                                  , sslkeylogfile => filelib:filename()
