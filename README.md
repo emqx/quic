@@ -67,8 +67,8 @@ make
 ``` erlang
 application:ensure_all_started(quicer),
 Port = 4567,
-LOptions = [ {cert, "cert.pem"}
-           , {key,  "key.pem"}
+LOptions = [ {certfile, "cert.pem"}
+           , {keyfile,  "key.pem"}
            , {alpn, ["sample"]}
            , {peer_bidi_stream_count, 1}
              ],

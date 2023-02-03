@@ -225,8 +225,10 @@ ClientLoadConfiguration(ErlNifEnv *env,
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
 
-  if (get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1)
-      && get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1))
+  if ((get_str_from_map(env, ATOM_CERTFILE, options, cert_path, PATH_MAX + 1)
+       || get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1))
+      && (get_str_from_map(env, ATOM_KEYFILE, options, key_path, PATH_MAX + 1)
+          || get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1)))
     {
       if (get_str_from_map(env, ATOM_PASSWORD, options, password, 256))
         {
@@ -376,9 +378,9 @@ load_verify(ErlNifEnv *env, const ERL_NIF_TERM *options, bool default_verify)
   if (!enif_get_map_value(env, *options, ATOM_VERIFY, &verify_atom))
     return default_verify;
 
-  if (verify_atom == ATOM_PEER)
+  if (verify_atom == ATOM_PEER || verify_atom == ATOM_VERIFY_PEER)
     return true;
-  else if (verify_atom == ATOM_NONE)
+  else if (verify_atom == ATOM_NONE || verify_atom == ATOM_VERIFY_NONE)
     return false;
   else
     return default_verify;

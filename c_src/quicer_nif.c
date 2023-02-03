@@ -129,7 +129,9 @@ ERL_NIF_TERM ATOM_QUIC_STATUS_CERT_UNOBTAINABLE;
 
 // option keys
 ERL_NIF_TERM ATOM_CERT;
+ERL_NIF_TERM ATOM_CERTFILE;
 ERL_NIF_TERM ATOM_KEY;
+ERL_NIF_TERM ATOM_KEYFILE;
 ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
 ERL_NIF_TERM ATOM_HANDLE;
@@ -604,7 +606,9 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_STREAM_OPTS_START_FLAG, start_flag)                          \
   /*                  QUIC_STREAM_OPTS end                        */          \
   ATOM(ATOM_CERT, cert);                                                      \
+  ATOM(ATOM_CERTFILE, certfile);                                              \
   ATOM(ATOM_KEY, key);                                                        \
+  ATOM(ATOM_KEYFILE, keyfile);                                                \
   ATOM(ATOM_PASSWORD, password);                                              \
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_HANDLE, handle);                                                  \
