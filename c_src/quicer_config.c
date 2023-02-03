@@ -225,8 +225,10 @@ ClientLoadConfiguration(ErlNifEnv *env,
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
 
-  if (get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1)
-      && get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1))
+  if ((get_str_from_map(env, ATOM_CERTFILE, options, cert_path, PATH_MAX + 1)
+       || get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1))
+      && (get_str_from_map(env, ATOM_KEYFILE, options, key_path, PATH_MAX + 1)
+          || get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1)))
     {
       if (get_str_from_map(env, ATOM_PASSWORD, options, password, 256))
         {

@@ -75,7 +75,9 @@
 -type listen_opts() :: listen_security_opts() | quic_settings().
 -type listen_security_opts() :: #{ alpn := [alpn()]
                                  , cert := file:filename()
+                                 , certfile := file:filename()
                                  , key := file:filename()
+                                 , keyfile := file:filename()
                                  , verify => none | peer | verify_peer | verify_none
                                  , cacertfile => filelib:filename()
                                  , password => string()
@@ -132,7 +134,9 @@
 -type conn_opts() :: quic_settings() |  #{ alpn := [string()]
                                          , conn_callback => module()
                                          , cert => filelib:filename()
+                                         , certfile => filelib:filename()
                                          , key => filelib:filename()
+                                         , keyfile => filelib:filename()
                                          , password => string()
                                          , verify => none | peer
                                          , handle => connection_handle() %% get NST from last connection, for reconnect.

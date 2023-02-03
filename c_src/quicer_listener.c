@@ -299,12 +299,18 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   char key_path[PATH_MAX + 1] = { 0 };
   ERL_NIF_TERM tmp_term;
 
-  if (get_str_from_map(env, ATOM_CERT, &options, cert_path, PATH_MAX + 1) <= 0)
+  if (get_str_from_map(env, ATOM_CERTFILE, &options, cert_path, PATH_MAX + 1)
+          <= 0
+      && get_str_from_map(env, ATOM_CERT, &options, cert_path, PATH_MAX + 1)
+             <= 0)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (get_str_from_map(env, ATOM_KEY, &options, key_path, PATH_MAX + 1) <= 0)
+  if (get_str_from_map(env, ATOM_KEYFILE, &options, key_path, PATH_MAX + 1)
+          <= 0
+      && get_str_from_map(env, ATOM_KEY, &options, key_path, PATH_MAX + 1)
+             <= 0)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }

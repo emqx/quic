@@ -2026,8 +2026,8 @@ default_conn_opts() ->
 
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
-  [ {cert, filename:join(DataDir, "server.pem")}
-  , {key,  filename:join(DataDir, "server.key")}
+  [ {certfile, filename:join(DataDir, "server.pem")}
+  , {keyfile,  filename:join(DataDir, "server.key")}
   , {alpn, ["sample"]}
   , {verify, none}
   , {idle_timeout_ms, 10000}

@@ -2916,8 +2916,8 @@ default_conn_opts_bad_client_cert(Config, Ca) ->
 default_listen_opts(Config) ->
   DataDir = ?config(data_dir, Config),
   [ {verify, none}
-  , {cert, filename:join(DataDir, "server.pem")}
-  , {key,  filename:join(DataDir, "server.key")}
+  , {certfile, filename:join(DataDir, "server.pem")}
+  , {keyfile,  filename:join(DataDir, "server.key")}
   , {alpn, ["sample"]}
   , {idle_timeout_ms, 10000}
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT

@@ -1464,9 +1464,8 @@ handle_connection_event_resumption_ticket_received(
 }
 
 static QUIC_STATUS
-handle_connection_event_peer_certificate_received(
-    QuicerConnCTX *c_ctx,
-    QUIC_CONNECTION_EVENT *Event)
+handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
+                                                  QUIC_CONNECTION_EVENT *Event)
 {
   // @TODO peer_certificate_received
   // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
