@@ -83,6 +83,7 @@ jobs:
           - debian11
           - debian10
           - debian9
+          - amzn2
           - el7
           - el8
           - el9
