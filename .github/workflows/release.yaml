@@ -16,7 +16,6 @@ jobs:
         os:
           - macos-12
           - macos-11
-          - macos-10.15
     runs-on: ${{ matrix.os }}
     steps:
       - name: prepare
@@ -54,7 +53,7 @@ jobs:
           . $HOME/.kerl/${{ matrix.otp }}/activate
           BUILD_RELEASE=1 make
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           name: packages
@@ -67,7 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         builder:
-          - 5.0-28
+          - 5.0-29
         otp:
           - 25.1.2-2
           - 24.3.4.2-2
@@ -84,8 +83,10 @@ jobs:
           - debian11
           - debian10
           - debian9
+          - amzn2
           - el7
           - el8
+          - el9
           - alpine3.15.1
     runs-on: ubuntu-latest
 
@@ -111,7 +112,7 @@ jobs:
           IMAGE=ghcr.io/emqx/emqx-builder/${{ matrix.builder }}:${{ matrix.elixir }}-${{ matrix.otp }}-${{ matrix.os }}
           docker run -i --rm -v $(pwd):/wd --workdir /wd --platform=linux/${{ matrix.arch }} -e BUILD_RELEASE=1 $IMAGE bash -euc 'git config --global --add safe.directory /wd; make'
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           name: packages
