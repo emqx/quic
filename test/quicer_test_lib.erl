@@ -20,6 +20,7 @@
 
 -export([gen_ca/2,
          gen_host_cert/3,
+         gen_host_cert/4,
          receive_all/0
         ]).
 
@@ -43,21 +44,30 @@ ca_key_name(Path, Name) ->
   filename(Path, "~s.key", [Name]).
 
 gen_host_cert(H, CaName, Path) ->
+  gen_host_cert(H, CaName, Path, #{}).
+
+gen_host_cert(H, CaName, Path, Opts) ->
   ECKeyFile = filename(Path, "~s-ec.key", [CaName]),
   CN = str(H),
   HKey = filename(Path, "~s.key", [H]),
   HCSR = filename(Path, "~s.csr", [H]),
   HPEM = filename(Path, "~s.pem", [H]),
   HEXT = filename(Path, "~s.extfile", [H]),
+  PasswordArg = case maps:get(password, Opts, undefined) of
+               undefined ->
+                 " -nodes ";
+               Password ->
+                 io_lib:format(" -passout pass:'~s' ", [Password])
+             end,
   CSR_Cmd =
     lists:flatten(
       io_lib:format(
-        "openssl req -new -nodes -newkey ec:~s "
+        "openssl req -new ~s -newkey ec:~s "
         "-keyout ~s -out ~s "
         "-addext \"subjectAltName=DNS:~s\" "
         "-addext keyUsage=digitalSignature,keyAgreement "
         "-subj \"/C=SE/O=Internet Widgits Pty Ltd/CN=~s\"",
-        [ECKeyFile, HKey, HCSR, CN, CN])),
+        [PasswordArg, ECKeyFile, HKey, HCSR, CN, CN])),
   create_file(HEXT,
               "keyUsage=digitalSignature,keyAgreement\n"
               "subjectAltName=DNS:~s\n", [CN]),

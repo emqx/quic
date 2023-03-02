@@ -41,6 +41,8 @@
         , tc_lib_re_registration/1
         , tc_lib_registration_neg/1
         , tc_open_listener/1
+        , tc_open_listener_with_cert_password/1
+        , tc_open_listener_with_wrong_cert_password/1
         , tc_open_listener_bind/1
         , tc_open_listener_bind_v6/1
         , tc_open_listener_neg_1/1
@@ -162,6 +164,8 @@
 
 -define(PROPTEST(M,F), true = proper:quickcheck(M:F())).
 
+-define(SERVER_KEY_PASSWORD, "sErve7r8Key$!").
+
 all() ->
   lists:filtermap(
     fun({Fun, _A}) ->
@@ -194,6 +198,7 @@ init_per_suite(Config) ->
   _ = quicer_test_lib:gen_host_cert("client", "ca", DataDir),
   _ = quicer_test_lib:gen_ca(DataDir, "other-ca"),
   _ = quicer_test_lib:gen_host_cert("other-client", "other-ca", DataDir),
+  _ = quicer_test_lib:gen_host_cert("server-password", "ca", DataDir, #{password => ?SERVER_KEY_PASSWORD}),
   application:ensure_all_started(quicer),
   Config.
 
@@ -329,6 +334,26 @@ tc_open_listener(Config) ->
   {ok, P} = gen_udp:open(Port),
   ok = gen_udp:close(P),
   ok.
+
+tc_open_listener_with_cert_password(Config) ->
+  Port = select_port(),
+  DataDir = ?config(data_dir, Config),
+  PasswordCerts = [ {certfile, filename:join(DataDir, "server-password.pem")}
+                  , {keyfile,  filename:join(DataDir, "server-password.key")}
+                  , {password, ?SERVER_KEY_PASSWORD}
+                  ],
+  {ok, _L} = quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config)),
+  ok.
+
+tc_open_listener_with_wrong_cert_password(Config) ->
+  Port = select_port(),
+  DataDir = ?config(data_dir, Config),
+  PasswordCerts = [ {certfile, filename:join(DataDir, "server-password.pem")}
+                  , {keyfile,  filename:join(DataDir, "server-password.key")}
+                  , {password, "123"}
+                  ],
+  ?assertMatch( {error, config_error, tls_error}
+              , quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config))).
 
 tc_open_listener_bind(Config) ->
   ListenOn = "127.0.0.1:4567",
