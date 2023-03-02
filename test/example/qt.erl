@@ -1,7 +1,7 @@
 -module(qt).
 
 -export([s/0, c/0]).
--export([check_processes/0, certs/0]).
+-export([check_processes/0, certs/0, perf/3]).
 
 -include("../../include/quicer.hrl").
 
@@ -122,6 +122,13 @@ recv_ping(S, N, CNo, SNo) ->
       io:format("Setting active 20\n",[]),
       ok = quicer:setopt(S, active, 20),
       recv_ping(S, N, CNo, SNo);
+
+    {quic, <<"perf", SZ:32, NN:32>>, S, _} ->
+      ok = quicer:setopt(S, active, false),
+      {ok, 2} = quicer:send(S, <<"ok">>),
+      perf_loop(S, SZ, NN),
+      recv_ping(S, N, CNo, SNo);
+
     {quic, <<"ping">>, S,_} ->
       io:format("Got ping ~p from ~p:~p\n",[N, CNo, SNo]),
       {ok, 4} = quicer:send(S, <<"pong">>),
@@ -138,6 +145,15 @@ recv_ping(S, N, CNo, SNo) ->
       quicer:async_close_stream(S),
       closed
   end.
+
+
+perf_loop(_, _, 0) ->
+  ok;
+perf_loop(S, Sz, N) ->
+  {ok, Bin} = quicer:recv(S, Sz),
+  {ok, Sz} = quicer:send(S, Bin),
+  perf_loop(S, Sz, N-1).
+
 
 send_ping(0, _) ->
   ok;
@@ -236,7 +252,7 @@ client(Conns, Streams, CNo, SNo) ->
                 {ok, Stm} = quicer:start_stream(Conn, #{active => 30}),
                 ok = client_negotiate(Stm, NN, NN),
                 io:format("Stream ~p~n", [NN]),
-                {Conn, Stm}
+                {{Conn, NN} ,{Stm, NN, NN}}
             end, lists:seq(CNo, CNo+N-1)),
       NewConns = [element(1, C) || C <- L],
       NewStreams = [element(2, C) || C <- L],
@@ -345,6 +361,17 @@ client(Conns, Streams, CNo, SNo) ->
                  end
              end, lists:seq(SNo, SNo+ NN-1)),
       client(Conns, S2 ++ Streams, CNo, NN+SNo);
+
+    {ok, {perf, NumPacks, PackSz}} ->
+      %% create a connection + stream, and measure speed
+      %% sending NumPacks, of size PackSz
+      {ok, Conn} = quicer:connect("localhost", Port, c_opts(), 10000),
+      {ok, Stm} = quicer:start_stream(Conn, #{active => 30}),
+      ok = client_negotiate(Stm, 1, 1),
+      ok = quicer:setopt(Stm, active, false),
+      {T, ok} = timer:tc(qt, perf, [Stm, NumPacks, pack(PackSz)]),
+      io:format("T = ~p milli~n", [T div 1000]),
+      client(Conns, Streams, CNo, SNo);
 
 
     {ok, {close_connection, CNumber}} ->
@@ -456,6 +483,28 @@ check_processes() ->
       {error, lists:flatten(io_lib:format("~p~n", [Bad]))}
   end.
 
+
+perf(S, N, Packet) ->
+  Sz = size(Packet),
+  {ok, 12} = quicer:send(S, <<"perf", Sz:32, N:32>>),
+  {ok, <<"ok">>} = quicer:recv(S, 2),
+  perf2(S, N, Sz, Packet).
+
+perf2(_S, 0, _, _) ->
+  ok;
+perf2(S, N, Sz, Packet) ->
+  {ok, Sz} = quicer:send(S, Packet),
+  {ok, Bin} = quicer:recv(S, Sz),
+  Sz = size(Bin),
+  perf2(S, N-1, Sz, Packet).
+
+
+
+pack(N) ->
+  list_to_binary(
+    lists:map(fun(_) ->
+                  18
+              end, lists:seq(1, N))).
 
 certs() ->
   DataDir = ".",
