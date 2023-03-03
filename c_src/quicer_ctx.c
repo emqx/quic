@@ -31,6 +31,7 @@ init_l_ctx()
   l_ctx->env = enif_alloc_env();
   l_ctx->config_resource
       = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
+  CxPlatZeroMemory(l_ctx->config_resource, sizeof(QuicerConfigCTX));
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
   l_ctx->cacertfile = NULL;
