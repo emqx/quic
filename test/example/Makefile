@@ -19,5 +19,9 @@ server:
 client:
 	erl -sname c -pa ../../_build/default/lib/quicer/ebin
 
+ssl_server:
+	erl -sname s -pa ../../_build/default/lib/quicer/ebin -s qt_ssl s
+
+
 rev:
 	erl -pa ../../_build/default/lib/quicer/ebin -s rev

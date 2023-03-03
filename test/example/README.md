@@ -45,6 +45,10 @@ ok
 Also, it's interesting is to experiment with various variants of CTL-Z and
 CTL-C on both the server and the client.
 
+Furthermore, there is an almost identical variant called qt_ssl.erl that can
+be used to perform comaparisions between quic and SSL. Both speed and memory
+consumption tests can be performed. Spoiler, quic is both smaller and faster
+than OTP SSL.
 
 ## Example 2, rev.erl
 
