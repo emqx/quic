@@ -31,6 +31,12 @@
 
 -define(INTERVAL, 3000).
 
+%% Uncomment iof when running longrun() in order to be able
+%% to use the shell and inspect the system
+-define(iof(F, A), ok).
+-define(iof(F,A), io:format(standard_error, "~s:~p: " ++ F,
+                             [?MODULE,?LINE|A])).
+
 
 start() ->
   application:ensure_all_started(quicer),
@@ -46,9 +52,10 @@ d_test(N) ->
   L = lists:seq(1, N),
   Streams = [get_down_stream() || _N <- L],
   [ok= send_ping(5, S)|| S <- Streams],
-  io:format("Closing streams \n",[]),
+  ?iof("Closing streams \n",[]),
   [ok = quicer:close_stream(S) || S <- Streams],
-  io:format("Streams closed \n",[]).
+  ?iof("Streams closed \n",[]),
+  q_flush().
 
 
 u_test_run() ->
@@ -57,10 +64,18 @@ u_test(N) ->
   L = lists:seq(1, N),
   Streams = [get_up_stream() || _N <- L],
   [ok = send_ping(5, U) || U <- Streams],
-  io:format("Closing streams \n",[]),
+  ?iof("Closing streams \n",[]),
   [ok = quicer:close_stream(U) || U <- Streams],
-  io:format("Streams closed \n",[]).
+  ?iof("Streams closed \n",[]),
+  q_flush().
 
+q_flush() ->
+  receive
+    {quic, _,_,_} ->
+      q_flush()
+  after 10 ->
+      ok
+  end.
 
 send_and_close() ->
   S = get_down_stream(),
@@ -69,6 +84,13 @@ send_and_close() ->
   S2 = get_up_stream(),
   quicer:send(S2, <<"pelle ">>),
   quicer:async_close_stream(S2).
+
+
+%% Test that never ends, run and inspect memory manually
+longrun() ->
+  d_test(1000),
+  u_test(1000),
+  longrun().
 
 
 %% Top site code
@@ -104,17 +126,16 @@ top_loop2(Conn) ->
       ok = quicer:handoff_stream(Stream, H),
       top_loop(Conn);
     {From, get_down_stream} ->
-      io:format("Starting stream downwards \n",[]),
+      ?iof("Starting stream downwards \n",[]),
       {ok, Stream} =
         quicer:start_stream(
           Conn,
           #{active => false,
             start_flag => ?QUIC_STREAM_START_FLAG_IMMEDIATE}),
       quicer:handoff_stream(Stream, From),
-      From ! {top_site, Stream},
       top_loop2(Conn);
     {quic, closed, Conn, _} ->
-      io:format("Top conn closed \n",[]);
+      ?iof("Top conn closed \n",[]);
     {quic, streams_available, _, _} ->
       %% ignore
       top_loop2(Conn)
@@ -144,7 +165,7 @@ nat_site() ->
   Port = 4567,
   case quicer:connect("localhost", Port, c_opts(), 10000) of
     {ok, Conn} ->
-      io:format("Entering site loop Conn = ~p\n",[Conn]),
+      ?iof("Entering site loop Conn = ~p\n",[Conn]),
       site_loop(Conn);
     _Err ->
       timer:sleep(1000),
@@ -158,7 +179,7 @@ site_loop(Conn) ->
 site_loop2(Conn) ->
   receive
     {quic, new_stream, Stream, _} ->
-      io:format("New stream ~p~n", [Stream]),
+      ?iof("New stream ~p~n", [Stream]),
       P = proc_lib:spawn_link(fun() ->
                                   stream_handler0(Stream)
                               end),
@@ -172,7 +193,7 @@ site_loop2(Conn) ->
       ok = quicer:handoff_stream(UpStream, From),
       site_loop2(Conn);
     {quic, closed, Conn, _} ->
-      io:format("Conn closed \n",[]);
+      ?iof("Conn closed \n",[]);
     {quic, streams_available, _,_ } ->
       site_loop2(Conn)
   end.
@@ -191,34 +212,34 @@ get_up_stream() ->
 %%%
 
 stream_handler0(Stream) ->
-  io:format("Entering stream handler for ~p\n",[Stream]),
+  ?iof("Entering stream handler for ~p\n",[Stream]),
   receive
     {handoff_done, Stream, _} ->
       ok = quicer:setopt(Stream, active, 2),
       stream_handler(Stream, 0),
-      io:format("Leaving stream handler \n",[]),
+      ?iof("Leaving stream handler \n",[]),
       ok
   end.
 
 stream_handler(S, N) ->
   receive
     {quic, passive, S, _} ->
-      io:format("Setting active 2\n",[]),
+      ?iof("Setting active 2\n",[]),
       ok = quicer:setopt(S, active, 2),
       stream_handler(S, N);
     {quic, <<"ping">>, S,_} ->
-      io:format("Handler got ping ~p \n",[N]),
+      ?iof("Handler got ping ~p \n",[N]),
       {ok, 4} = quicer:send(S, <<"pong">>),
       stream_handler(S, N+1);
     {quic, Data, S, _} when is_binary(Data) ->
-      io:format("Handler got data ~p \n",[Data]),
+      ?iof("Handler got data ~p \n",[Data]),
       stream_handler(S, N);
     {quic, peer_send_shutdown, S, _} ->
-      io:format("Handler got peer send shutdown \n",[]),
+      ?iof("Handler got peer send shutdown \n",[]),
       quicer:async_shutdown_stream(S),
       closed;
     {quic, stream_closed, S, _X} ->
-      io:format("Handler got close stream \n",[]),
+      ?iof("Handler got close stream \n",[]),
       quicer:async_close_stream(S),
       closed
   end.
@@ -226,16 +247,16 @@ stream_handler(S, N) ->
 send_ping(0, _) ->
   ok;
 send_ping(N, S) ->
-  io:format("Sending ping \n",[]),
+  ?iof("Sending ping \n",[]),
   {ok, 4} = quicer:send(S, <<"ping">>),
   rec_pong(N, S).
 rec_pong(N, S) ->
   receive
     {quic, <<"pong">>, S,_} ->
-      io:format("Got pong ~p\n",[N]),
+      ?iof("Got pong ~p\n",[N]),
       send_ping(N-1, S);
     {quic, passive, S, _} ->
-      io:format("Setting active 2 \n",[]),
+      ?iof("Setting active 2 \n",[]),
       ok = quicer:setopt(S, active, 2),
       rec_pong(N, S);
     {quic, stream_closed, S, _} ->
