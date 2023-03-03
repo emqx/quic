@@ -33,7 +33,7 @@
 
 %% Uncomment iof when running longrun() in order to be able
 %% to use the shell and inspect the system
--define(iof(F, A), ok).
+% -define(iof(F, A), ok).
 -define(iof(F,A), io:format(standard_error, "~s:~p: " ++ F,
                              [?MODULE,?LINE|A])).
 
