@@ -47,6 +47,7 @@
         , tc_open_listener_bind_v6/1
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
+        , tc_open_listener_inval_parm/1
         , tc_close_listener/1
         , tc_get_listeners/1
         , tc_get_listener/1
@@ -311,6 +312,12 @@ tc_open_listener_neg_2(Config) ->
   {error, badarg} = quicer:listen("localhost:4567", default_listen_opts(Config)),
   %% following test should fail, but msquic has some hack to let it pass, ref: MsQuicListenerStart in msquic listener.c
   %% {error, badarg} = quicer:listen("8.8.8.8:4567", default_listen_opts(Config)),
+  ok.
+
+tc_open_listener_inval_parm(Config) ->
+  ?assertEqual({error, config_error, invalid_parameter},
+               quicer:listen(4567, [{stream_recv_buffer_default, 1024} % too small
+                                   | default_listen_opts(Config)])),
   ok.
 
 tc_lib_re_registration(_Config) ->
