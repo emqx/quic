@@ -419,6 +419,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           Status = MsQuic->ListenerOpen(
               GRegistration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
     {
+      l_ctx->config_resource->Configuration = NULL;
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
     }
