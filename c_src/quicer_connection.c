@@ -706,7 +706,7 @@ async_connect3(ErlNifEnv *env,
                       port)))
     {
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
-      enif_release_resource(c_ctx->config_resource);
+      TP_NIF_3(start_fail, (uintptr_t)(c_ctx->Connection), Status);
       goto Error;
     }
   c_ctx->is_closed = FALSE; // connection started
