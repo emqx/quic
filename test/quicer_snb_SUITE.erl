@@ -44,6 +44,7 @@
           tc_conn_resume_nst_async/1,
           tc_conn_resume_nst_with_data/1,
           tc_listener_no_acceptor/1,
+          tc_listener_inval_local_addr/1,
           tc_conn_stop_notify_acceptor/1,
           tc_accept_stream_active_once/1,
           tc_accept_stream_active_N/1,
@@ -183,6 +184,7 @@ all() ->
   , tc_conn_resume_nst_with_data
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
+  , tc_listener_inval_local_addr
   , tc_conn_stop_notify_acceptor
   , tc_accept_stream_active_once
   , tc_accept_stream_active_N
@@ -1384,6 +1386,31 @@ tc_listener_no_acceptor(Config) ->
                                       Trace))
                end),
   ok.
+
+%% @doc this triggers listener start fail
+tc_listener_inval_local_addr(Config) ->
+  BadPort = 1,
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 Res = quicer:listen(BadPort, default_listen_opts(Config)),
+                 ?block_until(#{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "resource_config_dealloc_callback"
+                               , tag := "end"}, 1000, 1000),
+                 Res
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch({error,listener_start_error,
+                                 {unknown_quic_status, _}}, Result),
+                   ?assertMatch([#{ context := "nif"
+                                  , function := "listen2"
+                                  , tag := "start_fail"
+                                  }],
+                                lists:filter(fun(Event) ->
+                                                 "nif" == maps:get(context, Event, undefined)
+                                             end, Trace))
+               end).
 
 tc_conn_stop_notify_acceptor(Config) ->
   Port = select_port(),

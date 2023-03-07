@@ -447,6 +447,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           Status = MsQuic->ListenerStart(
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
+      TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
@@ -473,6 +474,7 @@ close_listener1(ErlNifEnv *env,
 
   // It is safe to close it without holding the lock
   // This also ensures no ongoing listener callbacks
+  // This is a blocking call. @TODO have async version or use dirty scheduler
   MsQuic->ListenerClose(l);
 
   return ATOM_OK;
