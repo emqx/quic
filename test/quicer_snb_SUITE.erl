@@ -45,6 +45,7 @@
           tc_conn_resume_nst_with_data/1,
           tc_listener_no_acceptor/1,
           tc_listener_inval_local_addr/1,
+          tc_conn_start_inval_port/1,
           tc_conn_stop_notify_acceptor/1,
           tc_accept_stream_active_once/1,
           tc_accept_stream_active_N/1,
@@ -185,6 +186,7 @@ all() ->
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
   , tc_listener_inval_local_addr
+  , tc_conn_start_inval_port
   , tc_conn_stop_notify_acceptor
   , tc_accept_stream_active_once
   , tc_accept_stream_active_N
@@ -1401,10 +1403,40 @@ tc_listener_inval_local_addr(Config) ->
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertMatch({error,listener_start_error,
+                   ?assertMatch({error, listener_start_error,
                                  {unknown_quic_status, _}}, Result),
                    ?assertMatch([#{ context := "nif"
                                   , function := "listen2"
+                                  , tag := "start_fail"
+                                  }],
+                                lists:filter(fun(Event) ->
+                                                 "nif" == maps:get(context, Event, undefined)
+                                             end, Trace))
+               end).
+
+tc_conn_start_inval_port(_Config) ->
+  application:ensure_all_started(quicer),
+  BadPort = 65536,
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 Res = quicer:connect("localhost", BadPort, default_conn_opts(), infinity),
+                 receive
+                   {quic, closed, _, _} = Msg->
+                     ct:fail("shall not recv msg for failed connection  ~p", [Msg])
+                   after 100 ->
+                       ok
+                 end,
+                 ?block_until(#{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "resource_config_dealloc_callback"
+                               , tag := "end"}, 1000, 1000),
+                 Res
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch({error, conn_start_error}, Result),
+                   ?assertMatch([#{ context := "nif"
+                                  , function := "async_connect3"
                                   , tag := "start_fail"
                                   }],
                                 lists:filter(fun(Event) ->
