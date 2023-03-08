@@ -600,6 +600,10 @@ async_connect3(ErlNifEnv *env,
           goto Error;
         }
     }
+
+  assert(c_ctx->is_closed);
+  c_ctx->is_closed = FALSE; // connection opened.
+
   ERL_NIF_TERM essl_keylogfile;
   if (enif_get_map_value(
           env, eoptions, ATOM_SSL_KEYLOGFILE_NAME, &essl_keylogfile))
@@ -698,6 +702,7 @@ async_connect3(ErlNifEnv *env,
   // @TODO client async_connect_3 should able to take a config_resource as
   // input ERL TERM so that we don't need to call ClientLoadConfiguration
   //
+  assert(!c_ctx->is_closed);
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
                       c_ctx->Connection,
                       c_ctx->config_resource->Configuration,
@@ -709,7 +714,6 @@ async_connect3(ErlNifEnv *env,
       TP_NIF_3(start_fail, (uintptr_t)(c_ctx->Connection), Status);
       goto Error;
     }
-  c_ctx->is_closed = FALSE; // connection started
   eHandle = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandle);
