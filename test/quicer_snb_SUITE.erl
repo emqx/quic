@@ -126,6 +126,12 @@ end_per_group(_GroupName, _Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
+init_per_testcase(tc_listener_inval_local_addr, Config) ->
+  case os:type() of
+    {unix, darwin} -> {skip, "Not runnable on MacOS"};
+    _ ->
+      Config
+  end;
 init_per_testcase(_TestCase, Config) ->
   Config.
 
