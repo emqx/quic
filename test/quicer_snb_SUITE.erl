@@ -1391,10 +1391,10 @@ tc_listener_no_acceptor(Config) ->
 
 %% @doc this triggers listener start fail
 tc_listener_inval_local_addr(Config) ->
-  BadPort = 1,
+  BadListenOn = "8.8.8.8:443",
   ?check_trace(#{timetrap => 10000},
                begin
-                 Res = quicer:listen(BadPort, default_listen_opts(Config)),
+                 Res = quicer:listen(BadListenOn, default_listen_opts(Config)),
                  ?block_until(#{ ?snk_kind := debug
                                , context := "callback"
                                , function := "resource_config_dealloc_callback"
