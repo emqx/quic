@@ -48,6 +48,9 @@
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
         , tc_open_listener_inval_parm/1
+        , tc_open_listener_inval_cacertfile_1/1
+        , tc_open_listener_inval_cacertfile_2/1
+        , tc_open_listener_inval_cacertfile_3/1
         , tc_start_listener_alpn_too_long/1
         , tc_close_listener/1
         , tc_close_listener_twice/1
@@ -319,12 +322,6 @@ tc_open_listener_neg_2(Config) ->
   %% {error, badarg} = quicer:listen("8.8.8.8:4567", default_listen_opts(Config)),
   ok.
 
-tc_open_listener_inval_parm(Config) ->
-  ?assertEqual({error, config_error, invalid_parameter},
-               quicer:listen(4567, [{stream_recv_buffer_default, 1024} % too small
-                                   | default_listen_opts(Config)])),
-  ok.
-
 tc_lib_re_registration(_Config) ->
   case quicer:reg_open() of
     ok ->
@@ -336,6 +333,34 @@ tc_lib_re_registration(_Config) ->
   {error, badarg} = quicer:reg_open(),
   ok = quicer:reg_close(),
   ok = quicer:reg_close().
+
+tc_open_listener_inval_parm(Config) ->
+  Port = select_port(),
+  ?assertEqual({error, config_error, invalid_parameter},
+               quicer:listen(Port, [ {stream_recv_buffer_default, 1024} % too small
+                                   | default_listen_opts(Config)])),
+  ok.
+
+tc_open_listener_inval_cacertfile_1(Config) ->
+  Port = select_port(),
+  ?assertEqual({error, badarg},
+               quicer:listen(Port, [ {cacertfile, atom}
+                                   | default_listen_opts(Config)])),
+  ok.
+
+tc_open_listener_inval_cacertfile_2(Config) ->
+  Port = select_port(),
+  ?assertMatch({ok, _},
+               quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
+                                   | default_listen_opts(Config)])),
+  ok.
+
+tc_open_listener_inval_cacertfile_3(Config) ->
+  Port = select_port(),
+  ?assertEqual({error, badarg},
+               quicer:listen(Port, [ {cacertfile, [-1]}
+                                   | default_listen_opts(Config)])),
+  ok.
 
 tc_open_listener(Config) ->
   Port = select_port(),
