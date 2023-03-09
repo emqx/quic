@@ -777,7 +777,7 @@ tc_conn_gc(Config) ->
                                      end),
 
                  %% Server Process
-                 {ok, #{resource_id := _SRid}}
+                 {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
                                    , context := "callback"
                                    , function := "ServerConnectionCallback"
@@ -799,11 +799,11 @@ tc_conn_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 ok
+                 {SRid, CRid}
                end,
-               fun(Result, Trace) ->
+               fun({_SRid, _CRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertEqual(ok, Result),
+                   ct:pal("Target SRid: ~p, CRid: ~p", [_SRid, _CRid]),
                    %% check that at client side, GC is triggered after connection close.
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -811,12 +811,12 @@ tc_conn_gc(Config) ->
                                               , function := "ClientConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                                              , resource_id := _RidC
+                                              , resource_id := _CRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "resource_conn_dealloc_callback"
-                                              , resource_id := _RidC
+                                              , resource_id := _CRid
                                               , tag := "end"},
                                              Trace)),
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -824,12 +824,12 @@ tc_conn_gc(Config) ->
                                               , function := "ServerConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ServerConnectionCallback"
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
@@ -870,7 +870,7 @@ tc_conn_no_gc(Config) ->
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
                  %% Server Process
-                 {ok, #{resource_id := _SRid}}
+                 {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
                                    , context := "callback"
                                    , function := "ServerConnectionCallback"
@@ -894,10 +894,10 @@ tc_conn_no_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 {ok, CRid, Conn}
+                 {ok, CRid, SRid, Conn}
 
                end,
-               fun({ok, CRid, Conn}, Trace) ->
+               fun({ok, CRid, _RidS, Conn}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -962,7 +962,7 @@ tc_conn_no_gc_2(Config) ->
                      {PRef, C, ConnRid, S} -> {C, ConnRid, S}
                    end,
                  %% Server Process
-                 {ok, #{resource_id := _SRid}}
+                 {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
                                    , context := "callback"
                                    , function := "ServerConnectionCallback"
@@ -1000,10 +1000,10 @@ tc_conn_no_gc_2(Config) ->
                  timer:sleep(1000),
                  %% We can get segfault here if it is use-after-free
                  quicer:getstat(ClientConn, [send_cnt, recv_oct, send_pend]),
-                 {ok, CRid, ClientConn} %% Ensure we hold the ref here
+                 {ok, CRid, SRid, ClientConn} %% Ensure we hold the ref here
 
                end,
-               fun({ok, CRid, _}, Trace) ->
+               fun({ok, CRid, _SRid, _}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
