@@ -106,12 +106,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
       //
       status = handle_stream_event_peer_receive_aborted(s_ctx, Event);
       break;
-    case QUIC_STREAM_EVENT_PEER_ACCEPTED:
-      //
-      // The peer aborted its send direction of the stream.
-      //
-      status = handle_stream_event_peer_accepted(s_ctx, Event);
-      break;
     case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
       //
       // Both directions of the stream have been shut down and MsQuic is done
