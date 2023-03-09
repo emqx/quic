@@ -122,7 +122,8 @@ open_connection() ->
 
 -spec async_connect(hostname(), inet:port_number(), conn_opts()) ->
         {ok, connection_handle()} |
-        {error, conn_open_error | config_error | conn_start_error}.
+        {error, conn_open_error | config_error | conn_start_error} |
+          {error, not_found, any()}.
 async_connect(_Host, _Port, _Opts) ->
   erlang:nif_error(nif_library_not_loaded).
 

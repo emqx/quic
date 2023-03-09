@@ -2097,6 +2097,7 @@ default_listen_opts(Config) ->
   , {alpn, ["sample"]}
   , {verify, none}
   , {idle_timeout_ms, 10000}
+  , {handshake_idle_timeout_ms, 10000} %% some CI runner is slow on this
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   ].

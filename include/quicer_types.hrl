@@ -223,7 +223,7 @@
         param_conn_datagram_receive_enabled       |           %% |  X  |  X | @TODO
         param_conn_datagram_send_enabled          |           %% |  X  |    | @TODO
         param_conn_disable_1rtt_encryption        |           %% |  X  |  X |
-        param_conn_resumption_ticket              |           %% |     |  X | @TODO
+        param_conn_resumption_ticket              |           %% |     |  X |
         param_conn_peer_certificate_valid         |           %% |     |  X | @TODO
         param_conn_local_interface.                           %% |     |  X | @TODO
 
