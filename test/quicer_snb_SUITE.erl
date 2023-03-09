@@ -1283,7 +1283,8 @@ tc_conn_resume_nst_with_data(Config) ->
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
                  {ok, NewConn} = quicer_nif:open_connection(),
                  %% Send data over new stream in the resumed connection
-                 {ok, Stm2} = quicer:async_csend(NewConn, <<"ping_from_resumed">>, [{active, false}], ?QUIC_SEND_FLAG_ALLOW_0_RTT),
+                 {ok, Stm2} = quicer:async_csend(NewConn, <<"ping_from_resumed">>, [{active, false}],
+                                                 ?QUIC_SEND_FLAG_ALLOW_0_RTT bor ?QUICER_SEND_FLAG_SYNC),
                  %% Now we could start the connection to ensure 0-RTT data in use
                  {ok, ConnResumed} = quicer:async_connect("localhost", Port, [{nst, NST},
                                                                               {handle, NewConn},
