@@ -73,10 +73,6 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   TP_CB_3(event, (uintptr_t)Stream, Event->Type);
   switch (Event->Type)
     {
-    case QUIC_STREAM_EVENT_START_COMPLETE:
-      // Only for Local initiated stream
-      status = handle_stream_event_start_complete(s_ctx, Event);
-      break;
 
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
       //
@@ -998,6 +994,7 @@ handle_stream_event_recv(HQUIC Stream,
   return status;
 }
 
+// @doc Only for *Local* initiated stream
 static QUIC_STATUS
 handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
                                    __unused_parm__ QUIC_STREAM_EVENT *Event)
