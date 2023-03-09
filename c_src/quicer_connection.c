@@ -511,9 +511,7 @@ async_connect3(ErlNifEnv *env,
     }
 
   // allocate config_resource for client connection
-  if (NULL
-      == (c_ctx->config_resource
-          = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX))))
+  if (NULL == (c_ctx->config_resource = init_config_ctx()))
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
       goto Error;

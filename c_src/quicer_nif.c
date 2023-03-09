@@ -843,6 +843,7 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
     {
       MsQuic->ConfigurationClose(config_ctx->Configuration);
     }
+  deinit_config_ctx(config_ctx);
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
