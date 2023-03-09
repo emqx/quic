@@ -48,7 +48,10 @@
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
         , tc_open_listener_inval_parm/1
+        , tc_start_listener_alpn_too_long/1
         , tc_close_listener/1
+        , tc_close_listener_twice/1
+        , tc_close_listener_dealloc/1
         , tc_get_listeners/1
         , tc_get_listener/1
 
@@ -385,6 +388,33 @@ tc_open_listener_bind_v6(Config) ->
 
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).
+
+tc_close_listener_twice(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  quicer:close_listener(L),
+  quicer:close_listener(L).
+
+tc_close_listener_dealloc(Config) ->
+  Port = select_port(),
+  {Pid, Ref} = spawn_monitor(fun() ->
+                 {ok, _L} = quicer:listen(Port, default_listen_opts(Config))
+             end),
+  receive {'DOWN', Ref, process, Pid, normal} ->
+      ok
+  end.
+
+tc_start_listener_alpn_too_long(Config) ->
+  Port = select_port(),
+  {Pid, Ref} =
+    spawn_monitor(fun() ->
+                      {error, config_error, invalid_parameter}
+                        = quicer:listen(Port, default_listen_opts(Config) ++
+                                          [{alpn, [lists:duplicate(256, $p)]}])
+                  end),
+  receive {'DOWN', Ref, process, Pid, normal} ->
+      ok
+  end.
 
 tc_start_acceptor_without_callback(Config) ->
   Port = select_port(),
