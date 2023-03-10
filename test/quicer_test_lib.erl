@@ -21,8 +21,27 @@
 -export([gen_ca/2,
          gen_host_cert/3,
          gen_host_cert/4,
-         receive_all/0
+         receive_all/0,
+         recv_term_from_stream/1,
+         encode_stream_term/1
         ]).
+
+-define(MAGIC_HEADER, 4294967293).
+
+%% @doc recv erlang term from stream
+-spec recv_term_from_stream(quicer:stream_handle()) -> term().
+recv_term_from_stream(Stream) ->
+  {ok, << ?MAGIC_HEADER:32/unsigned, Len:64/unsigned>>} = quicer:recv(Stream, 12),
+  {ok, Payload} = quicer:recv(Stream, Len),
+  binary_to_term(Payload).
+
+%% @doc wrap one erlang term for transfer on the quic stream
+-spec encode_stream_term(term()) -> binary().
+encode_stream_term(Payload) when not is_binary(Payload) ->
+  encode_stream_term(term_to_binary(Payload));
+encode_stream_term(Payload) when is_binary(Payload)->
+    Len = byte_size(Payload),
+    << ?MAGIC_HEADER:32/unsigned, Len:64/unsigned, Payload/binary>>.
 
 gen_ca(Path, Name) ->
   %% Generate ca.pem and ca.key which will be used to generate certs

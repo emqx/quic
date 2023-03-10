@@ -526,9 +526,12 @@ tc_conn_close_flag_1(Config) ->
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
+                 ct:pal("Client connection Rid: ~p", [CRid]),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                 quicer:recv(Stm, 4),
+                 {ok, 9} = quicer:async_send(Stm, <<"__STATE__">>),
+                 #{conn := SConn} = quicer_test_lib:recv_term_from_stream(Stm),
+                 {ok, SRid} = quicer:get_conn_rid(SConn),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
                  {ok, _} = ?block_until(
                               #{ ?snk_kind := debug
@@ -540,14 +543,15 @@ tc_conn_close_flag_1(Config) ->
                               #{ ?snk_kind := debug
                                , context := "callback"
                                , function := "ClientConnectionCallback"
+                               , resource_id := CRid
                                , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                , tag := "event"}, 1000, 3000),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:stop_listener(mqtt),
+                 {CRid, SRid}
                end,
-               fun(Result, Trace) ->
+               fun({_CRid, SRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertEqual(ok, Result),
                    %% verify that client close_connection with default flag
                    %% triggers a close at server side
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -555,14 +559,14 @@ tc_conn_close_flag_1(Config) ->
                                               , function := "ServerConnectionCallback"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
                                               , tag := "event"
-                                              , resource_id := _CRid
+                                              , resource_id := SRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ServerConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                                              , resource_id := _CRid
+                                              , resource_id := SRid
                                               },
                                              Trace))
                end),
@@ -1011,12 +1015,12 @@ tc_conn_no_gc_2(Config) ->
                                               , function := "ServerConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ServerConnectionCallback"
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
