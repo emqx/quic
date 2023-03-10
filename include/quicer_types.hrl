@@ -211,7 +211,7 @@
         param_conn_quic_version                   |           %% |  X  |    |
         param_conn_local_address                  |           %% |  X  |    | @TODO
         param_conn_remote_address                 |           %% |  X  |  X | @TODO SET
-        param_conn_ideal_processor                |           %% |  X  |    | @TODO
+        param_conn_ideal_processor                |           %% |  X  |    |
         param_conn_settings                       |           %% |  X  |  X |
         param_conn_statistics                     |           %% |  X  |    |
         param_conn_statistics_plat                |           %% |  X  |    | @TODO
@@ -245,7 +245,7 @@
         param_global_retry_memory_percent |                   %% |  X  | X  | @TODO
         param_global_supported_versions   |                   %% |  X  |    | @TODO
         param_global_load_balacing_mode   |                   %% |  X  | X  | @TODO
-        param_global_perf_counters        |                   %% |  X  |    | @TODO
+        param_global_perf_counters        |                   %% |  X  |    |
         param_global_settings             |                   %% |  X  | X  | @TODO
         param_global_version.                                 %% |  X  |    | @TODO
 

@@ -82,6 +82,8 @@
         , tc_conn_client_cert/1
         , tc_conn_client_bad_cert/1
 
+        , tc_conn_opt_ideal_processor/1
+
         , tc_stream_client_init/1
         , tc_stream_client_send_binary/1
         , tc_stream_client_send_iolist/1
@@ -871,6 +873,22 @@ flush(Acc) ->
   after
     0 ->
       lists:reverse(Acc)
+  end.
+
+tc_conn_opt_ideal_processor(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, Processor} = quicer:getopt(Conn, param_conn_ideal_processor),
+      ?assert(is_integer(Processor)),
+      ok = quicer:close_connection(Conn)
+  after 5000 ->
+      ct:fail("listener_timeout")
   end.
 
 tc_stream_client_init(Config) ->

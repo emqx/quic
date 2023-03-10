@@ -630,12 +630,13 @@ encode_parm_to_eterm(ErlNifEnv *env,
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel,
                            Settings->ServerResumptionLevel)));
     }
-  else if (QUIC_PARAM_STREAM_ID == Param)
+  else if (QUIC_PARAM_STREAM_ID == Param
+           || QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param || \
-           QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param)
+  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
+           || QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param)
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
     }
@@ -1264,7 +1265,6 @@ get_connection_opt(ErlNifEnv *env,
     {
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       BufferLength = sizeof(QUIC_ADDR);
-      goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
     {
@@ -1274,9 +1274,7 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
     {
       Param = QUIC_PARAM_CONN_IDEAL_PROCESSOR;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BufferLength = sizeof(uint16_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SETTINGS))
     {

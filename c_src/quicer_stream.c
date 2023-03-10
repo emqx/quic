@@ -872,7 +872,7 @@ handle_stream_event_recv(HQUIC Stream,
   ErlNifBinary bin;
 
   assert(QUIC_STREAM_EVENT_RECEIVE == Event->Type);
-  assert(NULL != Event->RECEIVE.Buffers[0].Buffer);
+  // assert(NULL != Event->RECEIVE.Buffers[0].Buffer);
   assert(Event->RECEIVE.BufferCount > 0
          || Event->RECEIVE.Flags == QUIC_RECEIVE_FLAG_FIN);
 
