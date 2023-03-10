@@ -47,6 +47,7 @@
         , tc_open_listener_bind_v6/1
         , tc_set_listener_opt/1
         , tc_set_listener_opt_fail/1
+        , tc_get_listener_opt_addr/1
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
         , tc_open_listener_inval_parm/1
@@ -427,6 +428,12 @@ tc_set_listener_opt_fail(Config) ->
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   {error, _} = quicer:setopt(L, param_listener_cibir_id, <<1, 2, 3, 4, 5, 6>>),
   {error, not_supported} = quicer:getopt(L, param_listener_cibir_id),
+  quicer:close_listener(L).
+
+tc_get_listener_opt_addr(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  {ok, {{0, 0, 0, 0}, Port}} = quicer:getopt(L, param_listener_local_address),
   quicer:close_listener(L).
 
 tc_close_listener(_Config) ->

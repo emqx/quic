@@ -256,7 +256,7 @@
         param_configuration_ticket_keys.                      %% |     | X  | @TODO
 
 -type optname_listener() ::                                   %% with listener_handle
-        param_listener_local_address        |                 %% |  X  |    | @TODO
+        param_listener_local_address        |                 %% |  X  |    |
         param_listener_stats                |                 %% |  X  |    | @TODO
         param_listener_cibir_id.                              %% |     | X  |
 

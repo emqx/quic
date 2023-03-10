@@ -634,7 +634,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param)
+  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param || \
+           QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param)
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
     }
@@ -1660,10 +1661,10 @@ get_listener_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS))
     {
-      // @TODO
+      QUIC_ADDR q_addr = {0};
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Buffer = &q_addr;
+      BufferLength = sizeof(q_addr);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_STATS))
     {
