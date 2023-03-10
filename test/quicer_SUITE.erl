@@ -48,6 +48,7 @@
         , tc_set_listener_opt/1
         , tc_set_listener_opt_fail/1
         , tc_get_listener_opt_addr/1
+        , tc_get_listener_opt_stats/1
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
         , tc_open_listener_inval_parm/1
@@ -434,6 +435,15 @@ tc_get_listener_opt_addr(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   {ok, {{0, 0, 0, 0}, Port}} = quicer:getopt(L, param_listener_local_address),
+  quicer:close_listener(L).
+
+tc_get_listener_opt_stats(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  {ok, [{"total_accepted_connection", _},
+        {"total_rejected_connection", _},
+        {"binding_recv_dropped_packets", _}
+       ]} = quicer:getopt(L, param_listener_stats),
   quicer:close_listener(L).
 
 tc_close_listener(_Config) ->

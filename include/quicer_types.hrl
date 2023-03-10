@@ -257,7 +257,7 @@
 
 -type optname_listener() ::                                   %% with listener_handle
         param_listener_local_address        |                 %% |  X  |    |
-        param_listener_stats                |                 %% |  X  |    | @TODO
+        param_listener_stats                |                 %% |  X  |    |
         param_listener_cibir_id.                              %% |     | X  |
 
 -type conn_settings() :: [{conn_settings_key(), non_neg_integer()}].

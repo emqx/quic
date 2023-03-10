@@ -650,7 +650,19 @@ encode_parm_to_eterm(ErlNifEnv *env,
       bin.data = Buffer;
       res = SUCCESS(enif_make_binary(env, &bin));
     }
-
+  else if (QUIC_PARAM_LISTENER_STATS == Param)
+    {
+      QUIC_LISTENER_STATISTICS *stats = (QUIC_LISTENER_STATISTICS *)Buffer;
+      res = SUCCESS(
+          enif_make_list(env,
+                         3,
+                         PropTupleStrInt(total_accepted_connection,
+                                         stats->TotalAcceptedConnections),
+                         PropTupleStrInt(total_rejected_connection,
+                                         stats->TotalRejectedConnections),
+                         PropTupleStrInt(binding_recv_dropped_packets,
+                                         stats->BindingRecvDroppedPackets)));
+    }
   return res;
 }
 
@@ -1661,17 +1673,17 @@ get_listener_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS))
     {
-      QUIC_ADDR q_addr = {0};
+      QUIC_ADDR q_addr = { 0 };
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
       Buffer = &q_addr;
       BufferLength = sizeof(q_addr);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_STATS))
     {
-      // @TODO
+      QUIC_LISTENER_STATISTICS stats = { 65535, 65535, 65535 };
       Param = QUIC_PARAM_LISTENER_STATS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Buffer = &stats;
+      BufferLength = sizeof(stats);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_CIBIR_ID))
     {
