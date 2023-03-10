@@ -642,6 +642,13 @@ encode_parm_to_eterm(ErlNifEnv *env,
     {
       res = SUCCESS(ETERM_BOOL(*(BOOLEAN *)Buffer));
     }
+  else if (QUIC_PARAM_LISTENER_CIBIR_ID == Param)
+    {
+      ErlNifBinary bin;
+      bin.size = BufferLength;
+      bin.data = Buffer;
+      res = SUCCESS(enif_make_binary(env, &bin));
+    }
 
   return res;
 }
@@ -1627,6 +1634,7 @@ get_listener_opt(ErlNifEnv *env,
 {
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   void *Buffer = NULL;
+  bool isMalloc = FALSE;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
@@ -1664,6 +1672,13 @@ get_listener_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_CIBIR_ID))
+    {
+      Param = QUIC_PARAM_LISTENER_CIBIR_ID;
+      // Not Supported in MsQUIC
+      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
+    }
   else
     {
       res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
@@ -1671,6 +1686,16 @@ get_listener_opt(ErlNifEnv *env,
     }
 
   assert(Param);
+  if (!Buffer && !isMalloc)
+    { // when Buffer is not initialized.
+      Buffer = CXPLAT_ALLOC_NONPAGED(BufferLength, QUICER_OPT_BUFF);
+      if (!Buffer)
+        {
+          goto Exit;
+        }
+      isMalloc = TRUE;
+    }
+
   status = MsQuic->GetParam(l_ctx->Listener, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
@@ -1698,7 +1723,7 @@ set_listener_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-
+  ErlNifBinary bin;
   if (!l_ctx)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -1717,19 +1742,19 @@ set_listener_opt(ErlNifEnv *env,
       res = set_level_param(env, l_ctx->Listener, optname, optval, elevel);
       goto Exit;
     }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS))
+  if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_CIBIR_ID))
     {
-      // @TODO
-      Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
-    }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_STATS))
-    {
-      // @TODO
-      Param = QUIC_PARAM_LISTENER_STATS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Param = QUIC_PARAM_LISTENER_CIBIR_ID;
+      if (!enif_inspect_binary(env, optval, &bin))
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      else
+        {
+          BufferLength = (uint32_t)bin.size;
+          Buffer = (uint8_t *)bin.data;
+        }
     }
   else
     {

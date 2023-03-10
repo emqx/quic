@@ -45,6 +45,8 @@
         , tc_open_listener_with_wrong_cert_password/1
         , tc_open_listener_bind/1
         , tc_open_listener_bind_v6/1
+        , tc_set_listener_opt/1
+        , tc_set_listener_opt_fail/1
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
         , tc_open_listener_inval_parm/1
@@ -411,6 +413,21 @@ tc_open_listener_bind_v6(Config) ->
   {ok, P} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
   ok = gen_udp:close(P),
   ok.
+
+tc_set_listener_opt(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  Val = <<0, 1, 2, 3, 4, 5>>, %% must start with 0
+  ok = quicer:setopt(L, param_listener_cibir_id, Val),
+  {error, not_supported} = quicer:getopt(L, param_listener_cibir_id),
+  quicer:close_listener(L).
+
+tc_set_listener_opt_fail(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  {error, _} = quicer:setopt(L, param_listener_cibir_id, <<1, 2, 3, 4, 5, 6>>),
+  {error, not_supported} = quicer:getopt(L, param_listener_cibir_id),
+  quicer:close_listener(L).
 
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).

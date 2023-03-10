@@ -179,6 +179,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS;
 //
 ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_STATS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_LISTENER_CIBIR_ID;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_CONNECTION.
@@ -500,6 +501,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
                                                                               \
   ATOM(ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS, param_listener_local_address); \
   ATOM(ATOM_QUIC_PARAM_LISTENER_STATS, param_listener_stats);                 \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_CIBIR_ID, param_listener_cibir_id);           \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */                           \
                                                                               \

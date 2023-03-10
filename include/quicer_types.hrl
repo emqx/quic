@@ -199,6 +199,7 @@
 
 -type optname() ::
         optname_global()        |
+        optname_listener()      |
         optname_conn()          |
         optname_stream()        |
         optname_reg()           |
@@ -253,6 +254,11 @@
 -type optname_configuration() ::                              %% with config_handle()
         param_configuration_settings        |                 %% |  X  | X  | @TODO
         param_configuration_ticket_keys.                      %% |     | X  | @TODO
+
+-type optname_listener() ::                                   %% with listener_handle
+        param_listener_local_address        |                 %% |  X  |    | @TODO
+        param_listener_stats                |                 %% |  X  |    | @TODO
+        param_listener_cibir_id.                              %% |     | X  |
 
 -type conn_settings() :: [{conn_settings_key(), non_neg_integer()}].
 -type conn_settings_key() ::
