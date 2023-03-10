@@ -84,6 +84,8 @@
 
         , tc_conn_opt_ideal_processor/1
         , tc_conn_opt_share_udp_binding/1
+        , tc_conn_opt_local_uni_stream_count/1
+        , tc_conn_opt_local_bidi_stream_count/1
 
         , tc_stream_client_init/1
         , tc_stream_client_send_binary/1
@@ -905,6 +907,40 @@ tc_conn_opt_share_udp_binding(Config) ->
       ?assert(is_boolean(IsShared)),
       {error, invalid_state} = quicer:setopt(Conn, param_conn_share_udp_binding, not IsShared),
       {ok, IsShared} = quicer:getopt(Conn, param_conn_share_udp_binding),
+      ok = quicer:close_connection(Conn)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_conn_opt_local_bidi_stream_count(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, Cnt} = quicer:getopt(Conn, param_conn_local_bidi_stream_count),
+      ?assert(is_integer(Cnt)),
+      {error, invalid_parameter} = quicer:setopt(Conn, param_conn_local_bidi_stream_count, Cnt + 2),
+      ok = quicer:close_connection(Conn)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_conn_opt_local_uni_stream_count(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, Cnt} = quicer:getopt(Conn, param_conn_local_unidi_stream_count),
+      ?assert(is_integer(Cnt)),
+      {error, invalid_parameter} = quicer:setopt(Conn, param_conn_local_unidi_stream_count, Cnt + 2),
       ok = quicer:close_connection(Conn)
   after 5000 ->
       ct:fail("listener_timeout")

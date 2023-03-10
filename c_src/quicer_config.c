@@ -631,7 +631,9 @@ encode_parm_to_eterm(ErlNifEnv *env,
                            Settings->ServerResumptionLevel)));
     }
   else if (QUIC_PARAM_STREAM_ID == Param
-           || QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param)
+           || QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
+           || QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
+           || QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
@@ -1302,17 +1304,13 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
     {
       Param = QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BufferLength = sizeof(uint16_t);
     }
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT))
     {
       Param = QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BufferLength = sizeof(uint16_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS))
     {
@@ -1504,35 +1502,65 @@ set_connection_opt(ErlNifEnv *env,
           res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Exit;
         }
-      if (QUIC_SUCCEEDED(
-            status = MsQuic->SetParam(c_ctx->Connection,
-                                      QUIC_PARAM_CONN_SHARE_UDP_BINDING,
-                                      sizeof(value),
-                                      &value)))
-      {
-        res = ATOM_OK;
-        goto Exit;
-      }
+      if (QUIC_SUCCEEDED(status
+                         = MsQuic->SetParam(c_ctx->Connection,
+                                            QUIC_PARAM_CONN_SHARE_UDP_BINDING,
+                                            sizeof(value),
+                                            &value)))
+        {
+          res = ATOM_OK;
+          goto Exit;
+        }
       else
-      {
-        res = ERROR_TUPLE_2(ATOM_STATUS(status));
-        goto Exit;
-      }
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto Exit;
+        }
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
     {
-      Param = QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      uint32_t value = 0;
+      if (!enif_get_uint(env, optval, &value))
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      if (QUIC_SUCCEEDED(status = MsQuic->SetParam(
+                             c_ctx->Connection,
+                             QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT,
+                             sizeof(uint32_t),
+                             &value)))
+        {
+          res = ATOM_OK;
+          goto Exit;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto Exit;
+        }
     }
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT))
     {
-      Param = QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      uint32_t value = 0;
+      if (!enif_get_uint(env, optval, &value))
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      if (QUIC_SUCCEEDED(status = MsQuic->SetParam(
+                             c_ctx->Connection,
+                             QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT,
+                             sizeof(uint32_t),
+                             &value)))
+        {
+          res = ATOM_OK;
+          goto Exit;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto Exit;
+        }
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS))
     {
