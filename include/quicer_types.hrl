@@ -215,7 +215,7 @@
         param_conn_settings                       |           %% |  X  |  X |
         param_conn_statistics                     |           %% |  X  |    |
         param_conn_statistics_plat                |           %% |  X  |    | @TODO
-        param_conn_share_udp_binding              |           %% |  X  |  X | @TODO
+        param_conn_share_udp_binding              |           %% |  X  |  X |
         param_conn_local_bidi_stream_count        |           %% |  X  |    | @TODO
         param_conn_local_unidi_stream_count       |           %% |  X  |    | @TODO
         param_conn_max_stream_ids                 |           %% |  X  |    | @TODO

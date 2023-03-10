@@ -640,7 +640,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param)
+  else if (QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param
+           || QUIC_PARAM_CONN_SHARE_UDP_BINDING == Param)
     {
       res = SUCCESS(ETERM_BOOL(*(BOOLEAN *)Buffer));
     }
@@ -1296,9 +1297,7 @@ get_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING))
     {
       Param = QUIC_PARAM_CONN_SHARE_UDP_BINDING;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BufferLength = sizeof(BOOLEAN);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
     {
@@ -1490,10 +1489,35 @@ set_connection_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING))
     {
-      Param = QUIC_PARAM_CONN_SHARE_UDP_BINDING;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BOOLEAN value = TRUE;
+      BufferLength = sizeof(BOOLEAN);
+      if (IS_SAME_TERM(ATOM_FALSE, optval))
+        {
+          value = FALSE;
+        }
+      else if (IS_SAME_TERM(ATOM_TRUE, optval))
+        {
+          value = TRUE;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      if (QUIC_SUCCEEDED(
+            status = MsQuic->SetParam(c_ctx->Connection,
+                                      QUIC_PARAM_CONN_SHARE_UDP_BINDING,
+                                      sizeof(value),
+                                      &value)))
+      {
+        res = ATOM_OK;
+        goto Exit;
+      }
+      else
+      {
+        res = ERROR_TUPLE_2(ATOM_STATUS(status));
+        goto Exit;
+      }
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT))
     {
