@@ -633,7 +633,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
   else if (QUIC_PARAM_STREAM_ID == Param
            || QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
            || QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
-           || QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param)
+           || QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param
+           || QUIC_PARAM_STREAM_0RTT_LENGTH == Param)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
@@ -1110,15 +1111,15 @@ get_stream_opt(ErlNifEnv *env,
     }
   else if (ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH == optname)
     {
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Param = QUIC_PARAM_STREAM_0RTT_LENGTH;
+      Buffer = &BuffUint64;
+      BufferLength = sizeof(uint64_t);
     }
   else if (ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == optname)
     {
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Param = QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE;
+      Buffer = &BuffUint64;
+      BufferLength = sizeof(uint64_t);
     }
   else
     {
