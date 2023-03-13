@@ -662,13 +662,20 @@ encode_parm_to_eterm(ErlNifEnv *env,
     {
       res = SUCCESS(ETERM_BOOL(*(BOOLEAN *)Buffer));
     }
-  else if (QUIC_PARAM_LISTENER_CIBIR_ID == Param
-           && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type)
+  else if ((QUIC_PARAM_LISTENER_CIBIR_ID == Param
+            && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type)
+           || (QUIC_PARAM_TLS_NEGOTIATED_ALPN == Param
+               && QUICER_PARAM_HANDLE_TYPE_TLS == Type))
     {
-      ErlNifBinary bin;
-      bin.size = BufferLength;
-      bin.data = Buffer;
-      res = SUCCESS(enif_make_binary(env, &bin));
+      ERL_NIF_TERM ebin;
+      unsigned char *bin_data = enif_make_new_binary(env, BufferLength, &ebin);
+      if (!bin_data)
+        {
+          res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+        }
+
+      CxPlatCopyMemory(bin_data, Buffer, BufferLength);
+      res = SUCCESS(ebin);
     }
   else if (QUIC_PARAM_LISTENER_STATS == Param
            && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type)
@@ -1869,6 +1876,7 @@ get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  uint8_t alpn[255] = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO))
     {
@@ -1879,10 +1887,9 @@ get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN))
     {
-      // @TODO
       Param = QUIC_PARAM_TLS_NEGOTIATED_ALPN;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BufferLength = 255;
+      Buffer = alpn;
     }
   else
     {

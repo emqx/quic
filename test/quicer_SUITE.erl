@@ -1788,6 +1788,7 @@ tc_alpn(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, {_, _}} = quicer:sockname(Conn),
+      {ok, <<"sample">>} = quicer:getopt(Conn, param_tls_negotiated_alpn, quic_tls),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 1000 ->
