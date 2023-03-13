@@ -496,12 +496,14 @@ get_uint64_from_map(ErlNifEnv *env,
 
 ERL_NIF_TERM
 encode_parm_to_eterm(ErlNifEnv *env,
+                     QUICER_PARAM_HANDLE_TYPE Type,
                      uint32_t Param,
                      uint32_t BufferLength,
                      void *Buffer)
 {
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
-  if (QUIC_PARAM_CONN_STATISTICS == Param
+  if (QUICER_PARAM_HANDLE_TYPE_CONN == Type
+      && QUIC_PARAM_CONN_STATISTICS == Param
       && sizeof(QUIC_STATISTICS) == BufferLength)
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
@@ -575,7 +577,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
               statics->Recv.ValidAckFrames) // Count of receive ACK frames.
           ));
     }
-  else if (QUIC_PARAM_CONN_SETTINGS == Param)
+  else if (QUIC_PARAM_CONN_SETTINGS == Param
+           && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
     {
       QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
       res = SUCCESS(enif_make_list(
@@ -630,33 +633,45 @@ encode_parm_to_eterm(ErlNifEnv *env,
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel,
                            Settings->ServerResumptionLevel)));
     }
-  else if (QUIC_PARAM_STREAM_ID == Param
-           || QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
-           || QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
-           || QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param
-           || QUIC_PARAM_STREAM_0RTT_LENGTH == Param
-           || QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE)
+  else if ((QUIC_PARAM_STREAM_ID == Param
+            && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
+           || (QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
+               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
+           || (QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
+               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
+           || (QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param
+               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
+           || (QUIC_PARAM_STREAM_0RTT_LENGTH == Param
+               && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
+           || (QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == Param
+               && QUICER_PARAM_HANDLE_TYPE_STREAM == Type))
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
-           || QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param)
+  else if ((QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
+            && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
+           || (QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param
+               && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type))
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
     }
-  else if (QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param
-           || QUIC_PARAM_CONN_SHARE_UDP_BINDING == Param)
+  else if ((QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param
+            && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
+           || (QUIC_PARAM_CONN_SHARE_UDP_BINDING == Param
+               && QUICER_PARAM_HANDLE_TYPE_CONN == Type))
     {
       res = SUCCESS(ETERM_BOOL(*(BOOLEAN *)Buffer));
     }
-  else if (QUIC_PARAM_LISTENER_CIBIR_ID == Param)
+  else if (QUIC_PARAM_LISTENER_CIBIR_ID == Param
+           && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type)
     {
       ErlNifBinary bin;
       bin.size = BufferLength;
       bin.data = Buffer;
       res = SUCCESS(enif_make_binary(env, &bin));
     }
-  else if (QUIC_PARAM_LISTENER_STATS == Param)
+  else if (QUIC_PARAM_LISTENER_STATS == Param
+           && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type)
     {
       QUIC_LISTENER_STATISTICS *stats = (QUIC_LISTENER_STATISTICS *)Buffer;
       res = SUCCESS(
@@ -1132,7 +1147,8 @@ get_stream_opt(ErlNifEnv *env,
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(
+          env, QUICER_PARAM_HANDLE_TYPE_STREAM, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1397,7 +1413,8 @@ get_connection_opt(ErlNifEnv *env,
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(
+          env, QUICER_PARAM_HANDLE_TYPE_CONN, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1765,7 +1782,8 @@ get_listener_opt(ErlNifEnv *env,
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(
+          env, QUICER_PARAM_HANDLE_TYPE_LISTENER, Param, BufferLength, Buffer);
     }
   else
     {
@@ -1876,7 +1894,8 @@ get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   status = MsQuic->GetParam(Handle, Param, &BufferLength, Buffer);
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(
+          env, QUICER_PARAM_HANDLE_TYPE_TLS, Param, BufferLength, Buffer);
     }
   else
     {
@@ -2038,7 +2057,8 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(
+          env, QUICER_PARAM_HANDLE_TYPE_GLOBAL, Param, BufferLength, Buffer);
     }
   else
     {
@@ -2155,7 +2175,8 @@ get_config_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
 
   if (QUIC_SUCCEEDED(status))
     {
-      res = encode_parm_to_eterm(env, Param, BufferLength, Buffer);
+      res = encode_parm_to_eterm(
+          env, QUICER_PARAM_HANDLE_TYPE_CONFIG, Param, BufferLength, Buffer);
     }
   else
     {
