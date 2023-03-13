@@ -634,7 +634,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
            || QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
            || QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
            || QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param
-           || QUIC_PARAM_STREAM_0RTT_LENGTH == Param)
+           || QUIC_PARAM_STREAM_0RTT_LENGTH == Param
+           || QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE)
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }

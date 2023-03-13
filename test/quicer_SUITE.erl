@@ -156,6 +156,7 @@
         , tc_conn_and_stream_shared_owner/1
 
         , tc_get_stream_0rtt_length/1
+        , tc_get_stream_ideal_sndbuff_size/1
         %% insecure, msquic only
         , tc_insecure_traffic/1
 
@@ -1671,6 +1672,27 @@ tc_get_stream_0rtt_length(Config) ->
       ct:fail("listener_timeout")
   end.
 
+tc_get_stream_ideal_sndbuff_size(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive
+        {quic, <<"ping">>, Stm, _} ->
+          ok
+      end,
+      %% before stream shutdown,
+      {ok, Val} = quicer:getopt(Stm, param_stream_ideal_send_buffer_size),
+      ?assert(is_integer(Val)),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
 
 tc_getstat(Config) ->
   Port = select_port(),
