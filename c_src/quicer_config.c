@@ -108,7 +108,7 @@ CompleteCredconfigLoadHook(HQUIC Configuration,
 
   DestroyCredConfig((QUIC_CREDENTIAL_CONFIG *)Context);
 }
-*/
+
 void
 DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *Config)
 {
@@ -131,6 +131,79 @@ DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *Config)
       break;
     }
   CXPLAT_FREE(Config, QUICER_CREDENTIAL_CONFIG);
+}
+*/
+
+ERL_NIF_TERM
+atom_proto_vsn(QUIC_TLS_PROTOCOL_VERSION vsn)
+{
+  switch (vsn)
+    {
+    case QUIC_TLS_PROTOCOL_1_3:
+      return ATOM_TLS_VSN_1_3;
+    default:
+      return ATOM_NONE;
+    }
+}
+ERL_NIF_TERM
+atom_cipher_algorithm(QUIC_CIPHER_ALGORITHM alg)
+{
+  switch (alg)
+    {
+    case QUIC_CIPHER_ALGORITHM_NONE:
+      return ATOM_NONE;
+    case QUIC_CIPHER_ALGORITHM_AES_128:
+      return ATOM_AES_128;
+    case QUIC_CIPHER_ALGORITHM_AES_256:
+      return ATOM_AES_256;
+    case QUIC_CIPHER_ALGORITHM_CHACHA20:
+      return ATOM_CHACHA20;
+    default:
+      return ATOM_UNDEFINED;
+    }
+}
+ERL_NIF_TERM
+atom_hash_algorithm(QUIC_HASH_ALGORITHM alg)
+{
+  switch (alg)
+    {
+    case QUIC_HASH_ALGORITHM_NONE:
+      return ATOM_NONE;
+    case QUIC_HASH_ALGORITHM_SHA_256:
+      return ATOM_SHA_256;
+    case QUIC_HASH_ALGORITHM_SHA_384:
+      return ATOM_SHA_384;
+    default:
+      return ATOM_UNDEFINED;
+    }
+}
+
+ERL_NIF_TERM
+atom_key_exchange_algorithm(QUIC_KEY_EXCHANGE_ALGORITHM alg)
+{
+  switch (alg)
+    {
+    case QUIC_KEY_EXCHANGE_ALGORITHM_NONE:
+      return ATOM_NONE;
+    default:
+      return ATOM_UNDEFINED;
+    }
+}
+
+ERL_NIF_TERM
+atom_cipher_suite(QUIC_CIPHER_SUITE suite)
+{
+  switch (suite)
+    {
+    case QUIC_CIPHER_SUITE_TLS_AES_128_GCM_SHA256:
+      return ATOM_AES_128_GCM_SHA256;
+    case QUIC_CIPHER_SUITE_TLS_AES_256_GCM_SHA384:
+      return ATOM_AES_256_GCM_SHA384;
+    case QUIC_CIPHER_SUITE_TLS_CHACHA20_POLY1305_SHA256:
+      return ATOM_CHACHA20_POLY1305_SHA256;
+    default:
+      return ATOM_UNDEFINED;
+    }
 }
 
 // @todo support per registration.
@@ -1880,9 +1953,44 @@ get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO))
     {
-      // @TODO
-      Param = QUIC_PARAM_TLS_HANDSHAKE_INFO;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
+      QUIC_HANDSHAKE_INFO info = {};
+      BufferLength = sizeof(QUIC_HANDSHAKE_INFO);
+      ERL_NIF_TERM einfo;
+      if (QUIC_SUCCEEDED(status
+                         = MsQuic->GetParam(Handle,
+                                            QUIC_PARAM_TLS_HANDSHAKE_INFO,
+                                            &BufferLength,
+                                            &info)))
+        {
+          assert(BufferLength == sizeof(QUIC_HANDSHAKE_INFO));
+          ERL_NIF_TERM props_name[]
+              = { ATOM_TLS_PROTOCOL_VERSION,  ATOM_CIPHER_ALGORITHM,
+                  ATOM_CIPHER_STRENGTH,       ATOM_HASH_ALGORITHM,
+                  ATOM_HASH_STRENGTH,         ATOM_KEY_EXCHANGE_ALGORITHM,
+                  ATOM_KEY_EXCHANGE_STRENGTH, ATOM_CIPHER_SUITE };
+          ERL_NIF_TERM props_value[]
+              = { atom_proto_vsn(info.TlsProtocolVersion),
+                  atom_cipher_algorithm(info.CipherAlgorithm),
+                  enif_make_uint64(env, (uint64_t)info.CipherStrength),
+                  atom_hash_algorithm(info.Hash),
+                  enif_make_uint64(env, (uint64_t)info.HashStrength),
+                  atom_key_exchange_algorithm(info.KeyExchangeAlgorithm),
+                  enif_make_uint64(env, (uint64_t)info.KeyExchangeStrength),
+                  atom_cipher_suite(info.CipherSuite) };
+          if (enif_make_map_from_arrays(
+                  env, props_name, props_value, 8, &einfo))
+            {
+              res = SUCCESS(einfo);
+            }
+          else
+            {
+              res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+            }
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+        }
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN))

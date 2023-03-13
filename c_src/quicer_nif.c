@@ -210,6 +210,29 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE;
 // Parameters for QUIC_PARAM_LEVEL_TLS.
 //
 ERL_NIF_TERM ATOM_QUIC_TLS;
+ERL_NIF_TERM ATOM_TLS_PROTOCOL_VERSION;
+ERL_NIF_TERM ATOM_CIPHER_ALGORITHM;
+ERL_NIF_TERM ATOM_CIPHER_STRENGTH;
+ERL_NIF_TERM ATOM_HASH_ALGORITHM;
+ERL_NIF_TERM ATOM_HASH_STRENGTH;
+ERL_NIF_TERM ATOM_KEY_EXCHANGE_ALGORITHM;
+ERL_NIF_TERM ATOM_KEY_EXCHANGE_STRENGTH;
+ERL_NIF_TERM ATOM_CIPHER_SUITE;
+
+ERL_NIF_TERM ATOM_TLS_VSN_1_3;
+/* Cipher Alg */
+ERL_NIF_TERM ATOM_AES_128;
+ERL_NIF_TERM ATOM_AES_256;
+ERL_NIF_TERM ATOM_CHACHA20;
+/* Hash Alg */
+ERL_NIF_TERM ATOM_SHA_256;
+ERL_NIF_TERM ATOM_SHA_384;
+/* Cipher Suite */
+ERL_NIF_TERM ATOM_AES_128_GCM_SHA256;
+ERL_NIF_TERM ATOM_AES_128_GCM_SHA256;
+ERL_NIF_TERM ATOM_AES_256_GCM_SHA384;
+ERL_NIF_TERM ATOM_CHACHA20_POLY1305_SHA256;
+
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO;
 ERL_NIF_TERM ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN;
@@ -535,7 +558,28 @@ ERL_NIF_TERM ATOM_UNDEFINED;
        param_conn_peer_certificate_valid);                                    \
   ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE, param_conn_local_interface);     \
   /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
-  ATOM(ATOM_QUIC_TLS, quic_tls)                                               \
+  ATOM(ATOM_QUIC_TLS, quic_tls);                                              \
+  ATOM(ATOM_TLS_PROTOCOL_VERSION, tls_protocol_version);                      \
+  ATOM(ATOM_CIPHER_ALGORITHM, cipher_algorithm);                              \
+  ATOM(ATOM_CIPHER_STRENGTH, cipher_strength);                                \
+  ATOM(ATOM_HASH_ALGORITHM, hash_algorithm);                                  \
+  ATOM(ATOM_HASH_STRENGTH, hash_strength);                                    \
+  ATOM(ATOM_KEY_EXCHANGE_ALGORITHM, key_exchange_algorithm);                  \
+  ATOM(ATOM_KEY_EXCHANGE_STRENGTH, key_exchange_strength);                    \
+  ATOM(ATOM_CIPHER_SUITE, cipher_suite);                                      \
+  ATOM(ATOM_TLS_VSN_1_3, tlsv1_3);                                            \
+  /* Cipher Alg */                                                            \
+  ATOM(ATOM_AES_128, aes_128);                                                \
+  ATOM(ATOM_AES_256, aes_256);                                                \
+  ATOM(ATOM_CHACHA20, chacha20);                                              \
+  /* Hash Alg */                                                              \
+  ATOM(ATOM_SHA_256, sha_256);                                                \
+  ATOM(ATOM_SHA_384, sha_384);                                                \
+  /* Cipher Suite */                                                          \
+  ATOM(ATOM_AES_128_GCM_SHA256, sha_384);                                     \
+  ATOM(ATOM_AES_128_GCM_SHA256, aes_128_gcm_sha256);                          \
+  ATOM(ATOM_AES_256_GCM_SHA384, aes_256_gcm_sha384);                          \
+  ATOM(ATOM_CHACHA20_POLY1305_SHA256, chacha20_poly1305_sha256);              \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
        param_tls_schannel_context_attribute_w);                               \
                                                                               \

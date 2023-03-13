@@ -139,7 +139,7 @@
         , tc_alpn_mismatch/1
         , tc_idle_timeout/1
 
-
+        , tc_getopt_tls_handshake_info/1
         , tc_get_conn_rid/1
         , tc_get_stream_rid/1
 
@@ -2867,6 +2867,30 @@ tc_direct_send_over_conn_fail(Config) ->
       ct:fail("Stream id: ~p started: ~p", [StreamIdX, StartStatusX])
   after 100 ->
       ok
+  end.
+
+tc_getopt_tls_handshake_info(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  Opts = lists:keyreplace(alpn, 1, default_listen_opts(Config), {alpn, ["sample2", "sample"]}),
+  {SPid, _Ref} = spawn_monitor(fun() -> conn_server_with(Owner, Port, Opts) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, {_, _}} = quicer:sockname(Conn),
+      {ok, #{ cipher_algorithm := aes_256
+            , cipher_strength := 256
+            , cipher_suite := aes_256_gcm_sha384
+            , hash_algorithm := sha_384
+            , hash_strength := 0
+            , key_exchange_algorithm := none
+            , key_exchange_strength := 0
+            , tls_protocol_version := tlsv1_3}}
+         = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
+      ok = quicer:close_connection(Conn),
+      SPid ! done
+  after 1000 ->
+    ct:fail("timeout")
   end.
 
 %%% ====================
