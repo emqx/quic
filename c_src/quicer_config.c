@@ -874,7 +874,7 @@ setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       res = set_global_opt(env, NULL, eopt, evalue);
     }
-  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
+  else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
       res = set_stream_opt(
           env, (QuicerStreamCTX *)q_ctx, eopt, evalue, elevel);
@@ -2106,6 +2106,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  QUIC_SETTINGS Settings = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
@@ -2227,11 +2228,10 @@ set_global_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   uint32_t percent = 0;
-
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
       Param = QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
-      BufferLength = sizeof(uint32_t);
+      BufferLength = sizeof(uint16_t);
       if (!enif_get_uint(env, optval, &percent) || percent > UINT16_MAX)
         {
           res = ERROR_TUPLE_2(ATOM_BADARG);

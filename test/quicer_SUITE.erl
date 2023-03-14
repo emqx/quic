@@ -117,6 +117,7 @@
         , tc_setopt_bad_opt/1
         , tc_setopt_bad_nst/1
         , tc_setopt_config_settings/1
+        , tc_setopt_global_retry_mem_percent/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
         , tc_getopt_settings/1
@@ -1948,6 +1949,9 @@ tc_setopt_config_settings(Config) ->
   after 5000 ->
       ct:fail("listener_timeout")
   end.
+
+tc_setopt_global_retry_mem_percent(_Config) ->
+  ?assertEqual(ok, quicer:setopt(quic_global, param_global_retry_memory_percent, 30, false)).
 
 tc_setopt_conn_local_addr(Config) ->
   Port = select_port(),
