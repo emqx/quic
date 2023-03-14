@@ -655,7 +655,9 @@ encode_parm_to_eterm(ErlNifEnv *env,
   else if ((QUIC_PARAM_CONN_SETTINGS == Param
             && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
            || (QUIC_PARAM_CONFIGURATION_SETTINGS == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONFIG == Type))
+               && QUICER_PARAM_HANDLE_TYPE_CONFIG == Type)
+           || (QUIC_PARAM_GLOBAL_SETTINGS == Param
+               && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type))
     {
       QUIC_SETTINGS *Settings = (QUIC_SETTINGS *)Buffer;
       res = SUCCESS(enif_make_list(
@@ -2182,10 +2184,9 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_SETTINGS))
     {
-      // @TODO
       Param = QUIC_PARAM_GLOBAL_SETTINGS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Buffer = &Settings;
+      BufferLength = sizeof(QUIC_SETTINGS);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_VERSION))
     {

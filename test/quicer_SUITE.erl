@@ -1618,6 +1618,7 @@ tc_getopt_settings(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive {quic, <<"ping">>, Stm, _} -> ok end,
       ?assertEqual({ok, Settings}, quicer:getopt(Stm, param_configuration_settings, quic_configuration)),
+      ?assertNotEqual({ok, Settings}, quicer:getopt(quic_global, param_global_settings)),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
