@@ -75,6 +75,7 @@
         , getopt/2
         , getopt/3
         , setopt/3
+        , setopt/4
         , get_stream_id/1
         , getstat/2
         , peername/1
@@ -775,7 +776,14 @@ setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
 setopt({_Conn, Stream}, active, Value) ->
   setopt(Stream, active, Value);
 setopt(Handle, Opt, Value) ->
-  quicer_nif:setopt(Handle, Opt, Value, false).
+  setopt(Handle, Opt, Value, false).
+
+-spec setopt(handle(), optname(), any(), quic_handle_level()) ->
+        ok |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
+        {error, atom_reason()}.
+setopt(Handle, Opt, Value, Level) ->
+  quicer_nif:setopt(Handle, Opt, Value, Level).
 
 %% @doc get stream id with stream handle
 -spec get_stream_id(Stream::stream_handle()) ->

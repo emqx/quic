@@ -70,13 +70,14 @@ static ERL_NIF_TERM set_global_opt(ErlNifEnv *env,
 static ERL_NIF_TERM get_level_param(ErlNifEnv *env,
                                     HQUIC Handle,
                                     HQUIC ConfigHandle,
-                                    ERL_NIF_TERM level,
-                                    ERL_NIF_TERM eopt);
+                                    ERL_NIF_TERM eopt,
+                                    ERL_NIF_TERM level);
 static ERL_NIF_TERM set_level_param(ErlNifEnv *env,
                                     HQUIC Handle,
-                                    ERL_NIF_TERM level,
+                                    HQUIC ConfigHandle,
                                     ERL_NIF_TERM eopt,
-                                    ERL_NIF_TERM optval);
+                                    ERL_NIF_TERM optval,
+                                    ERL_NIF_TERM level);
 
 // Prepare for Async CredConfig loading
 /* static void CompleteCredconfigLoadHook(HQUIC Configuration, */
@@ -818,7 +819,7 @@ get_level_param(ErlNifEnv *env,
                 ERL_NIF_TERM eopt,
                 ERL_NIF_TERM level)
 {
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   if (IS_SAME_TERM(ATOM_QUIC_CONFIGURATION, level))
     {
       res = get_config_opt(env, ConfigHandle, eopt);
@@ -834,14 +835,16 @@ get_level_param(ErlNifEnv *env,
 ERL_NIF_TERM
 set_level_param(ErlNifEnv *env,
                 HQUIC Handle,
-                ERL_NIF_TERM level,
+                HQUIC ConfigHandle,
                 ERL_NIF_TERM eopt,
-                ERL_NIF_TERM eval)
+                ERL_NIF_TERM eval,
+                ERL_NIF_TERM level)
 {
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
+
   if (IS_SAME_TERM(ATOM_QUIC_CONFIGURATION, level))
     {
-      res = set_config_opt(env, Handle, eopt, eval);
+      res = set_config_opt(env, ConfigHandle, eopt, eval);
     }
   if (IS_SAME_TERM(ATOM_QUIC_TLS, level))
     {
@@ -852,9 +855,7 @@ set_level_param(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-setopt4(ErlNifEnv *env,
-        __unused_parm__ int argc,
-        __unused_parm__ const ERL_NIF_TERM argv[])
+setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM ctx = argv[0];
   ERL_NIF_TERM eopt = argv[1];
@@ -1290,7 +1291,12 @@ set_stream_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      res = set_level_param(env, s_ctx->Stream, optname, optval, elevel);
+      res = set_level_param(env,
+                            s_ctx->Stream,
+                            s_ctx->c_ctx->config_resource->Configuration,
+                            optname,
+                            optval,
+                            elevel);
       goto Exit;
     }
 
@@ -1539,7 +1545,12 @@ set_connection_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      res = set_level_param(env, c_ctx->Connection, optname, optval, elevel);
+      res = set_level_param(env,
+                            c_ctx->Connection,
+                            c_ctx->config_resource->Configuration,
+                            optname,
+                            optval,
+                            elevel);
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
@@ -1918,7 +1929,12 @@ set_listener_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      res = set_level_param(env, l_ctx->Listener, optname, optval, elevel);
+      res = set_level_param(env,
+                            l_ctx->Listener,
+                            l_ctx->config_resource->Configuration,
+                            optname,
+                            optval,
+                            elevel);
       goto Exit;
     }
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_CIBIR_ID))

@@ -116,6 +116,7 @@
         , tc_getopt/1
         , tc_setopt_bad_opt/1
         , tc_setopt_bad_nst/1
+        , tc_setopt_config_settings/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
         , tc_getopt_settings/1
@@ -1921,6 +1922,32 @@ tc_setopt_bad_nst(_Config)->
                                           [{nst, <<"">>}
                                           | default_conn_opts()], 5000).
 
+tc_setopt_config_settings(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+      ?assertEqual(ok, quicer:setopt(Conn, param_configuration_settings,
+                                     #{idle_timeout_ms => 60000},
+                                     quic_configuration)),
+      {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive {quic, <<"ping">>, Stm, _} -> ok end,
+      Settings1 = lists:keyreplace(idle_timeout_ms, 1, Settings, {idle_timeout_ms, 60000}),
+      %% This is meaning less test, just for coverage
+      %% config resources are not really exposed
+      ?assertEqual({ok, Settings1}, quicer:getopt(Conn, param_configuration_settings, quic_configuration)),
+      ?assertEqual({ok, Settings1}, quicer:getopt(Stm, param_configuration_settings, quic_configuration)),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
 
 tc_setopt_conn_local_addr(Config) ->
   Port = select_port(),

@@ -71,6 +71,8 @@
         conf_handle()       |
         reg_handle().
 
+-type quic_handle_level() :: quic_tls | quic_configuration | false.
+
 -type listen_on() :: inet:port_number() | string().
 -type listen_opts() :: listen_security_opts() | quic_settings().
 -type listen_security_opts() :: #{ alpn := [alpn()]
@@ -252,7 +254,7 @@
 -type optname_reg() :: param_registration_cid_prefix.         %% |  X  | X  | @TODO
 
 -type optname_configuration() ::                              %% with config_handle()
-        param_configuration_settings        |                 %% |  X  | X  | @TODO
+        param_configuration_settings        |                 %% |  X  | X  |
         param_configuration_ticket_keys.                      %% |     | X  | @TODO
 
 -type optname_listener() ::                                   %% with listener_handle
