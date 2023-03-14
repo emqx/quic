@@ -770,16 +770,27 @@ tc_conn_gc(Config) ->
                  %% The dead process should trigger a connection close
                  %% The dead process should trigger a GC
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
-                 _Child = spawn_link(fun() ->
-                                         %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
-                                         {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
-                                                                                         {verify, none},
-                                                                                         {alpn, ["sample"]}], 5000),
-                                         {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-                                         {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                                         {ok, <<"ping">>} = quicer:recv(Stm, 4)
-                                     end),
-
+                 Parent = self(),
+                 {Child, MRef} = spawn_monitor(
+                                   fun() ->
+                                       %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
+                                       {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
+                                                                                       {verify, none},
+                                                                                       {alpn, ["sample"]}], 5000),
+                                       {ok, Rid} = quicer:get_conn_rid(Conn),
+                                       Parent ! {crid, Rid},
+                                       {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                                       {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                                       {ok, <<"ping">>} = quicer:recv(Stm, 4)
+                                   end),
+                 CRid = receive
+                          {crid, Rid} ->
+                            Rid
+                        end,
+                 receive
+                   {'DOWN', MRef, process, Child, normal} ->
+                     erlang:garbage_collect()
+                 end,
                  %% Server Process
                  {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
@@ -794,6 +805,7 @@ tc_conn_gc(Config) ->
                                    , context := "callback"
                                    , function := "ClientConnectionCallback"
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , resource_id := CRid
                                    , tag := "event" },
                                   5000, 1000),
                  %% OTP GC callback
