@@ -118,6 +118,7 @@
         , tc_setopt_bad_nst/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
+        , tc_getopt_settings/1
 
         %% @TODO following two tcs are failing due to:
         %  https://github.com/microsoft/msquic/issues/2033
@@ -1387,7 +1388,7 @@ tc_stream_controlling_process_demon(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       Parent = self(),
-      {Old, MonRef} = spawn_monitor(
+      {_Old, MonRef} = spawn_monitor(
                              fun() ->
                                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                  Res = quicer:controlling_process(Stm, Parent),
@@ -1595,6 +1596,26 @@ tc_getopt(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive {quic, <<"ping">>, Stm, _} -> ok end,
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_getopt_settings(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+      ?assertEqual({ok, Settings}, quicer:getopt(Conn, param_configuration_settings, quic_configuration)),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      receive {quic, <<"ping">>, Stm, _} -> ok end,
+      ?assertEqual({ok, Settings}, quicer:getopt(Stm, param_configuration_settings, quic_configuration)),
       ok = quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
