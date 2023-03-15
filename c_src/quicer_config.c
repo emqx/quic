@@ -723,7 +723,9 @@ encode_parm_to_eterm(ErlNifEnv *env,
            || (QUIC_PARAM_STREAM_0RTT_LENGTH == Param
                && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
            || (QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == Param
-               && QUICER_PARAM_HANDLE_TYPE_STREAM == Type))
+               && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
+           || (QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT == Param
+               && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type))
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
@@ -2107,15 +2109,15 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
+  uint32_t percent = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   QUIC_SETTINGS Settings = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
-      // @TODO
       Param = QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Buffer = &percent;
+      BufferLength = sizeof(uint32_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS))
     {
