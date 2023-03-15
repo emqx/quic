@@ -2196,6 +2196,7 @@ set_global_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   uint32_t percent = 0;
+  QUIC_SETTINGS Settings = { 0 };
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
       Param = QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT;
@@ -2221,19 +2222,15 @@ set_global_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS))
-    {
-      // @TODO
-      Param = QUIC_PARAM_GLOBAL_PERF_COUNTERS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
-    }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_SETTINGS))
     {
-      // @TODO
       Param = QUIC_PARAM_GLOBAL_SETTINGS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      if (!create_settings(env, &optval, &Settings))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      BufferLength = sizeof(Settings);
+      Buffer = &Settings;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_VERSION))
     {
