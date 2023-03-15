@@ -725,6 +725,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
            || (QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == Param
                && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
            || (QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT == Param
+               && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type)
+           || (QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE == Param
                && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type))
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
@@ -2093,10 +2095,9 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE))
     {
-      // @TODO
       Param = QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Buffer = &percent;
+      BufferLength = sizeof(uint32_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS))
     {
@@ -2196,6 +2197,7 @@ set_global_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   uint32_t percent = 0;
+  uint32_t lbmode = 0;
   QUIC_SETTINGS Settings = { 0 };
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
@@ -2217,10 +2219,16 @@ set_global_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE))
     {
-      // @TODO
       Param = QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      // not sure if msquic checks it
+      BufferLength = sizeof(lbmode);
+      if (!enif_get_uint(env, optval, &lbmode)
+          || lbmode >= QUIC_LOAD_BALANCING_COUNT)
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      Buffer = &lbmode;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_SETTINGS))
     {

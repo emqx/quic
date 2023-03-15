@@ -119,6 +119,8 @@
         , tc_setopt_config_settings/1
         , tc_setopt_global_retry_mem_percent/1
         , tc_getopt_global_retry_mem_percent/1
+        , tc_setopt_global_lb_mode/1
+        , tc_getopt_global_lb_mode/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
         , tc_getopt_settings/1
@@ -1960,6 +1962,16 @@ tc_setopt_global_retry_mem_percent(_Config) ->
 tc_getopt_global_retry_mem_percent(_Config) ->
   {ok, Val} = quicer:getopt(quic_global, param_global_retry_memory_percent),
   ?assert(is_integer(Val)).
+
+tc_getopt_global_lb_mode(_Config) ->
+  ?assertEqual({ok, 0},
+               quicer:getopt(quic_global, param_global_load_balacing_mode)).
+
+tc_setopt_global_lb_mode(_Config) ->
+  ?assertEqual({error, badarg},
+               quicer:setopt(quic_global, param_global_load_balacing_mode, 4)),
+  ?assertEqual({error, invalid_parameter}, %% v1 api
+               quicer:setopt(quic_global, param_global_load_balacing_mode, 1)).
 
 tc_setopt_conn_local_addr(Config) ->
   Port = select_port(),
