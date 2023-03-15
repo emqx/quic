@@ -2058,47 +2058,12 @@ Exit:
 
 static ERL_NIF_TERM
 set_tls_opt(ErlNifEnv *env,
-            HQUIC Handle,
-            ERL_NIF_TERM optname,
+            __unused_parm__ HQUIC Handle,
+            __unused_parm__ ERL_NIF_TERM optname,
             __unused_parm__ ERL_NIF_TERM optval)
 {
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
-  void *Buffer = NULL;
-  uint32_t BufferLength = 0;
-  uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
-
-  if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO))
-    {
-      // @TODO
-      Param = QUIC_PARAM_TLS_HANDSHAKE_INFO;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
-    }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN))
-    {
-      // @TODO
-      Param = QUIC_PARAM_TLS_NEGOTIATED_ALPN;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
-    }
-  else
-    {
-      res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-      goto Exit;
-    }
-
-  assert(Param);
-  status = MsQuic->SetParam(Handle, Param, BufferLength, Buffer);
-  if (QUIC_SUCCEEDED(status))
-    {
-      res = ATOM_OK;
-    }
-  else
-    {
-      res = ERROR_TUPLE_2(ATOM_STATUS(status));
-    }
-Exit:
+  // Currently no writable opts
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_SUPPORTED);
   return res;
 }
 
