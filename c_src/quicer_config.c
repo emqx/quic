@@ -748,7 +748,9 @@ encode_parm_to_eterm(ErlNifEnv *env,
   else if ((QUIC_PARAM_LISTENER_CIBIR_ID == Param
             && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type)
            || (QUIC_PARAM_TLS_NEGOTIATED_ALPN == Param
-               && QUICER_PARAM_HANDLE_TYPE_TLS == Type))
+               && QUICER_PARAM_HANDLE_TYPE_TLS == Type)
+           || (QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH == Param
+               && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type))
     {
       ERL_NIF_TERM ebin;
       unsigned char *bin_data = enif_make_new_binary(env, BufferLength, &ebin);
@@ -2079,6 +2081,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   uint32_t percent = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   QUIC_SETTINGS Settings = { 0 };
+  uint8_t githash[41] = { 0 }; // git hash 40 chars + \0
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT))
     {
@@ -2156,12 +2159,11 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
       Buffer = &Settings;
       BufferLength = sizeof(QUIC_SETTINGS);
     }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_VERSION))
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH))
     {
-      // @TODO
-      Param = QUIC_PARAM_GLOBAL_VERSION_SETTINGS;
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      Param = QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH;
+      BufferLength = sizeof(githash);
+      Buffer = &githash;
     }
   else
     {

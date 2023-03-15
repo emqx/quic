@@ -161,6 +161,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_SETTINGS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_VERSION;
+ERL_NIF_TERM ATOM_QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH;
 
 //
 // Parameters for QUIC_PARAM_LEVEL_REGISTRATION.
@@ -510,6 +511,8 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, param_global_perf_counters);     \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, param_global_settings);               \
   ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, param_global_version);                 \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH,                               \
+       param_global_library_git_hash);                                        \
                                                                               \
   /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
   ATOM(ATOM_QUIC_REGISTRATION, quic_registration);                            \
