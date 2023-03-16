@@ -1074,6 +1074,7 @@ tc_conn_resume_nst(Config) ->
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()], 5000),
+                 {ok, HandshakeInfo} = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  {ok, <<"ping">>} = quicer:recv(Stm, 4),
@@ -1087,6 +1088,9 @@ tc_conn_resume_nst(Config) ->
 
                  {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST} | default_conn_opts()], 5000),
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
+                 {ok, HandshakeInfo0RTT} = quicer:getopt(ConnResumed, param_tls_handshake_info, quic_tls),
+                 ct:pal("handshake info:~n1RTT: ~p~n0RTT: ~p~n", [HandshakeInfo, HandshakeInfo0RTT]),
+                 ?assertEqual(HandshakeInfo, HandshakeInfo0RTT),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  quicer:shutdown_connection(Conn),
