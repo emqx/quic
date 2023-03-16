@@ -849,8 +849,10 @@ tc_conn_gc(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
-                   ?assertEqual(1, length([ E || #{function := "resource_conn_dealloc_callback"
-                                                  , tag := "end"} = E <- Trace]))
+                   ?assertEqual(1, length([ E || #{ function := "resource_conn_dealloc_callback"
+                                                  , resource_id := Rid
+                                                  , tag := "end"} = E <- Trace, Rid == _CRid])
+                               )
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
@@ -885,6 +887,7 @@ tc_conn_no_gc(Config) ->
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
                  %% Server Process
                  {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
@@ -899,6 +902,7 @@ tc_conn_no_gc(Config) ->
                                    , context := "callback"
                                    , function := "ClientConnectionCallback"
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , resource_id := CRid
                                    , tag := "event" },
                                   5000, 1000),
                  %% Give it time for gc that should not happen on var 'Conn', could be the source of flakiness.
@@ -1001,13 +1005,14 @@ tc_conn_no_gc_2(Config) ->
                  Block = ?block_until(#{ ?snk_kind := debug
                                        , context := "callback"
                                        , function := "resource_conn_dealloc_callback"
+                                       , resource_id := CRid
                                        , tag := "end"},
                                       5000, 1000),
                  case Block of
                    timeout -> ok;
                    {ok, #{ resource_id := CRid }} ->
                      %% Don't fail the testcase here, we need the traces in post run
-                     ct:pal("!!!Error!!!: Rid: ~p of ~p should not be released"
+                     ct:pal("!!!Error!!!: Rid: ~p of ~p should not be released~n"
                             "Check snb traces for more",
                             [CRid, ClientConn]);
                    {ok, #{ resource_id := _OtherRid }} ->
