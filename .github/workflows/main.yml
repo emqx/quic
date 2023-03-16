@@ -35,19 +35,7 @@ jobs:
         run: |
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
-          # run sudo for getting coredump
-          sudo make ci
-
-      - name: lldb bt
-        if: failure()
-        run: |
-          corefile=$(find /cores -name 'core.*')
-          if [ -n $corefile ]; then
-            sudo lldb --one-line bt $(erl -noshell -eval 'io:format(code:root_dir()),halt()')/erts-*/bin/beam.smp -c "${corefile}"
-          else
-            echo "No coredump found"
-          fi
-
+          make ci
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2
         if: failure()
