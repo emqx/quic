@@ -114,6 +114,7 @@
 
         % , tc_getopt_raw/1
         , tc_getopt/1
+        , tc_setopt_conn_settings/1
         , tc_setopt_bad_opt/1
         , tc_setopt_bad_nst/1
         , tc_setopt_config_settings/1
@@ -1880,6 +1881,46 @@ tc_idle_timeout(Config) ->
       ensure_server_exit_normal(Ref)
   end.
 
+tc_setopt_conn_settings(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() ->
+                                  echo_server(Owner,
+                                              Config ++ [{peer_bidi_stream_count, 1}], Port)
+                              end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Settings} = quicer:getopt(Conn, param_conn_settings),
+      ok = quicer:setopt(Conn, param_conn_settings, Settings),
+      {ok, Stm0} = quicer:start_stream(Conn, [{active, false}]),
+      %% Stream 0
+      {ok, 5} = quicer:send(Stm0, <<"ping0">>),
+      {ok, <<"ping0">>} = quicer:recv(Stm0, 0),
+      %% Stream 1 but get blocked due to stream count
+      {ok, Stm1} = quicer:start_stream(Conn, [{active, true}]),
+      {ok, 5} = quicer:send(Stm1, <<"ping1">>),
+      receive
+        {quic, Data, Stm1, _} = Msg when is_binary(Data) ->
+          ct:fail("unexpected_recv ~p ", [Msg])
+      after 1000 ->
+                ok
+      end,
+
+      %% unblock Stream 1
+      SPid ! {set_stm_cnt, 3},
+
+      receive
+        {quic, <<"ping1">>, Stm1, _} ->
+          ok
+      after 1000 ->
+          ct:fail("sending is still blocked", [])
+      end,
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end.
 
 tc_setopt(Config) ->
   Port = select_port(),
