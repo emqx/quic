@@ -1596,7 +1596,21 @@ tc_getopt(Config) ->
     listener_ready ->
       {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
       {ok, Stats} = quicer:getopt(Conn, Parm, false),
-      {ok, false} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
+      ?assertEqual({ok, false}, quicer:getopt(Conn, param_conn_datagram_receive_enabled)),
+      ?assertEqual({ok, false}, quicer:getopt(Conn, param_conn_datagram_send_enabled)),
+      ?assertEqual({ok, false}, quicer:getopt(Conn, param_conn_disable_1rtt_encryption)),
+      ?assertEqual({ok, 1}, quicer:getopt(Conn, param_conn_quic_version)),
+      %% 0: fifo
+      %% 1: round-robin
+      ?assertEqual({ok, 0}, quicer:getopt(Conn, param_conn_stream_scheduling_scheme)),
+      ?assertMatch({ok, {_, _}}, quicer:getopt(Conn, param_conn_local_address)),
+      {ok, MaxIds} = quicer:getopt(Conn, param_conn_max_stream_ids),
+      ct:pal("MaxStreamIds: client bidi: ~p, server bidi: ~p "
+             "client unidi ~p, server unidi ~p"
+            , MaxIds),
+      ?assertEqual({error, invalid_parameter}, quicer:getopt(Conn, param_conn_local_interface)),
+      ?assertEqual({error, invalid_parameter}, quicer:getopt(Conn, param_conn_peer_certificate_valid)),
+      {error, not_supported} = quicer:getopt(Conn, param_conn_resumption_ticket),
       0 = proplists:get_value("Recv.DroppedPackets", Stats),
       [true = proplists:is_defined(SKey, Stats)
        || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]],
@@ -1607,6 +1621,8 @@ tc_getopt(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       receive {quic, <<"ping">>, Stm, _} -> ok end,
       ok = quicer:close_connection(Conn),
+      %% @todo unsupp in msquic, leave it for now
+      {error, not_found} = quicer:getopt(Conn, param_conn_close_reason_phrase),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 5000 ->
