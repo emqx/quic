@@ -604,6 +604,8 @@ tc_conn_basic_verify_peer(_Config)->
                               , {peer_unidi_stream_count, 3}
                               , {alpn, ["h3"]}], 5000),
   {ok, {_, _}} = quicer:sockname(Conn),
+  {ok, Info} = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
+  ct:pal("Handshake Info with Google: ~p", [Info]),
   ok = quicer:close_connection(Conn),
   ok.
 
