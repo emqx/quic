@@ -1270,7 +1270,6 @@ set_stream_opt(ErlNifEnv *env,
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
   uint16_t BuffUint16 = 0;
-  uint64_t BuffUint64 = 0;
 
   // Non Msquic Opts
   if (IS_SAME_TERM(optname, ATOM_QUIC_STREAM_OPTS_ACTIVE))
@@ -1310,19 +1309,16 @@ set_stream_opt(ErlNifEnv *env,
 
   else if (IS_SAME_TERM(ATOM_QUIC_PARAM_STREAM_ID, optname))
     {
-      Param = QUIC_PARAM_STREAM_ID;
-      BufferLength = sizeof(uint64_t);
-      Buffer = &BuffUint64;
+      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
+      goto Exit;
     }
   else if (ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH == optname)
     {
-      // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
   else if (ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == optname)
     {
-      // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }

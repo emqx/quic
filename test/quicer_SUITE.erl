@@ -132,6 +132,7 @@
         % , tc_setopt_conn_local_addr/1
         % , tc_setopt_conn_local_addr_in_use/1
         , tc_setopt_stream_priority/1
+        , tc_setopt_stream_unsupp_opts/1
         , tc_strm_opt_active_n/1
         , tc_strm_opt_active_once/1
         , tc_strm_opt_active_1/1
@@ -2151,6 +2152,29 @@ tc_setopt_stream_priority(Config) ->
   after 5000 ->
     ct:fail("listener_timeout")
   end.
+
+tc_setopt_stream_unsupp_opts(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+      ?assertEqual({error, not_supported}, quicer:setopt(Stm, param_stream_id, 8)),
+      ?assertEqual({error, not_supported}, quicer:setopt(Stm, param_stream_0rtt_length, 4096)),
+      ?assertEqual({error, not_supported}, quicer:setopt(Stm, param_stream_ideal_send_buffer_size, 4096)),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, <<"ping">>} = quicer:recv(Stm, 0),
+      % try to set priority out of range
+      {error, param_error} = quicer:setopt(Stm, param_stream_priority, 65536),
+      SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end.
+
+
 
 tc_app_echo_server(Config) ->
   Port = select_port(),
