@@ -3006,8 +3006,9 @@ tc_getopt_tls_handshake_info(Config) ->
             , hash_strength := 0
             , key_exchange_algorithm := none
             , key_exchange_strength := 0
-            , tls_protocol_version := tlsv1_3}}
+            , tls_protocol_version := tlsv1_3} = HSInfo}
          = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
+      ?assertEqual({error,not_supported}, quicer:setopt(Conn, param_tls_handshake_info, HSInfo, quic_tls)),
       ok = quicer:close_connection(Conn),
       SPid ! done
   after 1000 ->
