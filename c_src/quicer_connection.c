@@ -443,6 +443,20 @@ open_connection0(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
+  c_ctx->owner = AcceptorAlloc();
+  if (!c_ctx->owner)
+    {
+      enif_release_resource(c_ctx);
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
+  if (!enif_self(env, &(c_ctx->owner->Pid)))
+    {
+      enif_release_resource(c_ctx);
+      res = ERROR_TUPLE_2(ATOM_BAD_PID);
+      return res;
+    }
+
   if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
                                                   ClientConnectionCallback,
                                                   c_ctx,
@@ -498,6 +512,7 @@ async_connect3(ErlNifEnv *env,
       if (enif_get_resource(env, eHandle, ctx_connection_t, (void **)&c_ctx))
         {
           assert(c_ctx->is_closed);
+          assert(c_ctx->owner);
           is_reuse_handle = TRUE;
         }
       else
@@ -505,27 +520,27 @@ async_connect3(ErlNifEnv *env,
           return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
     }
-  else // we create new c_ctx
+  else // we create new c_ctx and set owner
     {
       c_ctx = init_c_ctx();
+      if ((c_ctx->owner = AcceptorAlloc()) == NULL)
+        {
+          res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+          goto Error;
+        }
+
+      if (!enif_self(env, &(c_ctx->owner->Pid)))
+        {
+          res = ERROR_TUPLE_2(ATOM_BAD_PID);
+          goto Error;
+        }
     }
 
+  assert(c_ctx->owner);
   // allocate config_resource for client connection
   if (NULL == (c_ctx->config_resource = init_config_ctx()))
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-      goto Error;
-    }
-
-  if ((c_ctx->owner = AcceptorAlloc()) == NULL)
-    {
-      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-      goto Error;
-    }
-
-  if (!enif_self(env, &(c_ctx->owner->Pid)))
-    {
-      res = ERROR_TUPLE_2(ATOM_BAD_PID);
       goto Error;
     }
 
