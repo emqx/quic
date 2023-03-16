@@ -131,6 +131,7 @@
         %  https://github.com/microsoft/msquic/issues/2033
         % , tc_setopt_conn_local_addr/1
         % , tc_setopt_conn_local_addr_in_use/1
+        , tc_setopt_conn_remote_addr/1
         , tc_setopt_stream_priority/1
         , tc_setopt_stream_unsupp_opts/1
         , tc_strm_opt_active_n/1
@@ -1963,6 +1964,26 @@ tc_setopt(Config) ->
                 ok
       end,
 
+      {error, not_supported} = quicer:setopt(Conn, param_conn_quic_version, 1),
+      %% must be set before start
+      {error, invalid_state} = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
+
+      {error, not_supported} = quicer:setopt(Conn, param_conn_ideal_processor, 1),
+      {error, not_supported} = quicer:setopt(Conn, param_conn_max_stream_ids, [1,2,3,4]),
+      ok = quicer:setopt(Conn, param_conn_close_reason_phrase, "You are not welcome!"),
+      ok = quicer:setopt(Conn, param_conn_stream_scheduling_scheme, 1),
+      {ok, 1} = quicer:getopt(Conn, param_conn_stream_scheduling_scheme),
+      %% get-only
+      {error, invalid_parameter} = quicer:setopt(Conn, param_conn_datagram_send_enabled, false),
+      %% Must set before start
+      {error, invalid_state} = quicer:setopt(Conn, param_conn_datagram_receive_enabled, false),
+      {error, invalid_state} = quicer:setopt(Conn, param_conn_datagram_receive_enabled, true),
+      {error, invalid_state} = quicer:setopt(Conn, param_conn_datagram_receive_enabled, false),
+      ok = quicer:setopt(Conn, param_conn_peer_certificate_valid, true),
+      ok = quicer:setopt(Conn, param_conn_peer_certificate_valid, false),
+      {error, invalid_state} = quicer:setopt(Conn, param_conn_local_interface, 1),
+      %% test invalid
+      {error, invalid_parameter} = quicer:setopt(Conn, param_conn_resumption_ticket, << >>),
       %% unblock Stream 1
       SPid ! {set_stm_cnt, 3},
 
@@ -2016,6 +2037,17 @@ tc_setopt_config_settings(Config) ->
   after 5000 ->
       ct:fail("listener_timeout")
   end.
+
+tc_setopt_conn_remote_addr(_Config) ->
+  {ok, Conn} = quicer:open_connection(),
+  ok = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
+  ok = quicer:setopt(Conn, param_conn_datagram_receive_enabled, false),
+  {ok, Conn} = quicer:connect("google.com", 443, [ {verify, verify_peer}
+                                                 , {handle, Conn}
+                                                 , {peer_unidi_stream_count, 3}
+                                                 , {idle_timeout_ms, 5000}
+                                                 , {handshake_idle_timeout_ms, 5000}
+                                                 , {alpn, ["h3"]}], 1000).
 
 tc_setopt_global_retry_mem_percent(_Config) ->
   ?assertEqual(ok, quicer:setopt(quic_global, param_global_retry_memory_percent, 30, false)).

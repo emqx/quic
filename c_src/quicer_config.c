@@ -1564,8 +1564,11 @@ set_connection_opt(ErlNifEnv *env,
   bool isMalloc = FALSE;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
+  uint32_t Value = 0;
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
   QUIC_ADDR addr;
+  uint8_t phrase[512] = { 0 };
+  ErlNifBinary ticket;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1581,7 +1584,8 @@ set_connection_opt(ErlNifEnv *env,
     {
       Param = QUIC_PARAM_CONN_QUIC_VERSION;
       // QUIC_CONNECTION.stats.QuicVersion
-      BufferLength = sizeof(uint32_t);
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_SUPPORTED);
+      goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS))
     {
@@ -1597,14 +1601,18 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS))
     {
       Param = QUIC_PARAM_CONN_REMOTE_ADDRESS;
+      // @TODO fun name is missleading
+      if (!parse_listen_on(env, optval, &addr))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
       BufferLength = sizeof(QUIC_ADDR);
       Buffer = &addr;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR))
     {
       Param = QUIC_PARAM_CONN_IDEAL_PROCESSOR;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_SUPPORTED);
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SETTINGS))
@@ -1618,18 +1626,6 @@ set_connection_opt(ErlNifEnv *env,
           res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Exit;
         }
-    }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS))
-    {
-      Param = QUIC_PARAM_CONN_STATISTICS;
-      BufferLength = sizeof(QUIC_STATISTICS);
-    }
-  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT))
-    {
-      Param = QUIC_PARAM_CONN_STATISTICS_PLAT;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING))
     {
@@ -1711,39 +1707,70 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS))
     {
       Param = QUIC_PARAM_CONN_MAX_STREAM_IDS;
-      // @TODO
       res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE))
     {
       Param = QUIC_PARAM_CONN_CLOSE_REASON_PHRASE;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      BufferLength = sizeof(phrase);
+      Buffer = &phrase;
+      if (!enif_get_string(env, optval, Buffer, BufferLength, ERL_NIF_LATIN1))
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
     }
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME))
     {
       Param = QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      if (!enif_get_uint(env, optval, &Value))
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      Buffer = &Value;
+      BufferLength = sizeof(Value);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED))
     {
       Param = QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+
+      if (IS_SAME_TERM(ATOM_TRUE, optval))
+        {
+          Value = TRUE;
+        }
+      else if (IS_SAME_TERM(ATOM_FALSE, optval))
+        {
+          Value = FALSE;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      Buffer = &Value;
+      BufferLength = sizeof(uint8_t);
     }
   else if (IS_SAME_TERM(optname,
                         ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED))
     {
       Param = QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      if (IS_SAME_TERM(ATOM_TRUE, optval))
+        {
+          Value = TRUE;
+        }
+      else if (IS_SAME_TERM(ATOM_FALSE, optval))
+        {
+          Value = FALSE;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      Buffer = &Value;
+      BufferLength = sizeof(uint8_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION))
     {
@@ -1782,23 +1809,43 @@ set_connection_opt(ErlNifEnv *env,
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET))
     {
       Param = QUIC_PARAM_CONN_RESUMPTION_TICKET;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      if (!enif_inspect_binary(env, optval, &ticket)
+          || ticket.size > UINT32_MAX)
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      Buffer = ticket.data;
+      BufferLength = ticket.size;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID))
     {
       Param = QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      if (IS_SAME_TERM(ATOM_TRUE, optval))
+        {
+          Value = TRUE;
+        }
+      else if (IS_SAME_TERM(ATOM_FALSE, optval))
+        {
+          Value = FALSE;
+        }
+      else
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+          goto Exit;
+        }
+      Buffer = &Value;
+      BufferLength = sizeof(uint8_t);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE))
     {
       Param = QUIC_PARAM_CONN_LOCAL_INTERFACE;
-      // @TODO
-      res = ERROR_TUPLE_2(ATOM_STATUS(QUIC_STATUS_NOT_SUPPORTED));
-      goto Exit;
+      if (!enif_get_uint(env, optval, &Value))
+        {
+          res = ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      Buffer = &Value;
+      BufferLength = sizeof(Value);
     }
   else
     {
