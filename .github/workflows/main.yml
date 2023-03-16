@@ -35,6 +35,7 @@ jobs:
         run: |
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
+          make build-nif
           make ci
       - name: Archive CT Logs
         uses: actions/upload-artifact@v2
