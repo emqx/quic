@@ -4,7 +4,8 @@ on:
   push:
     tags:
       - "*"
-
+    branches:
+      - 'ci/**'
 jobs:
   mac:
     strategy:
@@ -16,41 +17,21 @@ jobs:
         os:
           - macos-12
           - macos-11
+          - macos-12-arm64
     runs-on: ${{ matrix.os }}
     steps:
-      - name: prepare
-        run: |
-          # brew update
-          brew install curl zip unzip gnu-sed kerl
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          git config --global credential.helper store
-      - uses: actions/cache@v3
-        id: cache
+      - uses: emqx/setup-otp@v1.0.0
         with:
-          path: ~/.kerl/${{ matrix.otp }}
-          key: otp-install-${{ matrix.otp }}-${{ matrix.os }}
-
-      - name: build erlang
-        if: steps.cache.outputs.cache-hit != 'true'
-        timeout-minutes: 60
-        run: |
-          kerl update releases
-          kerl build git https://github.com/emqx/otp.git OTP-${{ matrix.otp }} ${{ matrix.otp }}
-          kerl install ${{ matrix.otp }} $HOME/.kerl/${{ matrix.otp }}
+          os: ${{ matrix.os }}
+          otp: ${{ matrix.otp }}
 
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: install rebar3
-        run: |
-          wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-          cp ./rebar3 /usr/local/bin/rebar3
-
       - name: build release
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          . $HOME/.kerl/${{ matrix.otp }}/activate
           BUILD_RELEASE=1 make
 
       - uses: actions/upload-artifact@v3
