@@ -19,8 +19,11 @@ build() {
     make -j "$JOBS" -C c_build
     ## MacOS
     if [ -f priv/libquicer_nif.dylib ]; then
-        # TODO: why cp, but not mv ?
+        # https://developer.apple.com/forums/thread/696460
+        # remove then copy avoid SIGKILL (Code Signature Invalid)
+        [ -f "$TARGET_SO" ] && rm "$TARGET_SO"
         cp priv/libquicer_nif.dylib "$TARGET_SO"
+        echo "macOS"
     fi
 }
 

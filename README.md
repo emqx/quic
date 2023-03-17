@@ -17,7 +17,7 @@ API: is not stable, might be changed in the future.
 | OS      | Status    |
 |---------|-----------|
 | Linux   | Supported |
-| MACOS   | Supported |
+| macOS   | Supported |
 | Windows | TBD       |
 
 # BUILD
