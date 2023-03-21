@@ -712,50 +712,37 @@ encode_parm_to_eterm(ErlNifEnv *env,
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_ServerResumptionLevel,
                            Settings->ServerResumptionLevel)));
     }
-  else if ((QUIC_PARAM_STREAM_ID == Param
-            && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
-           || (QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_QUIC_VERSION == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_STREAM_0RTT_LENGTH == Param
-               && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
-           || (QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == Param
-               && QUICER_PARAM_HANDLE_TYPE_STREAM == Type)
-           || (QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT == Param
-               && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type)
-           || (QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE == Param
-               && QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type)
-           || (QUIC_PARAM_CONN_LOCAL_INTERFACE == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type))
+  else if ((QUICER_PARAM_HANDLE_TYPE_STREAM == Type
+            && (QUIC_PARAM_STREAM_ID == Param
+                || QUIC_PARAM_STREAM_0RTT_LENGTH == Param
+                || QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == Param))
+           || (QUICER_PARAM_HANDLE_TYPE_CONN == Type
+               && (QUIC_PARAM_CONN_IDEAL_PROCESSOR == Param
+                   || QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT == Param
+                   || QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT == Param
+                   || QUIC_PARAM_CONN_QUIC_VERSION == Param
+                   || QUIC_PARAM_CONN_LOCAL_INTERFACE == Param
+                   || QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME == Param))
+           || (QUICER_PARAM_HANDLE_TYPE_GLOBAL == Type
+               && (QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE == Param
+                   || QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT == Param)))
     {
       res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
     }
-  else if ((QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
-            && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_LOCAL_ADDRESS == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param
-               && QUICER_PARAM_HANDLE_TYPE_LISTENER == Type))
+  else if ((QUICER_PARAM_HANDLE_TYPE_CONN == Type
+            && (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
+                || QUIC_PARAM_CONN_LOCAL_ADDRESS == Param))
+           || (QUICER_PARAM_HANDLE_TYPE_LISTENER == Type
+               && QUIC_PARAM_LISTENER_LOCAL_ADDRESS == Param))
     {
       res = SUCCESS(addr2eterm(env, (QUIC_ADDR *)Buffer));
     }
-  else if ((QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param
-            && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_SHARE_UDP_BINDING == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type)
-           || (QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID == Param
-               && QUICER_PARAM_HANDLE_TYPE_CONN == Type))
+  else if (QUICER_PARAM_HANDLE_TYPE_CONN == Type
+           && (QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION == Param
+               || QUIC_PARAM_CONN_SHARE_UDP_BINDING == Param
+               || QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED == Param
+               || QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED == Param
+               || QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID == Param))
     {
       res = SUCCESS(ETERM_BOOL(*(BOOLEAN *)Buffer));
     }
