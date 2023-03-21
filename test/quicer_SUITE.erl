@@ -233,6 +233,7 @@ init_per_suite(Config) ->
   Config.
 
 end_per_suite(_Config) ->
+  application:stop(quicer),
   ok.
 
 
