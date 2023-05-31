@@ -44,6 +44,8 @@
           tc_conn_resume_nst_async/1,
           tc_conn_resume_nst_with_data/1,
           tc_listener_no_acceptor/1,
+          tc_listener_inval_local_addr/1,
+          tc_conn_start_inval_port/1,
           tc_conn_stop_notify_acceptor/1,
           tc_accept_stream_active_once/1,
           tc_accept_stream_active_N/1,
@@ -124,6 +126,12 @@ end_per_group(_GroupName, _Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
+init_per_testcase(tc_listener_inval_local_addr, Config) ->
+  case os:type() of
+    {unix, darwin} -> {skip, "Not runnable on MacOS"};
+    _ ->
+      Config
+  end;
 init_per_testcase(_TestCase, Config) ->
   Config.
 
@@ -183,6 +191,8 @@ all() ->
   , tc_conn_resume_nst_with_data
   , tc_conn_resume_nst_async
   , tc_listener_no_acceptor
+  , tc_listener_inval_local_addr
+  , tc_conn_start_inval_port
   , tc_conn_stop_notify_acceptor
   , tc_accept_stream_active_once
   , tc_accept_stream_active_N
@@ -516,9 +526,12 @@ tc_conn_close_flag_1(Config) ->
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
+                 ct:pal("Client connection Rid: ~p", [CRid]),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                 quicer:recv(Stm, 4),
+                 {ok, 9} = quicer:async_send(Stm, <<"__STATE__">>),
+                 #{conn := SConn} = quicer_test_lib:recv_term_from_stream(Stm),
+                 {ok, SRid} = quicer:get_conn_rid(SConn),
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
                  {ok, _} = ?block_until(
                               #{ ?snk_kind := debug
@@ -530,14 +543,15 @@ tc_conn_close_flag_1(Config) ->
                               #{ ?snk_kind := debug
                                , context := "callback"
                                , function := "ClientConnectionCallback"
+                               , resource_id := CRid
                                , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                , tag := "event"}, 1000, 3000),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:stop_listener(mqtt),
+                 {CRid, SRid}
                end,
-               fun(Result, Trace) ->
+               fun({_CRid, SRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertEqual(ok, Result),
                    %% verify that client close_connection with default flag
                    %% triggers a close at server side
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -545,14 +559,14 @@ tc_conn_close_flag_1(Config) ->
                                               , function := "ServerConnectionCallback"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
                                               , tag := "event"
-                                              , resource_id := _CRid
+                                              , resource_id := SRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ServerConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                                              , resource_id := _CRid
+                                              , resource_id := SRid
                                               },
                                              Trace))
                end),
@@ -767,7 +781,7 @@ tc_conn_gc(Config) ->
                                      end),
 
                  %% Server Process
-                 {ok, #{resource_id := _SRid}}
+                 {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
                                    , context := "callback"
                                    , function := "ServerConnectionCallback"
@@ -789,11 +803,11 @@ tc_conn_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 ok
+                 {SRid, CRid}
                end,
-               fun(Result, Trace) ->
+               fun({_SRid, _CRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertEqual(ok, Result),
+                   ct:pal("Target SRid: ~p, CRid: ~p", [_SRid, _CRid]),
                    %% check that at client side, GC is triggered after connection close.
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -801,12 +815,12 @@ tc_conn_gc(Config) ->
                                               , function := "ClientConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                                              , resource_id := _RidC
+                                              , resource_id := _CRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "resource_conn_dealloc_callback"
-                                              , resource_id := _RidC
+                                              , resource_id := _CRid
                                               , tag := "end"},
                                              Trace)),
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -814,12 +828,12 @@ tc_conn_gc(Config) ->
                                               , function := "ServerConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ServerConnectionCallback"
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
@@ -860,7 +874,7 @@ tc_conn_no_gc(Config) ->
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
                  %% Server Process
-                 {ok, #{resource_id := _SRid}}
+                 {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
                                    , context := "callback"
                                    , function := "ServerConnectionCallback"
@@ -884,10 +898,10 @@ tc_conn_no_gc(Config) ->
                                          , resource_id := CRid
                                          , tag := "end"},
                                         5000, 1000),
-                 {ok, CRid, Conn}
+                 {ok, CRid, SRid, Conn}
 
                end,
-               fun({ok, CRid, Conn}, Trace) ->
+               fun({ok, CRid, _RidS, Conn}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -952,7 +966,7 @@ tc_conn_no_gc_2(Config) ->
                      {PRef, C, ConnRid, S} -> {C, ConnRid, S}
                    end,
                  %% Server Process
-                 {ok, #{resource_id := _SRid}}
+                 {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
                                    , context := "callback"
                                    , function := "ServerConnectionCallback"
@@ -990,10 +1004,10 @@ tc_conn_no_gc_2(Config) ->
                  timer:sleep(1000),
                  %% We can get segfault here if it is use-after-free
                  quicer:getstat(ClientConn, [send_cnt, recv_oct, send_pend]),
-                 {ok, CRid, ClientConn} %% Ensure we hold the ref here
+                 {ok, CRid, SRid, ClientConn} %% Ensure we hold the ref here
 
                end,
-               fun({ok, CRid, _}, Trace) ->
+               fun({ok, CRid, _SRid, _}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -1001,12 +1015,12 @@ tc_conn_no_gc_2(Config) ->
                                               , function := "ServerConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "ServerConnectionCallback"
-                                              , resource_id := _RidS
+                                              , resource_id := _SRid
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
@@ -1273,7 +1287,8 @@ tc_conn_resume_nst_with_data(Config) ->
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
                  {ok, NewConn} = quicer_nif:open_connection(),
                  %% Send data over new stream in the resumed connection
-                 {ok, Stm2} = quicer:async_csend(NewConn, <<"ping_from_resumed">>, [{active, false}], ?QUIC_SEND_FLAG_ALLOW_0_RTT),
+                 {ok, Stm2} = quicer:async_csend(NewConn, <<"ping_from_resumed">>, [{active, false}],
+                                                 ?QUIC_SEND_FLAG_ALLOW_0_RTT bor ?QUICER_SEND_FLAG_SYNC),
                  %% Now we could start the connection to ensure 0-RTT data in use
                  {ok, ConnResumed} = quicer:async_connect("localhost", Port, [{nst, NST},
                                                                               {handle, NewConn},
@@ -1384,6 +1399,61 @@ tc_listener_no_acceptor(Config) ->
                                       Trace))
                end),
   ok.
+
+%% @doc this triggers listener start fail
+tc_listener_inval_local_addr(Config) ->
+  BadListenOn = "8.8.8.8:443",
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 Res = quicer:listen(BadListenOn, default_listen_opts(Config)),
+                 ?block_until(#{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "resource_config_dealloc_callback"
+                               , tag := "end"}, 1000, 1000),
+                 Res
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch({error, listener_start_error,
+                                 {unknown_quic_status, _}}, Result),
+                   ?assertMatch([#{ context := "nif"
+                                  , function := "listen2"
+                                  , tag := "start_fail"
+                                  }],
+                                lists:filter(fun(Event) ->
+                                                 "nif" == maps:get(context, Event, undefined)
+                                             end, Trace))
+               end).
+
+tc_conn_start_inval_port(_Config) ->
+  application:ensure_all_started(quicer),
+  BadPort = 65536,
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 Res = quicer:connect("localhost", BadPort, default_conn_opts(), infinity),
+                 receive
+                   {quic, closed, _, _} = Msg->
+                     ct:fail("shall not recv msg for failed connection  ~p", [Msg])
+                   after 100 ->
+                       ok
+                 end,
+                 ?block_until(#{ ?snk_kind := debug
+                               , context := "callback"
+                               , function := "resource_config_dealloc_callback"
+                               , tag := "end"}, 1000, 1000),
+                 Res
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertMatch({error, conn_start_error}, Result),
+                   ?assertMatch([#{ context := "nif"
+                                  , function := "async_connect3"
+                                  , tag := "start_fail"
+                                  }],
+                                lists:filter(fun(Event) ->
+                                                 "nif" == maps:get(context, Event, undefined)
+                                             end, Trace))
+               end).
 
 tc_conn_stop_notify_acceptor(Config) ->
   Port = select_port(),
@@ -2031,6 +2101,7 @@ default_listen_opts(Config) ->
   , {alpn, ["sample"]}
   , {verify, none}
   , {idle_timeout_ms, 10000}
+  , {handshake_idle_timeout_ms, 10000} %% some CI runner is slow on this
   , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
   , {peer_bidi_stream_count, 10}
   ].

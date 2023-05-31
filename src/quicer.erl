@@ -213,7 +213,7 @@ close_listener(Listener) ->
               inet:port_number(), conn_opts(), timeout()) ->
           {ok, connection_handle()} |
           {error, conn_open_error | config_error | conn_start_error} |
-          {error, timeout}.
+          {error, timeout} | {error, nst_not_found}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
   connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
@@ -235,7 +235,10 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
           {error, transport_down, Reason}
       end;
     {error, _} = Err ->
-      Err
+      Err;
+    {error, not_found, _} ->
+      %% nst error
+      {error, nst_not_found}
   end.
 
 %% @doc

@@ -201,16 +201,16 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   BOOLEAN is_destroy = FALSE;
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
 
-  assert(Connection == c_ctx->Connection);
-  if (!(Connection == c_ctx->Connection))
+  // Connecion Handle must match unless NULL (closed)
+  assert(Connection == c_ctx->Connection || NULL == c_ctx->Connection);
+
+  if (Connection == NULL)
     {
-      c_ctx->Connection = Connection;
+      return status;
     }
 
   enif_mutex_lock(c_ctx->lock);
   TP_CB_3(event, (uintptr_t)Connection, Event->Type);
-
-  // dbg("client connection event: %d", Event->Type);
 
   switch (Event->Type)
     {
@@ -256,14 +256,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // The connection has completed the shutdown process and is ready to be
       // safely cleaned up.
       //
-      // This is special case for client,
-      // it could happen that the connection is opened but never get started.
       // @see async_connect3
-      // in this case, we don't need to report closed to the owner
-      if (!c_ctx->is_closed) // owner doesn't know it is closed
-        {
-          status = handle_connection_event_shutdown_complete(c_ctx, Event);
-        }
+      status = handle_connection_event_shutdown_complete(c_ctx, Event);
       is_destroy = TRUE;
       c_ctx->is_closed = TRUE; // client shutdown completed
       break;
@@ -329,11 +323,12 @@ ServerConnectionCallback(HQUIC Connection,
   BOOLEAN is_destroy = FALSE;
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
 
-  assert(Connection == c_ctx->Connection);
+  // Connecion Handle must match unless NULL (closed)
+  assert(Connection == c_ctx->Connection || NULL == c_ctx->Connection);
 
-  if (!(Connection == c_ctx->Connection))
+  if (Connection == NULL)
     {
-      c_ctx->Connection = Connection;
+      return status;
     }
 
   enif_mutex_lock(c_ctx->lock);
@@ -516,9 +511,7 @@ async_connect3(ErlNifEnv *env,
     }
 
   // allocate config_resource for client connection
-  if (NULL
-      == (c_ctx->config_resource
-          = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX))))
+  if (NULL == (c_ctx->config_resource = init_config_ctx()))
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
       goto Error;
@@ -535,8 +528,6 @@ async_connect3(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_BAD_PID);
       goto Error;
     }
-
-  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
 
   ERL_NIF_TERM ecacertfile;
   X509_STORE *trusted = NULL;
@@ -596,10 +587,15 @@ async_connect3(ErlNifEnv *env,
                                                       c_ctx,
                                                       &(c_ctx->Connection))))
         {
+          assert(c_ctx->Connection == NULL);
           res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
           goto Error;
         }
     }
+
+  assert(c_ctx->is_closed);
+  c_ctx->is_closed = FALSE; // connection opened.
+
   ERL_NIF_TERM essl_keylogfile;
   if (enif_get_map_value(
           env, eoptions, ATOM_SSL_KEYLOGFILE_NAME, &essl_keylogfile))
@@ -698,6 +694,7 @@ async_connect3(ErlNifEnv *env,
   // @TODO client async_connect_3 should able to take a config_resource as
   // input ERL TERM so that we don't need to call ClientLoadConfiguration
   //
+  assert(!c_ctx->is_closed && c_ctx->Connection);
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
                       c_ctx->Connection,
                       c_ctx->config_resource->Configuration,
@@ -705,19 +702,30 @@ async_connect3(ErlNifEnv *env,
                       host,
                       port)))
     {
+      AcceptorDestroy(c_ctx->owner);
+      c_ctx->owner = NULL;
+
+      /* Although MsQuic internally close the connection after failed to start,
+         we still do not need to set is_closed here, we expect callback to set
+         it while handling the shutdown complete event otherwise could cause
+         race cond.
+      */
+      // c_ctx->is_closed = TRUE;
+
+      c_ctx->Connection = NULL;
+
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
-      enif_release_resource(c_ctx->config_resource);
+      TP_NIF_3(start_fail, (uintptr_t)(c_ctx->Connection), Status);
       goto Error;
     }
-  c_ctx->is_closed = FALSE; // connection started
+
+  assert(c_ctx->owner);
+  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
   eHandle = enif_make_resource(env, c_ctx);
 
   return SUCCESS(eHandle);
 
 Error:
-  // Error exit, it must not be started!
-  assert(c_ctx->is_closed);
-
   if (c_ctx->Connection)
     { // when is opened
 
@@ -760,7 +768,10 @@ Error:
       MsQuic->ConnectionClose(c_ctx->Connection);
       // prevent double ConnectionClose
       c_ctx->Connection = NULL;
+      c_ctx->is_closed = TRUE;
     }
+  // Error exit, it must be closed or Handle is NULL
+  assert(c_ctx->is_closed || NULL == c_ctx->Connection);
   return res;
 }
 
@@ -1151,6 +1162,7 @@ handle_connection_event_shutdown_complete(
   TP_CB_3(shutdown_complete,
           (uintptr_t)c_ctx->Connection,
           Event->SHUTDOWN_COMPLETE.AppCloseInProgress);
+
   ERL_NIF_TERM props_name[] = { ATOM_IS_HANDSHAKE_COMPLETED,
                                 ATOM_IS_PEER_ACKED,
                                 ATOM_IS_APP_CLOSING };
@@ -1165,8 +1177,11 @@ handle_connection_event_shutdown_complete(
                                               props_name,
                                               props_value,
                                               3);
-  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 
+  if (c_ctx->owner)
+    {
+      enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+    }
   //
   // Now inform the stream acceptors
   //

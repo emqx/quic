@@ -48,7 +48,13 @@
         , tc_open_listener_neg_1/1
         , tc_open_listener_neg_2/1
         , tc_open_listener_inval_parm/1
+        , tc_open_listener_inval_cacertfile_1/1
+        , tc_open_listener_inval_cacertfile_2/1
+        , tc_open_listener_inval_cacertfile_3/1
+        , tc_start_listener_alpn_too_long/1
         , tc_close_listener/1
+        , tc_close_listener_twice/1
+        , tc_close_listener_dealloc/1
         , tc_get_listeners/1
         , tc_get_listener/1
 
@@ -100,6 +106,7 @@
         % , tc_getopt_raw/1
         , tc_getopt/1
         , tc_setopt_bad_opt/1
+        , tc_setopt_bad_nst/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
 
@@ -146,7 +153,8 @@
         , tc_perf_counters/1
 
         %% stream event masks
-        , tc_event_start_compl/1
+        , tc_event_start_compl_client/1
+        , tc_event_start_compl_server/1
 
         %% API: csend
         , tc_direct_send_over_conn/1
@@ -314,12 +322,6 @@ tc_open_listener_neg_2(Config) ->
   %% {error, badarg} = quicer:listen("8.8.8.8:4567", default_listen_opts(Config)),
   ok.
 
-tc_open_listener_inval_parm(Config) ->
-  ?assertEqual({error, config_error, invalid_parameter},
-               quicer:listen(4567, [{stream_recv_buffer_default, 1024} % too small
-                                   | default_listen_opts(Config)])),
-  ok.
-
 tc_lib_re_registration(_Config) ->
   case quicer:reg_open() of
     ok ->
@@ -331,6 +333,34 @@ tc_lib_re_registration(_Config) ->
   {error, badarg} = quicer:reg_open(),
   ok = quicer:reg_close(),
   ok = quicer:reg_close().
+
+tc_open_listener_inval_parm(Config) ->
+  Port = select_port(),
+  ?assertEqual({error, config_error, invalid_parameter},
+               quicer:listen(Port, [ {stream_recv_buffer_default, 1024} % too small
+                                   | default_listen_opts(Config)])),
+  ok.
+
+tc_open_listener_inval_cacertfile_1(Config) ->
+  Port = select_port(),
+  ?assertEqual({error, badarg},
+               quicer:listen(Port, [ {cacertfile, atom}
+                                   | default_listen_opts(Config)])),
+  ok.
+
+tc_open_listener_inval_cacertfile_2(Config) ->
+  Port = select_port(),
+  ?assertMatch({ok, _},
+               quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
+                                   | default_listen_opts(Config)])),
+  ok.
+
+tc_open_listener_inval_cacertfile_3(Config) ->
+  Port = select_port(),
+  ?assertEqual({error, badarg},
+               quicer:listen(Port, [ {cacertfile, [-1]}
+                                   | default_listen_opts(Config)])),
+  ok.
 
 tc_open_listener(Config) ->
   Port = select_port(),
@@ -384,6 +414,33 @@ tc_open_listener_bind_v6(Config) ->
 
 tc_close_listener(_Config) ->
   {error,badarg} = quicer:close_listener(make_ref()).
+
+tc_close_listener_twice(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  quicer:close_listener(L),
+  quicer:close_listener(L).
+
+tc_close_listener_dealloc(Config) ->
+  Port = select_port(),
+  {Pid, Ref} = spawn_monitor(fun() ->
+                 {ok, _L} = quicer:listen(Port, default_listen_opts(Config))
+             end),
+  receive {'DOWN', Ref, process, Pid, normal} ->
+      ok
+  end.
+
+tc_start_listener_alpn_too_long(Config) ->
+  Port = select_port(),
+  {Pid, Ref} =
+    spawn_monitor(fun() ->
+                      {error, config_error, invalid_parameter}
+                        = quicer:listen(Port, default_listen_opts(Config) ++
+                                          [{alpn, [lists:duplicate(256, $p)]}])
+                  end),
+  receive {'DOWN', Ref, process, Pid, normal} ->
+      ok
+  end.
 
 tc_start_acceptor_without_callback(Config) ->
   Port = select_port(),
@@ -1682,6 +1739,12 @@ tc_setopt_bad_opt(_Config)->
                                         [{nst, foobar} %% BAD opt
                                         | default_conn_opts()], 5000).
 
+tc_setopt_bad_nst(_Config)->
+  Port = select_port(),
+  {error, nst_not_found} = quicer:connect("localhost", Port,
+                                          [{nst, <<"">>}
+                                          | default_conn_opts()], 5000).
+
 
 tc_setopt_conn_local_addr(Config) ->
   Port = select_port(),
@@ -2393,7 +2456,7 @@ tc_insecure_traffic(Config) ->
 tc_perf_counters(_Config) ->
   {ok, _} = quicer:perf_counters().
 
-tc_event_start_compl(Config) ->
+tc_event_start_compl_client(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
   ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
@@ -2429,6 +2492,57 @@ tc_event_start_compl(Config) ->
       ct:fail("Stream ~p should NOT recv event : ~p", [Stm, Status])
   after 0 ->
       ok
+  end,
+  quicer:close_connection(Conn),
+  ok.
+
+tc_event_start_compl_server(Config) ->
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{allow_insecure, true}, {conn_acceptors, 32}
+                 | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               , {is_echo_new_stream, true} %% server reply us on a server to client stream
+               , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              [ {param_conn_disable_1rtt_encryption, true}
+                              | default_conn_opts()], 5000),
+  %% Stream 1 enabled
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true},
+                                         {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  %% Stream 2 disabled
+  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0}]),
+  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
+  {ok, Conn} = quicer:async_accept_stream(Conn, [{active, true}]),
+  receive
+    {quic, start_completed, Stm,
+     #{status := success, stream_id := StreamId, is_peer_accepted := true}} ->
+      ct:pal("Stream ~p started", [StreamId]);
+    {quic, start_completed, Stm,
+     #{status := Reason, stream_id := StreamId}} ->
+      ct:fail("Stream ~p failed to start: ~p", [StreamId, Reason])
+  end,
+  receive
+    {quic, start_completed, Stm2,
+     #{status := Status}} ->
+      ct:fail("Stream ~p should NOT recv event : ~p", [Stm, Status])
+  after 0 ->
+      ok
+  end,
+  receive
+    {quic, Data, NewStream, _} = Evt
+        when is_binary(Data) andalso
+             NewStream =/= Stm andalso
+             NewStream =/= Stm2 ->
+      ct:pal("recv ~p", [Evt])
   end,
   quicer:close_connection(Conn),
   ok.

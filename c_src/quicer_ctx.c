@@ -29,9 +29,7 @@ init_l_ctx()
     }
   CxPlatZeroMemory(l_ctx, sizeof(QuicerListenerCTX));
   l_ctx->env = enif_alloc_env();
-  l_ctx->config_resource
-      = enif_alloc_resource(ctx_config_t, sizeof(QuicerConfigCTX));
-  CxPlatZeroMemory(l_ctx->config_resource, sizeof(QuicerConfigCTX));
+  l_ctx->config_resource = init_config_ctx();
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
   l_ctx->cacertfile = NULL;
@@ -46,7 +44,7 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
   if (l_ctx->config_resource)
     {
-      enif_release_resource(l_ctx->config_resource);
+      destroy_config_ctx(l_ctx->config_resource);
     }
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);

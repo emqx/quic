@@ -34,11 +34,13 @@
 
 -export([handle_stream_data/4]).
 
+%% @doc handle handoff from other stream owner.
 init_handoff(Stream, StreamOpts, Conn, #{is_orphan := true, flags := Flags}) ->
     InitState = #{ stream => Stream
                  , conn => Conn
                  , is_local => false
                  , is_unidir => quicer:is_unidirectional(Flags)
+                 , echo_stream => undefined
                  , sent_bytes => 0
                  },
     ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
@@ -48,8 +50,17 @@ post_handoff(Stream, _PostData, State) ->
     quicer:setopt(Stream, active, true),
     {ok, State}.
 
-new_stream(_, _, _) ->
-    InitState = #{sent_bytes => 0},
+
+%% @doc accepted new stream.
+new_stream(Stream, #{flags := Flags} = StreamOpts, Conn) ->
+    InitState = #{ stream => Stream
+                 , conn => Conn
+                 , is_local => false
+                 , echo_stream => undefined
+                 , stream_opts => StreamOpts
+                 , is_unidir => quicer:is_unidirectional(Flags)
+                 , sent_bytes => 0
+                 },
     {ok, InitState}.
 
 peer_accepted(_Stream, _Flags, S) ->
@@ -75,7 +86,25 @@ send_shutdown_complete(_Stream, _Flags, S) ->
 start_completed(_Stream, _Flags, S) ->
     {ok, S}.
 
-handle_stream_data(Stream, Bin, _Opts, #{sent_bytes := Cnt} = State) ->
+handle_stream_data(Stream, Bin, _Opts, #{ sent_bytes := Cnt
+                                        , stream_opts := StreamOpts
+                                        , conn := Conn
+                                        , echo_stream := undefined
+                                        , stream := Stream
+                                        } = State) ->
+    case maps:get(is_echo_new_stream, StreamOpts, false) of
+        false ->
+            {ok, Size} = quicer:send(Stream, echo_msg(Bin, State)),
+            {ok, State#{ sent_bytes => Cnt + Size }};
+        true ->
+            %% echo reply with a new stream from server to client.
+            {ok, EchoStream} = quicer:start_stream(Conn, StreamOpts),
+            {ok, Size} = quicer:send(EchoStream, echo_msg(Bin, State)),
+            {ok, State#{ sent_bytes => Cnt + Size, echo_stream => EchoStream }}
+    end;
+handle_stream_data(Stream, Bin, _Opts, #{ sent_bytes := Cnt
+                                        , echo_stream := _Ignore
+                                         } = State) ->
     {ok, Size} = quicer:send(Stream, Bin),
     {ok, State#{ sent_bytes => Cnt + Size }}.
 
@@ -88,3 +117,9 @@ handle_call(_Stream, _Request, _Opts, _CBState) ->
 
 stream_closed(_Stream, _Flags, S) ->
     {stop, normal, S}.
+
+%% For snabbkaffe, RID is meaningful on the same node.
+echo_msg(<<"__STATE__">>, State) ->
+    quicer_test_lib:encode_stream_term(State);
+echo_msg(Msg, _State) ->
+    Msg.

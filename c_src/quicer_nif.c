@@ -753,6 +753,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerConnCTX *c_ctx = (QuicerConnCTX *)obj;
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
   // must be closed otherwise will trigger callback and casue race cond.
+  // This ensures no callbacks during cleanup here.
   assert(c_ctx->is_closed == TRUE); // in dealloc
   if (c_ctx->Connection)
     {
@@ -842,6 +843,7 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
     {
       MsQuic->ConfigurationClose(config_ctx->Configuration);
     }
+  deinit_config_ctx(config_ctx);
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
