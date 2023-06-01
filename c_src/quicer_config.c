@@ -139,11 +139,10 @@ DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *Config)
 ERL_NIF_TERM
 atom_proto_vsn(QUIC_TLS_PROTOCOL_VERSION vsn)
 {
-  switch (vsn)
+  if (vsn == QUIC_TLS_PROTOCOL_1_3)
+    return ATOM_TLS_VSN_1_3;
+  else
     {
-    case QUIC_TLS_PROTOCOL_1_3:
-      return ATOM_TLS_VSN_1_3;
-    default:
       return ATOM_NONE;
     }
 }
@@ -183,11 +182,10 @@ atom_hash_algorithm(QUIC_HASH_ALGORITHM alg)
 ERL_NIF_TERM
 atom_key_exchange_algorithm(QUIC_KEY_EXCHANGE_ALGORITHM alg)
 {
-  switch (alg)
+  if (alg == QUIC_KEY_EXCHANGE_ALGORITHM_NONE)
+    return ATOM_NONE;
+  else
     {
-    case QUIC_KEY_EXCHANGE_ALGORITHM_NONE:
-      return ATOM_NONE;
-    default:
       return ATOM_UNDEFINED;
     }
 }

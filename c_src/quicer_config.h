@@ -62,7 +62,7 @@ QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
                              QUIC_CREDENTIAL_CONFIG *config,
                              const ERL_NIF_TERM *option,
                              BOOLEAN is_server);
-// void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *);
+
 ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
                                      HQUIC *Configuration,
