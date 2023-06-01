@@ -579,7 +579,6 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_SHA_256, sha_256);                                                \
   ATOM(ATOM_SHA_384, sha_384);                                                \
   /* Cipher Suite */                                                          \
-  ATOM(ATOM_AES_128_GCM_SHA256, sha_384);                                     \
   ATOM(ATOM_AES_128_GCM_SHA256, aes_128_gcm_sha256);                          \
   ATOM(ATOM_AES_256_GCM_SHA384, aes_256_gcm_sha384);                          \
   ATOM(ATOM_CHACHA20_POLY1305_SHA256, chacha20_poly1305_sha256);              \
