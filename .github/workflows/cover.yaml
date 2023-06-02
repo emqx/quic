@@ -39,9 +39,10 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         flag-name: run-c-lcov
         parallel: true
-        github-branch: ${{ github.ref_name }}
+        git-branch: ${{ github.ref_name }}
 
     - name: Coveralls Erl
+      if: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: rebar3 as test coveralls send
