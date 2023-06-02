@@ -522,6 +522,7 @@ async_connect3(ErlNifEnv *env,
     }
   else // we create new c_ctx and set owner
     {
+      assert(!c_ctx);
       c_ctx = init_c_ctx();
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
         {
