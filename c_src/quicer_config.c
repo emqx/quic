@@ -725,7 +725,19 @@ encode_parm_to_eterm(ErlNifEnv *env,
                && (QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE == Param
                    || QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT == Param)))
     {
-      res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
+      if (BufferLength == sizeof(uint64_t))
+      {
+        res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
+      }
+      else if (BufferLength == sizeof(uint32_t))
+      {
+        res = SUCCESS(ETERM_INT(*(uint32_t *)Buffer));
+      }
+      else if (BufferLength == sizeof(uint16_t))
+      {
+        res = SUCCESS(ETERM_INT(*(uint16_t *)Buffer));
+      }
+
     }
   else if ((QUICER_PARAM_HANDLE_TYPE_CONN == Type
             && (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param
@@ -1516,6 +1528,7 @@ get_connection_opt(ErlNifEnv *env,
       isMalloc = TRUE;
     }
 
+  assert(Buffer);
   status = MsQuic->GetParam(c_ctx->Connection, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
@@ -1878,6 +1891,8 @@ get_listener_opt(ErlNifEnv *env,
   bool isMalloc = FALSE;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
+  QUIC_ADDR q_addr = { 0 };
+  QUIC_LISTENER_STATISTICS stats = { 65535, 65535, 65535 };
   ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
 
   if (!l_ctx)
@@ -1905,14 +1920,13 @@ get_listener_opt(ErlNifEnv *env,
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS))
     {
-      QUIC_ADDR q_addr = { 0 };
+
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
       Buffer = &q_addr;
       BufferLength = sizeof(q_addr);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_STATS))
     {
-      QUIC_LISTENER_STATISTICS stats = { 65535, 65535, 65535 };
       Param = QUIC_PARAM_LISTENER_STATS;
       Buffer = &stats;
       BufferLength = sizeof(stats);
@@ -1941,6 +1955,7 @@ get_listener_opt(ErlNifEnv *env,
       isMalloc = TRUE;
     }
 
+  assert(!isMalloc);
   status = MsQuic->GetParam(l_ctx->Listener, Param, &BufferLength, Buffer);
 
   if (QUIC_SUCCEEDED(status))
