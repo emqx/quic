@@ -453,8 +453,7 @@ open_connection0(ErlNifEnv *env,
   if (!enif_self(env, &(c_ctx->owner->Pid)))
     {
       enif_release_resource(c_ctx);
-      res = ERROR_TUPLE_2(ATOM_BAD_PID);
-      return res;
+      return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
   if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
