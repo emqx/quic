@@ -1740,6 +1740,9 @@ tc_get_stream_ideal_sndbuff_size(Config) ->
       %% before stream shutdown,
       {ok, Val} = quicer:getopt(Stm, param_stream_ideal_send_buffer_size),
       ?assert(is_integer(Val)),
+      ok = quicer:shutdown_stream(Stm),
+      {ok, Val2} = quicer:getopt(Stm, param_stream_ideal_send_buffer_size),
+      ?assert(is_integer(Val2)),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 5000 ->
