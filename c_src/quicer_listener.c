@@ -284,12 +284,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  QuicerListenerCTX *l_ctx = init_l_ctx();
-
-  if (!enif_self(env, &(l_ctx->listenerPid)))
-    {
-      return ERROR_TUPLE_2(ATOM_BAD_PID);
-    }
 
   // Build CredConfig
   QUIC_CREDENTIAL_CONFIG CredConfig;
@@ -315,10 +309,45 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  QuicerListenerCTX *l_ctx = init_l_ctx();
+
+  if (!enif_self(env, &(l_ctx->listenerPid)))
+    {
+      return ERROR_TUPLE_2(ATOM_BAD_PID);
+    }
+
+  ERL_NIF_TERM ecacertfile;
+  if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
+    {
+      unsigned len;
+      if (enif_get_list_length(env, ecacertfile, &len))
+        {
+          l_ctx->cacertfile
+              = (char *)CXPLAT_ALLOC_NONPAGED(len + 1, QUICER_CACERTFILE);
+          if (!enif_get_string(env,
+                               ecacertfile,
+                               l_ctx->cacertfile,
+                               len + 1,
+                               ERL_NIF_LATIN1))
+            {
+              CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
+              l_ctx->cacertfile = NULL;
+              enif_release_resource(l_ctx);
+              return ERROR_TUPLE_2(ATOM_BADARG);
+            }
+        }
+      else
+        {
+          enif_release_resource(l_ctx);
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+
   if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
     {
       if (get_str_from_map(env, ATOM_PASSWORD, &options, password, 256) <= 0)
         {
+          enif_release_resource(l_ctx);
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
 
@@ -342,31 +371,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       CertFile->PrivateKeyFile = key_path;
       CredConfig.CertificateFile = CertFile;
       CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-    }
-
-  ERL_NIF_TERM ecacertfile;
-  if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
-    {
-      unsigned len;
-      if (enif_get_list_length(env, ecacertfile, &len))
-        {
-          l_ctx->cacertfile
-              = (char *)CXPLAT_ALLOC_NONPAGED(len + 1, QUICER_CACERTFILE);
-          if (!enif_get_string(env,
-                               ecacertfile,
-                               l_ctx->cacertfile,
-                               len + 1,
-                               ERL_NIF_LATIN1))
-            {
-              CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
-              l_ctx->cacertfile = NULL;
-              return ERROR_TUPLE_2(ATOM_BADARG);
-            }
-        }
-      else
-        {
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
     }
 
   bool Verify = load_verify(env, &options, false);
@@ -396,7 +400,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == CredConfig.Type)
     {
-      CxPlatFree(CredConfig.CertificateFile,
+      CxPlatFree(CredConfig.CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
     }
 
