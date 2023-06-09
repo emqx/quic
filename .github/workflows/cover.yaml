@@ -34,21 +34,21 @@ jobs:
         make cover
 
     - name: Coveralls C
-      uses: coverallsapp/github-action@master
+      uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         flag-name: run-c-lcov
         parallel: true
         git-branch: ${{ github.ref_name }}
+        git-commit: ${{ github.sha }}
 
     - name: Coveralls Erl
-      if: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: rebar3 as test coveralls send
 
     - name: Coveralls Finished
-      uses: coverallsapp/github-action@master
+      uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         parallel-finished: true
