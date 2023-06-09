@@ -71,6 +71,8 @@
         conf_handle()       |
         reg_handle().
 
+-type quic_handle_level() :: quic_tls | quic_configuration | false.
+
 -type listen_on() :: inet:port_number() | string().
 -type listen_opts() :: listen_security_opts() | quic_settings().
 -type listen_security_opts() :: #{ alpn := [alpn()]
@@ -199,6 +201,7 @@
 
 -type optname() ::
         optname_global()        |
+        optname_listener()      |
         optname_conn()          |
         optname_stream()        |
         optname_reg()           |
@@ -208,51 +211,56 @@
 -type optname_conn() ::   %% with connection_handle()
         %% /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */|
         param_conn_quic_version                   |           %% |  X  |    |
-        param_conn_local_address                  |           %% |  X  |    | @TODO
+        param_conn_local_address                  |           %% |  X  |    |
         param_conn_remote_address                 |           %% |  X  |  X | @TODO SET
-        param_conn_ideal_processor                |           %% |  X  |    | @TODO
+        param_conn_ideal_processor                |           %% |  X  |    |
         param_conn_settings                       |           %% |  X  |  X |
         param_conn_statistics                     |           %% |  X  |    |
         param_conn_statistics_plat                |           %% |  X  |    | @TODO
-        param_conn_share_udp_binding              |           %% |  X  |  X | @TODO
-        param_conn_local_bidi_stream_count        |           %% |  X  |    | @TODO
-        param_conn_local_unidi_stream_count       |           %% |  X  |    | @TODO
-        param_conn_max_stream_ids                 |           %% |  X  |    | @TODO
-        param_conn_close_reason_phrase            |           %% |  X  |  X | @TODO
-        param_conn_stream_scheduling_scheme       |           %% |  X  |  X | @TODO
-        param_conn_datagram_receive_enabled       |           %% |  X  |  X | @TODO
-        param_conn_datagram_send_enabled          |           %% |  X  |    | @TODO
+        param_conn_share_udp_binding              |           %% |  X  |  X |
+        param_conn_local_bidi_stream_count        |           %% |  X  |    |
+        param_conn_local_unidi_stream_count       |           %% |  X  |    |
+        param_conn_max_stream_ids                 |           %% |  X  |    |
+        param_conn_close_reason_phrase            |           %% |  X  |  X |
+        param_conn_stream_scheduling_scheme       |           %% |  X  |  X |
+        param_conn_datagram_receive_enabled       |           %% |  X  |  X |
+        param_conn_datagram_send_enabled          |           %% |  X  |    |
         param_conn_disable_1rtt_encryption        |           %% |  X  |  X |
         param_conn_resumption_ticket              |           %% |     |  X |
-        param_conn_peer_certificate_valid         |           %% |     |  X | @TODO
-        param_conn_local_interface.                           %% |     |  X | @TODO
+        param_conn_peer_certificate_valid         |           %% |     |  X |
+        param_conn_local_interface.                           %% |     |  X |
 
 -type optname_tls()   ::  %% with connection_handle()
-        param_tls_schannel_context_attribute_w    |           %% |  X  |    | @TODO
-        param_tls_handshake_info                  |           %% |  X  |  X | @TODO
-        param_tls_negotiated_alpn.                            %% |  X  |    | @TODO
+        param_tls_schannel_context_attribute_w    |           %% |  X  |    |
+        param_tls_handshake_info                  |           %% |  X  |    |
+        param_tls_negotiated_alpn.                            %% |  X  |    |
 
 -type optname_stream() ::
-        active                                    |           %% |  X  |  X | @TODO GET
-        controlling_process                       |           %% |     |    | @TODO GET SET
+        active                                    |           %% |  X  |  X |
+        controlling_process                       |           %% |     |  X |
         param_stream_id                           |           %% |     |  X |
-        param_stream_0rtt_length                  |           %% |  X  |    | @TODO
-        param_stream_ideal_send_buffer_size       |           %% |  X  |    | @TODO
+        param_stream_0rtt_length                  |           %% |  X  |    |
+        param_stream_ideal_send_buffer_size       |           %% |  X  |    |
         param_stream_priority.                                %% |     |    |
 
 -type optname_global() ::                                     %% with `undefined' handle
-        param_global_retry_memory_percent |                   %% |  X  | X  | @TODO
+        param_global_retry_memory_percent |                   %% |  X  | X  |
         param_global_supported_versions   |                   %% |  X  |    | @TODO
-        param_global_load_balacing_mode   |                   %% |  X  | X  | @TODO
-        param_global_perf_counters        |                   %% |  X  |    | @TODO
-        param_global_settings             |                   %% |  X  | X  | @TODO
+        param_global_load_balacing_mode   |                   %% |  X  | X  |
+        param_global_perf_counters        |                   %% |  X  |    |
+        param_global_settings             |                   %% |  X  | X  |
         param_global_version.                                 %% |  X  |    | @TODO
 
 -type optname_reg() :: param_registration_cid_prefix.         %% |  X  | X  | @TODO
 
 -type optname_configuration() ::                              %% with config_handle()
-        param_configuration_settings        |                 %% |  X  | X  | @TODO
+        param_configuration_settings        |                 %% |  X  | X  |
         param_configuration_ticket_keys.                      %% |     | X  | @TODO
+
+-type optname_listener() ::                                   %% with listener_handle
+        param_listener_local_address        |                 %% |  X  |    |
+        param_listener_stats                |                 %% |  X  |    |
+        param_listener_cibir_id.                              %% |     | X  |
 
 -type conn_settings() :: [{conn_settings_key(), non_neg_integer()}].
 -type conn_settings_key() ::

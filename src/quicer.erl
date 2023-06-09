@@ -75,6 +75,7 @@
         , getopt/2
         , getopt/3
         , setopt/3
+        , setopt/4
         , get_stream_id/1
         , getstat/2
         , peername/1
@@ -217,7 +218,12 @@ close_listener(Listener) ->
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
   connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
-  connect(inet:ntoa(Host), Port, Opts, Timeout);
+  case inet:ntoa(Host) of
+    NewHost when is_list(NewHost) ->
+      connect(NewHost, Port, Opts, Timeout);
+    E ->
+      E
+  end;
 connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
   NewTimeout = maps:get(handshake_idle_timeout_ms, Opts, Timeout),
   NewOpts = maps:merge(default_conn_opts(), Opts#{handshake_idle_timeout_ms => NewTimeout}),
@@ -317,14 +323,18 @@ accept(LSock, Opts, Timeout) when is_list(Opts) ->
   accept(LSock, maps:from_list(Opts), Timeout);
 accept(LSock, Opts, Timeout) ->
   % non-blocking
-  {ok, LSock} = quicer_nif:async_accept(LSock, Opts),
-  receive
-    {quic, new_conn, C, _} ->
-      {ok, C};
-    {quic, connected, C, _} ->
-      {ok, C}
-  after Timeout ->
-    {error, timeout}
+  case quicer_nif:async_accept(LSock, Opts) of
+    {ok, LSock} ->
+      receive
+        {quic, new_conn, C, _} ->
+          {ok, C};
+        {quic, connected, C, _} ->
+          {ok, C}
+      after Timeout ->
+          {error, timeout}
+      end;
+    E ->
+      E
   end.
 
 -spec async_accept(listener_handle(), acceptor_opts()) ->
@@ -544,7 +554,7 @@ send(Stream, Data) ->
         {error, cancelled}                        |
         {error, badarg | not_enough_mem | closed} |
         {error, stream_send_error, atom_reason()}.
-send(Stream, Data, Flag) ->
+send(Stream, Data, Flag) when is_integer(Flag) ->
   %% This is an sync send, set flag ?QUICER_SEND_FLAG_SYNC
   case quicer_nif:send(Stream, Data, Flag bor ?QUICER_SEND_FLAG_SYNC) of
     %% @todo make ref
@@ -775,7 +785,14 @@ setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
 setopt({_Conn, Stream}, active, Value) ->
   setopt(Stream, active, Value);
 setopt(Handle, Opt, Value) ->
-  quicer_nif:setopt(Handle, Opt, Value, false).
+  setopt(Handle, Opt, Value, false).
+
+-spec setopt(handle(), optname(), any(), quic_handle_level()) ->
+        ok |
+        {error, badarg | param_error | internal_error | not_enough_mem} |
+        {error, atom_reason()}.
+setopt(Handle, Opt, Value, Level) ->
+  quicer_nif:setopt(Handle, Opt, Value, Level).
 
 %% @doc get stream id with stream handle
 -spec get_stream_id(Stream::stream_handle()) ->

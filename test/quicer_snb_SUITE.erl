@@ -42,6 +42,7 @@
           tc_conn_resume_nst/1,
           tc_conn_resume_nst_with_stream/1,
           tc_conn_resume_nst_async/1,
+          tc_conn_resume_nst_async_2/1,
           tc_conn_resume_nst_with_data/1,
           tc_listener_no_acceptor/1,
           tc_listener_inval_local_addr/1,
@@ -190,6 +191,7 @@ all() ->
   , tc_conn_resume_nst_with_stream
   , tc_conn_resume_nst_with_data
   , tc_conn_resume_nst_async
+  , tc_conn_resume_nst_async_2
   , tc_listener_no_acceptor
   , tc_listener_inval_local_addr
   , tc_conn_start_inval_port
@@ -770,16 +772,27 @@ tc_conn_gc(Config) ->
                  %% The dead process should trigger a connection close
                  %% The dead process should trigger a GC
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
-                 _Child = spawn_link(fun() ->
-                                         %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
-                                         {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
-                                                                                         {verify, none},
-                                                                                         {alpn, ["sample"]}], 5000),
-                                         {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-                                         {ok, 4} = quicer:async_send(Stm, <<"ping">>),
-                                         {ok, <<"ping">>} = quicer:recv(Stm, 4)
-                                     end),
-
+                 Parent = self(),
+                 {Child, MRef} = spawn_monitor(
+                                   fun() ->
+                                       %% Note, the client process holds the ref to the `Conn', So `Conn' should get GC-ed when it dies.
+                                       {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000},
+                                                                                       {verify, none},
+                                                                                       {alpn, ["sample"]}], 5000),
+                                       {ok, Rid} = quicer:get_conn_rid(Conn),
+                                       Parent ! {crid, Rid},
+                                       {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                                       {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                                       {ok, <<"ping">>} = quicer:recv(Stm, 4)
+                                   end),
+                 CRid = receive
+                          {crid, Rid} ->
+                            Rid
+                        end,
+                 receive
+                   {'DOWN', MRef, process, Child, normal} ->
+                     erlang:garbage_collect()
+                 end,
                  %% Server Process
                  {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
@@ -794,6 +807,7 @@ tc_conn_gc(Config) ->
                                    , context := "callback"
                                    , function := "ClientConnectionCallback"
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , resource_id := CRid
                                    , tag := "event" },
                                   5000, 1000),
                  %% OTP GC callback
@@ -805,9 +819,9 @@ tc_conn_gc(Config) ->
                                         5000, 1000),
                  {SRid, CRid}
                end,
-               fun({_SRid, _CRid}, Trace) ->
+               fun({_SRid, CRid}, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ct:pal("Target SRid: ~p, CRid: ~p", [_SRid, _CRid]),
+                   ct:pal("Target SRid: ~p, CRid: ~p", [_SRid, CRid]),
                    %% check that at client side, GC is triggered after connection close.
                    %% check that at server side, connection was shutdown by client.
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -815,12 +829,12 @@ tc_conn_gc(Config) ->
                                               , function := "ClientConnectionCallback"
                                               , tag := "event"
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
-                                              , resource_id := _CRid
+                                              , resource_id := CRid
                                               },
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "resource_conn_dealloc_callback"
-                                              , resource_id := _CRid
+                                              , resource_id := CRid
                                               , tag := "end"},
                                              Trace)),
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -837,8 +851,24 @@ tc_conn_gc(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
-                   ?assertEqual(1, length([ E || #{function := "resource_conn_dealloc_callback"
-                                                  , tag := "end"} = E <- Trace]))
+
+
+                   TraceEvents = flush_previous_run(Trace, fun(#{ ?snk_kind := debug
+                                                                , context := "callback"
+                                                                , function := "ClientConnectionCallback"
+                                                                , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                                                , resource_id := Rid
+                                                                , tag := "event"
+                                                                }) when Rid == CRid ->
+                                                               true;
+                                                              (_) ->
+                                                               false
+                                                           end
+                                                   ),
+                   ?assertEqual(1, length([ E || #{ function := "resource_conn_dealloc_callback"
+                                                  , resource_id := Rid
+                                                  , tag := "end"} = E <- TraceEvents, Rid == CRid])
+                               )
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
@@ -873,6 +903,7 @@ tc_conn_no_gc(Config) ->
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
                  %% Server Process
                  {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug
@@ -887,6 +918,7 @@ tc_conn_no_gc(Config) ->
                                    , context := "callback"
                                    , function := "ClientConnectionCallback"
                                    , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
+                                   , resource_id := CRid
                                    , tag := "event" },
                                   5000, 1000),
                  %% Give it time for gc that should not happen on var 'Conn', could be the source of flakiness.
@@ -918,10 +950,22 @@ tc_conn_no_gc(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
+                   TraceEvents = flush_previous_run(Trace, fun(#{ ?snk_kind := debug
+                                                                , context := "callback"
+                                                                , function := "ClientConnectionCallback"
+                                                                , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                                                , resource_id := Rid
+                                                                , tag := "event"
+                                                                }) when Rid == CRid ->
+                                                               true;
+                                                              (_) ->
+                                                               false
+                                                           end
+                                                   ),
                    %% Check that there is no GC
                    ?assertEqual(0, length([ E || #{ function := "resource_conn_dealloc_callback"
                                                   , resource_id := Rid
-                                                  } = E <- Trace, Rid == CRid])),
+                                                  } = E <- TraceEvents, Rid == CRid])),
                  %% Just keep the ref till end
                   ?assert(Conn =/= undefined)
                end),
@@ -989,13 +1033,14 @@ tc_conn_no_gc_2(Config) ->
                  Block = ?block_until(#{ ?snk_kind := debug
                                        , context := "callback"
                                        , function := "resource_conn_dealloc_callback"
+                                       , resource_id := CRid
                                        , tag := "end"},
                                       5000, 1000),
                  case Block of
                    timeout -> ok;
                    {ok, #{ resource_id := CRid }} ->
                      %% Don't fail the testcase here, we need the traces in post run
-                     ct:pal("!!!Error!!!: Rid: ~p of ~p should not be released"
+                     ct:pal("!!!Error!!!: Rid: ~p of ~p should not be released~n"
                             "Check snb traces for more",
                             [CRid, ClientConn]);
                    {ok, #{ resource_id := _OtherRid }} ->
@@ -1025,9 +1070,21 @@ tc_conn_no_gc_2(Config) ->
                                               , tag := "event"},
                                              Trace)),
                    %% Check that there is no GC
+                   TraceEvents = flush_previous_run(Trace, fun(#{ ?snk_kind := debug
+                                                                , context := "callback"
+                                                                , function := "ClientConnectionCallback"
+                                                                , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                                                , resource_id := Rid
+                                                                , tag := "event"
+                                                                }) when Rid == CRid ->
+                                                               true;
+                                                              (_) ->
+                                                               false
+                                                           end
+                                                   ),
                    ?assertEqual(0, length([ E || #{ function := "resource_conn_dealloc_callback"
                                                   , resource_id := Rid
-                                                  } = E <- Trace, Rid == CRid]))
+                                                  } = E <- TraceEvents, Rid == CRid]))
                end),
   ct:pal("stop listener"),
   ok = quicer:stop_listener(mqtt),
@@ -1057,6 +1114,7 @@ tc_conn_resume_nst(Config) ->
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()], 5000),
+                 {ok, HandshakeInfo} = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                  {ok, <<"ping">>} = quicer:recv(Stm, 4),
@@ -1070,6 +1128,9 @@ tc_conn_resume_nst(Config) ->
 
                  {ok, ConnResumed} = quicer:connect("localhost", Port, [{nst, NST} | default_conn_opts()], 5000),
                  {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
+                 {ok, HandshakeInfo0RTT} = quicer:getopt(ConnResumed, param_tls_handshake_info, quic_tls),
+                 ct:pal("handshake info:~n1RTT: ~p~n0RTT: ~p~n", [HandshakeInfo, HandshakeInfo0RTT]),
+                 ?assertEqual(HandshakeInfo, HandshakeInfo0RTT),
                  {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  quicer:shutdown_connection(Conn),
@@ -1261,6 +1322,80 @@ tc_conn_resume_nst_async(Config) ->
                end),
   ok.
 
+%%% Non-blocking connection resume, client could send app data without waiting for handshake done using existing handle
+tc_conn_resume_nst_async_2(Config) ->
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                   | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 {ok, <<"ping">>} = quicer:recv(Stm, 4),
+                 NST = receive
+                         {quic, nst_received, Conn, Ticket} ->
+                           Ticket
+                       after 1000 ->
+                           ct:fail("No ticket received")
+                       end,
+                 quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
+                 {ok, NewConn} = quicer:open_connection(),
+                 ok = quicer:setopt(NewConn, param_conn_resumption_ticket, NST),
+                 {ok, ConnResumed} = quicer:async_connect("localhost", Port, [{handle, NewConn} | default_conn_opts()]),
+                 {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping3">>),
+                 {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
+                 ct:pal("stop listener"),
+                 quicer:shutdown_connection(ConnResumed),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% 1. verify that for each success connect we send a resumption ticket
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                              , tag := "event"
+                                              , resource_id := _CRid1
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ClientConnectionCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                              , resource_id := _CRid1
+                                              },
+                                             Trace)),
+                   %% 2. verify that resumption ticket is received on client side
+                   %%    and client use it to resume success
+                   ?assert(?causality(#{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ClientConnectionCallback"
+                                       , mark := ?QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED
+                                       , tag := "event"
+                                       , resource_id := _CRid1
+                                       },
+                                      #{ ?snk_kind := debug
+                                       , context := "callback"
+                                       , function := "ServerConnectionCallback"
+                                       , tag := "event"
+                                       , mark := ?QUIC_CONNECTION_EVENT_RESUMED
+                                       , resource_id := _SRid1
+                                       },
+                                      Trace))
+               end),
+  ok.
+
 tc_conn_resume_nst_with_data(Config) ->
   Port = select_port(),
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
@@ -1286,6 +1421,9 @@ tc_conn_resume_nst_with_data(Config) ->
                        end,
                  quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
                  {ok, NewConn} = quicer_nif:open_connection(),
+                 ok = quicer:setopt(NewConn, param_conn_share_udp_binding, false),
+                 ?assertEqual({ok, false}, quicer:getopt(NewConn, param_conn_share_udp_binding)),
+
                  %% Send data over new stream in the resumed connection
                  {ok, Stm2} = quicer:async_csend(NewConn, <<"ping_from_resumed">>, [{active, false}],
                                                  ?QUIC_SEND_FLAG_ALLOW_0_RTT bor ?QUICER_SEND_FLAG_SYNC),
@@ -2138,6 +2276,22 @@ wait_for_die([Pid | T]) ->
       wait_for_die(T)
   end.
 
+%% @doc find the starting point of the test run
+%%  some GC test may hit the Rid from previous run
+flush_previous_run([], _StartingPointFun) ->
+  %%% Oops, maybe wrong starting point
+  [];
+flush_previous_run([StartingPoint | T], StartingPoint) ->
+  T;
+flush_previous_run([Event | T], StartingPointFun) when is_function(StartingPointFun) ->
+  case StartingPointFun(Event) of
+    true ->
+      T;
+    false ->
+      flush_previous_run(T, StartingPointFun)
+  end;
+flush_previous_run([_H | T], StartingPoint) ->
+  flush_previous_run(T, StartingPoint).
 %%%_* Emacs ====================================================================
 %%% Local Variables:
 %%% allout-layout: t

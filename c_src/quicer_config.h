@@ -46,12 +46,23 @@ limitations under the License.
 
 #endif
 
+typedef enum QUICER_PARAM_HANDLE_TYPE
+{
+  QUICER_PARAM_HANDLE_TYPE_REG,
+  QUICER_PARAM_HANDLE_TYPE_CONFIG,
+  QUICER_PARAM_HANDLE_TYPE_LISTENER,
+  QUICER_PARAM_HANDLE_TYPE_CONN,
+  QUICER_PARAM_HANDLE_TYPE_STREAM,
+  QUICER_PARAM_HANDLE_TYPE_TLS,
+  QUICER_PARAM_HANDLE_TYPE_GLOBAL
+} QUICER_PARAM_HANDLE_TYPE;
+
 BOOLEAN ReloadCertConfig(HQUIC Configuration, QUIC_CREDENTIAL_CONFIG *Config);
 QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
                              QUIC_CREDENTIAL_CONFIG *config,
                              const ERL_NIF_TERM *option,
                              BOOLEAN is_server);
-void DestroyCredConfig(QUIC_CREDENTIAL_CONFIG *);
+
 ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
                                      HQUIC *Configuration,
