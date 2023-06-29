@@ -184,9 +184,11 @@
         , tc_direct_send_over_conn_block/1
         , tc_direct_send_over_conn_fail/1
 
-        %%
+        %% TLS certs
         , tc_peercert_client/1
+        , tc_peercert_client_nocert/1
         , tc_peercert_server/1
+        , tc_peercert_server_nocert/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -3134,6 +3136,24 @@ tc_peercert_client(Config) ->
   ensure_server_exit_normal(Ref),
   ok.
 
+tc_peercert_client_nocert(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts(),
+                              5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  ?assertEqual({ok, undefined}, quicer:peercert(Conn)),
+  ok = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
 tc_peercert_server(Config) ->
   Port = select_port(),
   Owner = self(),
@@ -3162,6 +3182,28 @@ tc_peercert_server(Config) ->
                        {utf8String,<<"client">>}}]]},
   ?assertMatch({_, Subject},
                pubkey_cert:subject_id(OTPCert)),
+  ok = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
+tc_peercert_server_nocert(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts(),
+                              5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  SPid ! peercert,
+  receive
+    {SPid, peercert, Cert} ->
+      ?assertEqual(undefined, Cert)
+  end,
   ok = quicer:close_connection(Conn),
   SPid ! done,
   ensure_server_exit_normal(Ref),
@@ -3360,10 +3402,17 @@ simple_conn_server(Owner, Config, Port) ->
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 1000),
   {ok, Conn} = quicer:handshake(Conn),
+  simple_conn_server_loop(L, Conn, Owner).
+
+simple_conn_server_loop(L, Conn, Owner) ->
   receive
     done ->
       quicer:close_listener(L),
       ok;
+    peercert ->
+      {ok, PeerCert} = quicer:peercert(Conn),
+      Owner ! {self(), peercert, PeerCert},
+      simple_conn_server_loop(L, Conn, Owner);
     {quic, shutdown, Conn} ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
