@@ -76,7 +76,7 @@ typedef struct QuicerConnCTX
   BOOLEAN is_closed;
   uint32_t event_mask;
   char *ssl_keylogfile;
-  void *reserved1;
+  X509 *peer_cert;
   void *reserved2;
   void *reserved3;
 } QuicerConnCTX;

@@ -92,6 +92,39 @@ static QUIC_STATUS handle_connection_event_resumption_ticket_received(
 static QUIC_STATUS handle_connection_event_peer_certificate_received(
     QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event);
 
+ERL_NIF_TERM
+peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+{
+  ERL_NIF_TERM ctx = argv[0];
+  ERL_NIF_TERM DerCert;
+  void *q_ctx;
+  QuicerConnCTX *c_ctx;
+  if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
+    {
+      c_ctx = ((QuicerStreamCTX *)q_ctx)->c_ctx;
+    }
+  else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
+    {
+      c_ctx = (QuicerConnCTX *)q_ctx;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  assert(c_ctx);
+
+  if (!c_ctx->peer_cert)
+    {
+      return SUCCESS(ATOM_UNDEFINED);
+    }
+
+  unsigned char *data
+      = enif_make_new_binary(env, i2d_X509(c_ctx->peer_cert, NULL), &DerCert);
+  i2d_X509(c_ctx->peer_cert, &data);
+  return SUCCESS(DerCert);
+}
+
 void
 dump_sslkeylogfile(_In_z_ const char *FileName,
                    _In_ QUIC_TLS_SECRETS TlsSecrets)
@@ -1497,11 +1530,18 @@ static QUIC_STATUS
 handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
                                                   QUIC_CONNECTION_EVENT *Event)
 {
-  // @TODO peer_certificate_received
   // Only with QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED set
   assert(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED == Event->Type);
   // Validate against CA certificates using OpenSSL API:s
   X509 *cert = (X509 *)Event->PEER_CERTIFICATE_RECEIVED.Certificate;
+
+  // Preserve cert in ctx
+  if (c_ctx->peer_cert)
+    {
+      X509_free(c_ctx->peer_cert);
+    }
+  c_ctx->peer_cert = X509_dup(cert);
+
   X509_STORE_CTX *x509_ctx
       = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;
 

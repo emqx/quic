@@ -79,6 +79,7 @@
         , get_stream_id/1
         , getstat/2
         , peername/1
+        , peercert/1
         , listeners/0
         , listener/1
         , controlling_process/2
@@ -823,6 +824,13 @@ getstat(Conn, Cnts) ->
         {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 peername(Handle) ->
   quicer_nif:getopt(Handle, param_conn_remote_address, false).
+
+%% @doc Peer Cert in DER-encoded binary
+%% mimic {@link ssl:peername/1}
+-spec peercert(connection_handle() | stream_handle()) ->
+        {ok, Cert:: public_key:der_encoded()} | {error, any()}.
+peercert(Handle) ->
+  quicer_nif:peercert(Handle).
 
 %% @doc Return true if stream open flags has unidirectional flag set
 -spec is_unidirectional(stream_open_flags()) -> boolean().

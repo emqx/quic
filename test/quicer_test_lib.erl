@@ -52,7 +52,7 @@ gen_ca(Path, Name) ->
           io_lib:format("openssl req -new -x509 -nodes "
                         "-newkey ec:~s "
                         "-keyout ~s -out ~s -days 3650 "
-                        "-subj \"/C=SE/O=Internet Widgits Pty Ltd CA\"",
+                        "-subj \"/C=SE/O=NOBODYAB\"",
                         [ECKeyFile, ca_key_name(Path, Name),
                          ca_cert_name(Path, Name)])),
   os:cmd(Cmd).
@@ -85,7 +85,7 @@ gen_host_cert(H, CaName, Path, Opts) ->
         "-keyout ~s -out ~s "
         "-addext \"subjectAltName=DNS:~s\" "
         "-addext keyUsage=digitalSignature,keyAgreement "
-        "-subj \"/C=SE/O=Internet Widgits Pty Ltd/CN=~s\"",
+        "-subj \"/C=SE/O=NOBODYAB/CN=~s\"",
         [PasswordArg, ECKeyFile, HKey, HCSR, CN, CN])),
   create_file(HEXT,
               "keyUsage=digitalSignature,keyAgreement\n"
