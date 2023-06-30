@@ -63,6 +63,7 @@ ERL_NIF_TERM ATOM_DGRAM_SEND_ERROR;
 ERL_NIF_TERM ATOM_SOCKNAME_ERROR;
 ERL_NIF_TERM ATOM_OWNER_DEAD;
 ERL_NIF_TERM ATOM_NOT_OWNER;
+ERL_NIF_TERM ATOM_NO_PEERCERT;
 
 // Mirror 'errors' in msquic_linux.h
 ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -423,6 +424,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                              \
   ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
   ATOM(ATOM_NOT_OWNER, not_owner);                                            \
+  ATOM(ATOM_NO_PEERCERT, no_peercert);                                        \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
   ATOM(ATOM_ERROR_CONTINUE, continue);                                        \

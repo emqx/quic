@@ -116,7 +116,7 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!c_ctx->peer_cert)
     {
-      return SUCCESS(ATOM_UNDEFINED);
+      return ERROR_TUPLE_2(ATOM_NO_PEERCERT);
     }
 
   unsigned char *data

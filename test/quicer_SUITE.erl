@@ -3148,7 +3148,7 @@ tc_peercert_client_nocert(Config) ->
                               default_conn_opts(),
                               5000),
   {ok, {_, _}} = quicer:sockname(Conn),
-  ?assertEqual({ok, undefined}, quicer:peercert(Conn)),
+  ?assertEqual({error, no_peercert}, quicer:peercert(Conn)),
   ok = quicer:close_connection(Conn),
   SPid ! done,
   ensure_server_exit_normal(Ref),
@@ -3201,8 +3201,8 @@ tc_peercert_server_nocert(Config) ->
   {ok, {_, _}} = quicer:sockname(Conn),
   SPid ! peercert,
   receive
-    {SPid, peercert, Cert} ->
-      ?assertEqual(undefined, Cert)
+    {SPid, peercert, CertResp} ->
+      ?assertEqual({error, no_peercert}, CertResp)
   end,
   ok = quicer:close_connection(Conn),
   SPid ! done,
@@ -3410,8 +3410,8 @@ simple_conn_server_loop(L, Conn, Owner) ->
       quicer:close_listener(L),
       ok;
     peercert ->
-      {ok, PeerCert} = quicer:peercert(Conn),
-      Owner ! {self(), peercert, PeerCert},
+      CertResp = quicer:peercert(Conn),
+      Owner ! {self(), peercert, CertResp},
       simple_conn_server_loop(L, Conn, Owner);
     {quic, shutdown, Conn} ->
       quicer:close_connection(Conn),
