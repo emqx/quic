@@ -78,6 +78,7 @@
         , setopt/4
         , get_stream_id/1
         , getstat/2
+        , negotiated_protocol/1
         , peername/1
         , listeners/0
         , listener/1
@@ -816,6 +817,11 @@ getstat(Conn, Cnts) ->
                          end, Cnts),
       {ok, CntRes}
   end.
+
+%% @doc Returns the protocol negotiated through ALPN or NPN extensions.
+-spec negotiated_protocol(Conn::connection_handle()) -> {ok, Protocol::binary()} | {error, Reason::any()}.
+negotiated_protocol(Conn) ->
+  quicer:getopt(Conn, param_tls_negotiated_alpn, quic_tls).
 
 %% @doc Peer name
 %% mimic {@link ssl:peername/1}
