@@ -113,7 +113,7 @@ reg_close() ->
 listen(_ListenOn, _Options) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec close_listener(listener_handle()) -> ok.
+-spec close_listener(listener_handle()) -> ok | {error, closed | badarg}.
 close_listener(_Listener) ->
   erlang:nif_error(nif_library_not_loaded).
 
