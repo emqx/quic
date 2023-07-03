@@ -465,6 +465,7 @@ close_listener1(ErlNifEnv *env,
                 const ERL_NIF_TERM argv[])
 {
   QuicerListenerCTX *l_ctx;
+  ERL_NIF_TERM ret = ATOM_OK;
   if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -473,13 +474,19 @@ close_listener1(ErlNifEnv *env,
   enif_mutex_lock(l_ctx->lock);
   HQUIC l = l_ctx->Listener;
   l_ctx->Listener = NULL;
+
+  if (l_ctx->is_closed)
+  {
+    ret = ERROR_TUPLE_2(ATOM_CLOSED);
+  }
   l_ctx->is_closed = TRUE;
   enif_mutex_unlock(l_ctx->lock);
 
   // It is safe to close it without holding the lock
   // This also ensures no ongoing listener callbacks
-  // This is a blocking call. @TODO have async version or use dirty scheduler
+  // This is a blocking call.
+  //
   MsQuic->ListenerClose(l);
 
-  return ATOM_OK;
+  return ret;
 }

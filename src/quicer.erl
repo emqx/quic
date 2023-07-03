@@ -202,9 +202,28 @@ listen(ListenOn, Opts) when is_map(Opts) ->
   quicer_nif:listen(ListenOn, Opts).
 
 %% @doc close listener with listener handle
--spec close_listener(listener_handle()) -> ok.
+-spec close_listener(listener_handle()) -> ok | {error, badarg | closed}.
 close_listener(Listener) ->
-  quicer_nif:close_listener(Listener).
+  close_listener(Listener, 5000).
+
+-spec close_listener(listener_handle(), timer:time()) ->
+        ok | {error, badarg | closed | timeout}.
+close_listener(Listener, Timeout) ->
+  case quicer_nif:close_listener(Listener) of
+    ok ->
+      receive
+        {quic, listener_stopped, Listener} ->
+          ok
+      after Timeout ->
+          {error, timeout}
+      end;
+    {error, closed} ->
+      %% already closed
+      %% follow OTP behavior
+      ok;
+    {error, _} = E->
+      E
+  end.
 
 %% @doc
 %% Initiate New Connection (Client)
