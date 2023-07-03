@@ -202,7 +202,7 @@ listen(ListenOn, Opts) when is_map(Opts) ->
   quicer_nif:listen(ListenOn, Opts).
 
 %% @doc close listener with listener handle
--spec close_listener(listener_handle()) -> ok | {error, badarg | closed}.
+-spec close_listener(listener_handle()) -> ok | {error, badarg | closed | timeout}.
 close_listener(Listener) ->
   close_listener(Listener, 5000).
 
