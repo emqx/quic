@@ -99,6 +99,8 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM DerCert;
   void *q_ctx;
   QuicerConnCTX *c_ctx;
+  int len = 0;
+  unsigned char *tmp;
   if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
       c_ctx = ((QuicerStreamCTX *)q_ctx)->c_ctx;
@@ -119,9 +121,24 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_NO_PEERCERT);
     }
 
+  if ((len = i2d_X509(c_ctx->peer_cert, NULL)) < 0)
+    {
+      // unlikely to happen
+      return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+    }
+
   unsigned char *data
-      = enif_make_new_binary(env, i2d_X509(c_ctx->peer_cert, NULL), &DerCert);
-  i2d_X509(c_ctx->peer_cert, &data);
+      = enif_make_new_binary(env, len, &DerCert);
+
+  if (!data)
+  {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+  }
+
+  // note, using tmp is mandatory, see doc for i2d_X590
+  tmp = data;
+
+  i2d_X509(c_ctx->peer_cert, &tmp);
   return SUCCESS(DerCert);
 }
 
