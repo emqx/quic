@@ -25,6 +25,13 @@ QUIC_STATUS ServerListenerCallback(HQUIC Listener,
                                    QUIC_LISTENER_EVENT *Event);
 
 ERL_NIF_TERM listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
+start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
+stop_listener1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 ERL_NIF_TERM
 close_listener1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 

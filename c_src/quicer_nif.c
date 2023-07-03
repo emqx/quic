@@ -1419,6 +1419,8 @@ static ErlNifFunc nif_funcs[] = {
   { "reg_open", 1, registration, 0 },
   { "reg_close", 0, deregistration, 0 },
   { "listen", 2, listen2, 0},
+  { "start_listener", 3, start_listener3, 0},
+  { "stop_listener", 1, stop_listener1, 0},
   { "close_listener", 1, close_listener1, 0},
   { "open_connection", 0, open_connection0, 0},
   { "async_connect", 3, async_connect3, 0},

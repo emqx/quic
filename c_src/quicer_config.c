@@ -726,18 +726,17 @@ encode_parm_to_eterm(ErlNifEnv *env,
                    || QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT == Param)))
     {
       if (BufferLength == sizeof(uint64_t))
-      {
-        res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
-      }
+        {
+          res = SUCCESS(ETERM_UINT_64(*(uint64_t *)Buffer));
+        }
       else if (BufferLength == sizeof(uint32_t))
-      {
-        res = SUCCESS(ETERM_INT(*(uint32_t *)Buffer));
-      }
+        {
+          res = SUCCESS(ETERM_INT(*(uint32_t *)Buffer));
+        }
       else if (BufferLength == sizeof(uint16_t))
-      {
-        res = SUCCESS(ETERM_INT(*(uint16_t *)Buffer));
-      }
-
+        {
+          res = SUCCESS(ETERM_INT(*(uint16_t *)Buffer));
+        }
     }
   else if ((QUICER_PARAM_HANDLE_TYPE_CONN == Type
             && (QUIC_PARAM_CONN_REMOTE_ADDRESS == Param

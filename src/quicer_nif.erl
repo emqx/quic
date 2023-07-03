@@ -20,6 +20,8 @@
         , reg_open/1
         , reg_close/0
         , listen/2
+        , start_listener/3
+        , stop_listener/1
         , close_listener/1
         , async_connect/3
         , async_accept/2
@@ -113,8 +115,16 @@ reg_close() ->
 listen(_ListenOn, _Options) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec close_listener(listener_handle()) -> ok.
+-spec start_listener(listener_handle(), listen_on(), listen_opts()) -> ok | {error, closed | badarg}.
+start_listener(_Listener, _ListenOn, _Opts) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec close_listener(listener_handle()) -> ok | {error, closed | badarg}.
 close_listener(_Listener) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec stop_listener(listener_handle()) -> ok | {error, closed | badarg}.
+stop_listener(_Listener) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec open_connection() -> {ok, connection_handle()} | {error, atom_reason()}.
