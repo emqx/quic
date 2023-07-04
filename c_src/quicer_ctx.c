@@ -78,6 +78,7 @@ init_c_ctx()
   c_ctx->ssl_keylogfile = NULL;
   c_ctx->is_closed = TRUE; // init
   c_ctx->config_resource = NULL;
+  c_ctx->peer_cert = NULL;
   return c_ctx;
 }
 
@@ -95,6 +96,11 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
       enif_release_resource(c_ctx->config_resource);
     }
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
+
+  if (c_ctx->peer_cert)
+    {
+      X509_free(c_ctx->peer_cert);
+    }
   enif_mutex_destroy(c_ctx->lock);
 }
 

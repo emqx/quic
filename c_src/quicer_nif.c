@@ -63,6 +63,7 @@ ERL_NIF_TERM ATOM_DGRAM_SEND_ERROR;
 ERL_NIF_TERM ATOM_SOCKNAME_ERROR;
 ERL_NIF_TERM ATOM_OWNER_DEAD;
 ERL_NIF_TERM ATOM_NOT_OWNER;
+ERL_NIF_TERM ATOM_NO_PEERCERT;
 
 // Mirror 'errors' in msquic_linux.h
 ERL_NIF_TERM ATOM_ERROR_NO_ERROR;
@@ -423,6 +424,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_DGRAM_SEND_ERROR, dgram_send_error);                              \
   ATOM(ATOM_OWNER_DEAD, owner_dead);                                          \
   ATOM(ATOM_NOT_OWNER, not_owner);                                            \
+  ATOM(ATOM_NO_PEERCERT, no_peercert);                                        \
                                                                               \
   ATOM(ATOM_ERROR_NO_ERROR, no_error);                                        \
   ATOM(ATOM_ERROR_CONTINUE, continue);                                        \
@@ -1434,6 +1436,7 @@ static ErlNifFunc nif_funcs[] = {
   { "getopt", 3, getopt3, 0},
   { "setopt", 4, setopt4, 0},
   { "controlling_process", 2, controlling_process, 0},
+  { "peercert", 1, peercert1, 0},
   /* for DEBUG */
   { "get_conn_rid", 1, get_conn_rid1, 1},
   { "get_stream_rid", 1, get_stream_rid1, 1}

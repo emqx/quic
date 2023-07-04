@@ -51,4 +51,7 @@ async_handshake_1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 QUIC_STATUS continue_connection_handshake(QuicerConnCTX *c_ctx);
 
+ERL_NIF_TERM
+peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 #endif // __QUICER_CONNECTION_H_

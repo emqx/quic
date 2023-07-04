@@ -36,6 +36,7 @@
         , getopt/3
         , setopt/4
         , controlling_process/2
+        , peercert/1
         ]).
 
 -export([ get_conn_rid/1
@@ -230,6 +231,11 @@ get_stream_rid(_Handle) ->
         ok |
         {error, closed | badarg | owner_dead | not_owner}.
 controlling_process(_H, _P) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec peercert(connection_handle()  | stream_handle()) ->
+        {ok, Cert:: public_key:der_encoded()} | {error, any()}.
+peercert(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 %% Internals

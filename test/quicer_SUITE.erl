@@ -16,7 +16,9 @@
 
 -module(quicer_SUITE).
 -include_lib("kernel/include/file.hrl").
+-include_lib("public_key/include/public_key.hrl").
 -include("quicer.hrl").
+
 
 %% API
 -export([all/0,
@@ -181,6 +183,12 @@
         , tc_direct_send_over_conn/1
         , tc_direct_send_over_conn_block/1
         , tc_direct_send_over_conn_fail/1
+
+        %% TLS certs
+        , tc_peercert_client/1
+        , tc_peercert_client_nocert/1
+        , tc_peercert_server/1
+        , tc_peercert_server_nocert/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -3099,6 +3107,108 @@ tc_getopt_tls_handshake_info(Config) ->
     ct:fail("timeout")
   end.
 
+tc_peercert_client(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server_client_cert(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts_client_cert(Config, "ca"),
+                              5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  {ok, PeerCert} = quicer:peercert(Conn),
+  OTPCert = public_key:pkix_decode_cert(PeerCert, otp),
+  Subject = {rdnSequence,
+                 [[{'AttributeTypeAndValue', ?'id-at-countryName',"SE"}],
+                  [{'AttributeTypeAndValue',
+                       ?'id-at-organizationName',
+                       {utf8String,<<"NOBODYAB">>}}],
+                  [{'AttributeTypeAndValue',
+                       ?'id-at-commonName',
+                       {utf8String,<<"server">>}}]]},
+  ?assertMatch({_, Subject},
+               pubkey_cert:subject_id(OTPCert)),
+  ok = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
+tc_peercert_client_nocert(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts(),
+                              5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  ?assertEqual({error, no_peercert}, quicer:peercert(Conn)),
+  ok = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
+tc_peercert_server(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server_client_cert(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts_client_cert(Config, "ca"),
+                              5000),
+  SPid ! peercert,
+  PeerCert = receive 
+               {SPid, peercert, Cert} ->
+                 Cert
+             end,
+  OTPCert = public_key:pkix_decode_cert(PeerCert, otp),
+  ct:pal("client cert is ~p", [OTPCert]),
+  Subject = {rdnSequence,
+                 [[{'AttributeTypeAndValue', ?'id-at-countryName',"SE"}],
+                  [{'AttributeTypeAndValue',
+                       ?'id-at-organizationName',
+                       {utf8String,<<"NOBODYAB">>}}],
+                  [{'AttributeTypeAndValue',
+                       ?'id-at-commonName',
+                       {utf8String,<<"client">>}}]]},
+  ?assertMatch({_, Subject},
+               pubkey_cert:subject_id(OTPCert)),
+  ok = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
+tc_peercert_server_nocert(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts(),
+                              5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  SPid ! peercert,
+  receive
+    {SPid, peercert, CertResp} ->
+      ?assertEqual({error, no_peercert}, CertResp)
+  end,
+  ok = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
 %%% ====================
 %%% Internal helpers
 %%% ====================
@@ -3292,10 +3402,17 @@ simple_conn_server(Owner, Config, Port) ->
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 1000),
   {ok, Conn} = quicer:handshake(Conn),
+  simple_conn_server_loop(L, Conn, Owner).
+
+simple_conn_server_loop(L, Conn, Owner) ->
   receive
     done ->
       quicer:close_listener(L),
       ok;
+    peercert ->
+      CertResp = quicer:peercert(Conn),
+      Owner ! {self(), peercert, CertResp},
+      simple_conn_server_loop(L, Conn, Owner);
     {quic, shutdown, Conn} ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
@@ -3319,10 +3436,17 @@ simple_conn_server_client_cert(Owner, Config, Port) ->
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 1000),
   {ok, Conn} = quicer:handshake(Conn),
+  simple_conn_server_client_cert_loop(L, Conn, Owner).
+
+simple_conn_server_client_cert_loop(L, Conn, Owner) ->
   receive
     done ->
       quicer:close_listener(L),
       ok;
+    peercert ->
+      {ok, PeerCert} = quicer:peercert(Conn),
+      Owner ! {self(), peercert, PeerCert},
+      simple_conn_server_client_cert_loop(L, Conn, Owner);
     {quic, shutdown, Conn, _ErrorCode} ->
       quicer:close_connection(Conn),
       quicer:close_listener(L)
