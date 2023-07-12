@@ -67,7 +67,7 @@ jobs:
       matrix:
         otp:
           - 24.3.4
-          - 25.1.2
+          - 25.3.2
         rebar3:
           - 3.20.0
         build_type:
