@@ -49,6 +49,7 @@ typedef struct QuicerListenerCTX
   // Listener handle closed flag
   // false means the handle is invalid
   BOOLEAN is_closed;
+  BOOLEAN is_stopped;
   BOOLEAN allow_insecure;
   void *reserved1;
   void *reserved2;

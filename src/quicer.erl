@@ -32,7 +32,10 @@
 
 %% Traffic APIs
 -export([ listen/2
+        , stop_listen/1
+        , start_listen/3
         , close_listener/1
+        , close_listener/2
         , connect/4
         , async_connect/3
         , handshake/1
@@ -168,18 +171,38 @@ reg_open(Profile) ->
 reg_close() ->
   quicer_nif:reg_close().
 
--spec start_listener(Appname :: atom(), listen_on(),
+-spec start_listener(Appname :: atom() | listener_handle(), listen_on(),
                      {listener_opts(),
                       connection_opts(),
                       stream_opts() | user_opts()}
                     ) ->
         {ok, pid()} | {error, any()}.
-start_listener(AppName, Port, Options) ->
+start_listener(AppName, Port, Options) when is_atom(AppName) ->
   quicer_listener:start_listener(AppName, Port, Options).
 
--spec stop_listener(atom()) -> ok.
-stop_listener(AppName) ->
+-spec start_listen(listener_handle(), listen_on(), listen_opts()) ->
+        {ok, pid()} | {error, any()}.
+start_listen(Listener, Port, Options) when is_list(Options)->
+  start_listen(Listener, Port, maps:from_list(Options));
+start_listen(Listener, Port, Options) ->
+  quicer_nif:start_listener(Listener, Port, Options).
+
+-spec stop_listener(atom() | listener_handle()) -> ok.
+stop_listener(AppName) when is_atom(AppName)->
   quicer_listener:stop_listener(AppName).
+
+-spec stop_listen(listener_handle()) -> ok.
+stop_listen(Handle) ->
+  case quicer_nif:stop_listener(Handle) of
+    ok ->
+      receive
+        {quic, listener_stopped, Handle} ->
+          ok
+      end;
+    %% @TODO handle already stopped
+    {error, Reason} ->
+      {error, Reason}
+  end.
 
 %% @doc Start listen on Port or "HOST:PORT".
 %%
@@ -210,6 +233,8 @@ close_listener(Listener) ->
         ok | {error, badarg | closed | timeout}.
 close_listener(Listener, Timeout) ->
   case quicer_nif:close_listener(Listener) of
+    ok when Timeout == 0 ->
+      ok;
     ok ->
       receive
         {quic, listener_stopped, Listener} ->

@@ -58,6 +58,8 @@
         , tc_open_listener_inval_cacertfile_2/1
         , tc_open_listener_inval_cacertfile_3/1
         , tc_start_listener_alpn_too_long/1
+        , tc_stop_start_listener/1
+        , tc_stop_close_listener/1
         , tc_close_listener/1
         , tc_close_listener_twice/1
         , tc_close_listener_dealloc/1
@@ -380,9 +382,9 @@ tc_open_listener_inval_cacertfile_1(Config) ->
 
 tc_open_listener_inval_cacertfile_2(Config) ->
   Port = select_port(),
-  ?assertMatch({ok, _},
-               quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
-                                   | default_listen_opts(Config)])),
+  {ok, L} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
+                                | default_listen_opts(Config)]),
+  ok = quicer:close_listener(L),
   ok.
 
 tc_open_listener_inval_cacertfile_3(Config) ->
@@ -409,7 +411,8 @@ tc_open_listener_with_cert_password(Config) ->
                   , {keyfile,  filename:join(DataDir, "server-password.key")}
                   , {password, ?SERVER_KEY_PASSWORD}
                   ],
-  {ok, _L} = quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config)),
+  {ok, L} = quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config)),
+  quicer:close_listener(L),
   ok.
 
 tc_open_listener_with_wrong_cert_password(Config) ->
@@ -473,22 +476,38 @@ tc_get_listener_opt_stats(Config) ->
   quicer:close_listener(L).
 
 tc_close_listener(_Config) ->
-  {error,badarg} = quicer:close_listener(make_ref()).
+  {error, badarg} = quicer:close_listener(make_ref()).
 
 tc_close_listener_twice(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  quicer:close_listener(L),
-  quicer:close_listener(L).
+  ok = quicer:close_listener(L),
+  %% follow OTP behavior, already closed
+  ok = quicer:close_listener(L).
 
 tc_close_listener_dealloc(Config) ->
   Port = select_port(),
   {Pid, Ref} = spawn_monitor(fun() ->
-                 {ok, _L} = quicer:listen(Port, default_listen_opts(Config))
+                 {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+                 exit(L)
              end),
-  receive {'DOWN', Ref, process, Pid, normal} ->
-      ok
+  receive {'DOWN', Ref, process, Pid, L} ->
+      quicer:close_listener(L)
   end.
+
+tc_stop_start_listener(Config) ->
+  Port = select_port(),
+  LConf = default_listen_opts(Config),
+  {ok, L} = quicer:listen(Port, LConf),
+  ok = quicer:stop_listen(L),
+  ok = quicer:start_listen(L, Port, LConf),
+  ok = quicer:close_listener(L).
+
+tc_stop_close_listener(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  ok = quicer:stop_listen(L),
+  ok = quicer:close_listener(L, 0).
 
 tc_start_listener_alpn_too_long(Config) ->
   Port = select_port(),
@@ -506,7 +525,8 @@ tc_start_acceptor_without_callback(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   ?assertEqual({error, missing_conn_callback},
-               quicer_connection:start_link(undefined, L, {[],[],[]}, self())).
+               quicer_connection:start_link(undefined, L, {[],[],[]}, self())),
+  quicer:close_listener(L).
 
 tc_get_listeners(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
@@ -3408,6 +3428,7 @@ simple_conn_server(Owner, Config, Port) ->
 simple_conn_server_loop(L, Conn, Owner) ->
   receive
     done ->
+      quicer:close_connection(Conn),
       quicer:close_listener(L),
       ok;
     peercert ->
