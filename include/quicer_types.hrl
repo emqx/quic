@@ -173,12 +173,12 @@
                               ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL |    %% Shutdown the stream immediately after start failure
                               ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT. %% Indicate PEER_ACCEPTED event if not accepted at start
 
--type stream_shutdown_flags() :: ?QUIC_STREAM_SHUTDOWN_FLAG_NONE |
-                                 ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL |
-                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND |
-                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE |
-                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT |
-                                 ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE. %% @TODO add xor
+-type stream_shutdown_flags() :: ?QUIC_STREAM_SHUTDOWN_FLAG_NONE |          %% **Invalid** option for `StreamShutdown`
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL |      %% Gracefully shutdown the stream
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_SEND |    %% Abortively shutdown the sending side of the stream
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT_RECEIVE | %% Abortively shutdown the sending side of the stream
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT |         %% Abortively shutdown both sending and receiveing side of the stream
+                                 ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE.      %% Don't wait for ack from peer, must be used with abortive shutdown
 
 -type send_flags() :: non_neg_integer(). %% is sync send or not
 
