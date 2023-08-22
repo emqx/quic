@@ -35,6 +35,7 @@
           tc_conn_close_flag_1/1,
           tc_conn_close_flag_2/1,
           tc_stream_close_errno/1,
+          tc_stream_shutdown_abort/1,
           tc_conn_idle_close/1,
           tc_conn_gc/1,
           tc_conn_no_gc/1,
@@ -184,6 +185,7 @@ all() ->
   , tc_conn_close_flag_2
   , tc_conn_idle_close
   , tc_stream_close_errno
+  , tc_stream_shutdown_abort
   , tc_conn_no_gc
   , tc_conn_no_gc_2
   , tc_conn_gc
@@ -673,6 +675,121 @@ tc_stream_close_errno(Config) ->
                                              #{ ?snk_kind := debug
                                               , event := peer_send_aborted
                                               , error_code := Errno
+                                              },
+                                             Trace)),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , module := quicer_stream
+                                              , error_code := Errno
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , event := stream_closed
+                                              , module := quicer_stream
+                                              , flags := #{error := 0}
+                                              },
+                                             Trace))
+                     end),
+  ok.
+
+tc_stream_shutdown_abort(Config) ->
+  Errno = 1234,
+  Port = select_port(),
+  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+                 {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+                 quicer:recv(Stm, 4),
+                 quicer:shutdown_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, Errno, 5000),
+                 quicer:close_connection(Conn),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug, context := "callback",
+                                function := "ServerConnectionCallback", mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+                                tag := "event"}, 1000, 1000),
+                 {ok, _} = ?block_until(
+                              #{?snk_kind := debug
+                               , event :=  peer_send_aborted
+                               , error_code := 1234
+                               }, 1000, 1000),
+                 ct:pal("stop listener"),
+                 ok = quicer:stop_listener(mqtt)
+               end,
+               fun(Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   ?assertEqual(ok, Result),
+                   %% check that server side
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_PEER_SEND_ABORTED
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "handle_stream_event_peer_send_aborted"
+                                              , tag := "peer_send_aborted"
+                                              , mark := Errno
+                                              },
+                                             Trace)),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_PEER_SEND_ABORTED
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , module := quicer_stream
+                                              , error_code := Errno
+                                              },
+                                             Trace)),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "handle_stream_event_peer_receive_aborted"
+                                              , tag := "peer_receive_aborted"
+                                              , mark := Errno
+                                              },
+                                             Trace)),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , context := "callback"
+                                              , function := "ServerStreamCallback"
+                                              , tag := "event"
+                                              , mark := ?QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , event := peer_receive_aborted
+                                              , module := quicer_stream
+                                              , error_code := Errno
+                                              },
+                                             Trace)),
+                   ?assert(?strict_causality(#{ ?snk_kind := debug
+                                              , event := peer_send_aborted
+                                              , module := quicer_stream
+                                              , error_code := Errno
+                                              },
+                                             #{ ?snk_kind := debug
+                                              , event := stream_closed
+                                              , module := quicer_stream
+                                              , flags := #{error := 0}
                                               },
                                              Trace))
                      end),
