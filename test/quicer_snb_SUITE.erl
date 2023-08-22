@@ -146,7 +146,7 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
-  quicer:stop_listener(mqtt),
+  quicer:terminate_listener(mqtt),
   snabbkaffe:cleanup(),
   Unhandled = quicer_test_lib:receive_all(),
   Unhandled =/= [] andalso ct:comment("What left in the message queue: ~p", [Unhandled]),
@@ -272,7 +272,7 @@ tc_app_echo_server(Config) ->
 
   quicer:close_stream(Stm),
   quicer:close_connection(Conn),
-  ok = quicer:stop_listener(mqtt).
+  ok = quicer:terminate_listener(mqtt).
 
 tc_slow_conn(Config) ->
   Port = select_port(),
@@ -296,7 +296,7 @@ tc_slow_conn(Config) ->
                  ct:pal("closing conn"),
                  quicer:close_connection(Conn),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -350,7 +350,7 @@ tc_stream_owner_down(Config) ->
                                 function := "ClientStreamCallback", mark := ?QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE,
                                 tag := "event"}, 1000, 1000)),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -437,7 +437,7 @@ tc_conn_owner_down(Config) ->
                            ?block_until(
                               #{?snk_kind := debug, event := closed, module := quicer_connection}, 1000, 1000)),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt),
+                 ok = quicer:terminate_listener(mqtt),
                  {ok, CRid} = quicer:get_conn_rid(Conn),
                  {CRid, SRid}
                end,
@@ -551,7 +551,7 @@ tc_conn_close_flag_1(Config) ->
                                , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                , tag := "event"}, 1000, 3000),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt),
+                 ok = quicer:terminate_listener(mqtt),
                  {CRid, SRid}
                end,
                fun({_CRid, SRid}, Trace) ->
@@ -602,7 +602,7 @@ tc_conn_close_flag_2(Config) ->
                                , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                , tag := "event"}, 3000, 3000), %% assume idle_timeout_is 5s
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -647,7 +647,7 @@ tc_stream_close_errno(Config) ->
                                , error_code := 1234
                                }, 1000, 1000),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -869,7 +869,7 @@ tc_conn_idle_close(Config) ->
                                              Trace))
                      end),
   ct:pal("stop listener"),
-  ok = quicer:stop_listener(mqtt),
+  ok = quicer:terminate_listener(mqtt),
   ok.
 
 tc_conn_gc(Config) ->
@@ -988,7 +988,7 @@ tc_conn_gc(Config) ->
                                )
                end),
   ct:pal("stop listener"),
-  ok = quicer:stop_listener(mqtt),
+  ok = quicer:terminate_listener(mqtt),
   ok.
 
 
@@ -1087,7 +1087,7 @@ tc_conn_no_gc(Config) ->
                   ?assert(Conn =/= undefined)
                end),
   ct:pal("stop listener"),
-  ok = quicer:stop_listener(mqtt),
+  ok = quicer:terminate_listener(mqtt),
   ok.
 
 tc_conn_no_gc_2(Config) ->
@@ -1204,7 +1204,7 @@ tc_conn_no_gc_2(Config) ->
                                                   } = E <- TraceEvents, Rid == CRid]))
                end),
   ct:pal("stop listener"),
-  ok = quicer:stop_listener(mqtt),
+  ok = quicer:terminate_listener(mqtt),
   ok.
 
 %%% Resume connection with connection opt: `nst'
@@ -1252,7 +1252,7 @@ tc_conn_resume_nst(Config) ->
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  quicer:shutdown_connection(Conn),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1325,7 +1325,7 @@ tc_conn_resume_nst_with_stream(Config) ->
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  quicer:shutdown_connection(ConnResumed),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1398,7 +1398,7 @@ tc_conn_resume_nst_async(Config) ->
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  ct:pal("stop listener"),
                  quicer:shutdown_connection(ConnResumed),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1472,7 +1472,7 @@ tc_conn_resume_nst_async_2(Config) ->
                  {ok, <<"ping3">>} = quicer:recv(Stm2, 5),
                  ct:pal("stop listener"),
                  quicer:shutdown_connection(ConnResumed),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1560,7 +1560,7 @@ tc_conn_resume_nst_with_data(Config) ->
                  ?assertNotEqual(NST2, NST),
 
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1634,7 +1634,7 @@ tc_listener_no_acceptor(Config) ->
                  {error, transport_down, #{status := connection_refused}}
                    = quicer:connect("localhost", Port, default_conn_opts(), 5000),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt),
+                 ok = quicer:terminate_listener(mqtt),
                  timer:sleep(5000)
                end,
                fun(_Result, Trace) ->
@@ -1772,7 +1772,7 @@ tc_accept_stream_active_once(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port,
                                              [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
 
@@ -1839,7 +1839,7 @@ tc_accept_stream_active_N(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port,
                                              [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
@@ -1931,7 +1931,7 @@ tc_multi_streams(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port,
                                              [{peer_bidi_stream_count, 10} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
@@ -1984,7 +1984,7 @@ tc_multi_streams_example_server_1(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port,
                                              [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
@@ -2079,7 +2079,7 @@ tc_multi_streams_example_server_2(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  ClientConnOpts = [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
                  {ok, ClientConnPid} = example_client_connection:start_link("localhost", Port,
                                                                    {ClientConnOpts, default_stream_opts()}),
@@ -2139,7 +2139,7 @@ tc_multi_streams_example_server_3(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  ClientConnOpts = [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
                  {ok, ClientConnPid} = example_client_connection:start_link("localhost", Port,
                                                                    {ClientConnOpts, default_stream_opts()}),
@@ -2300,7 +2300,7 @@ tc_passive_recv_1(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
-                 {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port,
                                              [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
@@ -2373,7 +2373,7 @@ select_port()->
 quicer_start_listener(Name, Port, Options)->
   quicer_start_listener(Name, Port, Options, 10).
 quicer_start_listener(Name, Port, Options, N) ->
-  case quicer:start_listener(mqtt, Port, Options) of
+  case quicer:spawn_listener(mqtt, Port, Options) of
     {ok, QuicApp} -> {ok, QuicApp};
     {error, listener_start_error, address_in_use} when N > 0 ->
       %% addr in use, retry....

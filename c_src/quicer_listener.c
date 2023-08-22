@@ -216,15 +216,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
       env = l_ctx->env;
-
-      // Close listener in NIF CTX leads to NULL Listener HQUIC
-      assert(l_ctx->Listener == NULL);
-
-      // Dummy call to prevent leakage if handle is not NULL
-      // @TODO they should be removed when we support ListenerStop call
-      MsQuic->ListenerClose(l_ctx->Listener);
-      l_ctx->Listener = NULL;
-
       enif_send(NULL,
                 &(l_ctx->listenerPid),
                 NULL,
@@ -232,7 +223,13 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  ATOM_QUIC,
                                  ATOM_LISTENER_STOPPED,
                                  enif_make_resource(env, l_ctx)));
-      is_destroy = TRUE;
+      if (!l_ctx->Listener)
+        {
+          // @NOTE This callback is part of the listener *close* process
+          // Listener is already closing, we can destroy the l_ctx now.
+          assert(!l_ctx->is_stopped);
+          is_destroy = TRUE;
+        }
       enif_clear_env(env);
       break;
     default:
@@ -283,7 +280,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
 
   // Build CredConfig
   QUIC_CREDENTIAL_CONFIG CredConfig;
@@ -452,6 +448,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
+      MsQuic->ListenerClose(l_ctx->Listener);
+      l_ctx->Listener = NULL;
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
     }
@@ -465,6 +463,48 @@ close_listener1(ErlNifEnv *env,
                 const ERL_NIF_TERM argv[])
 {
   QuicerListenerCTX *l_ctx;
+  BOOLEAN is_destroy = FALSE;
+  ERL_NIF_TERM ret = ATOM_OK;
+  if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(l_ctx->lock);
+  if (l_ctx->is_closed)
+    {
+      enif_mutex_unlock(l_ctx->lock);
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+  HQUIC l = l_ctx->Listener;
+  // set before destroy_l_ctx
+  l_ctx->Listener = NULL;
+  l_ctx->is_closed = TRUE;
+
+  // If is_stopped, it means the listener is already stopped.
+  // there will be no callback for QUIC_LISTENER_EVENT_STOP_COMPLETE
+  // so we need to destroy the l_ctx otherwise it will leak.
+  is_destroy = l_ctx->is_stopped;
+
+  enif_mutex_unlock(l_ctx->lock);
+
+  MsQuic->ListenerClose(l);
+  if (is_destroy)
+    {
+      destroy_l_ctx(l_ctx);
+    }
+  return ret;
+}
+
+ERL_NIF_TERM
+stop_listener1(ErlNifEnv *env,
+               __unused_parm__ int argc,
+               const ERL_NIF_TERM argv[])
+{
+  QuicerListenerCTX *l_ctx;
+  ERL_NIF_TERM ret = ATOM_OK;
+  BOOLEAN is_stopped = FALSE;
+  assert(argc == 1);
   if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -472,14 +512,91 @@ close_listener1(ErlNifEnv *env,
 
   enif_mutex_lock(l_ctx->lock);
   HQUIC l = l_ctx->Listener;
-  l_ctx->Listener = NULL;
-  l_ctx->is_closed = TRUE;
+  is_stopped = l_ctx->is_stopped;
+  l_ctx->is_stopped = TRUE;
+  enif_mutex_unlock(l_ctx->lock);
+  if (!l)
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+  else if (!is_stopped)
+    {
+      // void return
+      MsQuic->ListenerStop(l);
+    }
+  return ret;
+}
+
+ERL_NIF_TERM
+start_listener3(ErlNifEnv *env,
+                __unused_parm__ int argc,
+                const ERL_NIF_TERM argv[])
+{
+  ERL_NIF_TERM listener_handle = argv[0];
+  ERL_NIF_TERM elisten_on = argv[1];
+  ERL_NIF_TERM options = argv[2];
+
+  QuicerListenerCTX *l_ctx;
+  unsigned alpn_buffer_length = 0;
+  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_ADDR Address = {};
+  int UdpPort = 0;
+
+  // Return value
+  ERL_NIF_TERM ret = ATOM_OK;
+  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+
+  if (!enif_get_resource(
+          env, listener_handle, ctx_listener_t, (void **)&l_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
+  if (enif_get_string(
+          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
+      > 0)
+    {
+      if (!(QuicAddr4FromString(listen_on, &Address)
+            || QuicAddr6FromString(listen_on, &Address)))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  else if (enif_get_int(env, elisten_on, &UdpPort) && UdpPort >= 0)
+    {
+      QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
+      QuicAddrSetPort(&Address, (uint16_t)UdpPort);
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
+    {
+      return ERROR_TUPLE_2(ATOM_ALPN);
+    }
+
+  enif_mutex_lock(l_ctx->lock);
+  if (!l_ctx->Listener)
+    {
+      ret = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto exit;
+    }
+
+  if (QUIC_FAILED(
+          Status = MsQuic->ListenerStart(
+              l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
+    {
+      TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
+      ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
+      goto exit;
+    }
+  l_ctx->is_stopped = FALSE;
+
+exit:
   enif_mutex_unlock(l_ctx->lock);
 
-  // It is safe to close it without holding the lock
-  // This also ensures no ongoing listener callbacks
-  // This is a blocking call. @TODO have async version or use dirty scheduler
-  MsQuic->ListenerClose(l);
-
-  return ATOM_OK;
+  return ret;
 }

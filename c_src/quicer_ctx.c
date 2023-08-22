@@ -53,6 +53,10 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
 void
 destroy_l_ctx(QuicerListenerCTX *l_ctx)
 {
+  // @note, Destroy config asap as it holds rundown
+  // ref count in registration
+  destroy_config_ctx(l_ctx->config_resource);
+  l_ctx->config_resource = NULL;
   enif_release_resource(l_ctx);
 }
 

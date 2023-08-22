@@ -58,6 +58,8 @@
         , tc_open_listener_inval_cacertfile_2/1
         , tc_open_listener_inval_cacertfile_3/1
         , tc_start_listener_alpn_too_long/1
+        , tc_stop_start_listener/1
+        , tc_stop_close_listener/1
         , tc_close_listener/1
         , tc_close_listener_twice/1
         , tc_close_listener_dealloc/1
@@ -274,7 +276,7 @@ end_per_testcase(tc_open_listener_neg_1, _Config) ->
   quicer:open_lib(),
   quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
-  quicer:stop_listener(mqtt),
+  quicer:terminate_listener(mqtt),
   Unhandled = quicer_test_lib:receive_all(),
   Unhandled =/= [] andalso ct:comment("What left in the message queue: ~p", [Unhandled]),
   ok.
@@ -380,9 +382,9 @@ tc_open_listener_inval_cacertfile_1(Config) ->
 
 tc_open_listener_inval_cacertfile_2(Config) ->
   Port = select_port(),
-  ?assertMatch({ok, _},
-               quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
-                                   | default_listen_opts(Config)])),
+  {ok, L} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
+                                | default_listen_opts(Config)]),
+  ok = quicer:close_listener(L),
   ok.
 
 tc_open_listener_inval_cacertfile_3(Config) ->
@@ -409,7 +411,8 @@ tc_open_listener_with_cert_password(Config) ->
                   , {keyfile,  filename:join(DataDir, "server-password.key")}
                   , {password, ?SERVER_KEY_PASSWORD}
                   ],
-  {ok, _L} = quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config)),
+  {ok, L} = quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config)),
+  quicer:close_listener(L),
   ok.
 
 tc_open_listener_with_wrong_cert_password(Config) ->
@@ -473,22 +476,38 @@ tc_get_listener_opt_stats(Config) ->
   quicer:close_listener(L).
 
 tc_close_listener(_Config) ->
-  {error,badarg} = quicer:close_listener(make_ref()).
+  {error, badarg} = quicer:close_listener(make_ref()).
 
 tc_close_listener_twice(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  quicer:close_listener(L),
-  quicer:close_listener(L).
+  ok = quicer:close_listener(L),
+  %% follow OTP behavior, already closed
+  ok = quicer:close_listener(L).
 
 tc_close_listener_dealloc(Config) ->
   Port = select_port(),
   {Pid, Ref} = spawn_monitor(fun() ->
-                 {ok, _L} = quicer:listen(Port, default_listen_opts(Config))
+                 {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+                 exit(L)
              end),
-  receive {'DOWN', Ref, process, Pid, normal} ->
-      ok
+  receive {'DOWN', Ref, process, Pid, L} ->
+      quicer:close_listener(L)
   end.
+
+tc_stop_start_listener(Config) ->
+  Port = select_port(),
+  LConf = default_listen_opts(Config),
+  {ok, L} = quicer:listen(Port, LConf),
+  ok = quicer:stop_listener(L),
+  ok = quicer:start_listener(L, Port, LConf),
+  ok = quicer:close_listener(L).
+
+tc_stop_close_listener(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  ok = quicer:stop_listener(L),
+  ok = quicer:close_listener(L, 0).
 
 tc_start_listener_alpn_too_long(Config) ->
   Port = select_port(),
@@ -506,7 +525,8 @@ tc_start_acceptor_without_callback(Config) ->
   Port = select_port(),
   {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
   ?assertEqual({error, missing_conn_callback},
-               quicer_connection:start_link(undefined, L, {[],[],[]}, self())).
+               quicer_connection:start_link(undefined, L, {[],[],[]}, self())),
+  quicer:close_listener(L).
 
 tc_get_listeners(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
@@ -522,14 +542,14 @@ tc_get_listeners(Config) ->
               ],
   Res = lists:map(
           fun({Alpn, ListenOn}) ->
-              {ok, L} = quicer:start_listener(
+              {ok, L} = quicer:spawn_listener(
                           Alpn, ListenOn,
                           {ListenerOpts, ConnectionOpts, StreamOpts}),
               L
           end, Listeners),
   ?assertEqual(lists:reverse(lists:zip(Listeners, Res)),
                quicer:listeners()),
-  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners).
+  lists:foreach(fun({L, _}) -> ok = quicer:terminate_listener(L) end, Listeners).
 
 tc_get_listener(Config) ->
   ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
@@ -544,7 +564,7 @@ tc_get_listener(Config) ->
               , {alpn4, "[::1]:24570"}
               ],
   lists:map(fun({Alpn, ListenOn}) ->
-                {ok, L} = quicer:start_listener(Alpn, ListenOn,
+                {ok, L} = quicer:spawn_listener(Alpn, ListenOn,
                                                 {ListenerOpts, ConnectionOpts, StreamOpts}),
                 L
             end, Listeners),
@@ -555,7 +575,7 @@ tc_get_listener(Config) ->
                     true = is_process_alive(LPid)
                 end, Listeners),
 
-  lists:foreach(fun({L, _}) -> ok = quicer:stop_listener(L) end, Listeners),
+  lists:foreach(fun({L, _}) -> ok = quicer:terminate_listener(L) end, Listeners),
 
   lists:foreach(fun({Name, _} = NameListenON) ->
                     ?assertEqual({error, not_found}, quicer:listener(Name)),
@@ -2256,7 +2276,7 @@ tc_app_echo_server(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
   {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -2265,10 +2285,10 @@ tc_app_echo_server(Config) ->
   {ok, <<"pingpingping">>} = quicer:recv(Stm, 12),
   ok = quicer:close_stream(Stm),
   ok = quicer:close_connection(Conn),
-  ok = quicer:stop_listener(mqtt),
+  ok = quicer:terminate_listener(mqtt),
   %% test that listener could be reopened
-  {ok, _} = quicer:start_listener(mqtt, Port, Options),
-  ok = quicer:stop_listener(mqtt),
+  {ok, _} = quicer:spawn_listener(mqtt, Port, Options),
+  ok = quicer:terminate_listener(mqtt),
   ok.
 
 tc_strm_opt_active_1(Config) ->
@@ -2282,7 +2302,7 @@ tc_strm_opt_active_1(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, 1}]),
   {ok, 5} = quicer:send(Stm, <<"ping1">>),
@@ -2308,7 +2328,7 @@ tc_strm_opt_active_n(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, 3}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
@@ -2341,7 +2361,7 @@ tc_strm_opt_active_once(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, once}]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
@@ -2369,7 +2389,7 @@ tc_strm_opt_active_badarg(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {error, badarg} = quicer:start_stream(Conn, [{active, twice}]).
 
@@ -2384,7 +2404,7 @@ tc_get_conn_rid(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Rid} = quicer:get_conn_rid(Conn),
   ?assert(is_integer(Rid) andalso Rid =/=0).
@@ -2400,7 +2420,7 @@ tc_get_stream_rid(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [{active, 3}]),
   {ok, Rid} = quicer:get_stream_rid(Stm),
@@ -2422,7 +2442,7 @@ tc_stream_open_flag_unidirectional(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}
                                         , {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
@@ -2449,7 +2469,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED}
                                         , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
@@ -2493,7 +2513,7 @@ tc_stream_start_flag_immediate(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_IMMEDIATE}
                                         , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
@@ -2523,7 +2543,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
                                                         bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
@@ -2572,7 +2592,7 @@ tc_stream_start_flag_indicate_peer_accept_1(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT}
                                         , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
@@ -2787,7 +2807,7 @@ tc_conn_opt_sslkeylogfile(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port,
                               [ {sslkeylogfile, TargetFName} |
                                 default_conn_opts() ],
@@ -2808,7 +2828,7 @@ tc_insecure_traffic(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port,
                               [{param_conn_disable_1rtt_encryption, true} |
                                default_conn_opts()], 5000),
@@ -2837,7 +2857,7 @@ tc_event_start_compl_client(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port,
                               [{param_conn_disable_1rtt_encryption, true} |
                                default_conn_opts()], 5000),
@@ -2879,7 +2899,7 @@ tc_event_start_compl_server(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port,
                               [ {param_conn_disable_1rtt_encryption, true}
                               | default_conn_opts()], 5000),
@@ -2928,7 +2948,7 @@ tc_direct_send_over_conn(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:async_connect("localhost", Port,
                                     [{param_conn_disable_1rtt_encryption, true} |
                                      default_conn_opts()]),
@@ -2994,7 +3014,7 @@ tc_direct_send_over_conn_block(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:async_connect("localhost", Port,
                                     [{param_conn_disable_1rtt_encryption, true} |
                                      default_conn_opts()]),
@@ -3051,7 +3071,7 @@ tc_direct_send_over_conn_fail(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  {ok, _QuicApp} = quicer:start_listener(mqtt, Port, Options),
+  {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:async_connect("localhost", Port,
                                     [{param_conn_disable_1rtt_encryption, true} |
                                      default_conn_opts()]),
@@ -3408,6 +3428,7 @@ simple_conn_server(Owner, Config, Port) ->
 simple_conn_server_loop(L, Conn, Owner) ->
   receive
     done ->
+      quicer:close_connection(Conn),
       quicer:close_listener(L),
       ok;
     peercert ->
