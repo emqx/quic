@@ -63,7 +63,7 @@ get this event with status 'stream_limit_reached' if peer has flow control preve
 Otherwise, start stream will be queued. Also see [peer_accepted](#peer_accepted) 
 
 ```erlang
-{quic, start_completed, stream_handler(), #{ status := atom_status()
+{quic, start_completed, stream_handle(), #{ status := atom_status()
                                            , stream_id := integer()
                                            , is_peer_accepted := boolean() }
 ```
@@ -74,7 +74,7 @@ Data received in binary format.
 
 
 ```erlang
-{quic, binary(), stream_handler(), #{ absolute_offset := integer() 
+{quic, binary(), stream_handle(), #{ absolute_offset := integer() 
                                     , len := integer()
                                     , flags := integer()} }
 ```
@@ -99,7 +99,7 @@ This message is for sync send only.
 IsSendCanceled: Peer abort receive
 
 ```erlang
-{quic, send_complete, stream_handler(), IsSendCanceled :: boolean()}
+{quic, send_complete, stream_handle(), IsSendCanceled :: boolean()}
 ```
 
 
@@ -108,7 +108,7 @@ IsSendCanceled: Peer abort receive
 Peer has sent all the data and wants to shutdown gracefully.
 
 ```erlang
-{quic, peer_send_shutdown, stream_handler(), undefined}
+{quic, peer_send_shutdown, stream_handle(), undefined}
 ```
 
 @TODO mask
@@ -121,7 +121,7 @@ Peer terminated the sending part of the stream abruptly.
 The receiver can discard any data that it already received on the stream.
 
 ```erlang
-{quic, peer_send_aborted, stream_handler(), ErrorCode::integer()}
+{quic, peer_send_aborted, stream_handle(), ErrorCode::integer()}
 ```
 
 where 'ErrorCode' is application layer error code
@@ -133,7 +133,7 @@ The peer (receiver) abortively shut down the stream.
 The sender may assume the data sent is either handled or not handled.
 
 ```erlang
-{quic, peer_receive_aborted, stream_handler(), ErrorCode::integer()}
+{quic, peer_receive_aborted, stream_handle(), ErrorCode::integer()}
 ```
 
 where 'ErrorCode' is application layer error code
@@ -145,7 +145,7 @@ This will happen immediately on an abortive send or after a graceful stream
 send shutdown has been acknowledged by the peer.
 
 ```erlang
-{quic, send_shutdown_complete, stream_handler(), IsGraceful::boolean()}
+{quic, send_shutdown_complete, stream_handle(), IsGraceful::boolean()}
 ```
 
 ### shutdown_completed, stream is closed
@@ -153,7 +153,7 @@ send shutdown has been acknowledged by the peer.
 Both endpoints of sending and receiving of the stream have been shut down.
 
 ```erlang
-{quic, stream_closed, stream_handler(), #{ is_conn_shutdown := boolean()
+{quic, stream_closed, stream_handle(), #{ is_conn_shutdown := boolean()
                                          , is_app_closing := boolean()
                                          , is_shutdown_by_app := boolean()
                                          , is_closed_remotely := boolean()
@@ -174,7 +174,7 @@ To receive this event, the 'QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT' must be
 in `start_flag` while starting the stream.
 
 ```erlang
-{quic, peer_accepted, stream_handler(), undefined}
+{quic, peer_accepted, stream_handle(), undefined}
 ```
 
 Also see [start_complete](#start_complete)
@@ -188,7 +188,7 @@ will be pulled by NIF function instead of by sending the erlang messages
 see usage in: quicer:recv/2
 
 ``` erlang
-{quic, continue, stream_handler(), undefined}
+{quic, continue, stream_handle(), undefined}
 ```
 
 ### passive mode
@@ -200,7 +200,7 @@ Should call setopt active_n to make it back to active mode again
 Or use quicer:recv/2 to receive in passive mode
 
 ``` erlang
-{quic, passive, stream_handler(), undefined}
+{quic, passive, stream_handle(), undefined}
 ```
 
 ## Messages to Connection Owner
@@ -208,7 +208,7 @@ Or use quicer:recv/2 to receive in passive mode
 ### Connection connected
 
 ``` erlang
-{quic, connected, connection_handler(), #{ is_resumed := boolean()
+{quic, connected, connection_handle(), #{ is_resumed := boolean()
                                          , alpns := string() | undefined
                                          }}
 ```
@@ -221,7 +221,7 @@ This message notifies the connection owner that quic connection is established (
 Connection has been shutdown by the transport locally, such as idle timeout.
 
 ``` erlang
-{quic, transport_shutdown, connection_handler(), #{ status := atom_reason()
+{quic, transport_shutdown, connection_handle(), #{ status := atom_reason()
                                                   , error := error_code()
                                                   }
 ```
@@ -231,7 +231,7 @@ Connection has been shutdown by the transport locally, such as idle timeout.
 Peer side initiated connection shutdown.
 
 ``` erlang
-{quic, shutdown, connection_handler(), ErrorCode :: error_code()}
+{quic, shutdown, connection_handle(), ErrorCode :: error_code()}
 ```
 
 ### Shutdown Complete
@@ -240,7 +240,7 @@ The connection has completed the shutdown process and is ready to be
 safely cleaned up.
 
 ``` erlang
-{quic, closed, connection_handler(), #{ is_handshake_completed := boolean()
+{quic, closed, connection_handle(), #{ is_handshake_completed := boolean()
                                       , is_peer_acked := boolean()
                                       , is_app_closing := boolean()
                                       }} 
@@ -251,7 +251,7 @@ safely cleaned up.
 Connection local addr is changed.
 
 ```erlang
-{quic, local_address_changed, connection_handler(), NewAddr :: string()}.
+{quic, local_address_changed, connection_handle(), NewAddr :: string()}.
 
 ```
 
@@ -260,14 +260,14 @@ Connection local addr is changed.
 Connection peer addr is changed.
 
 ```erlang
-{quic, peer_address_changed, connection_handler(), NewAddr :: string()}.
+{quic, peer_address_changed, connection_handle(), NewAddr :: string()}.
 
 ```
 
 ### New stream started from peer
 
 ``` erlang
-{quic, new_stream, stream_handler(), #{ flags := stream_open_flags()
+{quic, new_stream, stream_handle(), #{ flags := stream_open_flags()
                                       , is_orphan := boolean()
                                       }}
 ```
@@ -286,7 +286,7 @@ More streams are available due to flow control from the peer.
 `Available = Max - Used`
 
 ```erlang
-{quic, streams_available, connection_handler(), #{ bidi_streams := integer()
+{quic, streams_available, connection_handle(), #{ bidi_streams := integer()
                                                  , unidi_streams := integer()
                                                  }}
 ```
@@ -295,7 +295,7 @@ More streams are available due to flow control from the peer.
 
 Peer wants to open more streams but cannot due to flow control
 ```erlang
-{quic, peer_needs_streams, connection_handler(), undefined}
+{quic, peer_needs_streams, connection_handle(), undefined}
 ```
 
 ### Ideal processor changed
@@ -307,7 +307,7 @@ Peer wants to open more streams but cannot due to flow control
 @TODO convert it to the new format and use some atom state
 
 ```erlang
-{quic, dgram, connection_handler(), MaxLen::integer()} 
+{quic, dgram, connection_handle(), MaxLen::integer()} 
 ```
 
 ### DATAGRAM received
@@ -315,7 +315,7 @@ Peer wants to open more streams but cannot due to flow control
 @TODO convert it to the new format
 
 ```erlang
-{quic, binary(), {dgram, connection_handler()}, flag :: integer()}
+{quic, binary(), {dgram, connection_handle()}, flag :: integer()}
 ```
 
 ### DATAGRAM send state changed
@@ -323,7 +323,7 @@ Peer wants to open more streams but cannot due to flow control
 @TODO use some atom state
 
 ```erlang
-{quic, send_dgram_completed, connection_handler(), State::integer()} 
+{quic, send_dgram_completed, connection_handle(), State::integer()} 
 ```
 
 ### Connection resumed
@@ -331,7 +331,7 @@ Peer wants to open more streams but cannot due to flow control
 **Server only**, connection is resumed with session ticket
 
 ``` erlang
-{quic, connection_resumed, connection_handler(), SessionData :: false | binary() }
+{quic, connection_resumed, connection_handle(), SessionData :: false | binary() }
 ```
 
 Connection is resumed with binary session data or with 'false' means empty session data.
@@ -342,7 +342,7 @@ Connection is resumed with binary session data or with 'false' means empty sessi
 set in connection opt `quic_event_mask` when client starts the connection.
 
 ``` erlang
-{quic, nst_received, connection_handler(), Ticket::binary()}
+{quic, nst_received, connection_handle(), Ticket::binary()}
 ```
 
 The `NST` could be used by Client for 0-RTT handshake with a connection opt 
@@ -365,7 +365,7 @@ The stream acceptor will no longer get new incoming stream.
 ### New incoming connection
 
 ``` erlang
-{quic, new_conn, connection_handler(), ConnecionInfo :: #{ version      := integer()
+{quic, new_conn, connection_handle(), ConnecionInfo :: #{ version      := integer()
                                                          , local_addr   := string()
                                                          , remote_addr  := string()
                                                          , server_name  := binary()
@@ -393,7 +393,7 @@ To complete the TLS handshake, quicer:handshake/1,2 should be called.
 ### Listener Stopped
 
 ```erlang
-{quic, listener_stopped, listener_handler(), is_app_closing::boolean()}
+{quic, listener_stopped, listener_handle(), is_app_closing::boolean()}
 ```
 
 This message is sent to the listener owner process, indicating the listener

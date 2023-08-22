@@ -20,9 +20,9 @@ If you don't agree with the decision or causing issue, please refer to the chapt
     However, keep ref counting is still required to avoid the MsQuic handle getting closed too early (it is still in use).
  
 1. MsQuic handle
-    All MsQuic handlers should be only closed in resource dealloc callback.
+    All MsQuic handles should be only closed in resource dealloc callback.
  
-    For tracking resources usage, quicer do not do refcnt on MsQuic  handlers, instead it relies on the Erlang garbage
+    For tracking resources usage, quicer do not do refcnt on MsQuic handles, instead it relies on the Erlang garbage
     Collection mechanism to track the refcnt on the MsQuic handle.
 
     To inc refcnt use:

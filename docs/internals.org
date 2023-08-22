@@ -1,25 +1,25 @@
 Write down some notes for internal implementations.
 
-* Handler Lifecycle
-** What is Handler
+* Handle Lifecycle
+** What is Handle
 
-In erlang code, Handler (a handle term) is a REF to the contexts and they are
+In erlang code, Handle (a handle term) is a REF to the contexts and they are
 
-- Listener handler
+- Listener handle
 
   For accessing l_ctx (Listener Context)
 
-- Connection handler
+- Connection handle
 
   For accessing c_ctx (Connection Context)
 
-- Stream handler
+- Stream handle
 
   For accessing s_ctx (Stream Context)
 
 `*_ctx` is the NIF resource object in C code, and it has
 
-1. A MsQuic handler (HQUIC) for interworking with MsQuic.
+1. A MsQuic handle (HQUIC) for interworking with MsQuic.
 2. A 'is_closed' boolean flag mark if the HQUIC is valid or not.
    If it is false, the HQUIC may become (or is becoming) invalid and it is unsafe to be used for calling MsQuic APIs.
 3. ... Other members(fields) are irrelevant here.
@@ -28,18 +28,18 @@ In erlang code, Handler (a handle term) is a REF to the contexts and they are
 
 Creation is the op of allocating NIF resources.
 
-*** Listener handler
+*** Listener handle
 
 Created in quicer_nif:listen/2
 
-*** Connection handler
+*** Connection handle
 
 In init_c_ctx
 
 1. server: ctx is created in listener callback when there is new incoming connection
 2. client: ctx is created in quicer_nif:async_connect3/3
 
-*** Stream handler
+*** Stream handle
 
 In init_s_ctx
 
@@ -48,9 +48,9 @@ In init_s_ctx
 
 ** Destroy
 
-In erlang vm, if there is a var holding the handler, it will not be garbage collected.
+In erlang vm, if there is a var holding the handle, it will not be garbage collected.
 
-Same as in C NIF code, if the handler is one of the input arguments, it is safe to access the *_ctx because the var in erlang is still holding the handler but we cannot assume the API caller will hold the handler for the entire lifecycle.
+Same as in C NIF code, if the handle is one of the input arguments, it is safe to access the *_ctx because the var in erlang is still holding the handle but we cannot assume the API caller will hold the handle for the entire lifecycle.
 
 ** Thread Safety with ref counting.
 
@@ -63,7 +63,7 @@ In term of thread safety, There are three players in quicer that could access th
 
 a. The MsQuic worker thread is accessing *_ctx in the callback function
 b. VM scheduler is executing a NIF function such as quicer:send/2
-c. VM scheduler thread is doing GC of the handler object
+c. VM scheduler thread is doing GC of the handle object
 
 After the context object is created, the refcnt is 1
 
@@ -88,14 +88,14 @@ After the context object is created, the refcnt is 1
 4. In MsQuic callback function when handling the event of 'SHUTDOWN COMPLETE'
 
    'SHUTDOWN COMPLETE' means resource is no longer active and there will be no more callbacks
-   (Connection->ClientCallbackHandler = NULL)
+   (Connection->ClientCallbackHandle = NULL)
 
    Callback should decrease the refcnt.
 
    In callback,
      Call enif_release_resource
-     Set msquic Handler to NULL within locking context.
-     Msquic API could deal with NULL handler.
+     Set msquic Handle to NULL within locking context.
+     Msquic API could deal with NULL handle.
 
 5. In MsQuic callback function and NIF function
 
@@ -112,11 +112,11 @@ After the context object is created, the refcnt is 1
    Everything contained in the resource object becomes invalid and it will be impossible to access the destructed
    resource obj from a) and b). But for accessing from c) it is out of our control.
 
-   Close the msquic handler.
+   Close the msquic handle.
 
 7. When close the connection via quicer_nif:close_connection3
 
-   Set Connection Handler to NULL within locked context
+   Set Connection Handle to NULL within locked context
 
 8. MsQuic callback signaling
 
@@ -170,7 +170,7 @@ typedef struct QUIC_API_TABLE {
 
     QUIC_SET_CONTEXT_FN                 SetContext;
     QUIC_GET_CONTEXT_FN                 GetContext;
-    QUIC_SET_CALLBACK_HANDLER_FN        SetCallbackHandler;
+    QUIC_SET_CALLBACK_HANDLE_FN        SetCallbackHandle;
 
     QUIC_SET_PARAM_FN                   SetParam;
     QUIC_GET_PARAM_FN                   GetParam;
@@ -214,7 +214,7 @@ typedef struct QUIC_API_TABLE {
 
 *** SetContext [Not Used]
 *** GetContext [Not Used]
-*** SetCallbackHandler
+*** SetCallbackHandle
 *** SetParam
 SYNC call in non-callback-context
 *** GetParam
@@ -291,8 +291,8 @@ QUIC_TRACE_API_COUNT // 26
 
 | MsQuic Event                       | Erlang Msg                                       |
 |------------------------------------+--------------------------------------------------|
-| QUIC_LISTENER_EVENT_NEW_CONNECTION | {quic,  new_conn         , connection_handler()}  |
-| QUIC_LISTENER_EVENT_STOP_COMPLETE  | {quic,  listener_stopped , listener_handler()}    |
+| QUIC_LISTENER_EVENT_NEW_CONNECTION | {quic,  new_conn         , connection_handle()}  |
+| QUIC_LISTENER_EVENT_STOP_COMPLETE  | {quic,  listener_stopped , listener_handle()}    |
 
 ** Connecion Events
 
@@ -320,21 +320,21 @@ QUIC_TRACE_API_COUNT // 26
 
 | MsQuic Event                                          | Erlang Msg                                                                 |
 |-------------------------------------------------------+----------------------------------------------------------------------------|
-| QUIC_CONNECTION_EVENT_CONNECTED                       | {quic, connected, connection_handler()}  @TODO more flags                  |
-| QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT | {quic, transport_shutdown, connection_handler(), atom_status()}            |
-| QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER      | {quic, shutdown, connection_handler(), ErrorCode::integer()}               |
-| QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE               | {quic, closed, connection_handler(), Flags::map()}                         |
-| QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED           | {quic, local_address_changed, connection_handler(), addr_str()}            |
-| QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED            | {quic, peer_address_changed, connection_handler(), addr_str()}             |
-| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handler(), new_stream_props()} stream            |
-| QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE               | {quic, streams_available, connection_handler(), BidirStmCnt, UniDirStmCnt} |
-| QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS              | {quic, peer_needs_streams, connection_handler()}                           |
+| QUIC_CONNECTION_EVENT_CONNECTED                       | {quic, connected, connection_handle()}  @TODO more flags                  |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT | {quic, transport_shutdown, connection_handle(), atom_status()}            |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER      | {quic, shutdown, connection_handle(), ErrorCode::integer()}               |
+| QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE               | {quic, closed, connection_handle(), Flags::map()}                         |
+| QUIC_CONNECTION_EVENT_LOCAL_ADDRESS_CHANGED           | {quic, local_address_changed, connection_handle(), addr_str()}            |
+| QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED            | {quic, peer_address_changed, connection_handle(), addr_str()}             |
+| QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handle(), new_stream_props()} stream            |
+| QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE               | {quic, streams_available, connection_handle(), BidirStmCnt, UniDirStmCnt} |
+| QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS              | {quic, peer_needs_streams, connection_handle()}                           |
 | QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED         | -                                                                          |
-| QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED          | {quic, dgram_max_len, integer()} @TODO with handler                        |
-| QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED               | {quic, dgram, binary()}          @TODO with handler                        |
-| QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED     | {quic, send_dgram_completed, connection_handler()}                         |
-| QUIC_CONNECTION_EVENT_RESUMED                         | {quic, connection_resumed, connection_handler, false \vert binary()}       |
-| QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED      | {quic, nst_received, connection_handler(), Ticket::binary()}               |
+| QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED          | {quic, dgram_max_len, integer()} @TODO with handle                        |
+| QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED               | {quic, dgram, binary()}          @TODO with handle                        |
+| QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED     | {quic, send_dgram_completed, connection_handle()}                         |
+| QUIC_CONNECTION_EVENT_RESUMED                         | {quic, connection_resumed, connection_handle, false \vert binary()}       |
+| QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED      | {quic, nst_received, connection_handle(), Ticket::binary()}               |
 | QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | @TODO                                                                      |
 |-------------------------------------------------------+----------------------------------------------------------------------------|
 
@@ -359,15 +359,15 @@ QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
 | MsQuic Event                             | Erlang Msg                                                                      |
 |------------------------------------------+---------------------------------------------------------------------------------|
 | QUIC_STREAM_EVENT_START_COMPLETE         | {quic, start_completed, #{}}                                                    |
-| QUIC_STREAM_EVENT_RECEIVE                | {quic, stream_handler(), continue} or {quic, binary(), stream_handler(), map()} |
-| QUIC_STREAM_EVENT_SEND_COMPLETE          | {quic, send_complete, stream_handler(), CanceledFlag}                           |
-| QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN     | {quic, peer_send_shutdown, stream_handler(), undefined}                         |
-| QUIC_STREAM_EVENT_PEER_SEND_ABORTED      | {quic, peer_send_aborted, stream_handler(), error_code()}                       |
-| QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED   | {quic, peer_receive_aborted, stream_handler(), error_code()}                    |
-| QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE      | {quic, stream_closed, stream_handler(), #{}}                                    |
+| QUIC_STREAM_EVENT_RECEIVE                | {quic, stream_handle(), continue} or {quic, binary(), stream_handle(), map()} |
+| QUIC_STREAM_EVENT_SEND_COMPLETE          | {quic, send_complete, stream_handle(), CanceledFlag}                           |
+| QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN     | {quic, peer_send_shutdown, stream_handle(), undefined}                         |
+| QUIC_STREAM_EVENT_PEER_SEND_ABORTED      | {quic, peer_send_aborted, stream_handle(), error_code()}                       |
+| QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED   | {quic, peer_receive_aborted, stream_handle(), error_code()}                    |
+| QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE      | {quic, stream_closed, stream_handle(), #{}}                                    |
 | QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE | @TODO                                                                           |
 | QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                           |
-| QUIC_STREAM_EVENT_PEER_ACCEPTED          | {quic, peer_accepted, stream_handler()}                                         |
+| QUIC_STREAM_EVENT_PEER_ACCEPTED          | {quic, peer_accepted, stream_handle()}                                         |
 
 * Multistreaming Support
 

@@ -24,12 +24,10 @@ Load QUIC_CREDENTIAL_CONFIG to configuration
 ** DONE Hibernate connection owner process since connection process is mostly idling
 Doable via return value of callback fun.
 
-** get Peer cert
-
 ** Get/Set Context
 with lock protection set/get the callback context.
 
-** New API: open_send(connection_handler(), Data, Flags)
+** New API: open_send(connection_handle(), Data, Flags)
 Open stream over this connection and send without starting the stream
 
 ** RegistrationShutdown
