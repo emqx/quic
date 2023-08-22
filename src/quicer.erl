@@ -32,8 +32,8 @@
 
 %% Traffic APIs
 -export([ listen/2
-        , stop_listen/1
-        , start_listen/3
+        , stop_listener/1
+        , start_listener/3
         , close_listener/1
         , close_listener/2
         , connect/4
@@ -110,8 +110,8 @@
         , open_connection/0
         ]).
 
--export([ start_listener/3 %% start application over quic
-        , stop_listener/1
+-export([ spawn_listener/3 %% start application over quic
+        , terminate_listener/1
         ]).
 
 -type connection_opts() :: proplists:proplist() | quicer_connection:opts().
@@ -171,28 +171,17 @@ reg_open(Profile) ->
 reg_close() ->
   quicer_nif:reg_close().
 
--spec start_listener(Appname :: atom() | listener_handle(), listen_on(),
-                     {listener_opts(),
-                      connection_opts(),
-                      stream_opts() | user_opts()}
-                    ) ->
+%% @doc Start a stopped listener with listener handle.
+-spec start_listener(listener_handle(), listen_on(), listen_opts()) ->
         {ok, pid()} | {error, any()}.
-start_listener(AppName, Port, Options) when is_atom(AppName) ->
-  quicer_listener:start_listener(AppName, Port, Options).
-
--spec start_listen(listener_handle(), listen_on(), listen_opts()) ->
-        {ok, pid()} | {error, any()}.
-start_listen(Listener, Port, Options) when is_list(Options)->
-  start_listen(Listener, Port, maps:from_list(Options));
-start_listen(Listener, Port, Options) ->
+start_listener(Listener, Port, Options) when is_list(Options)->
+  start_listener(Listener, Port, maps:from_list(Options));
+start_listener(Listener, Port, Options) ->
   quicer_nif:start_listener(Listener, Port, Options).
 
--spec stop_listener(atom() | listener_handle()) -> ok.
-stop_listener(AppName) when is_atom(AppName)->
-  quicer_listener:stop_listener(AppName).
-
--spec stop_listen(listener_handle()) -> ok.
-stop_listen(Handle) ->
+%% @doc Stop a started listener which could be closed or restarted later.
+-spec stop_listener(listener_handle()) -> ok.
+stop_listener(Handle) ->
   case quicer_nif:stop_listener(Handle) of
     ok ->
       receive
@@ -203,6 +192,22 @@ stop_listen(Handle) ->
     {error, Reason} ->
       {error, Reason}
   end.
+
+
+%% @doc start a listener process under supervisor tree
+-spec spawn_listener(Appname :: atom() | listener_handle(), listen_on(),
+                     {listener_opts(),
+                      connection_opts(),
+                      stream_opts() | user_opts()}
+                    ) ->
+        {ok, pid()} | {error, any()}.
+spawn_listener(AppName, Port, Options) when is_atom(AppName) ->
+  quicer_listener:start_listener(AppName, Port, Options).
+
+%% @doc terminate a listener process under supervisor tree
+-spec terminate_listener(atom() | listener_handle()) -> ok.
+terminate_listener(AppName) when is_atom(AppName)->
+  quicer_listener:stop_listener(AppName).
 
 %% @doc Start listen on Port or "HOST:PORT".
 %%
