@@ -725,7 +725,7 @@ tc_stream_shutdown_abort(Config) ->
                                , error_code := 1234
                                }, 1000, 1000),
                  ct:pal("stop listener"),
-                 ok = quicer:stop_listener(mqtt)
+                 ok = quicer:terminate_listener(mqtt)
                end,
                fun(Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
