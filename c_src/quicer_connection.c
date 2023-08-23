@@ -127,13 +127,12 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
     }
 
-  unsigned char *data
-      = enif_make_new_binary(env, len, &DerCert);
+  unsigned char *data = enif_make_new_binary(env, len, &DerCert);
 
   if (!data)
-  {
+    {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-  }
+    }
 
   // note, using tmp is mandatory, see doc for i2d_X590
   tmp = data;
@@ -595,39 +594,14 @@ async_connect3(ErlNifEnv *env,
     }
 
   ERL_NIF_TERM ecacertfile;
-  X509_STORE *trusted = NULL;
+
   if (enif_get_map_value(env, eoptions, ATOM_CACERTFILE, &ecacertfile))
     {
       char cacertfile[PATH_MAX];
-      if (enif_get_string(
-              env, ecacertfile, cacertfile, PATH_MAX, ERL_NIF_LATIN1)
-          > 0)
-        {
-          X509_LOOKUP *lookup = NULL;
-          trusted = X509_STORE_new();
-
-          if (trusted != NULL)
-            {
-              lookup = X509_STORE_add_lookup(trusted, X509_LOOKUP_file());
-              if (lookup != NULL)
-                {
-                  if (!X509_LOOKUP_load_file(
-                          lookup, cacertfile, X509_FILETYPE_PEM))
-                    {
-                      X509_STORE_free(trusted);
-                      trusted = NULL;
-                    }
-                }
-              else
-                {
-                  X509_STORE_free(trusted);
-                  trusted = NULL;
-                }
-            }
-          c_ctx->trusted = trusted;
-        }
-
-      if (trusted == NULL)
+      if (!(enif_get_string(
+                env, ecacertfile, cacertfile, PATH_MAX, ERL_NIF_LATIN1)
+                > 0
+            && build_trustedstore(cacertfile, &c_ctx->trusted)))
         {
           res = ERROR_TUPLE_2(ATOM_BADARG);
           goto Error;
@@ -635,7 +609,7 @@ async_connect3(ErlNifEnv *env,
     }
 
   // convert eoptions to Configuration
-  bool HasCaCertfile = trusted != NULL;
+  bool HasCaCertfile = c_ctx->trusted != NULL;
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
       env, &eoptions, &(c_ctx->config_resource->Configuration), HasCaCertfile);
 

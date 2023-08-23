@@ -33,6 +33,7 @@ init_l_ctx()
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
   l_ctx->cacertfile = NULL;
+  l_ctx->trusted_store = NULL;
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   return l_ctx;
@@ -41,6 +42,10 @@ init_l_ctx()
 void
 deinit_l_ctx(QuicerListenerCTX *l_ctx)
 {
+  if (l_ctx->trusted_store)
+    {
+      X509_STORE_free(l_ctx->trusted_store);
+    }
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
   if (l_ctx->config_resource)
     {

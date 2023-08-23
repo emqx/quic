@@ -20,6 +20,7 @@ limitations under the License.
 #include "quicer_internal.h"
 #include "quicer_nif.h"
 #include <msquichelper.h>
+#include <openssl/x509.h>
 
 #ifdef DEBUG
 #define dbg(fmt, ...)                                                         \
@@ -116,5 +117,7 @@ ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
                                 ERL_NIF_TERM optname,
                                 ERL_NIF_TERM optval,
                                 ERL_NIF_TERM elevel);
+
+BOOLEAN build_trustedstore(const char *cacertfile, X509_STORE **trusted_store);
 
 #endif // __QUICER_CONFIG_H_
