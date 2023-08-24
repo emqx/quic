@@ -50,34 +50,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
-      /* reload trusted store very time to make sure we incorporate
-       * any changes to the file
-       */
-      if (l_ctx->cacertfile)
+      if (l_ctx->trusted_store)
         {
-          X509_STORE *trusted = NULL;
-          X509_LOOKUP *lookup = NULL;
-          trusted = X509_STORE_new();
-
-          if (trusted != NULL)
-            {
-              lookup = X509_STORE_add_lookup(trusted, X509_LOOKUP_file());
-              if (lookup != NULL)
-                {
-                  if (!X509_LOOKUP_load_file(
-                          lookup, l_ctx->cacertfile, X509_FILETYPE_PEM))
-                    {
-                      X509_STORE_free(trusted);
-                      trusted = NULL;
-                    }
-                }
-              else
-                {
-                  X509_STORE_free(trusted);
-                  trusted = NULL;
-                }
-            }
-          c_ctx->trusted = trusted;
+          X509_STORE_up_ref(l_ctx->trusted_store);
+          c_ctx->trusted = l_ctx->trusted_store;
         }
 
       assert(l_ctx->config_resource);
@@ -320,11 +296,14 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         {
           l_ctx->cacertfile
               = (char *)CXPLAT_ALLOC_NONPAGED(len + 1, QUICER_CACERTFILE);
-          if (!enif_get_string(env,
-                               ecacertfile,
-                               l_ctx->cacertfile,
-                               len + 1,
-                               ERL_NIF_LATIN1))
+          if (!(enif_get_string(env,
+                                ecacertfile,
+                                l_ctx->cacertfile,
+                                len + 1,
+                                ERL_NIF_LATIN1)
+                    > 0
+                && build_trustedstore(l_ctx->cacertfile,
+                                      &l_ctx->trusted_store)))
             {
               CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
               l_ctx->cacertfile = NULL;

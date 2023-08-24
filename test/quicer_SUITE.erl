@@ -382,9 +382,8 @@ tc_open_listener_inval_cacertfile_1(Config) ->
 
 tc_open_listener_inval_cacertfile_2(Config) ->
   Port = select_port(),
-  {ok, L} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
+  {error, badarg} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
                                 | default_listen_opts(Config)]),
-  ok = quicer:close_listener(L),
   ok.
 
 tc_open_listener_inval_cacertfile_3(Config) ->

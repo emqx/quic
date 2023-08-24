@@ -2440,3 +2440,37 @@ get_str_from_map(ErlNifEnv *env,
 
   return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
 }
+
+BOOLEAN
+build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
+{
+  X509_STORE *store = NULL;
+  X509_LOOKUP *lookup = NULL;
+
+  if (cacertfile == NULL)
+    {
+      return FALSE;
+    }
+
+  store = X509_STORE_new();
+  if (store == NULL)
+    {
+      return FALSE;
+    }
+
+  lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+  if (lookup == NULL)
+    {
+      X509_STORE_free(store);
+      return FALSE;
+    }
+
+  if (!X509_LOOKUP_load_file(lookup, cacertfile, X509_FILETYPE_PEM))
+    {
+      X509_STORE_free(store);
+      return FALSE;
+    }
+
+  *trusted_store = store;
+  return TRUE;
+}
