@@ -1447,6 +1447,7 @@ static ErlNifFunc nif_funcs[] = {
   { "new_registration", 2, new_registration2, 0},
   { "shutdown_registration", 1, shutdown_registration_x, 0},
   { "shutdown_registration", 3, shutdown_registration_x, 0},
+  { "get_registration_name", 1, get_registration_name1, 0},
   { "listen", 2, listen2, 0},
   { "start_listener", 3, start_listener3, 0},
   { "stop_listener", 1, stop_listener1, 0},

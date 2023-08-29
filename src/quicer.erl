@@ -27,6 +27,7 @@
         , new_registration/2
         , shutdown_registration/1
         , shutdown_registration/3
+        , get_registration_name/1
         , reg_open/0
         , reg_open/1
         , reg_close/0
@@ -160,6 +161,12 @@ shutdown_registration(Handle) ->
         quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
 shutdown_registration(Handle, IsSilent, ErrCode) ->
   quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
+
+%% @doc get registration name
+-spec get_registration_name(Handle) ->
+        quicer_nif:get_registration_name(Handle).
+get_registration_name(Handle) ->
+  quicer_nif:get_registration_name(Handle).
 
 %% @doc GRegistraion should be opened before calling traffic APIs.
 %%

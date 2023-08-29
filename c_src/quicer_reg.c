@@ -61,6 +61,15 @@ new_registration2(ErlNifEnv *env,
     {
       ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
+
+  if (0 >= enif_get_string(
+          env, ename, r_ctx->name, UINT8_MAX + 1, ERL_NIF_LATIN1))
+    {
+      deinit_r_ctx(r_ctx);
+      destroy_r_ctx(r_ctx);
+      ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
   // Open Registration
   if (QUIC_FAILED(
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
@@ -117,4 +126,19 @@ shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM *argv)
     }
 
   return ATOM_OK;
+}
+
+ERL_NIF_TERM
+get_registration_name1(ErlNifEnv *env,
+                       __unused_parm__ int argc,
+                       const ERL_NIF_TERM argv[])
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  ERL_NIF_TERM ectx = argv[0];
+  if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  return SUCCESS(enif_make_string(env, r_ctx->name, ERL_NIF_LATIN1));
 }

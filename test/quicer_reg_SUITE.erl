@@ -121,7 +121,6 @@ all() ->
          nomatch =/= string:prefix(atom_to_list(F), "tc_")
     ].
 
-
 %%--------------------------------------------------------------------
 %% @spec TestCase() -> Info
 %% Info = [tuple()]
@@ -142,7 +141,8 @@ all() ->
 tc_new_reg(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
     Profile = quic_execution_profile_low_latency,
-    {ok, _Reg} = quicer:new_registration(Name, Profile),
+    {ok, Reg} = quicer:new_registration(Name, Profile),
+    quicer:shutdown_registration(Reg),
     ok.
 
 tc_shutdown_reg_1(_Config) ->
@@ -182,3 +182,11 @@ tc_shutdown_with_reason(_Config) ->
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
     ok = quicer:shutdown_registration(Reg, false, 123).
+
+tc_get_reg_name(_Config) ->
+    Name = atom_to_list(?FUNCTION_NAME),
+    Profile = quic_execution_profile_low_latency,
+    {ok, Reg} = quicer:new_registration(Name, Profile),
+    ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)),
+    ok = quicer:shutdown_registration(Reg),
+    ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)).

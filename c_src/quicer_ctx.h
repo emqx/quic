@@ -35,6 +35,7 @@ typedef struct QuicerRegistrationCTX
   ErlNifEnv *env;
   HQUIC Registration;
   BOOLEAN is_released;
+  char name[UINT8_MAX + 1];
 } QuicerRegistrationCTX;
 
 /*

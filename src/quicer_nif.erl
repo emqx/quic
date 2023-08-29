@@ -22,6 +22,7 @@
         , new_registration/2
         , shutdown_registration/1
         , shutdown_registration/3
+        , get_registration_name/1
         , listen/2
         , start_listener/3
         , stop_listener/1
@@ -124,6 +125,10 @@ shutdown_registration(_Handle) ->
 -spec shutdown_registration(reg_handle(), IsSilent::boolean(), ErrorCode::uint64())
                            -> ok | {error | badarg}.
 shutdown_registration(_Handle, _IsSilent, _ErrorCode) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_registration_name(reg_handle()) -> {ok, string()} | {error, badarg}.
+get_registration_name(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec listen(listen_on(), listen_opts()) ->
