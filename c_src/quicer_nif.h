@@ -31,6 +31,7 @@ limitations under the License.
 #include "quicer_dgram.h"
 #include "quicer_eterms.h"
 #include "quicer_queue.h"
+#include "quicer_reg.h"
 #include "quicer_stream.h"
 #include "quicer_tp.h"
 
@@ -44,6 +45,7 @@ extern const QUIC_API_TABLE *MsQuic;
 extern QUIC_REGISTRATION_CONFIG GRegConfig;
 
 // Context Types
+extern ErlNifResourceType *ctx_reg_t;
 extern ErlNifResourceType *ctx_listener_t;
 extern ErlNifResourceType *ctx_connection_t;
 extern ErlNifResourceType *ctx_stream_t;

@@ -28,6 +28,16 @@ limitations under the License.
 #define _CTX_NIF_READ_
 
 /*
+ * Registration
+ */
+typedef struct QuicerRegistrationCTX
+{
+  ErlNifEnv *env;
+  HQUIC Registration;
+  BOOLEAN is_released;
+} QuicerRegistrationCTX;
+
+/*
  * Configuration
  */
 typedef struct QuicerConfigCTX
@@ -122,6 +132,10 @@ typedef struct QuicerStreamSendCTX
 } QuicerStreamSendCTX;
 
 typedef struct QuicerStreamSendCTX QuicerDgramSendCTX;
+
+QuicerRegistrationCTX *init_r_ctx();
+void deinit_r_ctx(QuicerRegistrationCTX *r_ctx);
+void destroy_r_ctx(QuicerRegistrationCTX *r_ctx);
 
 QuicerListenerCTX *init_l_ctx();
 void deinit_l_ctx(QuicerListenerCTX *l_ctx);
