@@ -24,6 +24,10 @@
 %% Library APIs
 -export([ open_lib/0
         , close_lib/0
+        , new_registration/2
+        , shutdown_registration/1
+        , shutdown_registration/3
+        , get_registration_name/1
         , reg_open/0
         , reg_open/1
         , reg_close/0
@@ -140,7 +144,31 @@ close_lib() ->
   quicer_nif:close_lib().
 
 
-%% @doc Registraion should be opened before calling traffic APIs.
+%% @doc Create a new registration.
+-spec new_registration(Name, Profile) ->
+        quicer_nif:new_registration(Name, Profile).
+new_registration(Name, Profile) ->
+  quicer_nif:new_registration(Name, Profile).
+
+%% @doc Shutdown a registration.
+-spec shutdown_registration(Handle) ->
+        quicer_nif:shutdown_registration(Handle).
+shutdown_registration(Handle) ->
+  quicer_nif:shutdown_registration(Handle).
+
+%% @doc Shutdown a registration with error code and silent flag.
+-spec shutdown_registration(Handle, IsSilent, ErrCode) ->
+        quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
+shutdown_registration(Handle, IsSilent, ErrCode) ->
+  quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
+
+%% @doc get registration name
+-spec get_registration_name(Handle) ->
+        quicer_nif:get_registration_name(Handle).
+get_registration_name(Handle) ->
+  quicer_nif:get_registration_name(Handle).
+
+%% @doc GRegistraion should be opened before calling traffic APIs.
 %%
 %% This is called automatically when quicer application starts with
 %% app env: `profile'

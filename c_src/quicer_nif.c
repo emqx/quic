@@ -493,11 +493,11 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY,                               \
        quic_execution_profile_low_latency);                                   \
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT,                       \
-       quic_execution_profile_type_max_throughput);                           \
+       quic_execution_profile_max_throughput);                                \
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER,                            \
-       quic_execution_profile_type_scavenger);                                \
+       quic_execution_profile_scavenger);                                     \
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME,                            \
-       quic_execution_profile_type_real_time);                                \
+       quic_execution_profile_real_time);                                     \
   /*-----------------------------------------*/                               \
   /*         msquic params starts            */                               \
   /*-----------------------------------------*/                               \
@@ -748,6 +748,7 @@ const QUIC_API_TABLE *MsQuic = NULL;
 BOOLEAN isRegistered = false;
 BOOLEAN isLibOpened = false;
 
+ErlNifResourceType *ctx_reg_t = NULL;
 ErlNifResourceType *ctx_listener_t = NULL;
 ErlNifResourceType *ctx_connection_t = NULL;
 ErlNifResourceType *ctx_stream_t = NULL;
@@ -897,6 +898,19 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
+void
+resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
+{
+  TP_CB_3(start, (uintptr_t)obj, 0);
+  QuicerRegistrationCTX *reg_ctx = (QuicerRegistrationCTX *)obj;
+  deinit_r_ctx(reg_ctx);
+  if (reg_ctx->Registration)
+    {
+      MsQuic->RegistrationClose(reg_ctx->Registration);
+    }
+  TP_CB_3(end, (uintptr_t)obj, 0);
+}
+
 /*
 ** on_load is called when the NIF library is loaded and no previously loaded
 *library exists for this module.
@@ -934,6 +948,15 @@ on_load(ErlNifEnv *env,
   ErlNifResourceTypeInit configInit = {
     .dtor = resource_config_dealloc_callback, .down = NULL, .stop = NULL
   };
+
+  ErlNifResourceTypeInit regInit
+      = { .dtor = resource_reg_dealloc_callback, .down = NULL, .stop = NULL };
+
+  ctx_reg_t = enif_open_resource_type_x(env,
+                                        "registration_context_resource",
+                                        &regInit, // init callbacks
+                                        flags,
+                                        NULL);
 
   ctx_config_t = enif_open_resource_type_x(env,
                                            "config_context_resource",
@@ -1057,6 +1080,9 @@ closeLib(__unused_parm__ ErlNifEnv *env,
   return ATOM_OK;
 }
 
+/*
+** For global registration only
+*/
 static ERL_NIF_TERM
 registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
@@ -1418,6 +1444,10 @@ static ErlNifFunc nif_funcs[] = {
   { "reg_open", 0, registration, 0 },
   { "reg_open", 1, registration, 0 },
   { "reg_close", 0, deregistration, 0 },
+  { "new_registration", 2, new_registration2, 0},
+  { "shutdown_registration", 1, shutdown_registration_x, 0},
+  { "shutdown_registration", 3, shutdown_registration_x, 0},
+  { "get_registration_name", 1, get_registration_name1, 0},
   { "listen", 2, listen2, 0},
   { "start_listener", 3, start_listener3, 0},
   { "stop_listener", 1, stop_listener1, 0},

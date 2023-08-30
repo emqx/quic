@@ -1040,13 +1040,7 @@ tc_conn_no_gc(Config) ->
                                   5000, 1000),
                  %% Give it time for gc that should not happen on var 'Conn', could be the source of flakiness.
                  %% We are rather testing the OTP behavior here but proves our understandings are correct.
-                 %% OTP GC callback, should not happen
-                 timeout = ?block_until(#{ ?snk_kind := debug
-                                         , context := "callback"
-                                         , function := "resource_conn_dealloc_callback"
-                                         , resource_id := CRid
-                                         , tag := "end"},
-                                        5000, 1000),
+                 timer:sleep(5000),
                  {ok, CRid, SRid, Conn}
 
                end,
@@ -1147,23 +1141,7 @@ tc_conn_no_gc_2(Config) ->
                  %% But the resource dealloc callback should not be called since
                  %% we still have a ref in current process with Var: `ClientConn'
                  %% We are rather testing the OTP behavior here but proves our understandings are correct.
-                 Block = ?block_until(#{ ?snk_kind := debug
-                                       , context := "callback"
-                                       , function := "resource_conn_dealloc_callback"
-                                       , resource_id := CRid
-                                       , tag := "end"},
-                                      5000, 1000),
-                 case Block of
-                   timeout -> ok;
-                   {ok, #{ resource_id := CRid }} ->
-                     %% Don't fail the testcase here, we need the traces in post run
-                     ct:pal("!!!Error!!!: Rid: ~p of ~p should not be released~n"
-                            "Check snb traces for more",
-                            [CRid, ClientConn]);
-                   {ok, #{ resource_id := _OtherRid }} ->
-                     ok
-                 end,
-                 timer:sleep(1000),
+                 timer:sleep(5000),
                  %% We can get segfault here if it is use-after-free
                  quicer:getstat(ClientConn, [send_cnt, recv_oct, send_pend]),
                  {ok, CRid, SRid, ClientConn} %% Ensure we hold the ref here

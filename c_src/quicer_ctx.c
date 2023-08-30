@@ -18,6 +18,35 @@ limitations under the License.
 
 // alloc/dealloc ctx should be done in the callbacks.
 
+QuicerRegistrationCTX *
+init_r_ctx()
+{
+  QuicerRegistrationCTX *r_ctx
+      = enif_alloc_resource(ctx_reg_t, sizeof(QuicerRegistrationCTX));
+  if (!r_ctx)
+    {
+      return NULL;
+    }
+  CxPlatZeroMemory(r_ctx, sizeof(QuicerRegistrationCTX));
+  r_ctx->env = enif_alloc_env();
+  r_ctx->Registration = NULL;
+  r_ctx->is_released = FALSE;
+  return r_ctx;
+}
+
+void
+deinit_r_ctx(QuicerRegistrationCTX *r_ctx)
+{
+  enif_free_env(r_ctx->env);
+}
+
+void
+destroy_r_ctx(QuicerRegistrationCTX *r_ctx)
+{
+  r_ctx->is_released = TRUE;
+  enif_release_resource(r_ctx);
+}
+
 QuicerListenerCTX *
 init_l_ctx()
 {
