@@ -42,31 +42,7 @@
         , tc_lib_registration_1/1
         , tc_lib_re_registration/1
         , tc_lib_registration_neg/1
-        , tc_open_listener/1
-        , tc_open_listener_with_cert_password/1
-        , tc_open_listener_with_wrong_cert_password/1
-        , tc_open_listener_bind/1
-        , tc_open_listener_bind_v6/1
-        , tc_set_listener_opt/1
-        , tc_set_listener_opt_fail/1
-        , tc_get_listener_opt_addr/1
-        , tc_get_listener_opt_stats/1
-        , tc_open_listener_neg_1/1
-        , tc_open_listener_neg_2/1
-        , tc_open_listener_inval_parm/1
-        , tc_open_listener_inval_cacertfile_1/1
-        , tc_open_listener_inval_cacertfile_2/1
-        , tc_open_listener_inval_cacertfile_3/1
-        , tc_start_listener_alpn_too_long/1
-        , tc_stop_start_listener/1
-        , tc_stop_close_listener/1
-        , tc_close_listener/1
-        , tc_close_listener_twice/1
-        , tc_close_listener_dealloc/1
-        , tc_get_listeners/1
-        , tc_get_listener/1
-
-        , tc_start_acceptor_without_callback/1
+        , tc_open_listener_inval_reg/1
 
         , tc_conn_basic/1
         , tc_conn_basic_slow_start/1
@@ -197,6 +173,12 @@
 
 -export([tc_app_echo_server/1]).
 
+-import(quicer_test_lib, [ default_listen_opts/1
+                         , default_conn_opts/0
+                         , default_stream_opts/0
+                         , select_free_port/1
+                         ]).
+
 %% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/inet.hrl").
@@ -207,11 +189,7 @@
 -define(SERVER_KEY_PASSWORD, "sErve7r8Key$!").
 
 all() ->
-  lists:filtermap(
-    fun({Fun, _A}) ->
-        lists:prefix("tc_", atom_to_list(Fun))
-          andalso {true, Fun}
-    end, ?MODULE:module_info(exports)).
+  quicer_test_lib:all_tcs(?MODULE).
 
 suite() ->
   [{ct_hooks,[cth_surefire]}, {timetrap, {seconds, 30}}].
@@ -232,13 +210,7 @@ groups() ->
 %%% Overall setup/teardown
 %%%===================================================================
 init_per_suite(Config) ->
-  DataDir = ?config(data_dir, Config),
-  _ = quicer_test_lib:gen_ca(DataDir, "ca"),
-  _ = quicer_test_lib:gen_host_cert("server", "ca", DataDir),
-  _ = quicer_test_lib:gen_host_cert("client", "ca", DataDir),
-  _ = quicer_test_lib:gen_ca(DataDir, "other-ca"),
-  _ = quicer_test_lib:gen_host_cert("other-client", "other-ca", DataDir),
-  _ = quicer_test_lib:gen_host_cert("server-password", "ca", DataDir, #{password => ?SERVER_KEY_PASSWORD}),
+  quicer_test_lib:generate_tls_certs(Config),
   application:ensure_all_started(quicer),
   Config.
 
@@ -341,19 +313,6 @@ tc_lib_registration_1(_Config) ->
   ok = quicer:reg_open(quic_execution_profile_scavenger),
   ok = quicer:reg_close().
 
-tc_open_listener_neg_1(Config) ->
-  Port = select_port(),
-  ok = quicer:reg_close(),
-  ok = quicer:close_lib(),
-  {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
-  ok.
-
-tc_open_listener_neg_2(Config) ->
-  {error, badarg} = quicer:listen("localhost:4567", default_listen_opts(Config)),
-  %% following test should fail, but msquic has some hack to let it pass, ref: MsQuicListenerStart in msquic listener.c
-  %% {error, badarg} = quicer:listen("8.8.8.8:4567", default_listen_opts(Config)),
-  ok.
-
 tc_lib_re_registration(_Config) ->
   case quicer:reg_open() of
     ok ->
@@ -366,221 +325,14 @@ tc_lib_re_registration(_Config) ->
   ok = quicer:reg_close(),
   ok = quicer:reg_close().
 
-tc_open_listener_inval_parm(Config) ->
+tc_open_listener_inval_reg(Config) ->
   Port = select_port(),
-  ?assertEqual({error, config_error, invalid_parameter},
-               quicer:listen(Port, [ {stream_recv_buffer_default, 1024} % too small
-                                   | default_listen_opts(Config)])),
+  ok = quicer:reg_close(),
+  ok = quicer:close_lib(),
+  {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
+  quicer:open_lib(),
+  quicer:reg_open(),
   ok.
-
-tc_open_listener_inval_cacertfile_1(Config) ->
-  Port = select_port(),
-  ?assertEqual({error, badarg},
-               quicer:listen(Port, [ {cacertfile, atom}
-                                   | default_listen_opts(Config)])),
-  ok.
-
-tc_open_listener_inval_cacertfile_2(Config) ->
-  Port = select_port(),
-  {error, badarg} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
-                                | default_listen_opts(Config)]),
-  ok.
-
-tc_open_listener_inval_cacertfile_3(Config) ->
-  Port = select_port(),
-  ?assertEqual({error, badarg},
-               quicer:listen(Port, [ {cacertfile, [-1]}
-                                   | default_listen_opts(Config)])),
-  ok.
-
-tc_open_listener(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  {ok, {_, Port}} = quicer:sockname(L),
-  {error, eaddrinuse} = gen_udp:open(Port),
-  ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(Port),
-  ok = gen_udp:close(P),
-  ok.
-
-tc_open_listener_with_cert_password(Config) ->
-  Port = select_port(),
-  DataDir = ?config(data_dir, Config),
-  PasswordCerts = [ {certfile, filename:join(DataDir, "server-password.pem")}
-                  , {keyfile,  filename:join(DataDir, "server-password.key")}
-                  , {password, ?SERVER_KEY_PASSWORD}
-                  ],
-  {ok, L} = quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config)),
-  quicer:close_listener(L),
-  ok.
-
-tc_open_listener_with_wrong_cert_password(Config) ->
-  Port = select_port(),
-  DataDir = ?config(data_dir, Config),
-  PasswordCerts = [ {certfile, filename:join(DataDir, "server-password.pem")}
-                  , {keyfile,  filename:join(DataDir, "server-password.key")}
-                  , {password, "123"}
-                  ],
-  ?assertMatch( {error, config_error, tls_error}
-              , quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config))).
-
-tc_open_listener_bind(Config) ->
-  ListenOn = "127.0.0.1:4567",
-  {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
-  {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(4567),
-  ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(4567),
-  ok = gen_udp:close(P),
-  ok.
-
-tc_open_listener_bind_v6(Config) ->
-  ListenOn = "[::1]:4567",
-  {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
-  {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
-  ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
-  ok = gen_udp:close(P),
-  ok.
-
-tc_set_listener_opt(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  Val = <<0, 1, 2, 3, 4, 5>>, %% must start with 0
-  ok = quicer:setopt(L, param_listener_cibir_id, Val),
-  {error, not_supported} = quicer:getopt(L, param_listener_cibir_id),
-  quicer:close_listener(L).
-
-tc_set_listener_opt_fail(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  {error, _} = quicer:setopt(L, param_listener_cibir_id, <<1, 2, 3, 4, 5, 6>>),
-  {error, not_supported} = quicer:getopt(L, param_listener_cibir_id),
-  quicer:close_listener(L).
-
-tc_get_listener_opt_addr(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  {ok, {{0, 0, 0, 0}, Port}} = quicer:getopt(L, param_listener_local_address),
-  quicer:close_listener(L).
-
-tc_get_listener_opt_stats(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  {ok, [{"total_accepted_connection", _},
-        {"total_rejected_connection", _},
-        {"binding_recv_dropped_packets", _}
-       ]} = quicer:getopt(L, param_listener_stats),
-  quicer:close_listener(L).
-
-tc_close_listener(_Config) ->
-  {error, badarg} = quicer:close_listener(make_ref()).
-
-tc_close_listener_twice(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  ok = quicer:close_listener(L),
-  %% follow OTP behavior, already closed
-  ok = quicer:close_listener(L).
-
-tc_close_listener_dealloc(Config) ->
-  Port = select_port(),
-  {Pid, Ref} = spawn_monitor(fun() ->
-                 {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-                 exit(L)
-             end),
-  receive {'DOWN', Ref, process, Pid, L} ->
-      quicer:close_listener(L)
-  end.
-
-tc_stop_start_listener(Config) ->
-  Port = select_port(),
-  LConf = default_listen_opts(Config),
-  {ok, L} = quicer:listen(Port, LConf),
-  ok = quicer:stop_listener(L),
-  ok = quicer:start_listener(L, Port, LConf),
-  ok = quicer:close_listener(L).
-
-tc_stop_close_listener(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  ok = quicer:stop_listener(L),
-  ok = quicer:close_listener(L, 0).
-
-tc_start_listener_alpn_too_long(Config) ->
-  Port = select_port(),
-  {Pid, Ref} =
-    spawn_monitor(fun() ->
-                      {error, config_error, invalid_parameter}
-                        = quicer:listen(Port, default_listen_opts(Config) ++
-                                          [{alpn, [lists:duplicate(256, $p)]}])
-                  end),
-  receive {'DOWN', Ref, process, Pid, normal} ->
-      ok
-  end.
-
-tc_start_acceptor_without_callback(Config) ->
-  Port = select_port(),
-  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
-  ?assertEqual({error, missing_conn_callback},
-               quicer_connection:start_link(undefined, L, {[],[],[]}, self())),
-  quicer:close_listener(L).
-
-tc_get_listeners(Config) ->
-  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
-  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
-                   , {stream_acceptors, 32}
-                     | default_conn_opts()],
-  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
-               | default_stream_opts() ],
-  Listeners = [ {alpn1, "127.0.0.1:24567"}
-              , {alpn2, "0.0.0.1:24568"}
-              , {alpn3, 24569}
-              , {alpn4, "[::1]:24570"}
-              ],
-  Res = lists:map(
-          fun({Alpn, ListenOn}) ->
-              {ok, L} = quicer:spawn_listener(
-                          Alpn, ListenOn,
-                          {ListenerOpts, ConnectionOpts, StreamOpts}),
-              L
-          end, Listeners),
-  ?assertEqual(lists:reverse(lists:zip(Listeners, Res)),
-               quicer:listeners()),
-  lists:foreach(fun({L, _}) -> ok = quicer:terminate_listener(L) end, Listeners).
-
-tc_get_listener(Config) ->
-  ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
-  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
-                   , {stream_acceptors, 32}
-                     | default_conn_opts()],
-  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
-               | default_stream_opts() ],
-  Listeners = [ {alpn1, "127.0.0.1:24567"}
-              , {alpn2, "0.0.0.1:24568"}
-              , {alpn3, 24569}
-              , {alpn4, "[::1]:24570"}
-              ],
-  lists:map(fun({Alpn, ListenOn}) ->
-                {ok, L} = quicer:spawn_listener(Alpn, ListenOn,
-                                                {ListenerOpts, ConnectionOpts, StreamOpts}),
-                L
-            end, Listeners),
-
-  lists:foreach(fun({Name, _} = NameListenON) ->
-                    {ok, LPid} = quicer:listener(Name),
-                    {ok, LPid} = quicer:listener(NameListenON),
-                    true = is_process_alive(LPid)
-                end, Listeners),
-
-  lists:foreach(fun({L, _}) -> ok = quicer:terminate_listener(L) end, Listeners),
-
-  lists:foreach(fun({Name, _} = NameListenON) ->
-                    ?assertEqual({error, not_found}, quicer:listener(Name)),
-                    ?assertEqual({error, not_found}, quicer:listener(NameListenON))
-                end, Listeners),
-  ?assertEqual({error, not_found}, quicer:listener(bad_listen_name)).
 
 tc_conn_basic(Config) ->
   {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_basic(Config) end),
@@ -3145,7 +2897,7 @@ tc_peercert_client(Config) ->
                  [[{'AttributeTypeAndValue', ?'id-at-countryName',"SE"}],
                   [{'AttributeTypeAndValue',
                        ?'id-at-organizationName',
-                       {utf8String,<<"NOBODYAB">>}}],
+                       {utf8String,<<"TEST">>}}],
                   [{'AttributeTypeAndValue',
                        ?'id-at-commonName',
                        {utf8String,<<"server">>}}]]},
@@ -3196,7 +2948,7 @@ tc_peercert_server(Config) ->
                  [[{'AttributeTypeAndValue', ?'id-at-countryName',"SE"}],
                   [{'AttributeTypeAndValue',
                        ?'id-at-organizationName',
-                       {utf8String,<<"NOBODYAB">>}}],
+                       {utf8String,<<"TEST">>}}],
                   [{'AttributeTypeAndValue',
                        ?'id-at-commonName',
                        {utf8String,<<"client">>}}]]},
@@ -3562,14 +3314,7 @@ ensure_server_exit_normal(MonRef, Timeout) ->
       ct:fail("server still running", [])
   end.
 
-default_stream_opts() ->
-  [].
 
-default_conn_opts() ->
-  [{verify, none},
-   {alpn, ["sample"]},
-   %% {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
-   {idle_timeout_ms, 5000}].
 
 default_conn_opts_verify(Config, Ca) ->
   DataDir = ?config(data_dir, Config),
@@ -3588,18 +3333,6 @@ default_conn_opts_bad_client_cert(Config, Ca) ->
   [{key, filename:join(DataDir, "other-client.key")},
    {cert, filename:join(DataDir, "other-client.pem")}|
    default_conn_opts_verify(Config, Ca)].
-
-default_listen_opts(Config) ->
-  DataDir = ?config(data_dir, Config),
-  [ {verify, none}
-  , {certfile, filename:join(DataDir, "server.pem")}
-  , {keyfile,  filename:join(DataDir, "server.key")}
-  , {alpn, ["sample"]}
-  , {idle_timeout_ms, 10000}
-  , {server_resumption_level, 2} % QUIC_SERVER_RESUME_AND_ZERORTT
-  , {peer_bidi_stream_count, 10}
-  , {peer_unidi_stream_count, 0}
-  | Config ].
 
 default_listen_opts_client_cert(Config) ->
   DataDir = ?config(data_dir, Config),
@@ -3631,20 +3364,6 @@ retry_with(Fun, Retry, ErrorInfo) ->
       retry_with(Fun, Retry - 1, NewErrorInfo)
   end.
 
-%% select a random port picked by OS
-select_port()->
-  {ok, S} = gen_udp:open(0, [{reuseaddr, true}]),
-  {ok, {_, Port}} = inet:sockname(S),
-  gen_udp:close(S),
-  case os:type() of
-    {unix,darwin} ->
-      %% in MacOS, still get address_in_use after close port
-      timer:sleep(500);
-    _ ->
-      skip
-  end,
-  ct:pal("select port: ~p", [Port]),
-  Port.
 
 flush_streams_available(Conn) ->
   receive
@@ -3657,7 +3376,8 @@ filename(Path, F, A) ->
 str(Arg) ->
   binary_to_list(iolist_to_binary(Arg)).
 
-
+select_port() ->
+  select_free_port(quic).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

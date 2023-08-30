@@ -89,6 +89,8 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
+    erlang:garbage_collect(self(), [{type, major}]),
+    timer:sleep(1000),
     ok.
 
 %%--------------------------------------------------------------------
@@ -116,11 +118,7 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 all() ->
-    [ F
-      || {F, 1} <- ?MODULE:module_info(exports),
-         nomatch =/= string:prefix(atom_to_list(F), "tc_")
-    ].
-
+    quicer_test_lib:all_tcs(?MODULE).
 %%--------------------------------------------------------------------
 %% @spec TestCase() -> Info
 %% Info = [tuple()]
@@ -138,7 +136,14 @@ all() ->
 %% Comment = term()
 %% @end
 %%--------------------------------------------------------------------
-tc_new_reg(_Config) ->
+tc_new_reg(Config) ->
+    {Pid, Ref} = erlang:spawn_monitor(fun() -> do_tc_new_reg(Config) end),
+    receive
+        {'DOWN', Ref, process, Pid, Reason} ->
+            ?assertEqual(normal, Reason)
+    end.
+
+do_tc_new_reg(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
