@@ -27,7 +27,7 @@ jobs:
           key: brew-${{ matrix.os }}-${{ matrix.otp  }}
       - name: prepare
         run: |
-          #brew update
+          export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
           brew install erlang@${{ matrix.otp }}
       - name: install rebar3
         run: |
