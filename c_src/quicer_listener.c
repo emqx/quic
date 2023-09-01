@@ -228,8 +228,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   ERL_NIF_TERM elisten_on = argv[0];
   ERL_NIF_TERM options = argv[1];
+
   QUIC_ADDR Address = {};
-  int UdpPort = 0;
   HQUIC Registration = NULL;
 
   if (!enif_is_map(env, options))
@@ -237,28 +237,13 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
-  if (enif_get_string(
-          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
-      > 0)
-    {
-      if (!(QuicAddr4FromString(listen_on, &Address)
-            || QuicAddr6FromString(listen_on, &Address)))
-        {
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-    }
-  else if (enif_get_int(env, elisten_on, &UdpPort) && UdpPort >= 0)
-    {
-      QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
-      QuicAddrSetPort(&Address, (uint16_t)UdpPort);
-    }
-  else
+  // Check ListenOn string
+  if (!parse_listen_on(env, elisten_on, &Address))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  // Build CredConfig
+  // Start Build CredConfig from options
   QUIC_CREDENTIAL_CONFIG CredConfig;
   CxPlatZeroMemory(&CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
   char password[256] = { 0 };
@@ -290,11 +275,10 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Set owner for l_ctx
   if (!enif_self(env, &(l_ctx->listenerPid)))
-  {
-    destroy_l_ctx(l_ctx);
-    return ERROR_TUPLE_2(ATOM_BAD_PID);
-  }
-
+    {
+      destroy_l_ctx(l_ctx);
+      return ERROR_TUPLE_2(ATOM_BAD_PID);
+    }
 
   // Get Reg for l_ctx
   if (enif_get_map_value(env, options, ATOM_QUIC_REGISTRATION, &tmp_term))
@@ -346,6 +330,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
     }
 
+  // Get password for Server CertFile
   if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
     {
       if (get_str_from_map(env, ATOM_PASSWORD, &options, password, 256) <= 0)
@@ -376,6 +361,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
     }
 
+  // Get Verify for CredConfig
   bool Verify = load_verify(env, &options, false);
 
   if (!Verify)
@@ -393,6 +379,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
     }
 
+  // Now load server config
   ERL_NIF_TERM estatus
       = ServerLoadConfiguration(env,
                                 &options,
@@ -418,6 +405,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   // mon will be removed when triggered or when l_ctx is dealloc.
+  // this is wrong scope
   ErlNifMonitor mon;
 
   if (0 != enif_monitor_process(env, l_ctx, &l_ctx->listenerPid, &mon))
@@ -425,7 +413,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_BAD_MON);
     }
-
 
   // Now open listener
   if (QUIC_FAILED(Status = MsQuic->ListenerOpen(
@@ -440,6 +427,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
           // deref the resource
           enif_release_resource(r_ctx);
         }
+
+      // Server Configuration should be destroyed
       l_ctx->config_resource->Configuration = NULL;
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));

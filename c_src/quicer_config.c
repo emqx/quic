@@ -1174,15 +1174,33 @@ bool
 parse_listen_on(ErlNifEnv *env, ERL_NIF_TERM elisten_on, QUIC_ADDR *Address)
 {
   char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
-  if (enif_get_string(
-          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
-      > 0)
+  int UdpPort = 0;
+
+  ErlNifTermType type = enif_term_type(env, elisten_on);
+  switch (type)
     {
-      if ((QuicAddr4FromString(listen_on, Address)
-           || QuicAddr6FromString(listen_on, Address)))
+    case ERL_NIF_TERM_TYPE_LIST:
+      if (enif_get_string(
+              env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
+          > 0)
         {
+          if ((QuicAddr4FromString(listen_on, Address)
+               || QuicAddr6FromString(listen_on, Address)))
+            {
+              return TRUE;
+            }
+        }
+      break;
+    case ERL_NIF_TERM_TYPE_INTEGER:
+      if (enif_get_int(env, elisten_on, &UdpPort) && UdpPort >= 0)
+        {
+          QuicAddrSetFamily(Address, QUIC_ADDRESS_FAMILY_UNSPEC);
+          QuicAddrSetPort(Address, (uint16_t)UdpPort);
           return TRUE;
         }
+      break;
+    default:
+      break;
     }
   return FALSE;
 }
