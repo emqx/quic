@@ -230,6 +230,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM options = argv[1];
   QUIC_ADDR Address = {};
   int UdpPort = 0;
+  HQUIC Registration = NULL;
 
   if (!enif_is_map(env, options))
     {
@@ -264,6 +265,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   char cert_path[PATH_MAX + 1] = { 0 };
   char key_path[PATH_MAX + 1] = { 0 };
   ERL_NIF_TERM tmp_term;
+  QuicerRegistrationCTX *r_ctx = NULL;
 
   if (get_str_from_map(env, ATOM_CERTFILE, &options, cert_path, PATH_MAX + 1)
           <= 0
@@ -281,13 +283,39 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  // End Build CredConfig from options
+
+  // Now build l_ctx
   QuicerListenerCTX *l_ctx = init_l_ctx();
 
+  // Set owner for l_ctx
   if (!enif_self(env, &(l_ctx->listenerPid)))
+  {
+    destroy_l_ctx(l_ctx);
+    return ERROR_TUPLE_2(ATOM_BAD_PID);
+  }
+
+
+  // Get Reg for l_ctx
+  if (enif_get_map_value(env, options, ATOM_QUIC_REGISTRATION, &tmp_term))
     {
-      return ERROR_TUPLE_2(ATOM_BAD_PID);
+      if (!enif_get_resource(env, tmp_term, ctx_reg_t, (void **)&r_ctx))
+        {
+          destroy_l_ctx(l_ctx);
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+      enif_keep_resource(r_ctx);
+      Registration = r_ctx->Registration;
+    }
+  else
+    {
+      Registration = GRegistration;
     }
 
+  // NULL, if no registration in opts
+  l_ctx->r_ctx = r_ctx;
+
+  // Get cert file for l_ctx
   ERL_NIF_TERM ecacertfile;
   if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
     {
@@ -365,8 +393,12 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-  ERL_NIF_TERM estatus = ServerLoadConfiguration(
-      env, &options, &l_ctx->config_resource->Configuration, &CredConfig);
+  ERL_NIF_TERM estatus
+      = ServerLoadConfiguration(env,
+                                &options,
+                                Registration,
+                                &l_ctx->config_resource->Configuration,
+                                &CredConfig);
 
   // Cleanup CredConfig
   if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
@@ -394,10 +426,20 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_MON);
     }
 
-  if (QUIC_FAILED(
-          Status = MsQuic->ListenerOpen(
-              GRegistration, ServerListenerCallback, l_ctx, &l_ctx->Listener)))
+
+  // Now open listener
+  if (QUIC_FAILED(Status = MsQuic->ListenerOpen(
+                      // Listener registration
+                      Registration,
+                      ServerListenerCallback,
+                      l_ctx,
+                      &l_ctx->Listener)))
     {
+      if (r_ctx)
+        {
+          // deref the resource
+          enif_release_resource(r_ctx);
+        }
       l_ctx->config_resource->Configuration = NULL;
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));

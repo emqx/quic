@@ -1121,7 +1121,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
     }
-
+  // Open global registration
   if (QUIC_FAILED(status
                   = MsQuic->RegistrationOpen(&GRegConfig, &GRegistration)))
     {

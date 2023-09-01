@@ -63,8 +63,12 @@ end_per_suite(_Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
-init_per_group(_GroupName, Config) ->
-  Config.
+init_per_group(global_reg, Config) ->
+  Config;
+init_per_group(suite_reg, Config) ->
+  {ok, SReg} = quicer:new_registration(atom_to_list(?MODULE),
+                                       quic_execution_profile_max_throughput),
+  [{quic_registration, SReg} | Config].
 
 %%--------------------------------------------------------------------
 %% @spec end_per_group(GroupName, Config0) ->
@@ -73,6 +77,8 @@ init_per_group(_GroupName, Config) ->
 %% Config0 = Config1 = [tuple()]
 %% @end
 %%--------------------------------------------------------------------
+end_per_group(suite_reg, Config) ->
+  quicer:shutdown_registration(proplists:get_value(quic_registration, Config));
 end_per_group(_GroupName, _Config) ->
   ok.
 
@@ -113,7 +119,10 @@ end_per_testcase(_TestCase, _Config) ->
 %% @end
 %%--------------------------------------------------------------------
 groups() ->
-  [].
+  TCs = quicer_test_lib:all_tcs(?MODULE),
+  [ {global_reg, [], TCs}
+  , {suite_reg, [], TCs}
+  ].
 
 %%--------------------------------------------------------------------
 %% @spec all() -> GroupsAndTestCases | {skip,Reason}
@@ -124,7 +133,9 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 all() ->
-  quicer_test_lib:all_tcs(?MODULE).
+  [ {group, global_reg}
+  , {group, suite_reg}
+  ].
 
 %%--------------------------------------------------------------------
 %% @spec TestCase() -> Info
@@ -188,6 +199,32 @@ tc_open_listener(Config) ->
   ok = quicer:close_listener(L),
   {ok, P} = gen_udp:open(Port),
   ok = gen_udp:close(P),
+  ok.
+
+tc_open_listener_with_inval_reg(Config) ->
+  Port = select_port(),
+  Config1 = proplists:delete(quic_registration, Config),
+  %% Given invalid  registration
+  Reg = erlang:make_ref(),
+  %% When try to listen with the invalid registration
+  Res = quicer:listen(Port, default_listen_opts([{quic_registration, Reg} | Config1])),
+  %% Then it shall fail to listen and proper error is returned
+  ?assertEqual({error, quic_registration}, Res),
+  ok.
+
+tc_open_listener_with_new_reg(Config) ->
+  Port = select_port(),
+  %% Given New registration is created
+  {ok, Reg} = quicer:new_registration(atom_to_list(?MODULE), quic_execution_profile_max_throughput),
+  %% When Listener is created with the New Registration
+  {ok, L} = quicer:listen(Port, default_listen_opts([{quic_registration, Reg} | Config])),
+  {ok, {_, Port}} = quicer:sockname(L),
+  %% Then Listener is created successfully and port is occupied
+  {error, eaddrinuse} = gen_udp:open(Port),
+  ok = quicer:close_listener(L),
+  {ok, P} = gen_udp:open(Port),
+  ok = gen_udp:close(P),
+  ok = quicer:shutdown_registration(Reg),
   ok.
 
 tc_open_listener_with_cert_password(Config) ->

@@ -210,12 +210,13 @@ atom_cipher_suite(QUIC_CIPHER_SUITE suite)
 ERL_NIF_TERM
 ServerLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option,
+                        HQUIC Registration,
                         HQUIC *Configuration,
                         QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_SETTINGS Settings = { 0 };
 
-  if (!isRegistered)
+  if (!isRegistered && (Registration == GRegistration))
     {
       return ATOM_REG_FAILED;
     }
@@ -238,7 +239,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,

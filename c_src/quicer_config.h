@@ -66,6 +66,7 @@ QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
 
 ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
+                                     HQUIC Registration,
                                      HQUIC *Configuration,
                                      QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,

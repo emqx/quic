@@ -65,6 +65,7 @@ init_l_ctx()
   l_ctx->trusted_store = NULL;
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
+  l_ctx->r_ctx = NULL;
   return l_ctx;
 }
 
@@ -80,6 +81,10 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
     {
       destroy_config_ctx(l_ctx->config_resource);
     }
+  if (l_ctx->r_ctx && l_ctx->r_ctx->Registration != GRegistration)
+    {
+      enif_release_resource(l_ctx->r_ctx);
+    }
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);
 }
@@ -90,6 +95,12 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
   // @note, Destroy config asap as it holds rundown
   // ref count in registration
   destroy_config_ctx(l_ctx->config_resource);
+  
+  if (l_ctx->r_ctx)
+    {
+      enif_release_resource(l_ctx->r_ctx);
+      l_ctx->r_ctx = NULL;
+    }
   l_ctx->config_resource = NULL;
   enif_release_resource(l_ctx);
 }
