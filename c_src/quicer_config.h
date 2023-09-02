@@ -121,4 +121,18 @@ ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
 
 BOOLEAN build_trustedstore(const char *cacertfile, X509_STORE **trusted_store);
 
+BOOLEAN parse_cert_options(ErlNifEnv *env,
+                           ERL_NIF_TERM options,
+                           QUIC_CREDENTIAL_CONFIG *CredConfig);
+
+BOOLEAN
+parse_verify_options_server(ErlNifEnv *env,
+                            ERL_NIF_TERM options,
+                            QUIC_CREDENTIAL_CONFIG *CredConfig);
+
+BOOLEAN
+parse_cacertfile_option(ErlNifEnv *env,
+                        ERL_NIF_TERM options,
+                        char **cacertfile);
+
 #endif // __QUICER_CONFIG_H_

@@ -21,6 +21,10 @@ limitations under the License.
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 
+BOOLEAN parse_registration(ErlNifEnv *env,
+                           ERL_NIF_TERM options,
+                           QuicerRegistrationCTX **r_ctx);
+
 QUIC_STATUS
 ServerListenerCallback(__unused_parm__ HQUIC Listener,
                        void *Context,
@@ -231,6 +235,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   QUIC_ADDR Address = {};
   HQUIC Registration = NULL;
+  char *cacertfile = NULL;
 
   if (!enif_is_map(env, options))
     {
@@ -245,33 +250,48 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Start Build CredConfig from options
   QUIC_CREDENTIAL_CONFIG CredConfig;
-  CxPlatZeroMemory(&CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
-  char password[256] = { 0 };
-  char cert_path[PATH_MAX + 1] = { 0 };
-  char key_path[PATH_MAX + 1] = { 0 };
-  ERL_NIF_TERM tmp_term;
-  QuicerRegistrationCTX *r_ctx = NULL;
+  // CxPlatZeroMemory(&CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+  CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
-  if (get_str_from_map(env, ATOM_CERTFILE, &options, cert_path, PATH_MAX + 1)
-          <= 0
-      && get_str_from_map(env, ATOM_CERT, &options, cert_path, PATH_MAX + 1)
-             <= 0)
+  if (!parse_cert_options(env, options, &CredConfig))
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      return ERROR_TUPLE_2(ATOM_QUIC_TLS);
     }
 
-  if (get_str_from_map(env, ATOM_KEYFILE, &options, key_path, PATH_MAX + 1)
-          <= 0
-      && get_str_from_map(env, ATOM_KEY, &options, key_path, PATH_MAX + 1)
-             <= 0)
+  if (!parse_verify_options_server(env, options, &CredConfig))
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      return ERROR_TUPLE_2(ATOM_VERIFY);
     }
 
-  // End Build CredConfig from options
+  if (!parse_cacertfile_option(env, options, &cacertfile))
+    {
+      // TLS opt error not file content error
+      return ERROR_TUPLE_2(ATOM_CACERTFILE);
+    }
 
   // Now build l_ctx
   QuicerListenerCTX *l_ctx = init_l_ctx();
+
+  if (!l_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
+  if (cacertfile)
+    {
+      l_ctx->cacertfile = cacertfile;
+      // We do our own certificate verification against the certificates
+      // in cacertfile
+      // @see QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+
+      if (!build_trustedstore(l_ctx->cacertfile, &l_ctx->trusted_store))
+        {
+          destroy_l_ctx(l_ctx);
+          return ERROR_TUPLE_2(ATOM_CERT_ERROR);
+        }
+    }
 
   // Set owner for l_ctx
   if (!enif_self(env, &(l_ctx->listenerPid)))
@@ -280,103 +300,24 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  // Get Reg for l_ctx
-  if (enif_get_map_value(env, options, ATOM_QUIC_REGISTRATION, &tmp_term))
+  // Get Reg for l_ctx, quic_registration is optional
+  if (!parse_registration(env, options, &l_ctx->r_ctx))
     {
-      if (!enif_get_resource(env, tmp_term, ctx_reg_t, (void **)&r_ctx))
-        {
-          destroy_l_ctx(l_ctx);
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-      enif_keep_resource(r_ctx);
-      Registration = r_ctx->Registration;
+      destroy_l_ctx(l_ctx);
+      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+    }
+
+  if (l_ctx->r_ctx)
+    {
+      // quic_registration is set
+      enif_keep_resource(l_ctx->r_ctx);
+      Registration = l_ctx->r_ctx->Registration;
     }
   else
     {
+      // quic_registration is not set, use global registration
+      // msquic should reject if global registration is NULL (closed)
       Registration = GRegistration;
-    }
-
-  // NULL, if no registration in opts
-  l_ctx->r_ctx = r_ctx;
-
-  // Get cert file for l_ctx
-  ERL_NIF_TERM ecacertfile;
-  if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
-    {
-      unsigned len;
-      if (enif_get_list_length(env, ecacertfile, &len))
-        {
-          l_ctx->cacertfile
-              = (char *)CXPLAT_ALLOC_NONPAGED(len + 1, QUICER_CACERTFILE);
-          if (!(enif_get_string(env,
-                                ecacertfile,
-                                l_ctx->cacertfile,
-                                len + 1,
-                                ERL_NIF_LATIN1)
-                    > 0
-                && build_trustedstore(l_ctx->cacertfile,
-                                      &l_ctx->trusted_store)))
-            {
-              CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
-              l_ctx->cacertfile = NULL;
-              enif_release_resource(l_ctx);
-              return ERROR_TUPLE_2(ATOM_BADARG);
-            }
-        }
-      else
-        {
-          enif_release_resource(l_ctx);
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-    }
-
-  // Get password for Server CertFile
-  if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
-    {
-      if (get_str_from_map(env, ATOM_PASSWORD, &options, password, 256) <= 0)
-        {
-          enif_release_resource(l_ctx);
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-
-      QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
-          = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
-              sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
-              QUICER_CERTIFICATE_FILE);
-
-      CertFile->CertificateFile = cert_path;
-      CertFile->PrivateKeyFile = key_path;
-      CertFile->PrivateKeyPassword = password;
-      CredConfig.CertificateFileProtected = CertFile;
-      CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
-    }
-  else
-    {
-      QUIC_CERTIFICATE_FILE *CertFile
-          = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
-              sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
-      CertFile->CertificateFile = cert_path;
-      CertFile->PrivateKeyFile = key_path;
-      CredConfig.CertificateFile = CertFile;
-      CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-    }
-
-  // Get Verify for CredConfig
-  bool Verify = load_verify(env, &options, false);
-
-  if (!Verify)
-    CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-  else
-    {
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
-      if (l_ctx->cacertfile)
-        {
-          // We do our own certificate verification agains the certificates
-          // in cacertfile
-          CredConfig.Flags
-              |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
-          CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-        }
     }
 
   // Now load server config
@@ -388,6 +329,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                                 &CredConfig);
 
   // Cleanup CredConfig
+  // @todo clean more dynamically allocated memory such as cert paths
   if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
     {
       CxPlatFree(CredConfig.CertificateFile, QUICER_CERTIFICATE_FILE);
@@ -422,12 +364,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                       l_ctx,
                       &l_ctx->Listener)))
     {
-      if (r_ctx)
-        {
-          // deref the resource
-          enif_release_resource(r_ctx);
-        }
-
       // Server Configuration should be destroyed
       l_ctx->config_resource->Configuration = NULL;
       destroy_l_ctx(l_ctx);
@@ -438,7 +374,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
-  // Allow insecure
+  // Allow insecure, default is false
   ERL_NIF_TERM eisInsecure;
   if (enif_get_map_value(env, options, ATOM_ALLOW_INSECURE, &eisInsecure)
       && IS_SAME_TERM(eisInsecure, ATOM_TRUE))

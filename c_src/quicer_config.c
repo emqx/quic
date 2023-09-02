@@ -2433,6 +2433,7 @@ Exit:
   return res;
 }
 
+// @deprecated
 int
 get_str_from_map(ErlNifEnv *env,
                  ERL_NIF_TERM key,
@@ -2458,6 +2459,46 @@ get_str_from_map(ErlNifEnv *env,
     }
 
   return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
+}
+
+char *
+str_from_map(ErlNifEnv *env,
+             ERL_NIF_TERM key,
+             const ERL_NIF_TERM *map,
+             unsigned int max_len)
+{
+  unsigned int len = 0;
+  ERL_NIF_TERM tmp_term;
+
+  if (!enif_get_map_value(env, *map, key, &tmp_term))
+    {
+      goto exit;
+    }
+
+  if (ERL_NIF_TERM_TYPE_LIST != enif_term_type(env, tmp_term))
+    {
+      goto exit;
+    }
+
+  if (!enif_get_list_length(env, tmp_term, &len))
+    {
+      goto exit;
+    }
+
+  if (len == 0 || max_len < len)
+    {
+      goto exit;
+    }
+
+  char *str_buffer = (char *)malloc(len + 1);
+
+  if (enif_get_string(env, tmp_term, str_buffer, len + 1, ERL_NIF_LATIN1))
+    {
+      return str_buffer;
+    }
+
+exit:
+  return NULL;
 }
 
 BOOLEAN
@@ -2491,5 +2532,148 @@ build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
     }
 
   *trusted_store = store;
+  return TRUE;
+}
+
+/*
+** Build QUIC_CREDENTIAL_CONFIG from options, certfile, keyfile and password
+*/
+BOOLEAN
+parse_cert_options(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+  char *password = NULL;
+  char *certfile = NULL;
+  char *keyfile = NULL;
+  ERL_NIF_TERM tmp_term;
+
+  if (!CredConfig)
+    {
+      return FALSE;
+    }
+  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+
+  if (!(certfile = str_from_map(env, ATOM_CERTFILE, &options, PATH_MAX + 1)))
+    {
+      return FALSE;
+    }
+  if (!(keyfile = str_from_map(env, ATOM_KEYFILE, &options, PATH_MAX + 1)))
+    {
+      return FALSE;
+    }
+
+  // Get password for Server CertFile
+  if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
+    {
+      if (!(password = str_from_map(env, ATOM_PASSWORD, &options, 256)))
+        {
+          return FALSE;
+        }
+
+      QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
+          = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
+              QUICER_CERTIFICATE_FILE);
+
+      if (!CertFile)
+        {
+          return FALSE;
+        }
+      CertFile->CertificateFile = certfile;
+      CertFile->PrivateKeyFile = keyfile;
+      CertFile->PrivateKeyPassword = password;
+      CredConfig->CertificateFileProtected = CertFile;
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
+    }
+  else
+    {
+      QUIC_CERTIFICATE_FILE *CertFile
+          = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
+      if (!CertFile)
+        {
+          return FALSE;
+        }
+      CertFile->CertificateFile = certfile;
+      CertFile->PrivateKeyFile = keyfile;
+      CredConfig->CertificateFile = CertFile;
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+    }
+
+  return TRUE;
+}
+
+/*
+ * Parse verify option for listener (server)
+ *  verify : boolean() | undefined
+ */
+BOOLEAN
+parse_verify_options_server(ErlNifEnv *env,
+                            ERL_NIF_TERM options,
+                            QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+
+  BOOLEAN verify = load_verify(env, &options, FALSE);
+
+  if (!verify)
+    {
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+    }
+  else
+    {
+      // Server flag:
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+    }
+  return TRUE;
+}
+
+/*
+** Parse optional cacertfile option
+*/
+BOOLEAN
+parse_cacertfile_option(ErlNifEnv *env,
+                        ERL_NIF_TERM options,
+                        char **cacertfile)
+{
+  ERL_NIF_TERM ecacertfile;
+  char *tmp = NULL;
+
+  if (!enif_is_map(env, options))
+    {
+      return FALSE;
+    }
+
+  if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
+    {
+      tmp = str_from_map(env, ATOM_CACERTFILE, &options, PATH_MAX + 1);
+      if (!tmp)
+        {
+          return FALSE;
+        }
+    }
+  *cacertfile = tmp;
+  return TRUE;
+}
+
+/*
+ * parse optional quic_registration, and store it in r_ctx
+ * return TRUE if quic_registration is present and valid or not present
+ * */
+BOOLEAN
+parse_registration(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QuicerRegistrationCTX **r_ctx)
+{
+  ERL_NIF_TERM tmp_term;
+  assert(*r_ctx == NULL);
+  if (enif_get_map_value(env, options, ATOM_QUIC_REGISTRATION, &tmp_term))
+    {
+      if (!enif_get_resource(env, tmp_term, ctx_reg_t, (void **)r_ctx))
+        {
+          return FALSE;
+        }
+    }
+
   return TRUE;
 }

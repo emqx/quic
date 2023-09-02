@@ -173,20 +173,21 @@ tc_open_listener_inval_parm(Config) ->
 
 tc_open_listener_inval_cacertfile_1(Config) ->
   Port = select_port(),
-  ?assertEqual({error, badarg},
+  ?assertEqual({error, cacertfile},
                quicer:listen(Port, [ {cacertfile, atom}
                                    | default_listen_opts(Config)])),
   ok.
 
 tc_open_listener_inval_cacertfile_2(Config) ->
   Port = select_port(),
-  {error, badarg} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
-                                        | default_listen_opts(Config)]),
+  ?assertEqual({error, cacertfile},
+               quicer:listen(Port, [ {cacertfile, <<"1,2,3,4">>}
+                                   | default_listen_opts(Config)])),
   ok.
 
 tc_open_listener_inval_cacertfile_3(Config) ->
   Port = select_port(),
-  ?assertEqual({error, badarg},
+  ?assertEqual({error, cacertfile},
                quicer:listen(Port, [ {cacertfile, [-1]}
                                    | default_listen_opts(Config)])),
   ok.
