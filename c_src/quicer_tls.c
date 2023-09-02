@@ -1,0 +1,173 @@
+/*--------------------------------------------------------------------
+Copyright (c) 2023 EMQ Technologies Co., Ltd. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-------------------------------------------------------------------*/
+#include "quicer_tls.h"
+
+/*
+** Build QUIC_CREDENTIAL_CONFIG from options, certfile, keyfile and password
+*/
+BOOLEAN
+parse_cert_options(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+  char *password = NULL;
+  char *certfile = NULL;
+  char *keyfile = NULL;
+  ERL_NIF_TERM tmp_term;
+
+  if (!CredConfig)
+    {
+      return FALSE;
+    }
+  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+
+  if (!(certfile
+        = str_from_map(env, ATOM_CERTFILE, &options, NULL, PATH_MAX + 1)))
+    {
+      return FALSE;
+    }
+  if (!(keyfile
+        = str_from_map(env, ATOM_KEYFILE, &options, NULL, PATH_MAX + 1)))
+    {
+      return FALSE;
+    }
+
+  // Get password for Server CertFile
+  if (enif_get_map_value(env, options, ATOM_PASSWORD, &tmp_term))
+    {
+      if (!(password = str_from_map(env, ATOM_PASSWORD, &options, NULL, 256)))
+        {
+          return FALSE;
+        }
+
+      QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
+          = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
+              QUICER_CERTIFICATE_FILE);
+
+      if (!CertFile)
+        {
+          return FALSE;
+        }
+      CertFile->CertificateFile = certfile;
+      CertFile->PrivateKeyFile = keyfile;
+      CertFile->PrivateKeyPassword = password;
+      CredConfig->CertificateFileProtected = CertFile;
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
+    }
+  else
+    {
+      QUIC_CERTIFICATE_FILE *CertFile
+          = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
+              sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
+      if (!CertFile)
+        {
+          return FALSE;
+        }
+      CertFile->CertificateFile = certfile;
+      CertFile->PrivateKeyFile = keyfile;
+      CredConfig->CertificateFile = CertFile;
+      CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+    }
+
+  return TRUE;
+}
+
+/*
+ * Parse verify option for listener (server)
+ *  verify : boolean() | undefined
+ */
+BOOLEAN
+parse_verify_options_server(ErlNifEnv *env,
+                            ERL_NIF_TERM options,
+                            QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+
+  BOOLEAN verify = load_verify(env, &options, FALSE);
+
+  if (!verify)
+    {
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+    }
+  else
+    {
+      // Server flag:
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+    }
+  return TRUE;
+}
+
+/*
+** Parse optional cacertfile option
+*/
+BOOLEAN
+parse_cacertfile_option(ErlNifEnv *env,
+                        ERL_NIF_TERM options,
+                        char **cacertfile)
+{
+  ERL_NIF_TERM ecacertfile;
+  char *tmp = NULL;
+
+  if (!enif_is_map(env, options))
+    {
+      return FALSE;
+    }
+
+  if (enif_get_map_value(env, options, ATOM_CACERTFILE, &ecacertfile))
+    {
+      tmp = str_from_map(env, ATOM_CACERTFILE, &options, NULL, PATH_MAX + 1);
+      if (!tmp)
+        {
+          return FALSE;
+        }
+    }
+  *cacertfile = tmp;
+  return TRUE;
+}
+
+BOOLEAN
+build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
+{
+  X509_STORE *store = NULL;
+  X509_LOOKUP *lookup = NULL;
+
+  if (cacertfile == NULL)
+    {
+      return FALSE;
+    }
+
+  store = X509_STORE_new();
+  if (store == NULL)
+    {
+      return FALSE;
+    }
+
+  lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+  if (lookup == NULL)
+    {
+      X509_STORE_free(store);
+      return FALSE;
+    }
+
+  if (!X509_LOOKUP_load_file(lookup, cacertfile, X509_FILETYPE_PEM))
+    {
+      X509_STORE_free(store);
+      return FALSE;
+    }
+
+  *trusted_store = store;
+  return TRUE;
+}

@@ -102,6 +102,10 @@ int get_str_from_map(ErlNifEnv *env,
                      const ERL_NIF_TERM *map,
                      char *buff,
                      unsigned max_len);
+char *str_from_map(ErlNifEnv *env,
+                   ERL_NIF_TERM key,
+                   const ERL_NIF_TERM *map,
+                   unsigned int max_len);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
@@ -118,21 +122,5 @@ ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
                                 ERL_NIF_TERM optname,
                                 ERL_NIF_TERM optval,
                                 ERL_NIF_TERM elevel);
-
-BOOLEAN build_trustedstore(const char *cacertfile, X509_STORE **trusted_store);
-
-BOOLEAN parse_cert_options(ErlNifEnv *env,
-                           ERL_NIF_TERM options,
-                           QUIC_CREDENTIAL_CONFIG *CredConfig);
-
-BOOLEAN
-parse_verify_options_server(ErlNifEnv *env,
-                            ERL_NIF_TERM options,
-                            QUIC_CREDENTIAL_CONFIG *CredConfig);
-
-BOOLEAN
-parse_cacertfile_option(ErlNifEnv *env,
-                        ERL_NIF_TERM options,
-                        char **cacertfile);
 
 #endif // __QUICER_CONFIG_H_

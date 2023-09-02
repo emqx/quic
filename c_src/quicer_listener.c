@@ -16,6 +16,7 @@ limitations under the License.
 
 #include "quicer_listener.h"
 #include "quicer_config.h"
+#include "quicer_tls.h"
 #include "quicer_tp.h"
 #include <netinet/in.h>
 #include <openssl/pem.h>
