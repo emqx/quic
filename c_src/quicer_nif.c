@@ -758,12 +758,19 @@ QUIC_REGISTRATION_CONFIG GRegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
 void
-resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
-                                __unused_parm__ void *obj,
+resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
+                                void *ctx,
                                 __unused_parm__ ErlNifPid *pid,
                                 __unused_parm__ ErlNifMonitor *mon)
 {
-  // @TODO
+  QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)ctx;
+  TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
+  if (l_ctx->Listener)
+    {
+      MsQuic->ListenerStop(l_ctx->Listener);
+    }
+
+  TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
 }
 
 void

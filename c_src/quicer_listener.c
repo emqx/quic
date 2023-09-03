@@ -352,10 +352,9 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   // mon will be removed when triggered or when l_ctx is dealloc.
-  // this is wrong scope
-  ErlNifMonitor mon;
-
-  if (0 != enif_monitor_process(env, l_ctx, &l_ctx->listenerPid, &mon))
+  if (0
+      != enif_monitor_process(
+          env, l_ctx, &l_ctx->listenerPid, &l_ctx->owner_mon))
     {
       destroy_l_ctx(l_ctx);
       return ERROR_TUPLE_2(ATOM_BAD_MON);

@@ -18,6 +18,7 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -compile(export_all).
 -compile(nowarn_export_all).
@@ -406,6 +407,62 @@ tc_get_listener(Config) ->
                     ?assertEqual({error, not_found}, quicer:listener(NameListenON))
                 end, Listeners),
   ?assertEqual({error, not_found}, quicer:listener(bad_listen_name)).
+
+tc_listener_closed_when_owner_die_and_gc(Config) ->
+  Port = select_port(),
+  Me = self(),
+  %% Given when port is occupied by another process
+  {Pid, MRef} = spawn_monitor(fun() ->
+                                  {ok, _L} = quicer:listen(Port, default_listen_opts(Config)),
+                                  Me ! {started, self()},
+                                  receive done -> ok end
+                              end),
+  receive {started, Pid} -> ok end,
+  {error, listener_start_error, {unknown_quic_status, Reason}}
+    = quicer:listen(Port, default_listen_opts(Config)),
+  ?assert(Reason == 91 orelse Reason == 41),
+
+  Pid ! done,
+  %% When the owner process dies
+  receive {'DOWN', MRef, process, Pid, normal} ->
+      ok
+  end,
+  %% Then port is released and new listener can be started
+  {ok, L} = snabbkaffe:retry(10000, 10,
+                             fun() ->
+                                 {ok, _L0} = quicer:listen(Port, default_listen_opts(Config))
+                             end),
+  ok = quicer:close_listener(L).
+
+tc_listener_stopped_when_owner_die(Config) ->
+  Port = select_port(),
+  Me = self(),
+  {Pid, MRef} = spawn_monitor(fun() ->
+                                  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+                                  Me ! {started, self(), L},
+                                  receive done -> ok end
+                              end),
+  %% Given a Listener Handle owned by another process
+  receive {started, Pid, L0} -> ok end,
+  {error, listener_start_error, {unknown_quic_status, Reason}}
+    = quicer:listen(Port, default_listen_opts(Config)),
+  ?assert(Reason == 91 orelse Reason == 41),
+
+  Pid ! done,
+  %% When the owner process dies
+  receive {'DOWN', MRef, process, Pid, normal} ->
+      ok
+  end,
+  %% Then port is released and new listener can be started
+  {ok, L1} = snabbkaffe:retry(10000, 10,
+                             fun() ->
+                                 {ok, _L0} = quicer:listen(Port, default_listen_opts(Config))
+                             end),
+  %% Then the old listener can be closed but timeout since it is already stopped
+  %% and no stop event is triggered
+  {error, timeout} = quicer:close_listener(L0, _timeout = 10),
+  %% Then the new listener can be closed
+  ok = quicer:close_listener(L1).
 
 select_port() ->
   select_free_port(quic).

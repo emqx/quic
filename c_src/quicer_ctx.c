@@ -102,6 +102,7 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
       l_ctx->r_ctx = NULL;
     }
   l_ctx->config_resource = NULL;
+  enif_demonitor_process(l_ctx->env, l_ctx, &l_ctx->owner_mon);
   enif_release_resource(l_ctx);
 }
 
