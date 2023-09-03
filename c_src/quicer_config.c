@@ -2461,14 +2461,23 @@ get_str_from_map(ErlNifEnv *env,
   return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
 }
 
+/*
+** Fill str_buffer with string value of key in map.
+** In case str_buffer is NULL, then new memory will be allocated,
+** and caller should free it after use.
+**
+** Returns NULL on error.
+*/
 char *
 str_from_map(ErlNifEnv *env,
              ERL_NIF_TERM key,
              const ERL_NIF_TERM *map,
+             char *str_buffer,
              unsigned int max_len)
 {
   unsigned int len = 0;
   ERL_NIF_TERM tmp_term;
+  BOOLEAN is_alloc = str_buffer == NULL;
 
   if (!enif_get_map_value(env, *map, key, &tmp_term))
     {
@@ -2480,21 +2489,28 @@ str_from_map(ErlNifEnv *env,
       goto exit;
     }
 
-  if (!enif_get_list_length(env, tmp_term, &len))
+  if ((!str_buffer && !enif_get_list_length(env, tmp_term, &len))
+      || len > max_len)
     {
       goto exit;
     }
-
-  if (len == 0 || max_len < len)
+  else
     {
-      goto exit;
+      len = max_len;
     }
 
-  char *str_buffer = (char *)malloc(len + 1);
+  if (is_alloc)
+    {
+      str_buffer = (char *)malloc(len + 1);
+    }
 
   if (enif_get_string(env, tmp_term, str_buffer, len + 1, ERL_NIF_LATIN1))
     {
       return str_buffer;
+    }
+  else if (is_alloc)
+    {
+      free(str_buffer);
     }
 
 exit:

@@ -330,13 +330,17 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                                 &CredConfig);
 
   // Cleanup CredConfig
-  // @todo clean more dynamically allocated memory such as cert paths
   if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
     {
+      free((char *)CredConfig.CertificateFile->CertificateFile);
+      free((char *)CredConfig.CertificateFile->PrivateKeyFile);
       CxPlatFree(CredConfig.CertificateFile, QUICER_CERTIFICATE_FILE);
     }
   else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == CredConfig.Type)
     {
+      free((char *)CredConfig.CertificateFileProtected->CertificateFile);
+      free((char *)CredConfig.CertificateFileProtected->PrivateKeyFile);
+      free((char *)CredConfig.CertificateFileProtected->PrivateKeyPassword);
       CxPlatFree(CredConfig.CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
     }

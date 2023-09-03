@@ -105,6 +105,7 @@ int get_str_from_map(ErlNifEnv *env,
 char *str_from_map(ErlNifEnv *env,
                    ERL_NIF_TERM key,
                    const ERL_NIF_TERM *map,
+                   char *string_buffer,
                    unsigned int max_len);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
