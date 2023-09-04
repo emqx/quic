@@ -199,7 +199,7 @@ tc_open_listener(Config) ->
   {ok, {_, Port}} = quicer:sockname(L),
   {error, eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(Port),
+  {ok, P} = snabbkaffe:retry(100, 10, fun()-> gen_udp:open(Port) end),
   ok = gen_udp:close(P),
   ok.
 
@@ -254,9 +254,9 @@ tc_open_listener_bind(Config) ->
   ListenOn = "127.0.0.1:4567",
   {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
   {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(4567),
+  {error, eaddrinuse} = gen_udp:open(4567),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(4567),
+  {ok, P} = snabbkaffe:retry(100, 10, fun() -> gen_udp:open(4567) end),
   ok = gen_udp:close(P),
   ok.
 
@@ -264,9 +264,9 @@ tc_open_listener_bind_v6(Config) ->
   ListenOn = "[::1]:4567",
   {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
   {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  {error, eaddrinuse} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  {ok, P} = snabbkaffe:retry(100, 10, fun() -> gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]) end),
   ok = gen_udp:close(P),
   ok.
 
@@ -325,7 +325,7 @@ tc_stop_start_listener(Config) ->
   LConf = default_listen_opts(Config),
   {ok, L} = quicer:listen(Port, LConf),
   ok = quicer:stop_listener(L),
-  ok = quicer:start_listener(L, Port, LConf),
+  ok = snabbkaffe:retry(100, 10, fun() -> quicer:start_listener(L, Port, LConf) end),
   ok = quicer:close_listener(L).
 
 tc_stop_close_listener(Config) ->

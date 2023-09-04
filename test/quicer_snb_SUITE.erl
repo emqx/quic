@@ -1714,7 +1714,6 @@ tc_conn_stop_notify_acceptor(Config) ->
                                                  end,
                                                  exit({normal, Acceptors})
                                              end),
-                 timer:sleep(1000),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), infinity),
                  quicer:shutdown_connection(Conn),
 
