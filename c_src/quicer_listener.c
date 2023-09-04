@@ -230,6 +230,7 @@ ERL_NIF_TERM
 listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+  ERL_NIF_TERM ret = ATOM_OK;
 
   ERL_NIF_TERM elisten_on = argv[0];
   ERL_NIF_TERM options = argv[1];
@@ -249,9 +250,9 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  // Start Build CredConfig from options
+  // Start build CredConfig from with listen opts
   QUIC_CREDENTIAL_CONFIG CredConfig;
-  // CxPlatZeroMemory(&CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
   if (!parse_cert_options(env, options, &CredConfig))
@@ -289,23 +290,23 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
       if (!build_trustedstore(l_ctx->cacertfile, &l_ctx->trusted_store))
         {
-          destroy_l_ctx(l_ctx);
-          return ERROR_TUPLE_2(ATOM_CERT_ERROR);
+          ret = ERROR_TUPLE_2(ATOM_CERT_ERROR);
+          goto exit;
         }
     }
 
   // Set owner for l_ctx
   if (!enif_self(env, &(l_ctx->listenerPid)))
     {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_BAD_PID);
+      ret = ERROR_TUPLE_2(ATOM_BAD_PID);
+      goto exit;
     }
 
   // Get Reg for l_ctx, quic_registration is optional
   if (!parse_registration(env, options, &l_ctx->r_ctx))
     {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+      ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+      goto exit;
     }
 
   if (l_ctx->r_ctx)
@@ -329,26 +330,10 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                                 &l_ctx->config_resource->Configuration,
                                 &CredConfig);
 
-  // Cleanup CredConfig
-  if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
-    {
-      free((char *)CredConfig.CertificateFile->CertificateFile);
-      free((char *)CredConfig.CertificateFile->PrivateKeyFile);
-      CxPlatFree(CredConfig.CertificateFile, QUICER_CERTIFICATE_FILE);
-    }
-  else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == CredConfig.Type)
-    {
-      free((char *)CredConfig.CertificateFileProtected->CertificateFile);
-      free((char *)CredConfig.CertificateFileProtected->PrivateKeyFile);
-      free((char *)CredConfig.CertificateFileProtected->PrivateKeyPassword);
-      CxPlatFree(CredConfig.CertificateFileProtected,
-                 QUICER_CERTIFICATE_FILE_PROTECTED);
-    }
-
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
+      ret = ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
+      goto exit;
     }
 
   // mon will be removed when triggered or when l_ctx is dealloc.
@@ -356,8 +341,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       != enif_monitor_process(
           env, l_ctx, &l_ctx->listenerPid, &l_ctx->owner_mon))
     {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_BAD_MON);
+      ret = ERROR_TUPLE_2(ATOM_BAD_MON);
+      goto exit;
     }
 
   // Now open listener
@@ -370,8 +355,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       // Server Configuration should be destroyed
       l_ctx->config_resource->Configuration = NULL;
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
+      ret = ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
+      goto exit;
     }
   l_ctx->is_closed = FALSE;
 
@@ -388,8 +373,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
     {
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_2(ATOM_ALPN);
+      ret = ERROR_TUPLE_2(ATOM_ALPN);
+      goto exit;
     }
 
   // Start Listener
@@ -400,11 +385,18 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       MsQuic->ListenerClose(l_ctx->Listener);
       l_ctx->Listener = NULL;
-      destroy_l_ctx(l_ctx);
-      return ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
+      ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
+      goto exit;
     }
   ERL_NIF_TERM listenHandle = enif_make_resource(env, l_ctx);
+
+  free_certificate(&CredConfig);
   return OK_TUPLE_2(listenHandle);
+
+exit: //errors..
+  free_certificate(&CredConfig);
+  destroy_l_ctx(l_ctx);
+  return ret;
 }
 
 ERL_NIF_TERM

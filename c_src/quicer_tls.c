@@ -171,3 +171,31 @@ build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
   *trusted_store = store;
   return TRUE;
 }
+
+/*
+ * Free certfile/certfileprotected of QUIC_CREDENTIAL_CONFIG
+ *
+*/
+void
+free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
+{
+  if (!cc)
+    {
+      return;
+    }
+
+  if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == cc->Type)
+    {
+      free((char *)cc->CertificateFile->CertificateFile);
+      free((char *)cc->CertificateFile->PrivateKeyFile);
+      CxPlatFree(cc->CertificateFile, QUICER_CERTIFICATE_FILE);
+    }
+  else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == cc->Type)
+    {
+      free((char *)cc->CertificateFileProtected->CertificateFile);
+      free((char *)cc->CertificateFileProtected->PrivateKeyFile);
+      free((char *)cc->CertificateFileProtected->PrivateKeyPassword);
+      CxPlatFree(cc->CertificateFileProtected,
+                 QUICER_CERTIFICATE_FILE_PROTECTED);
+    }
+}
