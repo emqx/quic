@@ -393,7 +393,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   free_certificate(&CredConfig);
   return OK_TUPLE_2(listenHandle);
 
-exit: //errors..
+exit: // errors..
   free_certificate(&CredConfig);
   destroy_l_ctx(l_ctx);
   return ret;

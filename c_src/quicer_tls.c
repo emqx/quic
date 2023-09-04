@@ -175,7 +175,7 @@ build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
 /*
  * Free certfile/certfileprotected of QUIC_CREDENTIAL_CONFIG
  *
-*/
+ */
 void
 free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
 {

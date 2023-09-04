@@ -35,6 +35,5 @@ parse_cacertfile_option(ErlNifEnv *env,
 BOOLEAN
 build_trustedstore(const char *cacertfile, X509_STORE **trusted_store);
 
-void
-free_certificate(QUIC_CREDENTIAL_CONFIG *cc);
+void free_certificate(QUIC_CREDENTIAL_CONFIG *cc);
 #endif // QUICER_TLS_H_

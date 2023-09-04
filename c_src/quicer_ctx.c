@@ -95,7 +95,7 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
   // @note, Destroy config asap as it holds rundown
   // ref count in registration
   destroy_config_ctx(l_ctx->config_resource);
-  
+
   if (l_ctx->r_ctx)
     {
       enif_release_resource(l_ctx->r_ctx);
