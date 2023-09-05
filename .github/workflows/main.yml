@@ -68,14 +68,17 @@ jobs:
         otp:
           - 24.3.4
           - 25.3.2
+        openssl:
+          - openssl3
+          - openssl
         rebar3:
           - 3.20.0
         build_type:
           - RelWithDebInfo
           - Debug
         logging:
-          - true
-          - false
+          - ON
+          - OFF
         arch:
           - x86_64
     steps:
@@ -88,15 +91,19 @@ jobs:
           otp-version: ${{ matrix.otp }}
           rebar3-version: ${{ matrix.rebar3 }}
       - name: release build with debug log off
+        env:
+          CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
+          QUIC_TLS: ${{ matrix.openssl }}
+          QUIC_ENABLE_LOGGING: ${{ matrix.logging }}
         run: |
           echo "github ref: ${{ github.event.ref }}"
           echo "github ref: ${{ github.ref }}"
           sudo sysctl -w kernel.core_pattern=core
           ulimit -c unlimited
-          export CMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
-          if ${{ matrix.logging }}"" == "true" ; then
-            export QUIC_ENABLE_LOGGING=ON
+          export CMAKE_BUILD_TYPE
+          export QUIC_TLS
+          export QUIC_ENABLE_LOGGING
+          if "${QUIC_ENABLE_LOGGING}" == "ON" ; then
 
             sudo apt-add-repository ppa:lttng/stable-2.13
             sudo apt-get update
