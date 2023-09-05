@@ -210,12 +210,13 @@ atom_cipher_suite(QUIC_CIPHER_SUITE suite)
 ERL_NIF_TERM
 ServerLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *option,
+                        HQUIC Registration,
                         HQUIC *Configuration,
                         QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   QUIC_SETTINGS Settings = { 0 };
 
-  if (!isRegistered)
+  if (!isRegistered && (Registration == GRegistration))
     {
       return ATOM_REG_FAILED;
     }
@@ -238,7 +239,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,
@@ -1173,15 +1174,33 @@ bool
 parse_listen_on(ErlNifEnv *env, ERL_NIF_TERM elisten_on, QUIC_ADDR *Address)
 {
   char listen_on[INET6_ADDRSTRLEN + 6] = { 0 };
-  if (enif_get_string(
-          env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
-      > 0)
+  int UdpPort = 0;
+
+  ErlNifTermType type = enif_term_type(env, elisten_on);
+  switch (type)
     {
-      if ((QuicAddr4FromString(listen_on, Address)
-           || QuicAddr6FromString(listen_on, Address)))
+    case ERL_NIF_TERM_TYPE_LIST:
+      if (enif_get_string(
+              env, elisten_on, listen_on, INET6_ADDRSTRLEN + 6, ERL_NIF_LATIN1)
+          > 0)
         {
+          if ((QuicAddr4FromString(listen_on, Address)
+               || QuicAddr6FromString(listen_on, Address)))
+            {
+              return TRUE;
+            }
+        }
+      break;
+    case ERL_NIF_TERM_TYPE_INTEGER:
+      if (enif_get_int(env, elisten_on, &UdpPort) && UdpPort >= 0)
+        {
+          QuicAddrSetFamily(Address, QUIC_ADDRESS_FAMILY_UNSPEC);
+          QuicAddrSetPort(Address, (uint16_t)UdpPort);
           return TRUE;
         }
+      break;
+    default:
+      break;
     }
   return FALSE;
 }
@@ -2414,6 +2433,7 @@ Exit:
   return res;
 }
 
+// @deprecated
 int
 get_str_from_map(ErlNifEnv *env,
                  ERL_NIF_TERM key,
@@ -2441,36 +2461,80 @@ get_str_from_map(ErlNifEnv *env,
   return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
 }
 
-BOOLEAN
-build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
+/*
+** Fill str_buffer with string value of key in map.
+** In case str_buffer is NULL, then new memory will be allocated,
+** and caller should free it after use.
+**
+** Returns NULL on error.
+*/
+char *
+str_from_map(ErlNifEnv *env,
+             ERL_NIF_TERM key,
+             const ERL_NIF_TERM *map,
+             char *str_buffer,
+             unsigned int max_len)
 {
-  X509_STORE *store = NULL;
-  X509_LOOKUP *lookup = NULL;
+  unsigned int len = 0;
+  ERL_NIF_TERM tmp_term;
+  BOOLEAN is_alloc = str_buffer == NULL;
 
-  if (cacertfile == NULL)
+  if (!enif_get_map_value(env, *map, key, &tmp_term))
     {
-      return FALSE;
+      goto exit;
     }
 
-  store = X509_STORE_new();
-  if (store == NULL)
+  if (ERL_NIF_TERM_TYPE_LIST != enif_term_type(env, tmp_term))
     {
-      return FALSE;
+      goto exit;
     }
 
-  lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
-  if (lookup == NULL)
+  if ((!str_buffer && !enif_get_list_length(env, tmp_term, &len))
+      || len > max_len)
     {
-      X509_STORE_free(store);
-      return FALSE;
+      goto exit;
+    }
+  else
+    {
+      len = max_len;
     }
 
-  if (!X509_LOOKUP_load_file(lookup, cacertfile, X509_FILETYPE_PEM))
+  if (is_alloc)
     {
-      X509_STORE_free(store);
-      return FALSE;
+      str_buffer = (char *)malloc(len + 1);
     }
 
-  *trusted_store = store;
+  if (enif_get_string(env, tmp_term, str_buffer, len + 1, ERL_NIF_LATIN1))
+    {
+      return str_buffer;
+    }
+  else if (is_alloc)
+    {
+      free(str_buffer);
+    }
+
+exit:
+  return NULL;
+}
+
+/*
+ * parse optional quic_registration, and store it in r_ctx
+ * return TRUE if quic_registration is present and valid or not present
+ * */
+BOOLEAN
+parse_registration(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QuicerRegistrationCTX **r_ctx)
+{
+  ERL_NIF_TERM tmp_term;
+  assert(*r_ctx == NULL);
+  if (enif_get_map_value(env, options, ATOM_QUIC_REGISTRATION, &tmp_term))
+    {
+      if (!enif_get_resource(env, tmp_term, ctx_reg_t, (void **)r_ctx))
+        {
+          return FALSE;
+        }
+    }
+
   return TRUE;
 }

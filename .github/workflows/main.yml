@@ -121,9 +121,11 @@ jobs:
       - name: gdb bt
         if: failure()
         run: |
+          set -x
           which gdb || sudo apt install gdb
-          corefile=$(find _build/test -name core)
-          if [ -n $corefile ]; then
+          corefile=$(find _build/test -name core.*)
+          if [ -n "$corefile" ]; then
+            echo "found corefile: $corefile";
             gdb -ex bt $(erl -noshell -eval 'io:format(code:root_dir()),halt()')/erts-*/bin/beam.smp "${corefile}"
           else
             echo "No coredump found"

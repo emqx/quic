@@ -90,6 +90,7 @@
                                  , password => string()
                                  , sslkeylogfile => filelib:filename()
                                  , allow_insecure => boolean()
+                                 , quic_registration => reg_handle()
                                  , conn_acceptors => non_neg_integer()
                                  }.
 

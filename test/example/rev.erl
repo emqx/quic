@@ -98,8 +98,8 @@ longrun() ->
 
 top_site() ->
   Port = 4567,
-  LOptions = #{cert => "./server.pem",
-               key => "./server.key",
+  LOptions = #{certfile => "./server.pem",
+               keyfile => "./server.key",
                verify => none,
                handshake_idle_timeout_ms => 3 * ?INTERVAL,
                keep_alive_interval_ms => ?INTERVAL,

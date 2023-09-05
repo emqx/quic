@@ -758,14 +758,32 @@ QUIC_REGISTRATION_CONFIG GRegConfig
     = { "quicer_nif", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
 
 void
-resource_listener_down_callback(__unused_parm__ ErlNifEnv *caller_env,
-                                __unused_parm__ void *obj,
+resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
+                                void *ctx,
                                 __unused_parm__ ErlNifPid *pid,
                                 __unused_parm__ ErlNifMonitor *mon)
 {
-  // @TODO
+  QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)ctx;
+  TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
+  // Hold lock for the race of ListenerClose and ListenerStop call
+  enif_mutex_lock(l_ctx->lock);
+  if (!l_ctx->is_closed && !l_ctx->is_stopped && l_ctx->Listener)
+    {
+      l_ctx->is_stopped = TRUE;
+      // We only stop here, but not close it, because possible subsequent
+      // scenarios a. Some pid could still start the stopped listener with nif
+      // handle b. Some pid could still close the stopped listener with nif
+      // handle
+      // 3. We close it in resource_listener_dealloc_callback anyway.
+      MsQuic->ListenerStop(l_ctx->Listener);
+    }
+  enif_mutex_unlock(l_ctx->lock);
+  TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
 }
 
+/*
+** Listener NIF handle, end of world...
+*/
 void
 resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
@@ -1121,7 +1139,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
     }
-
+  // Open global registration
   if (QUIC_FAILED(status
                   = MsQuic->RegistrationOpen(&GRegConfig, &GRegistration)))
     {

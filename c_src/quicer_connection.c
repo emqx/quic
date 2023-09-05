@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 #include "quicer_connection.h"
 #include "quicer_ctx.h"
+#include "quicer_tls.h"
 #include <assert.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>

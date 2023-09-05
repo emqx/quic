@@ -68,6 +68,8 @@ set(SOURCES
   c_src/quicer_ctx.h
   c_src/quicer_listener.c
   c_src/quicer_listener.h
+  c_src/quicer_tls.c
+  c_src/quicer_tls.h
   c_src/quicer_connection.c
   c_src/quicer_connection.h
   c_src/quicer_stream.c

@@ -3208,8 +3208,14 @@ simple_conn_server_client_cert(Owner, Config, Port) ->
   {ok, L} = quicer:listen(Port, default_listen_opts_client_cert(Config)),
   Owner ! listener_ready,
   {ok, Conn} = quicer:accept(L, [], 1000),
-  {ok, Conn} = quicer:handshake(Conn),
-  simple_conn_server_client_cert_loop(L, Conn, Owner).
+  case quicer:handshake(Conn) of
+    {ok, Conn} ->
+      simple_conn_server_client_cert_loop(L, Conn, Owner);
+    {error, closed} ->
+      receive done ->
+          quicer:close_listener(L)
+      end
+  end.
 
 simple_conn_server_client_cert_loop(L, Conn, Owner) ->
   receive

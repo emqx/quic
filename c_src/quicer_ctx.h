@@ -51,9 +51,11 @@ typedef struct QuicerListenerCTX
 {
   // config_resource is allocated in 'init_l_ctx'
   QuicerConfigCTX *config_resource;
+  QuicerRegistrationCTX *r_ctx;
   HQUIC Listener;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
+  ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
   char *cacertfile;

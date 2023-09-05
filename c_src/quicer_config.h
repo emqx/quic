@@ -66,6 +66,7 @@ QUIC_STATUS UpdateCredConfig(ErlNifEnv *env,
 
 ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
+                                     HQUIC Registration,
                                      HQUIC *Configuration,
                                      QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
@@ -101,6 +102,11 @@ int get_str_from_map(ErlNifEnv *env,
                      const ERL_NIF_TERM *map,
                      char *buff,
                      unsigned max_len);
+char *str_from_map(ErlNifEnv *env,
+                   ERL_NIF_TERM key,
+                   const ERL_NIF_TERM *map,
+                   char *string_buffer,
+                   unsigned int max_len);
 
 ERL_NIF_TERM getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
@@ -117,7 +123,5 @@ ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
                                 ERL_NIF_TERM optname,
                                 ERL_NIF_TERM optval,
                                 ERL_NIF_TERM elevel);
-
-BOOLEAN build_trustedstore(const char *cacertfile, X509_STORE **trusted_store);
 
 #endif // __QUICER_CONFIG_H_

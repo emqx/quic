@@ -18,6 +18,7 @@
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -compile(export_all).
 -compile(nowarn_export_all).
@@ -63,8 +64,12 @@ end_per_suite(_Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
-init_per_group(_GroupName, Config) ->
-  Config.
+init_per_group(global_reg, Config) ->
+  Config;
+init_per_group(suite_reg, Config) ->
+  {ok, SReg} = quicer:new_registration(atom_to_list(?MODULE),
+                                       quic_execution_profile_max_throughput),
+  [{quic_registration, SReg} | Config].
 
 %%--------------------------------------------------------------------
 %% @spec end_per_group(GroupName, Config0) ->
@@ -73,6 +78,8 @@ init_per_group(_GroupName, Config) ->
 %% Config0 = Config1 = [tuple()]
 %% @end
 %%--------------------------------------------------------------------
+end_per_group(suite_reg, Config) ->
+  quicer:shutdown_registration(proplists:get_value(quic_registration, Config));
 end_per_group(_GroupName, _Config) ->
   ok.
 
@@ -113,7 +120,10 @@ end_per_testcase(_TestCase, _Config) ->
 %% @end
 %%--------------------------------------------------------------------
 groups() ->
-  [].
+  TCs = quicer_test_lib:all_tcs(?MODULE),
+  [ {global_reg, [], TCs}
+  , {suite_reg, [], TCs}
+  ].
 
 %%--------------------------------------------------------------------
 %% @spec all() -> GroupsAndTestCases | {skip,Reason}
@@ -124,7 +134,9 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 all() ->
-  quicer_test_lib:all_tcs(?MODULE).
+  [ {group, global_reg}
+  , {group, suite_reg}
+  ].
 
 %%--------------------------------------------------------------------
 %% @spec TestCase() -> Info
@@ -162,20 +174,21 @@ tc_open_listener_inval_parm(Config) ->
 
 tc_open_listener_inval_cacertfile_1(Config) ->
   Port = select_port(),
-  ?assertEqual({error, badarg},
+  ?assertEqual({error, cacertfile},
                quicer:listen(Port, [ {cacertfile, atom}
                                    | default_listen_opts(Config)])),
   ok.
 
 tc_open_listener_inval_cacertfile_2(Config) ->
   Port = select_port(),
-  {error, badarg} = quicer:listen(Port, [ {cacertfile, [1,2,3,4]}
-                                        | default_listen_opts(Config)]),
+  ?assertEqual({error, cacertfile},
+               quicer:listen(Port, [ {cacertfile, <<"1,2,3,4">>}
+                                   | default_listen_opts(Config)])),
   ok.
 
 tc_open_listener_inval_cacertfile_3(Config) ->
   Port = select_port(),
-  ?assertEqual({error, badarg},
+  ?assertEqual({error, cacertfile},
                quicer:listen(Port, [ {cacertfile, [-1]}
                                    | default_listen_opts(Config)])),
   ok.
@@ -188,6 +201,32 @@ tc_open_listener(Config) ->
   ok = quicer:close_listener(L),
   {ok, P} = gen_udp:open(Port),
   ok = gen_udp:close(P),
+  ok.
+
+tc_open_listener_with_inval_reg(Config) ->
+  Port = select_port(),
+  Config1 = proplists:delete(quic_registration, Config),
+  %% Given invalid  registration
+  Reg = erlang:make_ref(),
+  %% When try to listen with the invalid registration
+  Res = quicer:listen(Port, default_listen_opts([{quic_registration, Reg} | Config1])),
+  %% Then it shall fail to listen and proper error is returned
+  ?assertEqual({error, quic_registration}, Res),
+  ok.
+
+tc_open_listener_with_new_reg(Config) ->
+  Port = select_port(),
+  %% Given New registration is created
+  {ok, Reg} = quicer:new_registration(atom_to_list(?MODULE), quic_execution_profile_max_throughput),
+  %% When Listener is created with the New Registration
+  {ok, L} = quicer:listen(Port, default_listen_opts([{quic_registration, Reg} | Config])),
+  {ok, {_, Port}} = quicer:sockname(L),
+  %% Then Listener is created successfully and port is occupied
+  {error, eaddrinuse} = gen_udp:open(Port),
+  ok = quicer:close_listener(L),
+  {ok, P} = gen_udp:open(Port),
+  ok = gen_udp:close(P),
+  ok = quicer:shutdown_registration(Reg),
   ok.
 
 tc_open_listener_with_cert_password(Config) ->
@@ -368,6 +407,62 @@ tc_get_listener(Config) ->
                     ?assertEqual({error, not_found}, quicer:listener(NameListenON))
                 end, Listeners),
   ?assertEqual({error, not_found}, quicer:listener(bad_listen_name)).
+
+tc_listener_closed_when_owner_die_and_gc(Config) ->
+  Port = select_port(),
+  Me = self(),
+  %% Given when port is occupied by another process
+  {Pid, MRef} = spawn_monitor(fun() ->
+                                  {ok, _L} = quicer:listen(Port, default_listen_opts(Config)),
+                                  Me ! {started, self()},
+                                  receive done -> ok end
+                              end),
+  receive {started, Pid} -> ok end,
+  {error, listener_start_error, {unknown_quic_status, Reason}}
+    = quicer:listen(Port, default_listen_opts(Config)),
+  ?assert(Reason == 91 orelse Reason == 41),
+
+  Pid ! done,
+  %% When the owner process dies
+  receive {'DOWN', MRef, process, Pid, normal} ->
+      ok
+  end,
+  %% Then port is released and new listener can be started
+  {ok, L} = snabbkaffe:retry(10000, 10,
+                             fun() ->
+                                 {ok, _L0} = quicer:listen(Port, default_listen_opts(Config))
+                             end),
+  ok = quicer:close_listener(L).
+
+tc_listener_stopped_when_owner_die(Config) ->
+  Port = select_port(),
+  Me = self(),
+  {Pid, MRef} = spawn_monitor(fun() ->
+                                  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+                                  Me ! {started, self(), L},
+                                  receive done -> ok end
+                              end),
+  %% Given a Listener Handle owned by another process
+  receive {started, Pid, L0} -> ok end,
+  {error, listener_start_error, {unknown_quic_status, Reason}}
+    = quicer:listen(Port, default_listen_opts(Config)),
+  ?assert(Reason == 91 orelse Reason == 41),
+
+  Pid ! done,
+  %% When the owner process dies
+  receive {'DOWN', MRef, process, Pid, normal} ->
+      ok
+  end,
+  %% Then port is released and new listener can be started
+  {ok, L1} = snabbkaffe:retry(10000, 10,
+                             fun() ->
+                                 {ok, _L0} = quicer:listen(Port, default_listen_opts(Config))
+                             end),
+  %% Then the old listener can be closed but timeout since it is already stopped
+  %% and no stop event is triggered
+  {error, timeout} = quicer:close_listener(L0, _timeout = 10),
+  %% Then the new listener can be closed
+  ok = quicer:close_listener(L1).
 
 select_port() ->
   select_free_port(quic).

@@ -250,6 +250,10 @@ terminate_listener(AppName) when is_atom(AppName)->
 %% @end
 -spec listen(listen_on(), listen_opts()) ->
         {ok, listener_handle()} |
+        {error, quic_tls} |   %% bad tls related opts, cacertfile, certfile, keyfile, password...
+        {error, cacertfile} | %% bad cacert file
+        {error, quic_registration} | %% wrong registration opt
+        {error, badarg} |
         {error, listener_open_error,  atom_reason()} |
         {error, listener_start_error, atom_reason()}.
 listen(ListenOn, Opts) when is_list(Opts) ->
