@@ -103,8 +103,8 @@ jobs:
           export CMAKE_BUILD_TYPE
           export QUIC_TLS
           export QUIC_ENABLE_LOGGING
-          if "${QUIC_ENABLE_LOGGING}" == "ON" ; then
-
+          if [ "${QUIC_ENABLE_LOGGING}" == "ON" ] ; then
+            export QUIC_LOGGING_TYPE=lttng
             sudo apt-add-repository ppa:lttng/stable-2.13
             sudo apt-get update
             sudo apt-get install -y lttng-tools  babeltrace liblttng-ust-dev lttng-modules-dkms-
