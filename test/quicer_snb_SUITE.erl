@@ -1701,8 +1701,10 @@ tc_conn_stop_notify_acceptor(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   ?check_trace(#{timetrap => 10000},
                begin
+                 Parent = self(),
                  {SPid, Ref} = spawn_monitor(fun() ->
                                                  {ok, Listener} = quicer:listen(Port, ListenerOpts),
+                                                 Parent ! {self(), ready},
                                                  {ok, Conn} = quicer:accept(Listener, []),
                                                  Acceptors = lists:map(fun(_) ->
                                                                            spawn(quicer, accept_stream, [Conn, []])
@@ -1714,6 +1716,7 @@ tc_conn_stop_notify_acceptor(Config) ->
                                                  end,
                                                  exit({normal, Acceptors})
                                              end),
+                 receive {SPid, ready} -> ok end,
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), infinity),
                  quicer:shutdown_connection(Conn),
 
