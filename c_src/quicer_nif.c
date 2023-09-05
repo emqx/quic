@@ -765,21 +765,19 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
 {
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)ctx;
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
-  BOOLEAN to_stop = FALSE;
+  // Hold lock for the race of ListenerClose and ListenerStop call
   enif_mutex_lock(l_ctx->lock);
   if (!l_ctx->is_closed && !l_ctx->is_stopped && l_ctx->Listener)
     {
-      to_stop = TRUE;
       l_ctx->is_stopped = TRUE;
-    }
-  enif_mutex_unlock(l_ctx->lock);
-  if (to_stop)
-    {
-      // We only stop here, but not close it, because we want to
-      // close it in resource_listener_dealloc_callback
-      // Or some pid could still start the stopped listener with nif handle
+      // We only stop here, but not close it, because possible subsequent
+      // scenarios a. Some pid could still start the stopped listener with nif
+      // handle b. Some pid could still close the stopped listener with nif
+      // handle
+      // 3. We close it in resource_listener_dealloc_callback anyway.
       MsQuic->ListenerStop(l_ctx->Listener);
     }
+  enif_mutex_unlock(l_ctx->lock);
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
 }
 

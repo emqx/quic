@@ -36,11 +36,10 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
   QuicerConnCTX *c_ctx = NULL;
   BOOLEAN is_destroy = FALSE;
 
-  enif_mutex_lock(l_ctx->lock);
-  // dbg("server listener event: %d", Event->Type);
   switch (Event->Type)
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
+      enif_mutex_lock(l_ctx->lock);
       //
       // Note, c_ctx is newly init here, don't grab lock.
       //
@@ -196,6 +195,9 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       break;
 
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
+      // **Note**, the callback in msquic for this event is called in the
+      // MsQuicListenerClose or MsQuicListenerStop. we assume caller should
+      // ensure the thread safty thus we don't hold lock
       env = l_ctx->env;
       enif_send(NULL,
                 &(l_ctx->listenerPid),
@@ -207,18 +209,20 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       if (!l_ctx->Listener)
         {
           // @NOTE This callback is part of the listener *close* process
-          // Listener is already closing, we can destroy the l_ctx now.
+          // Listener is already closing, we can destroy the l_ctx now
+          // as the handle is NULL no subsequent msquic API is allowed/possible
           assert(!l_ctx->is_stopped);
           is_destroy = TRUE;
         }
       enif_clear_env(env);
-      break;
+      goto Exit2;
     default:
       break;
     }
 
 Error:
   enif_mutex_unlock(l_ctx->lock);
+Exit2:
   if (is_destroy)
     {
       destroy_l_ctx(l_ctx);
@@ -445,27 +449,25 @@ stop_listener1(ErlNifEnv *env,
 {
   QuicerListenerCTX *l_ctx;
   ERL_NIF_TERM ret = ATOM_OK;
-  BOOLEAN is_stopped = FALSE;
   assert(argc == 1);
   if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
   enif_mutex_lock(l_ctx->lock);
-  HQUIC l = l_ctx->Listener;
-  is_stopped = l_ctx->is_stopped;
-  l_ctx->is_stopped = TRUE;
-  enif_mutex_unlock(l_ctx->lock);
-  if (!l)
+  if (!l_ctx->Listener)
     {
-      return ERROR_TUPLE_2(ATOM_CLOSED);
+      ret = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto exit;
     }
-  else if (!is_stopped)
+  else if (!l_ctx->is_stopped)
     {
+      l_ctx->is_stopped = TRUE;
       // void return
-      MsQuic->ListenerStop(l);
+      MsQuic->ListenerStop(l_ctx->Listener);
     }
+exit:
+  enif_mutex_unlock(l_ctx->lock);
   return ret;
 }
 
