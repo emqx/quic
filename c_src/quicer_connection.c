@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -------------------------------------------------------------------*/
 #include "quicer_connection.h"
+#include "quicer_config.h"
 #include "quicer_ctx.h"
 #include "quicer_tls.h"
 #include <assert.h>
@@ -516,6 +517,8 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   QuicerConnCTX *c_ctx = init_c_ctx();
+  c_ctx->r_ctx = r_ctx;
+
   if (!c_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
@@ -577,6 +580,7 @@ async_connect3(ErlNifEnv *env,
   int port = 0;
   char host[256] = { 0 };
 
+  HQUIC Registration = NULL;
   if (!enif_get_int(env, eport, &port) && port > 0)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -596,6 +600,15 @@ async_connect3(ErlNifEnv *env,
           assert(c_ctx->is_closed);
           assert(c_ctx->owner);
           is_reuse_handle = TRUE;
+          if (c_ctx->r_ctx && c_ctx->r_ctx->Registration)
+            {
+              Registration = c_ctx->r_ctx->Registration;
+            }
+          else
+            {
+              Registration = GRegistration;
+            }
+          // @TODO we should take lock here
         }
       else
         {
@@ -606,12 +619,34 @@ async_connect3(ErlNifEnv *env,
     {
       assert(!c_ctx);
       c_ctx = init_c_ctx();
+
+      // Get Reg for c_ctx, quic_registration is optional
+      if (!parse_registration(env, eoptions, &c_ctx->r_ctx))
+        {
+          res = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+          goto Error;
+        }
+
+      if (c_ctx->r_ctx && c_ctx->r_ctx->Registration)
+        {
+          // quic_registration is set
+          enif_keep_resource(c_ctx->r_ctx);
+          Registration = c_ctx->r_ctx->Registration;
+        }
+      else
+        {
+          // quic_registration is not set, use global registration
+          // msquic should reject if global registration is NULL (closed)
+          Registration = GRegistration;
+        }
+
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
         {
           res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
           goto Error;
         }
 
+      // set owner
       if (!enif_self(env, &(c_ctx->owner->Pid)))
         {
           res = ERROR_TUPLE_2(ATOM_BAD_PID);
@@ -627,25 +662,30 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-  ERL_NIF_TERM ecacertfile;
-
-  if (enif_get_map_value(env, eoptions, ATOM_CACERTFILE, &ecacertfile))
+  // parse opt cacertfile
+  char *cacertfile = NULL;
+  if (!parse_cacertfile_option(env, eoptions, &cacertfile))
     {
-      char cacertfile[PATH_MAX];
-      if (!(enif_get_string(
-                env, ecacertfile, cacertfile, PATH_MAX, ERL_NIF_LATIN1)
-                > 0
-            && build_trustedstore(cacertfile, &c_ctx->trusted)))
+      // TLS opt error not file content error
+      res = ERROR_TUPLE_2(ATOM_CACERTFILE);
+      goto Error;
+    }
+
+  if (cacertfile)
+    {
+      if (!build_trustedstore(cacertfile, &c_ctx->trusted))
         {
-          res = ERROR_TUPLE_2(ATOM_BADARG);
+          free(cacertfile);
+          res = ERROR_TUPLE_2(ATOM_CERT_ERROR);
           goto Error;
         }
+      free(cacertfile);
     }
 
   // convert eoptions to Configuration
-  bool HasCaCertfile = c_ctx->trusted != NULL;
+
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
-      env, &eoptions, &(c_ctx->config_resource->Configuration), HasCaCertfile);
+      env, &eoptions, Registration, &(c_ctx->config_resource->Configuration));
 
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {

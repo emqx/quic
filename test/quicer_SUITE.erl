@@ -1827,11 +1827,11 @@ tc_setopt_conn_remote_addr(_Config) ->
   ok = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
   ok = quicer:setopt(Conn, param_conn_datagram_receive_enabled, false),
   Res = quicer:connect("google.com", 443, [ {verify, verify_peer}
-                                         , {handle, Conn}
-                                         , {peer_unidi_stream_count, 3}
-                                         , {idle_timeout_ms, 5000}
-                                         , {handshake_idle_timeout_ms, 5000}
-                                         , {alpn, ["h3"]}], 1000),
+                                          , {handle, Conn}
+                                          , {peer_unidi_stream_count, 3}
+                                          , {idle_timeout_ms, 5000}
+                                          , {handshake_idle_timeout_ms, 5000}
+                                          , {alpn, ["h3"]}], 1000),
   case Res of
     {ok, _} -> %% Linux
       ok;
@@ -3320,8 +3320,6 @@ ensure_server_exit_normal(MonRef, Timeout) ->
       ct:fail("server still running", [])
   end.
 
-
-
 default_conn_opts_verify(Config, Ca) ->
   DataDir = ?config(data_dir, Config),
   [{verify, peer},
@@ -3330,14 +3328,14 @@ default_conn_opts_verify(Config, Ca) ->
 
 default_conn_opts_client_cert(Config, Ca) ->
   DataDir = ?config(data_dir, Config),
-  [{key, filename:join(DataDir, "client.key")},
-   {cert, filename:join(DataDir, "client.pem")}|
+  [{keyfile, filename:join(DataDir, "client.key")},
+   {certfile, filename:join(DataDir, "client.pem")}|
    default_conn_opts_verify(Config, Ca)].
 
 default_conn_opts_bad_client_cert(Config, Ca) ->
   DataDir = ?config(data_dir, Config),
-  [{key, filename:join(DataDir, "other-client.key")},
-   {cert, filename:join(DataDir, "other-client.pem")}|
+  [{keyfile, filename:join(DataDir, "other-client.key")},
+   {certfile, filename:join(DataDir, "other-client.pem")}|
    default_conn_opts_verify(Config, Ca)].
 
 default_listen_opts_client_cert(Config) ->

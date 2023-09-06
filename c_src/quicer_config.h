@@ -71,8 +71,8 @@ ERL_NIF_TERM ServerLoadConfiguration(ErlNifEnv *env,
                                      QUIC_CREDENTIAL_CONFIG *Config);
 ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
                                      const ERL_NIF_TERM *option,
-                                     HQUIC *Configuration,
-                                     bool HasCaCertFile);
+                                     HQUIC Registration,
+                                     HQUIC *Configuration);
 
 bool load_alpn(ErlNifEnv *env,
                const ERL_NIF_TERM *option,
@@ -97,11 +97,6 @@ bool get_uint64_from_map(ErlNifEnv *env,
                          const ERL_NIF_TERM map,
                          ERL_NIF_TERM key,
                          uint64_t *value);
-int get_str_from_map(ErlNifEnv *env,
-                     ERL_NIF_TERM key,
-                     const ERL_NIF_TERM *map,
-                     char *buff,
-                     unsigned max_len);
 char *str_from_map(ErlNifEnv *env,
                    ERL_NIF_TERM key,
                    const ERL_NIF_TERM *map,

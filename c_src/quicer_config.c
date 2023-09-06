@@ -17,6 +17,7 @@ limitations under the License.
 #include "quicer_config.h"
 #include "quicer_internal.h"
 #include "quicer_queue.h"
+#include "quicer_tls.h"
 #include <msquichelper.h>
 
 extern BOOLEAN isRegistered;
@@ -266,14 +267,17 @@ ServerLoadConfiguration(ErlNifEnv *env,
 ERL_NIF_TERM
 ClientLoadConfiguration(ErlNifEnv *env,
                         const ERL_NIF_TERM *options, // map
-                        HQUIC *Configuration,
-                        bool HasCaCertFile)
+                        HQUIC Registration,
+                        HQUIC *Configuration)
 {
   QUIC_SETTINGS Settings = { 0 };
-  char cert_path[PATH_MAX + 1] = { 0 };
-  char key_path[PATH_MAX + 1] = { 0 };
-  char password[256] = { 0 };
   ERL_NIF_TERM ret = ATOM_OK;
+
+  if (!isRegistered && (Registration == GRegistration))
+    {
+      return ATOM_REG_FAILED;
+    }
+
   //
   // Configures the client's idle timeout.
   //
@@ -291,59 +295,21 @@ ClientLoadConfiguration(ErlNifEnv *env,
   /* Settings.IsSet.DesiredVersionsList = TRUE; */
 
   //
-  // Configures a default client configuration, optionally disabling
-  // server certificate validation.
+  // Configures a default client configuration
   //
   QUIC_CREDENTIAL_CONFIG CredConfig;
   CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
   CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
-  CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
+  CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_CLIENT;
 
-  if ((get_str_from_map(env, ATOM_CERTFILE, options, cert_path, PATH_MAX + 1)
-       || get_str_from_map(env, ATOM_CERT, options, cert_path, PATH_MAX + 1))
-      && (get_str_from_map(env, ATOM_KEYFILE, options, key_path, PATH_MAX + 1)
-          || get_str_from_map(env, ATOM_KEY, options, key_path, PATH_MAX + 1)))
+  // certs and keys are optional at client side
+  parse_cert_options(env, *options, &CredConfig);
+
+  // If Verify Peer...
+  if (!parse_verify_options(env, *options, &CredConfig, FALSE))
     {
-      if (get_str_from_map(env, ATOM_PASSWORD, options, password, 256))
-        {
-          QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
-              = (QUIC_CERTIFICATE_FILE_PROTECTED *)CXPLAT_ALLOC_NONPAGED(
-                  sizeof(QUIC_CERTIFICATE_FILE_PROTECTED),
-                  QUICER_CERTIFICATE_FILE);
-
-          CertFile->CertificateFile = cert_path;
-          CertFile->PrivateKeyFile = key_path;
-          CertFile->PrivateKeyPassword = password;
-          CredConfig.CertificateFileProtected = CertFile;
-          CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
-        }
-      else
-        {
-          QUIC_CERTIFICATE_FILE *CertFile
-              = (QUIC_CERTIFICATE_FILE *)CXPLAT_ALLOC_NONPAGED(
-                  sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
-          CertFile->CertificateFile = cert_path;
-          CertFile->PrivateKeyFile = key_path;
-          CredConfig.CertificateFile = CertFile;
-          CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-        }
+      return ERROR_TUPLE_2(ATOM_VERIFY);
     }
-
-  // Should we try to verify the certificate the server sends?
-  bool Verify = load_verify(env, options, true);
-
-  if (!Verify)
-    {
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-    }
-  else if (HasCaCertFile)
-    {
-      // Do own validation instead against provided ca certs in cacertfile
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
-
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-    }
-  // Default to validation against system ca certificates
 
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
@@ -359,7 +325,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(GRegistration,
+  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
                                                      alpn_buffers,
                                                      alpn_buffer_length,
                                                      &Settings,
@@ -386,16 +352,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
 done:
 
   // Cleanup CredConfig
-  if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE == CredConfig.Type)
-    {
-      CxPlatFree(CredConfig.CertificateFile, QUICER_CERTIFICATE_FILE);
-    }
-  else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == CredConfig.Type)
-    {
-      CxPlatFree(CredConfig.CertificateFile,
-                 QUICER_CERTIFICATE_FILE_PROTECTED);
-    }
-
+  free_certificate(&CredConfig);
   return ret;
 }
 
@@ -2431,34 +2388,6 @@ set_config_opt(ErlNifEnv *env,
     }
 Exit:
   return res;
-}
-
-// @deprecated
-int
-get_str_from_map(ErlNifEnv *env,
-                 ERL_NIF_TERM key,
-                 const ERL_NIF_TERM *map,
-                 char *buff,
-                 unsigned max_len)
-{
-
-  ERL_NIF_TERM tmp_term;
-  if (!buff)
-    {
-      return 0;
-    }
-  unsigned tmp_len = 0;
-  if (!enif_get_map_value(env, *map, key, &tmp_term))
-    {
-      return 0;
-    }
-
-  if (!enif_get_list_length(env, tmp_term, &tmp_len) || tmp_len > max_len)
-    {
-      return 0;
-    }
-
-  return enif_get_string(env, tmp_term, buff, tmp_len + 1, ERL_NIF_LATIN1);
 }
 
 /*

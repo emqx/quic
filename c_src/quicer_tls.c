@@ -32,7 +32,6 @@ parse_cert_options(ErlNifEnv *env,
     {
       return FALSE;
     }
-  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
 
   if (!(certfile
         = str_from_map(env, ATOM_CERTFILE, &options, NULL, PATH_MAX + 1)))
@@ -91,9 +90,10 @@ parse_cert_options(ErlNifEnv *env,
  *  verify : boolean() | undefined
  */
 BOOLEAN
-parse_verify_options_server(ErlNifEnv *env,
-                            ERL_NIF_TERM options,
-                            QUIC_CREDENTIAL_CONFIG *CredConfig)
+parse_verify_options(ErlNifEnv *env,
+                     ERL_NIF_TERM options,
+                     QUIC_CREDENTIAL_CONFIG *CredConfig,
+                     BOOLEAN is_server)
 {
 
   BOOLEAN verify = load_verify(env, &options, FALSE);
@@ -104,8 +104,26 @@ parse_verify_options_server(ErlNifEnv *env,
     }
   else
     {
-      // Server flag:
-      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+      // Verify peer is enabled
+      if (is_server)
+        {
+          CredConfig->Flags
+              |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+        }
+      else
+        {
+          ERL_NIF_TERM tmp;
+          if (enif_get_map_value(env, options, ATOM_CACERTFILE, &tmp))
+            {
+              // cacertfile is set, use it for self validation.
+              CredConfig->Flags
+                  |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+              CredConfig->Flags
+                  |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+            }
+          CredConfig->Flags
+              |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
+        }
     }
   return TRUE;
 }

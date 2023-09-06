@@ -16,8 +16,8 @@ limitations under the License.
 
 #ifndef __QUICER_CONNECTION_H_
 #define __QUICER_CONNECTION_H_
+#include "erl_nif.h"
 #include "quicer_internal.h"
-#include "quicer_nif.h"
 #include <msquichelper.h>
 
 typedef enum QUICER_CONNECTION_EVENT_MASKS

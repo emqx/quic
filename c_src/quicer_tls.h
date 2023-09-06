@@ -15,7 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 #ifndef QUICER_TLS_H_
 #define QUICER_TLS_H_
-
+#include "msquic.h"
 #include "quicer_nif.h"
 
 BOOLEAN parse_cert_options(ErlNifEnv *env,
@@ -23,9 +23,10 @@ BOOLEAN parse_cert_options(ErlNifEnv *env,
                            QUIC_CREDENTIAL_CONFIG *CredConfig);
 
 BOOLEAN
-parse_verify_options_server(ErlNifEnv *env,
-                            ERL_NIF_TERM options,
-                            QUIC_CREDENTIAL_CONFIG *CredConfig);
+parse_verify_options(ErlNifEnv *env,
+                     ERL_NIF_TERM options,
+                     QUIC_CREDENTIAL_CONFIG *CredConfig,
+                     BOOLEAN is_server);
 
 BOOLEAN
 parse_cacertfile_option(ErlNifEnv *env,
