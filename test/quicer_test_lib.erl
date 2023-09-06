@@ -27,7 +27,10 @@
          receive_all/0,
          recv_term_from_stream/1,
          encode_stream_term/1,
-         select_free_port/1
+         select_free_port/1,
+         flush/1,
+         ensure_server_exit_normal/1,
+         ensure_server_exit_normal/2
         ]).
 
 
@@ -318,6 +321,29 @@ generate_tls_certs(Config) ->
                                           filename:join(DataDir, "intermediate1.pem"),
                                           filename:join(DataDir, "two-intermediates-bundle.pem")
                                          ])).
+
+-spec flush([term()]) -> [term()].
+flush(Acc) ->
+  receive
+    Other ->
+      flush([Other|Acc])
+  after
+    0 ->
+      lists:reverse(Acc)
+  end.
+
+-spec ensure_server_exit_normal(reference()) -> ok.
+ensure_server_exit_normal(MonRef) ->
+  ensure_server_exit_normal(MonRef, 5000).
+ensure_server_exit_normal(MonRef, Timeout) ->
+  receive
+    {'DOWN', MonRef, process, _, normal} ->
+      ok;
+    {'DOWN', MonRef, process, _, Other} ->
+      ct:fail("server exits abnormally ~p ", [Other])
+  after Timeout ->
+      ct:fail("server still running", [])
+  end.
 
 
 %%%_* Emacs ====================================================================
