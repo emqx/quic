@@ -50,7 +50,9 @@
         ]).
 
 %% For tests only
--export([open_connection/0]).
+-export([ open_connection/0
+        , open_connection/1
+        ]).
 
 -on_load(init/0).
 
@@ -152,6 +154,10 @@ stop_listener(_Listener) ->
 
 -spec open_connection() -> {ok, connection_handle()} | {error, atom_reason()}.
 open_connection() ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec open_connection(#{ quic_registration => reg_handle()}) -> {ok, connection_handle()} | {error, atom_reason()}.
+open_connection(_) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec async_connect(hostname(), inet:port_number(), conn_opts()) ->

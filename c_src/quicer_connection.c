@@ -93,6 +93,11 @@ static QUIC_STATUS handle_connection_event_resumption_ticket_received(
 static QUIC_STATUS handle_connection_event_peer_certificate_received(
     QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event);
 
+BOOLEAN
+parse_registration(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QuicerRegistrationCTX **r_ctx);
+
 ERL_NIF_TERM
 peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
@@ -472,20 +477,43 @@ ServerConnectionCallback(HQUIC Connection,
 
   return status;
 }
+
 /*
 ** Open connection handle only
-** No ownership, No monitoring.
+** Set ownership but no monitoring.
 */
 ERL_NIF_TERM
-open_connection0(ErlNifEnv *env,
-                 __unused_parm__ int argc,
-                 __unused_parm__ const ERL_NIF_TERM argv[])
+open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM eHandle;
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
+  QuicerRegistrationCTX *r_ctx = NULL;
+  HQUIC registration = NULL;
 
-  assert(argc == 0);
+  if (argc == 0)
+    {
+      registration = GRegistration;
+      r_ctx = NULL;
+    }
+  else
+    {
+      assert(argc == 1);
+      ERL_NIF_TERM options = argv[1];
+      if (!parse_registration(env, options, &r_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+        }
+      if (r_ctx)
+        {
+          enif_keep_resource(r_ctx);
+          registration = r_ctx->Registration;
+        }
+      else
+        {
+          registration = GRegistration;
+        }
+    }
 
   QuicerConnCTX *c_ctx = init_c_ctx();
   if (!c_ctx)
@@ -496,29 +524,34 @@ open_connection0(ErlNifEnv *env,
   c_ctx->owner = AcceptorAlloc();
   if (!c_ctx->owner)
     {
-      enif_release_resource(c_ctx);
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto exit;
     }
 
   if (!enif_self(env, &(c_ctx->owner->Pid)))
     {
-      enif_release_resource(c_ctx);
-      return ERROR_TUPLE_2(ATOM_BAD_PID);
+      res = ERROR_TUPLE_2(ATOM_BAD_PID);
+      goto exit;
     }
 
-  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
+  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(registration,
                                                   ClientConnectionCallback,
                                                   c_ctx,
                                                   &(c_ctx->Connection))))
     {
-      destroy_c_ctx(c_ctx);
       res = ERROR_TUPLE_2(ATOM_STATUS(Status));
+      goto exit;
     }
-  else
+
+  eHandle = enif_make_resource(env, c_ctx);
+  return SUCCESS(eHandle);
+
+exit:
+  if (r_ctx)
     {
-      eHandle = enif_make_resource(env, c_ctx);
-      res = SUCCESS(eHandle);
+      enif_release_resource(r_ctx);
     }
+  enif_release_resource(c_ctx);
   return res;
 }
 
@@ -622,7 +655,7 @@ async_connect3(ErlNifEnv *env,
 
   if (!is_reuse_handle)
     {
-      if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(GRegistration,
+      if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration,
                                                       ClientConnectionCallback,
                                                       c_ctx,
                                                       &(c_ctx->Connection))))
