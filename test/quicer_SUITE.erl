@@ -769,6 +769,7 @@ tc_stream_client_send_binary(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       flush_streams_available(Conn),
+      flush_datagram_state_changed(Conn),
       receive
         {quic, <<"pong">>, _, _} ->
           ok = quicer:close_stream(Stm),
@@ -792,6 +793,7 @@ tc_stream_client_send_iolist(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:send(Stm, ["p", ["i", ["n"]], <<"g">>]),
       flush_streams_available(Conn),
+      flush_datagram_state_changed(Conn),
       receive
         {quic, <<"pong">>, _, _} ->
           ok = quicer:close_stream(Stm),
@@ -815,6 +817,7 @@ tc_stream_client_async_send(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, []),
       {ok, 4} = quicer:async_send(Stm, <<"ping">>),
       flush_streams_available(Conn),
+      flush_datagram_state_changed(Conn),
       receive
         {quic, <<"pong">>, _, _} ->
           ok = quicer:close_stream(Stm),
@@ -936,6 +939,7 @@ tc_stream_active_switch_to_passive(Config) ->
       {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
       {ok, 11} = quicer:send(Stm, <<"ping_active">>),
       flush_streams_available(Conn),
+      flush_datagram_state_changed(Conn),
       {error, einval} = quicer:recv(Stm, 0),
       receive
         {quic, <<"ping_active">>, Stm, _} -> ok
@@ -1240,7 +1244,7 @@ dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram) ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, true);
     {quic, <<"pong">>, _, _} ->
       dgram_client_recv_loop(Conn, true, ReceivedViaDgram);
-    {quic, dgram_max_len, _} ->
+    {quic, dgram_state_changed, Conn, #{dgram_send_enabled := true, dgram_max_len := _Size}} ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram);
     Other ->
       ct:fail("Unexpected Msg ~p", [Other])
@@ -2314,7 +2318,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
              #{status := Reason, stream_id := StreamID}} ->
       ct:fail("Stream ~pstart complete with other reason: ~p", [StreamID, Reason])
   end,
-
+  flush_datagram_state_changed(Conn),
   %% Expect a send_shutdown_complete
   receive {quic, send_shutdown_complete, Stm, false } -> ok end,
 
@@ -3375,6 +3379,11 @@ flush_streams_available(Conn) ->
   receive
     {quic, streams_available, Conn,
      #{bidi_streams := _, unidi_streams := _}} -> ok
+  end.
+
+flush_datagram_state_changed(Conn) ->
+  receive
+    {quic, dgram_state_changed, Conn, _} -> ok
   end.
 
 filename(Path, F, A) ->

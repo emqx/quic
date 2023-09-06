@@ -47,6 +47,7 @@
         , resumed/3
         , nst_received/3
         , new_stream/3
+        , datagram_state_changed/3
         ]).
 
 init(ConnOpts) when is_list(ConnOpts) ->
@@ -120,4 +121,7 @@ peer_needs_streams(C, #{bidi_streams := Current}, S) ->
     {ok, S};
 %% for https://github.com/microsoft/msquic/issues/3120
 peer_needs_streams(_C, undefined, S) ->
+    {ok, S}.
+
+datagram_state_changed(_C, _Flags, S) ->
     {ok, S}.

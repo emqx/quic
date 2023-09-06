@@ -329,7 +329,9 @@ ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
 ERL_NIF_TERM ATOM_NST_RECEIVED;
 ERL_NIF_TERM ATOM_NST;
 ERL_NIF_TERM ATOM_DGRAM;
+ERL_NIF_TERM ATOM_DGRAM_STATE_CHANGED;
 ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
+ERL_NIF_TERM ATOM_DGRAM_SEND_ENABLED;
 ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
 ERL_NIF_TERM ATOM_NEW_CONN;
@@ -690,7 +692,9 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_NST_RECEIVED, nst_received);                                      \
   ATOM(ATOM_NST, nst);                                                        \
   ATOM(ATOM_DGRAM, dgram);                                                    \
+  ATOM(ATOM_DGRAM_STATE_CHANGED, dgram_state_changed);                        \
   ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                    \
+  ATOM(ATOM_DGRAM_SEND_ENABLED, dgram_send_enabled);                          \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \

@@ -26,8 +26,8 @@ EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
 extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
-static void handle_dgram_state_event(QuicerConnCTX *c_ctx,
-                                     QUIC_CONNECTION_EVENT *Event);
+static void handle_dgram_state_changed_event(QuicerConnCTX *c_ctx,
+                                             QUIC_CONNECTION_EVENT *Event);
 
 static void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
                                           QUIC_CONNECTION_EVENT *Event);
@@ -1040,20 +1040,27 @@ async_handshake_1(ErlNifEnv *env,
 }
 
 void
-handle_dgram_state_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
+handle_dgram_state_changed_event(QuicerConnCTX *c_ctx,
+                                 QUIC_CONNECTION_EVENT *Event)
 {
-  if (Event->DATAGRAM_STATE_CHANGED.SendEnabled == 1)
-    {
-      ErlNifEnv *env = c_ctx->env;
-      int max_len = Event->DATAGRAM_STATE_CHANGED.MaxSendLength;
-      enif_send(NULL,
-                &(c_ctx->owner->Pid),
-                NULL,
-                enif_make_tuple3(env,
-                                 ATOM_QUIC,
-                                 ATOM_DGRAM_MAX_LEN,
-                                 enif_make_int(env, max_len)));
-    }
+  assert(QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED == Event->Type);
+  ErlNifEnv *env = c_ctx->env;
+  uint16_t max_len = Event->DATAGRAM_STATE_CHANGED.MaxSendLength;
+
+  ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
+  ERL_NIF_TERM props_name[] = { ATOM_DGRAM_MAX_LEN, ATOM_DGRAM_SEND_ENABLED };
+  ERL_NIF_TERM props_value[]
+      = { enif_make_uint(env, max_len),
+          ATOM_BOOLEAN(Event->DATAGRAM_STATE_CHANGED.SendEnabled) };
+
+  ERL_NIF_TERM report = make_event_with_props(c_ctx->env,
+                                              ATOM_DGRAM_STATE_CHANGED,
+                                              ConnHandle,
+                                              props_name,
+                                              props_value,
+                                              2);
+
+  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 }
 
 void
@@ -1412,8 +1419,7 @@ static QUIC_STATUS
 handle_connection_event_datagram_state_changed(QuicerConnCTX *c_ctx,
                                                QUIC_CONNECTION_EVENT *Event)
 {
-  assert(QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED == Event->Type);
-  handle_dgram_state_event(c_ctx, Event);
+  handle_dgram_state_changed_event(c_ctx, Event);
   return QUIC_STATUS_SUCCESS;
 }
 

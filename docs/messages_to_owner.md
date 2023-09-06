@@ -304,10 +304,9 @@ Peer wants to open more streams but cannot due to flow control
 
 
 ### DATAGRAM state changed
-@TODO convert it to the new format and use some atom state
 
 ```erlang
-{quic, dgram, connection_handle(), MaxLen::integer()} 
+{quic, dgram_state_changed, connection_handle(), #{ dgram_send_enabled := boolean(), dgram_max_len := uint64()}}
 ```
 
 ### DATAGRAM received

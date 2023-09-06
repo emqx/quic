@@ -409,6 +409,11 @@ handle_info({quic, nst_received, C, TicketBin},
     ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => nst_received, ticket => TicketBin}),
     default_cb_ret(M:nst_received(C, TicketBin, CBState), State);
 
+handle_info({quic, dgram_state_changed, C, Flags},
+            #{callback := M, callback_state := CBState} = State) ->
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => dgram_state_changed, flags => Flags}),
+    default_cb_ret(M:datagram_state_changed(C, Flags, CBState), State);
+
 %%% ==============================================================
 %%% Handle messages for link/monitor
 %%% ==============================================================
