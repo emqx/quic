@@ -318,20 +318,20 @@ handle_cast(_Request, State) ->
 handle_info({quic, closed, undefined, undefined},
             #{ is_local := false
              , stream := undefined
-             , conn := Conn
+             , conn := _Conn
              } = S) ->
-    ?tp(debug, acceptor_recv_conn_stop, #{conn => Conn, module => ?MODULE, pid => self()}),
+    ?tp_ignore_side_effects_in_prod(acceptor_recv_conn_stop, #{conn => _Conn, module => ?MODULE, pid => self()}),
     {stop, normal, S};
 
 %% For acceptor
-handle_info({quic, new_stream, Stream, #{flags := Flags, is_orphan := false} = Props},
+handle_info({quic, new_stream, Stream, #{flags := _Flags, is_orphan := false} = Props},
             #{ stream_opts := Options
              , stream := undefined
              , conn := Conn
              , callback := CallbackModule
              , callback_state := undefined
              } = State) ->
-    ?tp(debug, new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => Flags}),
+    ?tp_ignore_side_effects_in_prod(new_stream, #{module=>?MODULE, stream=>Stream, stream_flags => _Flags}),
     try CallbackModule:new_stream(Stream, maps:merge(Options, Props), Conn) of
         {ok, CallbackState} ->
             {noreply, State#{stream := Stream, callback_state := CallbackState}};
@@ -348,7 +348,7 @@ handle_info({quic, Bin, Stream, Props},
              , callback_state := CallbackState } = State)
   when is_binary(Bin) ->
     %% FPbuffer is disabled, callback module should handle out of order delivery
-    ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream}),
+    ?tp_ignore_side_effects_in_prod(stream_data, #{module=>?MODULE, stream=>Stream}),
     default_cb_ret(M:handle_stream_data(Stream, Bin, Props, CallbackState), State);
 handle_info({quic, Bin, Stream, Props} = Evt,
             #{ stream := Stream, callback := M
@@ -356,7 +356,7 @@ handle_info({quic, Bin, Stream, Props} = Evt,
              , callback_state := CallbackState } = State)
   when is_binary(Bin) andalso Buffer =/= disabled ->
     %% FPbuffer is enabled, callback module get ordered data
-    ?tp(debug, stream_data, #{module=>?MODULE, stream=>Stream, buffer => Buffer}),
+    ?tp_ignore_side_effects_in_prod(stream_data, #{module=>?MODULE, stream=>Stream, buffer => Buffer}),
     case quicer:update_fpbuffer(quicer:quic_data(Evt), Buffer) of
         {[], NewBuffer} ->
             {noreply, State#{ fpbuffer := NewBuffer} };
@@ -375,61 +375,61 @@ handle_info({quic, start_completed, Stream,
              }
            , #{ callback := M
               , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => start_completed, props => Props}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => start_completed, props => Props}),
     default_cb_ret(M:start_completed(Stream, Props, CBState), State);
 
 handle_info({quic, send_complete, Stream, IsSendCanceled},
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event=>send_complete, is_canceled=>IsSendCanceled}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event=>send_complete, is_canceled=>IsSendCanceled}),
     default_cb_ret(M:send_complete(Stream, IsSendCanceled, CBState), State);
 
 handle_info({quic, peer_send_shutdown, Stream, undefined},
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_send_shutdown}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => peer_send_shutdown}),
     default_cb_ret(M:peer_send_shutdown(Stream, undefined, CBState), State);
 
 handle_info({quic, peer_send_aborted, Stream, ErrorCode},
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_send_aborted, error_code => ErrorCode}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => peer_send_aborted, error_code => ErrorCode}),
     default_cb_ret(M:peer_send_aborted(Stream, ErrorCode, CBState), State);
 
 handle_info({quic, peer_receive_aborted, Stream, ErrorCode},
             #{ callback := M,
                callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_receive_aborted, error_code => ErrorCode}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => peer_receive_aborted, error_code => ErrorCode}),
     default_cb_ret(M:peer_receive_aborted(Stream, ErrorCode, CBState), State);
 
 handle_info({quic, send_shutdown_complete, Stream, IsGraceful},
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => send_shutdown_complete, is_graceful => IsGraceful}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => send_shutdown_complete, is_graceful => IsGraceful}),
     default_cb_ret(M:send_shutdown_complete(Stream, IsGraceful, CBState), State);
 
 handle_info({quic, stream_closed, Stream, Flags},
             #{ callback := M
              , conn := C
              , callback_state := CbState} = State) when C =/= undefined andalso is_map(Flags) ->
-    ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed, flags=>Flags}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event=>stream_closed, flags=>Flags}),
     default_cb_ret(M:stream_closed(Stream, Flags, CbState), State);
 
 handle_info({quic, peer_accepted, Stream, undefined},
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => peer_accepted}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => peer_accepted}),
     default_cb_ret(M:peer_accepted(Stream, undefined, CBState), State);
 
 handle_info({quic, passive, Stream, undefined},
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => passive}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => passive}),
     default_cb_ret(M:passive(Stream, undefined, CBState), State);
 handle_info(Info,
             #{ callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event => info}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event => info}),
     default_cb_ret(M:handle_info(Info, CBState), State).
 
 %% @TODO  handle_info({EXIT....
@@ -449,7 +449,7 @@ handle_info(Info,
 handle_continue({?post_init, PrevOwner}, #{ is_owner := false, stream := Stream
                                           , callback_state := CBState
                                           , callback := M} = State) ->
-    ?tp(debug, #{event=>?post_init, module=>?MODULE, stream=>Stream}),
+    ?tp_ignore_side_effects_in_prod(debug, #{event=>?post_init, module=>?MODULE, stream=>Stream}),
     case wait_for_handoff(PrevOwner, Stream) of
         {ok, PostInfo}->
             case erlang:function_exported(M, post_handoff, 3) of
@@ -463,7 +463,7 @@ handle_continue({?post_init, PrevOwner}, #{ is_owner := false, stream := Stream
     end;
 handle_continue(Other, #{ callback := M
                         , callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event=>continue, stream=>maps:get(stream, State)}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event=>continue, stream=>maps:get(stream, State)}),
     default_cb_ret(M:handle_continue(Other, CBState), State).
 %%--------------------------------------------------------------------
 %% @private

@@ -554,7 +554,7 @@ accept_stream(Conn, Opts, Timeout) when is_map(Opts) ->
         {quic, new_stream, Stream, _StreamProps} ->
           {ok, Stream};
         {quic, closed, undefined, undefined} ->
-          ?tp(debug, stream_acceptor_conn_closed, #{ conn => Conn }),
+          ?tp_ignore_side_effects_in_prod(stream_acceptor_conn_closed, #{ conn => Conn }),
           {error, closed}
       after Timeout ->
           {error, timeout}
@@ -997,7 +997,7 @@ handoff_stream(Stream, NewOwner, HandoffData) when NewOwner == self() ->
   NewOwner ! {handoff_done, Stream, HandoffData},
   ok;
 handoff_stream(Stream, NewOwner, HandoffData) ->
-  ?tp(debug, #{event=>?FUNCTION_NAME, module=>?MODULE, stream=>Stream, owner=>NewOwner}),
+  ?tp_ignore_side_effects_in_prod(debug, #{event=>?FUNCTION_NAME, module=>?MODULE, stream=>Stream, owner=>NewOwner}),
   case quicer:getopt(Stream, active) of
     {ok, ActiveN} ->
       ActiveN =/= false andalso quicer:setopt(Stream, active, false),
@@ -1135,10 +1135,10 @@ do_forward_stream_msgs(Stream, Owner, MRef) ->
             Owner ! Msg,
             do_forward_stream_msgs(Stream, Owner, MRef);
         {'DOWN', MRef, process, Owner, _} ->
-            ?tp(debug, do_forward_stream_msg_fail, #{stream => Stream, owner => Owner}),
+            ?tp_ignore_side_effects_in_prod(do_forward_stream_msg_fail, #{stream => Stream, owner => Owner}),
             {error, owner_down}
     after 0 ->
-            ?tp(debug, do_forward_stream_msg_done, #{stream => Stream, owner => Owner}),
+            ?tp_ignore_side_effects_in_prod(do_forward_stream_msg_done, #{stream => Stream, owner => Owner}),
             erlang:demonitor(MRef),
             ok
     end.

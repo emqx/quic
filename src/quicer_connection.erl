@@ -276,7 +276,7 @@ handle_call(get_handle, _From, #{ conn := Connection } = State) ->
     {reply, Connection, State};
 handle_call({stream_send, Callback, Data, SendFlags, Opts}, _From,
             #{ callback_state := _CbState, conn := Conn } = State) ->
-    ?tp(debug, #{module => ?MODULE, event => stream_send, conn => Conn}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, event => stream_send, conn => Conn}),
     case quicer_stream:start_link(Callback, Conn, Opts) of
         {ok, StreamPid} ->
             try quicer_stream:send(StreamPid, Data, SendFlags) of
@@ -319,7 +319,7 @@ handle_cast(_Request, State) ->
           {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info({quic, new_conn, C, Props},
             #{callback := M, sup := Sup, callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, conn=>C, props=>Props, event=>new_conn}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, conn=>C, props=>Props, event=>new_conn}),
     %% I become the connection owner, I should start an new acceptor.
     Sup =/= undefined andalso (catch supervisor:start_child(Sup, [Sup])),
     default_cb_ret(M:new_conn(C, Props, CBState), State#{conn := C});
@@ -328,7 +328,7 @@ handle_info({quic, connected, C, #{is_resumed := IsResumed} = Props},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
-    ?tp(debug, #{module=>?MODULE, conn=>C, props=>Props, event => connected}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, conn=>C, props=>Props, event => connected}),
     %% @TODO add option to unlink from supervisor
     default_cb_ret(M:connected(C, Props, CbState), State#{is_resumed => IsResumed});
 
@@ -337,7 +337,7 @@ handle_info({quic, transport_shutdown, C, DownInfo},
              , callback := M
              , callback_state := CbState
              } = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => transport_shutdown}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => transport_shutdown}),
     default_cb_ret(M:transport_shutdown(C, DownInfo, CbState), State);
 
 handle_info({quic, shutdown, C, ErrorCode},
@@ -345,27 +345,27 @@ handle_info({quic, shutdown, C, ErrorCode},
              , callback := M
              , callback_state := CbState
              } = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => shutdown}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => shutdown}),
     default_cb_ret(M:shutdown(C, ErrorCode, CbState), State);
 
 handle_info({quic, closed, C, #{is_app_closing := false} = Flags},
             #{conn := C, callback := M,
               callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, conn=>C, event => closed}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, conn=>C, event => closed}),
     default_cb_ret(M:closed(C, Flags, CBState), State);
 
 handle_info({quic, local_address_changed, C, NewAddr},
             #{ conn := C
              , callback := M
              , callback_state := CBState} = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => local_address_changed, new_addr => NewAddr}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => local_address_changed, new_addr => NewAddr}),
     default_cb_ret(M:local_address_changed(C, NewAddr, CBState), State);
 
 handle_info({quic, peer_address_changed, C, NewAddr},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => peer_address_changed, new_addr => NewAddr}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => peer_address_changed, new_addr => NewAddr}),
     default_cb_ret(M:peer_address_changed(C, NewAddr, CbState), State);
 
 handle_info({quic, new_stream, Stream, Props},
@@ -378,7 +378,7 @@ handle_info({quic, new_stream, Stream, Props},
     %%   AND the stream acceptor should accept new stream so it will likely pick up the control stream
     %% note, by desgin, control stream doesn't have to be the first stream initiated.
     %% here, it handles new stream when there is no available stream acceptor for the connection.
-    ?tp(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event => new_stream}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, conn=>C, stream=>Stream, event => new_stream}),
     default_cb_ret(M:new_stream(Stream, Props, CbState), State);
 
 handle_info({quic, streams_available, C, #{ bidi_streams := BidirStreams
@@ -386,7 +386,7 @@ handle_info({quic, streams_available, C, #{ bidi_streams := BidirStreams
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => streams_available,
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => streams_available,
                  bidir_cnt => BidirStreams, unidir_cnt => UnidirStreams}),
     default_cb_ret(M:streams_available(C, {BidirStreams, UnidirStreams}, CbState), State);
 
@@ -395,18 +395,18 @@ handle_info({quic, peer_needs_streams, C, Needs},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => peer_needs_streams}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => peer_needs_streams}),
     default_cb_ret(M:peer_needs_streams(C, Needs, CbState), State);
 
 handle_info({quic, connection_resumed, C, ResumeData},
             #{callback := M, callback_state := CBState} = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => connection_resumed, data => ResumeData}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => connection_resumed, data => ResumeData}),
     default_cb_ret(M:resumed(C, ResumeData, CBState), State);
 
 %% Client Only
 handle_info({quic, nst_received, C, TicketBin},
             #{callback := M, callback_state := CBState} = State) ->
-    ?tp(debug, #{module => ?MODULE, conn => C, event => nst_received, ticket => TicketBin}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => nst_received, ticket => TicketBin}),
     default_cb_ret(M:nst_received(C, TicketBin, CBState), State);
 
 %%% ==============================================================
@@ -434,7 +434,7 @@ handle_info(OtherInfo, #{callback := M,
           {stop, Reason :: normal | term(), NewState :: term()}.
 handle_continue(Cont, #{callback := M,
                         callback_state := CBState} = State) ->
-    ?tp(debug, #{module=>?MODULE, event=>continue, stream=>maps:get(stream, State)}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module=>?MODULE, event=>continue, stream=>maps:get(stream, State)}),
     default_cb_ret(M:handle_continue(Cont, CBState), State).
 %%--------------------------------------------------------------------
 %% @private
