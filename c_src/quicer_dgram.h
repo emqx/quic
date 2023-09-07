@@ -25,4 +25,8 @@ void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
                                    QUIC_CONNECTION_EVENT *Event);
 void handle_dgram_state_changed_event(QuicerConnCTX *c_ctx,
                                       QUIC_CONNECTION_EVENT *Event);
+
+void handle_dgram_recv_event(QuicerConnCTX *c_ctx,
+                             QUIC_CONNECTION_EVENT *Event);
+
 #endif // __QUICER_DGRAM_H_

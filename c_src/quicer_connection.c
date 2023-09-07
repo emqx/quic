@@ -27,9 +27,6 @@ EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
 extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
-static void handle_dgram_recv_event(QuicerConnCTX *c_ctx,
-                                    QUIC_CONNECTION_EVENT *Event);
-
 static QUIC_STATUS
 handle_connection_event_connected(QuicerConnCTX *c_ctx,
                                   QUIC_CONNECTION_EVENT *Event);
@@ -1032,22 +1029,6 @@ async_handshake_1(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
   return res;
-}
-
-void
-handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
-{
-  ErlNifEnv *env = c_ctx->env;
-  ErlNifBinary bin;
-  ERL_NIF_TERM report;
-  enif_alloc_binary(Event->DATAGRAM_RECEIVED.Buffer->Length, &bin);
-  CxPlatCopyMemory(bin.data,
-                   Event->DATAGRAM_RECEIVED.Buffer->Buffer,
-                   Event->DATAGRAM_RECEIVED.Buffer->Length);
-  bin.size = Event->DATAGRAM_RECEIVED.Buffer->Length;
-  report = enif_make_tuple3(
-      env, ATOM_QUIC, ATOM_DGRAM, enif_make_binary(env, &bin));
-  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
 }
 
 /* handle conn connected event and deliver the message to the conn owner

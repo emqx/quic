@@ -1241,9 +1241,9 @@ dgram_client_recv_loop(Conn, true, true) ->
 
 dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram) ->
   receive
-    {quic, dgram, <<"pong">>} ->
+    {quic, <<"pong">>, Conn, Flag} when is_integer(Flag) ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, true);
-    {quic, <<"pong">>, _, _} ->
+    {quic, <<"pong">>, _Stream, Flag} ->
       dgram_client_recv_loop(Conn, true, ReceivedViaDgram);
     {quic, dgram_state_changed, Conn, #{dgram_send_enabled := true, dgram_max_len := _Size}} ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram);
@@ -3158,7 +3158,7 @@ ping_pong_server_dgram_loop(L, Conn, Stm) ->
       ct:pal("send stream pong"),
       {ok, 4} = quicer:send(Stm, <<"pong">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);
-    {quic, dgram, <<"ping">>} ->
+    {quic, <<"ping">>, Conn, Flag} when is_integer(Flag) ->
       ct:pal("send dgram pong"),
       {ok, 4} = quicer:send_dgram(Conn, <<"pong">>),
       ping_pong_server_dgram_loop(L, Conn, Stm);

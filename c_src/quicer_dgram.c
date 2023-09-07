@@ -159,6 +159,30 @@ handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
     }
 }
 
+void
+handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
+{
+  ErlNifEnv *env = c_ctx->env;
+  ERL_NIF_TERM bin;
+  ERL_NIF_TERM report;
+
+  size_t len = Event->DATAGRAM_RECEIVED.Buffer->Length;
+  unsigned char *buff = enif_make_new_binary(env, len, &bin);
+  if (buff)
+    {
+      CxPlatCopyMemory(buff, Event->DATAGRAM_RECEIVED.Buffer->Buffer, len);
+
+      ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
+      report = enif_make_tuple4(
+          env,
+          ATOM_QUIC,
+          bin,
+          ConnHandle,
+          enif_make_uint(env, Event->DATAGRAM_RECEIVED.Flags));
+      enif_send(NULL, &c_ctx->owner->Pid, NULL, report);
+    }
+}
+
 ERL_NIF_TERM
 atom_dgram_send_state(uint16_t state)
 {

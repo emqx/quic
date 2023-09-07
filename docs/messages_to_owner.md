@@ -70,8 +70,9 @@ Otherwise, start stream will be queued. Also see [peer_accepted](#peer_accepted)
 
 ### active received data
 
-Data received in binary format.
+Stream data received in binary format with stream handle
 
+also see [DATAGRAM received data].
 
 ```erlang
 {quic, binary(), stream_handle(), #{ absolute_offset := integer() 
@@ -309,12 +310,12 @@ Peer wants to open more streams but cannot due to flow control
 {quic, dgram_state_changed, connection_handle(), #{ dgram_send_enabled := boolean(), dgram_max_len := uint64()}}
 ```
 
-### DATAGRAM received
+### DATAGRAM received data
 
-@TODO convert it to the new format
+with connection handle and integer flag
 
 ```erlang
-{quic, binary(), {dgram, connection_handle()}, flag :: integer()}
+{quic, binary(), connection_handle(), flag :: non_neg_integer()}
 ```
 
 ### DATAGRAM send completed, success or fail.
