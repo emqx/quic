@@ -104,6 +104,30 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 void
+handle_dgram_state_changed_event(QuicerConnCTX *c_ctx,
+                                 QUIC_CONNECTION_EVENT *Event)
+{
+  assert(QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED == Event->Type);
+  ErlNifEnv *env = c_ctx->env;
+  uint16_t max_len = Event->DATAGRAM_STATE_CHANGED.MaxSendLength;
+
+  ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
+  ERL_NIF_TERM props_name[] = { ATOM_DGRAM_MAX_LEN, ATOM_DGRAM_SEND_ENABLED };
+  ERL_NIF_TERM props_value[]
+      = { enif_make_uint(env, max_len),
+          ATOM_BOOLEAN(Event->DATAGRAM_STATE_CHANGED.SendEnabled) };
+
+  ERL_NIF_TERM report = make_event_with_props(c_ctx->env,
+                                              ATOM_DGRAM_STATE_CHANGED,
+                                              ConnHandle,
+                                              props_name,
+                                              props_value,
+                                              2);
+
+  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
+}
+
+void
 handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
                               QUIC_CONNECTION_EVENT *Event)
 {
