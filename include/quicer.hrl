@@ -123,6 +123,15 @@
 -define(QUIC_RECEIVE_FLAG_0_RTT                 , 16#0001).
 -define(QUIC_RECEIVE_FLAG_FIN                   , 16#0002).
 
+%% QUIC DATAGRAM_SEND_STATE
+-define(QUIC_DATAGRAM_SEND_UNKNOWN, dgram_send_unknown).                  %% Not yet sent.
+-define(QUIC_DATAGRAM_SEND_SENT, dgram_send_sent).                        %% Sent and awaiting acknowledegment
+-define(QUIC_DATAGRAM_SEND_LOST_SUSPECT, dgram_send_lost_suspect).        %% Suspected as lost, but still tracked
+-define(QUIC_DATAGRAM_SEND_LOST_DISCARDED, dgram_send_lost_discarded).    %% Lost and not longer being tracked
+-define(QUIC_DATAGRAM_SEND_ACKNOWLEDGED, dgram_send_acknowledged).        %% Acknowledged
+-define(QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS, dgram_send_acknowledged_spurious).   %% Acknowledged after being suspected lost
+-define(QUIC_DATAGRAM_SEND_CANCELED, dgram_send_canceled).
+
 -record(quic_data, {
     offset = 0 :: non_neg_integer(),
     size = 0 :: non_neg_integer(),

@@ -1228,6 +1228,7 @@ tc_dgram_client_send(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
       flush_streams_available(Conn),
+      flush_datagram_state_changed(Conn),
       dgram_client_recv_loop(Conn, false, false),
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)

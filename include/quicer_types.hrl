@@ -378,4 +378,12 @@
 %% @doc binary data with offset and size info
 -type quic_data() :: #quic_data{}.
 
+-type datagram_send_state() :: ?QUIC_DATAGRAM_SEND_UNKNOWN %% Not sent yet
+                             | ?QUIC_DATAGRAM_SEND_SENT    %% Sent but not acked yet
+                             | ?QUIC_DATAGRAM_SEND_LOST_SUSPECT %% Suspected lost but still tracked
+                             | ?QUIC_DATAGRAM_SEND_LOST_DISCARDED %% Lost and no longer tracked
+                             | ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED   %% Acknowledged
+                             | ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS %% Acknowledged after being suspected lost
+                             | ?QUIC_DATAGRAM_SEND_CANCELED.             %% Send cancelled
+
 -endif. %% QUICER_TYPES_HRL

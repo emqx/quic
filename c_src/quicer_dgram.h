@@ -21,4 +21,7 @@ limitations under the License.
 
 ERL_NIF_TERM send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
+void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
+                                   QUIC_CONNECTION_EVENT *Event);
+
 #endif // __QUICER_DGRAM_H_

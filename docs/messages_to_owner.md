@@ -317,12 +317,10 @@ Peer wants to open more streams but cannot due to flow control
 {quic, binary(), {dgram, connection_handle()}, flag :: integer()}
 ```
 
-### DATAGRAM send state changed
-
-@TODO use some atom state
+### DATAGRAM send completed, success or fail.
 
 ```erlang
-{quic, send_dgram_completed, connection_handle(), State::integer()} 
+{quic, dgram_send_state, connection_handle(), #{state := datagram_send_state()}} 
 ```
 
 ### Connection resumed

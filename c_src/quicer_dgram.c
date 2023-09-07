@@ -16,6 +16,8 @@ limitations under the License.
 
 #include "quicer_dgram.h"
 
+static ERL_NIF_TERM atom_dgram_send_state(uint16_t state);
+
 ERL_NIF_TERM
 send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
@@ -99,4 +101,70 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       enif_mutex_unlock(c_ctx->lock);
       return SUCCESS(ETERM_UINT_64(bin->size));
     }
+}
+
+void
+handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
+                              QUIC_CONNECTION_EVENT *Event)
+{
+  assert(QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED == Event->Type);
+  // result of previous unreliable datagram send
+  QUIC_DATAGRAM_SEND_STATE state = Event->DATAGRAM_SEND_STATE_CHANGED.State;
+  QuicerDgramSendCTX *dgram_send_ctx
+      = (QuicerDgramSendCTX *)(Event->DATAGRAM_SEND_STATE_CHANGED
+                                   .ClientContext);
+
+  ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
+  ERL_NIF_TERM props_name[] = { ATOM_STATE };
+  ERL_NIF_TERM props_value[] = { atom_dgram_send_state(state) };
+  ERL_NIF_TERM report = make_event_with_props(c_ctx->env,
+                                              ATOM_DGRAM_SEND_STATE,
+                                              ConnHandle,
+                                              props_name,
+                                              props_value,
+                                              1);
+  enif_send(NULL, &dgram_send_ctx->caller, NULL, report);
+
+  if (QUIC_DATAGRAM_SEND_LOST_DISCARDED == state
+      || QUIC_DATAGRAM_SEND_ACKNOWLEDGED == state
+      || QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS == state
+      || QUIC_DATAGRAM_SEND_CANCELED == state)
+    {
+      // Destroy only when in final state
+      destroy_dgram_send_ctx(dgram_send_ctx);
+    }
+}
+
+ERL_NIF_TERM
+atom_dgram_send_state(uint16_t state)
+{
+  ERL_NIF_TERM ret = ATOM_UNDEFINED;
+  switch (state)
+    {
+    case QUIC_DATAGRAM_SEND_UNKNOWN:
+      ret = ATOM_QUIC_DATAGRAM_SEND_UNKNOWN;
+      break;
+    case QUIC_DATAGRAM_SEND_SENT:
+      ret = ATOM_QUIC_DATAGRAM_SEND_SENT;
+      break;
+    case QUIC_DATAGRAM_SEND_LOST_SUSPECT:
+      ret = ATOM_QUIC_DATAGRAM_SEND_LOST_SUSPECT;
+      break;
+    case QUIC_DATAGRAM_SEND_LOST_DISCARDED:
+      ret = ATOM_QUIC_DATAGRAM_SEND_LOST_DISCARDED;
+      break;
+    case QUIC_DATAGRAM_SEND_ACKNOWLEDGED:
+      ret = ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED;
+      break;
+    case QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS:
+      ret = ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS;
+      break;
+    case QUIC_DATAGRAM_SEND_CANCELED:
+      ret = ATOM_QUIC_DATAGRAM_SEND_CANCELED;
+      break;
+    default:
+      ret = ATOM_UNDEFINED;
+      break;
+    }
+  return ret;
 }
