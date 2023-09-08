@@ -709,38 +709,8 @@ async_connect3(ErlNifEnv *env,
   assert(c_ctx->is_closed);
   c_ctx->is_closed = FALSE; // connection opened.
 
-  ERL_NIF_TERM essl_keylogfile;
-  if (enif_get_map_value(
-          env, eoptions, ATOM_SSL_KEYLOGFILE_NAME, &essl_keylogfile))
-    {
-      char *keylogfile = CXPLAT_ALLOC_NONPAGED(PATH_MAX, QUICER_TRACE);
-      if (enif_get_string(
-              env, essl_keylogfile, keylogfile, PATH_MAX, ERL_NIF_LATIN1)
-          > 0)
-        {
-          QUIC_TLS_SECRETS *TlsSecrets = CXPLAT_ALLOC_NONPAGED(
-              sizeof(QUIC_TLS_SECRETS), QUICER_TLS_SECRETS);
-
-          CxPlatZeroMemory(TlsSecrets, sizeof(QUIC_TLS_SECRETS));
-          Status = MsQuic->SetParam(c_ctx->Connection,
-                                    QUIC_PARAM_CONN_TLS_SECRETS,
-                                    sizeof(QUIC_TLS_SECRETS),
-                                    TlsSecrets);
-          if (QUIC_FAILED(Status))
-            {
-              fprintf(stderr,
-                      "failed to enable secret logging: %s",
-                      QuicStatusToString(Status));
-            }
-          c_ctx->TlsSecrets = TlsSecrets;
-          c_ctx->ssl_keylogfile = keylogfile;
-        }
-
-      else
-        {
-          fprintf(stderr, "failed to read string ssl_keylogfile");
-        }
-    }
+  // optional set sslkeylogfile
+  parse_sslkeylogfile_option(env, eoptions, c_ctx);
 
   ERL_NIF_TERM evalue;
   if (enif_get_map_value(
