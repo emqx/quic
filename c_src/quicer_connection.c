@@ -507,6 +507,7 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
   QuicerRegistrationCTX *r_ctx = NULL;
   HQUIC registration = NULL;
+  ERL_NIF_TERM options = argv[1];
 
   if (argc == 0)
     {
@@ -516,7 +517,6 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   else
     {
       assert(argc == 1);
-      ERL_NIF_TERM options = argv[1];
       if (!parse_registration(env, options, &r_ctx))
         {
           return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
@@ -559,6 +559,12 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
                                                   &(c_ctx->Connection))))
     {
       res = ERROR_TUPLE_2(ATOM_STATUS(Status));
+      goto exit;
+    }
+
+  if (!IS_SAME_TERM(ATOM_OK,
+                    (res = parse_conn_resume_ticket(env, options, c_ctx))))
+    {
       goto exit;
     }
 
@@ -666,12 +672,10 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-
   if (is_reuse_handle)
-  {
-    enif_mutex_lock(c_ctx->lock);
-  }
-
+    {
+      enif_mutex_lock(c_ctx->lock);
+    }
 
   assert(c_ctx->owner);
   // allocate config_resource for client connection
@@ -723,6 +727,12 @@ async_connect3(ErlNifEnv *env,
           res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
           goto Error;
         }
+
+      if (!IS_SAME_TERM(
+              ATOM_OK, (res = parse_conn_resume_ticket(env, eoptions, c_ctx))))
+        {
+          goto Error;
+        }
     }
 
   assert(c_ctx->is_closed);
@@ -733,12 +743,6 @@ async_connect3(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_OK,
                     (res = parse_conn_local_address(env, eoptions, c_ctx))))
-    {
-      goto Error;
-    }
-
-  if (!IS_SAME_TERM(ATOM_OK,
-                    (res = parse_conn_resume_ticket(env, eoptions, c_ctx))))
     {
       goto Error;
     }
@@ -789,10 +793,10 @@ async_connect3(ErlNifEnv *env,
   enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
   eHandle = enif_make_resource(env, c_ctx);
 
-  if(is_reuse_handle)
-  {
-    enif_mutex_unlock(c_ctx->lock);
-  }
+  if (is_reuse_handle)
+    {
+      enif_mutex_unlock(c_ctx->lock);
+    }
   return SUCCESS(eHandle);
 
 Error:
@@ -842,10 +846,10 @@ Error:
   // Error exit, it must be closed or Handle is NULL
   assert(c_ctx->is_closed || NULL == c_ctx->Connection);
 
-  if(is_reuse_handle)
-  {
-    enif_mutex_unlock(c_ctx->lock);
-  }
+  if (is_reuse_handle)
+    {
+      enif_mutex_unlock(c_ctx->lock);
+    }
 
   return res;
 }
