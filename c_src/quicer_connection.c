@@ -99,6 +99,22 @@ parse_registration(ErlNifEnv *env,
                    ERL_NIF_TERM options,
                    QuicerRegistrationCTX **r_ctx);
 
+ERL_NIF_TERM parse_conn_local_address(ErlNifEnv *env,
+                                      ERL_NIF_TERM eoptions,
+                                      QuicerConnCTX *c_ctx);
+
+ERL_NIF_TERM parse_conn_resume_ticket(ErlNifEnv *env,
+                                      ERL_NIF_TERM eoptions,
+                                      QuicerConnCTX *c_ctx);
+
+ERL_NIF_TERM parse_conn_disable_1rtt_encryption(ErlNifEnv *env,
+                                                ERL_NIF_TERM eoptions,
+                                                QuicerConnCTX *c_ctx);
+
+ERL_NIF_TERM parse_conn_event_mask(ErlNifEnv *env,
+                                   ERL_NIF_TERM eoptions,
+                                   QuicerConnCTX *c_ctx);
+
 ERL_NIF_TERM
 peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 {
@@ -561,15 +577,13 @@ exit:
 ERL_NIF_TERM
 async_connect3(ErlNifEnv *env,
                __unused_parm__ int argc,
-               __unused_parm__ const ERL_NIF_TERM argv[])
+               const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
-
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
   ERL_NIF_TERM eHandle = ATOM_UNDEFINED;
-  ERL_NIF_TERM NST; // New Session Ticket
   // Usually we should not get this error
   // If we get it is internal logic error
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
@@ -712,72 +726,36 @@ async_connect3(ErlNifEnv *env,
   // optional set sslkeylogfile
   parse_sslkeylogfile_option(env, eoptions, c_ctx);
 
-  ERL_NIF_TERM evalue;
-  if (enif_get_map_value(
-          env, eoptions, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, &evalue))
+  if (!IS_SAME_TERM(ATOM_OK,
+                    (res = parse_conn_local_address(env, eoptions, c_ctx))))
     {
-      if (!IS_SAME_TERM(ATOM_OK,
-                        set_connection_opt(env,
-                                           c_ctx,
-                                           ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS,
-                                           evalue,
-                                           ATOM_FALSE)))
-        {
-          res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
-          goto Error;
-        }
+      goto Error;
     }
 
-  if (enif_get_map_value(env,
-                         eoptions,
-                         ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
-                         &evalue))
+  if (!IS_SAME_TERM(ATOM_OK,
+                    (res = parse_conn_resume_ticket(env, eoptions, c_ctx))))
     {
-      if (!IS_SAME_TERM(
-              ATOM_OK,
-              set_connection_opt(env,
-                                 c_ctx,
-                                 ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
-                                 evalue,
-                                 ATOM_FALSE)))
-        {
-          res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
-          goto Error;
-        }
+      goto Error;
     }
 
-  if (enif_get_map_value(env, eoptions, ATOM_NST, &NST))
+  if (!IS_SAME_TERM(
+          ATOM_OK,
+          (res = parse_conn_disable_1rtt_encryption(env, eoptions, c_ctx))))
     {
-      // Resume connection with NST binary
-      //
-      //
-      ErlNifBinary ticket;
-      if (!enif_inspect_binary(env, NST, &ticket) || ticket.size > UINT32_MAX)
-        {
-          res = ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-          goto Error;
-        }
-      else
-        {
-          if (QUIC_FAILED(Status
-                          = MsQuic->SetParam(c_ctx->Connection,
-                                             QUIC_PARAM_CONN_RESUMPTION_TICKET,
-                                             ticket.size,
-                                             ticket.data)))
-            {
-              res = ERROR_TUPLE_3(ATOM_ERROR_NOT_FOUND, ATOM_STATUS(Status));
-              goto Error;
-            }
-        }
+      goto Error;
     }
 
-  // This is optional
-  get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &c_ctx->event_mask);
+  if (!IS_SAME_TERM(ATOM_OK,
+                    (res = parse_conn_event_mask(env, eoptions, c_ctx))))
+    {
+      goto Error;
+    }
 
   // @TODO client async_connect_3 should able to take a config_resource as
   // input ERL TERM so that we don't need to call ClientLoadConfiguration
   //
   assert(!c_ctx->is_closed && c_ctx->Connection);
+
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
                       c_ctx->Connection,
                       c_ctx->config_resource->Configuration,
@@ -811,7 +789,6 @@ async_connect3(ErlNifEnv *env,
 Error:
   if (c_ctx->Connection)
     { // when is opened
-
       /*
        We should not call *destroy_c_ctx* from here.
        because it could cause race cond:
@@ -1596,6 +1573,91 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
     return QUIC_STATUS_SUCCESS;
 
   /* @TODO validate SNI */
+}
+
+/*
+** parse optional conn opt: local addr
+*/
+ERL_NIF_TERM
+parse_conn_local_address(ErlNifEnv *env,
+                         ERL_NIF_TERM eoptions,
+                         QuicerConnCTX *c_ctx)
+{
+
+  ERL_NIF_TERM evalue;
+  ERL_NIF_TERM res = ATOM_OK;
+  if (enif_get_map_value(
+          env, eoptions, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, &evalue))
+    {
+      return set_connection_opt(
+          env, c_ctx, ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, evalue, ATOM_FALSE);
+    }
+  return res;
+}
+
+/*
+** parse optional conn opt: disable_1rtt_encryption
+*/
+ERL_NIF_TERM
+parse_conn_disable_1rtt_encryption(ErlNifEnv *env,
+                                   ERL_NIF_TERM eoptions,
+                                   QuicerConnCTX *c_ctx)
+{
+  ERL_NIF_TERM evalue;
+  if (enif_get_map_value(env,
+                         eoptions,
+                         ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                         &evalue))
+    {
+      return set_connection_opt(env,
+                                c_ctx,
+                                ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,
+                                evalue,
+                                ATOM_FALSE);
+    }
+  return ATOM_OK;
+}
+
+/*
+** parse optional conn opt: nst (resume_ticket)
+**
+** resume connection with NST binary
+*/
+ERL_NIF_TERM
+parse_conn_resume_ticket(ErlNifEnv *env,
+                         ERL_NIF_TERM eoptions,
+                         QuicerConnCTX *c_ctx)
+{
+  ERL_NIF_TERM evalue;
+  if (enif_get_map_value(env, eoptions, ATOM_NST, &evalue))
+    {
+      return set_connection_opt(env,
+                                c_ctx,
+                                ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET,
+                                evalue,
+                                ATOM_FALSE);
+    }
+  return ATOM_OK;
+}
+
+/*
+ * parse optional conn opt: quic_event_mask
+ *
+ */
+ERL_NIF_TERM
+parse_conn_event_mask(ErlNifEnv *env,
+                      ERL_NIF_TERM eoptions,
+                      QuicerConnCTX *c_ctx)
+{
+  ERL_NIF_TERM evalue;
+  if (enif_get_map_value(env, eoptions, ATOM_QUIC_EVENT_MASK, &evalue))
+    {
+      if (!enif_get_uint(env, evalue, &(c_ctx->event_mask)))
+        {
+          return ERROR_TUPLE_2(ATOM_QUIC_EVENT_MASK);
+        }
+    }
+  return ATOM_OK;
 }
 
 ///_* Emacs

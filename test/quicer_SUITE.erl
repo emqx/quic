@@ -1285,15 +1285,15 @@ tc_setopt(Config) ->
 
 tc_setopt_bad_opt(_Config)->
   Port = select_port(),
-  {error, param_error} = quicer:connect("localhost", Port,
-                                        [{nst, foobar} %% BAD opt
-                                        | default_conn_opts()], 5000).
+  {error, badarg} = quicer:connect("localhost", Port,
+                                   [{nst, foobar} %% BAD opt
+                                   | default_conn_opts()], 5000).
 
 tc_setopt_bad_nst(_Config)->
   Port = select_port(),
-  {error, nst_not_found} = quicer:connect("localhost", Port,
-                                          [{nst, <<"">>}
-                                          | default_conn_opts()], 5000).
+  {error, invalid_parameter} = quicer:connect("localhost", Port,
+                                              [{nst, <<"">>}
+                                              | default_conn_opts()], 5000).
 
 tc_setopt_config_settings(Config) ->
   Port = select_port(),

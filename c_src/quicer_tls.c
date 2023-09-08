@@ -262,7 +262,7 @@ parse_sslkeylogfile_option(ErlNifEnv *env,
                                             sizeof(QUIC_TLS_SECRETS),
                                             TlsSecrets)))
     {
-      //unlikely
+      // unlikely
       CXPLAT_FREE(keylogfile, QUICER_TRACE);
       keylogfile = NULL;
       CXPLAT_FREE(TlsSecrets, QUICER_TLS_SECRETS);
