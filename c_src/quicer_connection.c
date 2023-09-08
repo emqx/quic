@@ -608,7 +608,6 @@ async_connect3(ErlNifEnv *env,
   if (enif_get_map_value(env, eoptions, ATOM_HANDLE, &eHandle))
     {
       // Reuse c_ctx from existing connecion handle
-      //
       if (enif_get_resource(env, eHandle, ctx_connection_t, (void **)&c_ctx))
         {
           assert(c_ctx->is_closed);
@@ -622,7 +621,6 @@ async_connect3(ErlNifEnv *env,
             {
               Registration = GRegistration;
             }
-          // @TODO we should take lock here
         }
       else
         {
@@ -667,6 +665,13 @@ async_connect3(ErlNifEnv *env,
           goto Error;
         }
     }
+
+
+  if (is_reuse_handle)
+  {
+    enif_mutex_lock(c_ctx->lock);
+  }
+
 
   assert(c_ctx->owner);
   // allocate config_resource for client connection
@@ -784,6 +789,10 @@ async_connect3(ErlNifEnv *env,
   enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
   eHandle = enif_make_resource(env, c_ctx);
 
+  if(is_reuse_handle)
+  {
+    enif_mutex_unlock(c_ctx->lock);
+  }
   return SUCCESS(eHandle);
 
 Error:
@@ -832,6 +841,12 @@ Error:
     }
   // Error exit, it must be closed or Handle is NULL
   assert(c_ctx->is_closed || NULL == c_ctx->Connection);
+
+  if(is_reuse_handle)
+  {
+    enif_mutex_unlock(c_ctx->lock);
+  }
+
   return res;
 }
 
