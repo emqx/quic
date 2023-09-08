@@ -321,6 +321,7 @@ ERL_NIF_TERM ATOM_STREAMS_AVAILABLE;
 ERL_NIF_TERM ATOM_PEER_NEEDS_STREAMS;
 ERL_NIF_TERM ATOM_START_COMPLETE;
 ERL_NIF_TERM ATOM_SEND_COMPLETE;
+ERL_NIF_TERM ATOM_DGRAM_SEND_STATE;
 ERL_NIF_TERM ATOM_SEND_DGRAM_COMPLETE;
 ERL_NIF_TERM ATOM_EINVAL;
 ERL_NIF_TERM ATOM_QUIC;
@@ -329,7 +330,9 @@ ERL_NIF_TERM ATOM_QUIC_EVENT_MASK;
 ERL_NIF_TERM ATOM_NST_RECEIVED;
 ERL_NIF_TERM ATOM_NST;
 ERL_NIF_TERM ATOM_DGRAM;
+ERL_NIF_TERM ATOM_DGRAM_STATE_CHANGED;
 ERL_NIF_TERM ATOM_DGRAM_MAX_LEN;
+ERL_NIF_TERM ATOM_DGRAM_SEND_ENABLED;
 ERL_NIF_TERM ATOM_DEBUG;
 ERL_NIF_TERM ATOM_ONCE;
 ERL_NIF_TERM ATOM_NEW_CONN;
@@ -379,6 +382,7 @@ ERL_NIF_TERM ATOM_IS_ORPHAN;
 ERL_NIF_TERM ATOM_BIDI_STREAMS;
 ERL_NIF_TERM ATOM_UNIDI_STREAMS;
 ERL_NIF_TERM ATOM_STATUS;
+ERL_NIF_TERM ATOM_STATE;
 ERL_NIF_TERM ATOM_STREAM_ID;
 ERL_NIF_TERM ATOM_IS_PEER_ACCEPTED;
 ERL_NIF_TERM ATOM_IS_CONN_SHUTDOWN;
@@ -393,6 +397,15 @@ ERL_NIF_TERM ATOM_SERVER_NAME;
 ERL_NIF_TERM ATOM_CLIENT_ALPNS;
 ERL_NIF_TERM ATOM_CRYPTO_BUFFER;
 ERL_NIF_TERM ATOM_UNDEFINED;
+
+// Datagram Send State
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_UNKNOWN;
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_SENT;
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_LOST_SUSPECT;
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_LOST_DISCARDED;
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED;
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS;
+ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
 
 // Mirror 'status' in msquic_linux.h
 
@@ -682,6 +695,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_PEER_NEEDS_STREAMS, peer_needs_streams);                          \
   ATOM(ATOM_START_COMPLETE, start_completed);                                 \
   ATOM(ATOM_SEND_COMPLETE, send_complete);                                    \
+  ATOM(ATOM_DGRAM_SEND_STATE, dgram_send_state);                              \
   ATOM(ATOM_SEND_DGRAM_COMPLETE, send_dgram_completed);                       \
   ATOM(ATOM_EINVAL, einval);                                                  \
   ATOM(ATOM_QUIC, quic);                                                      \
@@ -690,7 +704,9 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_NST_RECEIVED, nst_received);                                      \
   ATOM(ATOM_NST, nst);                                                        \
   ATOM(ATOM_DGRAM, dgram);                                                    \
+  ATOM(ATOM_DGRAM_STATE_CHANGED, dgram_state_changed);                        \
   ATOM(ATOM_DGRAM_MAX_LEN, dgram_max_len);                                    \
+  ATOM(ATOM_DGRAM_SEND_ENABLED, dgram_send_enabled);                          \
   ATOM(ATOM_DEBUG, debug);                                                    \
   ATOM(ATOM_ONCE, once);                                                      \
   ATOM(ATOM_NEW_CONN, new_conn);                                              \
@@ -727,6 +743,7 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_BIDI_STREAMS, bidi_streams);                                      \
   ATOM(ATOM_UNIDI_STREAMS, unidi_streams);                                    \
   ATOM(ATOM_STATUS, status);                                                  \
+  ATOM(ATOM_STATE, state);                                                    \
   ATOM(ATOM_STREAM_ID, stream_id);                                            \
   ATOM(ATOM_IS_PEER_ACCEPTED, is_peer_accepted);                              \
   ATOM(ATOM_IS_CONN_SHUTDOWN, is_conn_shutdown);                              \
@@ -739,6 +756,14 @@ ERL_NIF_TERM ATOM_UNDEFINED;
   ATOM(ATOM_SERVER_NAME, server_name);                                        \
   ATOM(ATOM_CLIENT_ALPNS, client_alpns);                                      \
   ATOM(ATOM_CRYPTO_BUFFER, crypto_buffer);                                    \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_UNKNOWN, dgram_send_unknown);                  \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_SENT, dgram_send_sent);                        \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_LOST_SUSPECT, dgram_send_lost_suspect);        \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_LOST_DISCARDED, dgram_send_lost_discarded);    \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED, dgram_send_acknowledged);        \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS,                         \
+       dgram_send_acknowledged_spurious);                                     \
+  ATOM(ATOM_QUIC_DATAGRAM_SEND_CANCELED, dgram_send_canceled);                \
   ATOM(ATOM_UNDEFINED, undefined);
 
 HQUIC GRegistration = NULL;

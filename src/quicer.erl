@@ -727,11 +727,20 @@ do_recv(Stream, Count, Buff) ->
         {error, dgram_send_error, atom_reason()}.
 send_dgram(Conn, Data) ->
   case quicer_nif:send_dgram(Conn, Data, _IsSync = 1) of
-    %% @todo make ref
+    %% @todo we need find tuned event mask
     {ok, _Len} = OK ->
       receive
-        {quic, send_dgram_completed, Conn} ->
-          OK
+        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_SENT}} ->
+          receive
+            {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
+              OK;
+            {quic, dgram_send_state, Conn, #{state := Other}} ->
+              {error, dgram_send_error, Other}
+          end;
+        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
+          OK;
+        {quic, dgram_send_state, Conn, #{state := Other}} ->
+          {error, dgram_send_error, Other}
       end;
     E ->
       E
@@ -1150,7 +1159,6 @@ flush(QuicEventName, Handle) when is_atom(QuicEventName) ->
     {quic, QuicEventName, Handle, _} -> ok
   %% Event must come, do not timeout
   end.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

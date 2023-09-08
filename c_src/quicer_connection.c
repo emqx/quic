@@ -15,6 +15,7 @@ limitations under the License.
 -------------------------------------------------------------------*/
 #include "quicer_connection.h"
 #include "quicer_ctx.h"
+#include "quicer_dgram.h"
 #include "quicer_tls.h"
 #include <assert.h>
 #include <openssl/pem.h>
@@ -25,15 +26,6 @@ extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 
 extern inline const char *QuicStatusToString(QUIC_STATUS Status);
-
-static void handle_dgram_state_event(QuicerConnCTX *c_ctx,
-                                     QUIC_CONNECTION_EVENT *Event);
-
-static void handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
-                                          QUIC_CONNECTION_EVENT *Event);
-
-static void handle_dgram_recv_event(QuicerConnCTX *c_ctx,
-                                    QUIC_CONNECTION_EVENT *Event);
 
 static QUIC_STATUS
 handle_connection_event_connected(QuicerConnCTX *c_ctx,
@@ -1039,60 +1031,6 @@ async_handshake_1(ErlNifEnv *env,
   return res;
 }
 
-void
-handle_dgram_state_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
-{
-  if (Event->DATAGRAM_STATE_CHANGED.SendEnabled == 1)
-    {
-      ErlNifEnv *env = c_ctx->env;
-      int max_len = Event->DATAGRAM_STATE_CHANGED.MaxSendLength;
-      enif_send(NULL,
-                &(c_ctx->owner->Pid),
-                NULL,
-                enif_make_tuple3(env,
-                                 ATOM_QUIC,
-                                 ATOM_DGRAM_MAX_LEN,
-                                 enif_make_int(env, max_len)));
-    }
-}
-
-void
-handle_dgram_send_state_event(QuicerConnCTX *c_ctx,
-                              QUIC_CONNECTION_EVENT *Event)
-{
-  ErlNifEnv *env = c_ctx->env;
-  if (Event->DATAGRAM_SEND_STATE_CHANGED.State == QUIC_DATAGRAM_SEND_SENT)
-    {
-      QuicerDgramSendCTX *dgram_send_ctx
-          = (QuicerDgramSendCTX *)(Event->DATAGRAM_SEND_STATE_CHANGED
-                                       .ClientContext);
-      enif_send(NULL,
-                &dgram_send_ctx->caller,
-                NULL,
-                enif_make_tuple3(env,
-                                 ATOM_QUIC,
-                                 ATOM_SEND_DGRAM_COMPLETE,
-                                 enif_make_resource(env, c_ctx)));
-      destroy_dgram_send_ctx(dgram_send_ctx);
-    }
-}
-
-void
-handle_dgram_recv_event(QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
-{
-  ErlNifEnv *env = c_ctx->env;
-  ErlNifBinary bin;
-  ERL_NIF_TERM report;
-  enif_alloc_binary(Event->DATAGRAM_RECEIVED.Buffer->Length, &bin);
-  CxPlatCopyMemory(bin.data,
-                   Event->DATAGRAM_RECEIVED.Buffer->Buffer,
-                   Event->DATAGRAM_RECEIVED.Buffer->Length);
-  bin.size = Event->DATAGRAM_RECEIVED.Buffer->Length;
-  report = enif_make_tuple3(
-      env, ATOM_QUIC, ATOM_DGRAM, enif_make_binary(env, &bin));
-  enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
-}
-
 /* handle conn connected event and deliver the message to the conn owner
    {quic, connected, connection_handle(), #{ is_resumed := boolean()
                                             , alpns = binary() | undefined
@@ -1412,8 +1350,7 @@ static QUIC_STATUS
 handle_connection_event_datagram_state_changed(QuicerConnCTX *c_ctx,
                                                QUIC_CONNECTION_EVENT *Event)
 {
-  assert(QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED == Event->Type);
-  handle_dgram_state_event(c_ctx, Event);
+  handle_dgram_state_changed_event(c_ctx, Event);
   return QUIC_STATUS_SUCCESS;
 }
 
