@@ -345,6 +345,7 @@ ERL_NIF_TERM ATOM_NEW_STREAM;
 /*----------------------------------------------------------*/
 ERL_NIF_TERM ATOM_SNABBKAFFE_COLLECTOR;
 ERL_NIF_TERM ATOM_TRACE;
+ERL_NIF_TERM ATOM_TIME;
 // Trace point Context, nif for callback
 ERL_NIF_TERM ATOM_CONTEXT;
 ERL_NIF_TERM ATOM_NIF;
@@ -715,6 +716,7 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_NEW_STREAM, new_stream);                                          \
   ATOM(ATOM_SNABBKAFFE_COLLECTOR, snabbkaffe_collector);                      \
   ATOM(ATOM_TRACE, trace);                                                    \
+  ATOM(ATOM_TIME, time);                                                      \
   ATOM(ATOM_CONTEXT, context);                                                \
   ATOM(ATOM_NIF, nif);                                                        \
   ATOM(ATOM_CALLBACK, callback);                                              \
