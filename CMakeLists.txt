@@ -21,10 +21,21 @@ else()
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
+if (DEFINED ENV{QUICER_USE_OPENSSL3})
+  message(STATUS "Use openssl3")
+  set(QUIC_TLS "openssl3")
+endif()
+
 if (DEFINED ENV{QUIC_ENABLE_LOGGING})
   set(QUIC_ENABLE_LOGGING $ENV{QUIC_ENABLE_LOGGING})
+  set(QUIC_LOGGING_TYPE lttng)
 else()
   set(QUIC_ENABLE_LOGGING "OFF")
+endif()
+
+if (DEFINED ENV{QUIC_LOGGING_TYPE})
+  set(QUIC_ENABLE_LOGGING "ON")
+  set(QUIC_LOGGING_TYPE $ENV{QUIC_LOGGING_TYPE})
 endif()
 
 if (DEFINED ENV{QUICER_USE_LTTNG} AND  DEFINED ENV{QUICER_USE_SNK})
@@ -91,8 +102,8 @@ add_subdirectory(msquic)
 add_library(quicer_static STATIC ${SOURCES})
 target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ msquic/src/inc/)
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
-  # note, the value of ${ATOMIC} will be set by msquic
-  target_link_libraries(quicer_static PRIVATE core platform inc warnings logging ${ATOMIC} "-Wl,--no-gc-sections")
+  # note, the value of ${ATOMIC} and %{NUMA} will be set by msquic
+  target_link_libraries(quicer_static PRIVATE core platform inc warnings logging ${ATOMIC} ${NUMA} "-Wl,--no-gc-sections")
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
   target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
 endif()
@@ -125,7 +136,7 @@ set_target_properties(quicer_nif
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/priv/
 )
 
-if (QUIC_ENABLE_LOGGING)
+if (QUIC_ENABLE_LOGGING STREQUAL "ON" AND QUIC_LOGGING_TYPE STREQUAL "lttng")
   set_target_properties(msquic.lttng PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/priv)
   set_target_properties(msquic.lttng PROPERTIES LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/priv)
 endif()

@@ -199,7 +199,7 @@ tc_open_listener(Config) ->
   {ok, {_, Port}} = quicer:sockname(L),
   {error, eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(Port),
+  {ok, P} = snabbkaffe:retry(100, 10, fun()-> {ok, _} = gen_udp:open(Port) end),
   ok = gen_udp:close(P),
   ok.
 
@@ -224,7 +224,7 @@ tc_open_listener_with_new_reg(Config) ->
   %% Then Listener is created successfully and port is occupied
   {error, eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(Port),
+  {ok, P} = snabbkaffe:retry(100, 10, fun()-> {ok, _} = gen_udp:open(Port) end),
   ok = gen_udp:close(P),
   ok = quicer:shutdown_registration(Reg),
   ok.
@@ -251,22 +251,24 @@ tc_open_listener_with_wrong_cert_password(Config) ->
               , quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config))).
 
 tc_open_listener_bind(Config) ->
-  ListenOn = "127.0.0.1:4567",
+  Port = select_port(),
+  ListenOn = "127.0.0.1"++":"++integer_to_list(Port),
   {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
   {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(4567),
+  {error, eaddrinuse} = gen_udp:open(Port),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(4567),
+  {ok, P} = snabbkaffe:retry(100, 10, fun() -> {ok, _} = gen_udp:open(Port) end),
   ok = gen_udp:close(P),
   ok.
 
 tc_open_listener_bind_v6(Config) ->
-  ListenOn = "[::1]:4567",
+  Port = select_port(),
+  ListenOn = "[::1]"++":"++integer_to_list(Port),
   {ok, L} = quicer:listen(ListenOn, default_listen_opts(Config)),
   {ok, {_, _}} = quicer:sockname(L),
-  {error,eaddrinuse} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  {error, eaddrinuse} = gen_udp:open(Port, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
   ok = quicer:close_listener(L),
-  {ok, P} = gen_udp:open(4567, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]),
+  {ok, P} = snabbkaffe:retry(100, 10, fun() -> {ok, _} = gen_udp:open(Port, [{ip, {0, 0, 0, 0, 0, 0, 0, 1}}]) end),
   ok = gen_udp:close(P),
   ok.
 
@@ -325,7 +327,7 @@ tc_stop_start_listener(Config) ->
   LConf = default_listen_opts(Config),
   {ok, L} = quicer:listen(Port, LConf),
   ok = quicer:stop_listener(L),
-  ok = quicer:start_listener(L, Port, LConf),
+  ok = snabbkaffe:retry(100, 10, fun() -> ok = quicer:start_listener(L, Port, LConf) end),
   ok = quicer:close_listener(L).
 
 tc_stop_close_listener(Config) ->
@@ -465,7 +467,9 @@ tc_listener_stopped_when_owner_die(Config) ->
   ok = quicer:close_listener(L1).
 
 select_port() ->
-  select_free_port(quic).
+  Port = select_free_port(quic),
+  timer:sleep(100),
+  Port.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
