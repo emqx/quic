@@ -328,6 +328,7 @@ extern ERL_NIF_TERM ATOM_NEW_STREAM;
 /*----------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_SNABBKAFFE_COLLECTOR;
 extern ERL_NIF_TERM ATOM_TRACE;
+extern ERL_NIF_TERM ATOM_TIME;
 // Trace point Context, nif for callback
 extern ERL_NIF_TERM ATOM_CONTEXT;
 extern ERL_NIF_TERM ATOM_NIF;

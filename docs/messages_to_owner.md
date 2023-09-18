@@ -296,7 +296,7 @@ More streams are available due to flow control from the peer.
 
 Peer wants to open more streams but cannot due to flow control
 ```erlang
-{quic, peer_needs_streams, connection_handle(), undefined}
+{quic, peer_needs_streams, connection_handle(), unidi_streams | bidi_streams}
 ```
 
 ### Ideal processor changed

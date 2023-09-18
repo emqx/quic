@@ -395,7 +395,7 @@ handle_info({quic, peer_needs_streams, C, Needs},
             #{ conn := C
              , callback := M
              , callback_state := CbState} = State) ->
-    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => peer_needs_streams}),
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => peer_needs_streams, needs => Needs}),
     default_cb_ret(M:peer_needs_streams(C, Needs, CbState), State);
 
 handle_info({quic, connection_resumed, C, ResumeData},

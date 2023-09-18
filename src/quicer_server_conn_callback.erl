@@ -105,7 +105,7 @@ streams_available(_C, {BidirCnt, UnidirCnt}, S) ->
             , peer_bidi_stream_count => BidirCnt}}.
 
 %% @doc May integrate with App flow control
-peer_needs_streams(_C, undefined, S) ->
+peer_needs_streams(_C, _UnidiOrBidi, S) ->
     {ok, S}.
 
 connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
