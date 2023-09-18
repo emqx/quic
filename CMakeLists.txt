@@ -98,7 +98,7 @@ elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
 endif()
 
 # @todo clean compiler warnings in the code
-target_compile_options(quicer_static PUBLIC "-ggdb3" "-Wno-unused-variable")
+target_compile_options(quicer_static PUBLIC "-ggdb3")
 
 if (DEFINED ENV{QUICER_TEST_COVER})
   add_compile_options("-fprofile-arcs" "-ftest-coverage")

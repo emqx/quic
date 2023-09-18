@@ -77,6 +77,7 @@ typedef struct QuicerConnCTX
   // for server, inherit from l_ctx
   // for client, alloc on its own
   QuicerConfigCTX *config_resource;
+  QuicerRegistrationCTX *r_ctx;
   HQUIC Connection;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;

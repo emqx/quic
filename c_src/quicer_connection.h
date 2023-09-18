@@ -16,8 +16,8 @@ limitations under the License.
 
 #ifndef __QUICER_CONNECTION_H_
 #define __QUICER_CONNECTION_H_
+#include "erl_nif.h"
 #include "quicer_internal.h"
-#include "quicer_nif.h"
 #include <msquichelper.h>
 
 typedef enum QUICER_CONNECTION_EVENT_MASKS
@@ -26,7 +26,7 @@ typedef enum QUICER_CONNECTION_EVENT_MASKS
 } QUICER_CONNECTION_EVENT_MASK;
 
 ERL_NIF_TERM
-open_connection0(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM
 async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM

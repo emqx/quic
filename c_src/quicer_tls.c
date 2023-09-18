@@ -32,7 +32,6 @@ parse_cert_options(ErlNifEnv *env,
     {
       return FALSE;
     }
-  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
 
   if (!(certfile
         = str_from_map(env, ATOM_CERTFILE, &options, NULL, PATH_MAX + 1)))
@@ -91,9 +90,10 @@ parse_cert_options(ErlNifEnv *env,
  *  verify : boolean() | undefined
  */
 BOOLEAN
-parse_verify_options_server(ErlNifEnv *env,
-                            ERL_NIF_TERM options,
-                            QUIC_CREDENTIAL_CONFIG *CredConfig)
+parse_verify_options(ErlNifEnv *env,
+                     ERL_NIF_TERM options,
+                     QUIC_CREDENTIAL_CONFIG *CredConfig,
+                     BOOLEAN is_server)
 {
 
   BOOLEAN verify = load_verify(env, &options, FALSE);
@@ -104,8 +104,26 @@ parse_verify_options_server(ErlNifEnv *env,
     }
   else
     {
-      // Server flag:
-      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+      // Verify peer is enabled
+      if (is_server)
+        {
+          CredConfig->Flags
+              |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+        }
+      else
+        {
+          ERL_NIF_TERM tmp;
+          if (enif_get_map_value(env, options, ATOM_CACERTFILE, &tmp))
+            {
+              // cacertfile is set, use it for self validation.
+              CredConfig->Flags
+                  |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+              CredConfig->Flags
+                  |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+            }
+          CredConfig->Flags
+              |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
+        }
     }
   return TRUE;
 }
@@ -198,4 +216,63 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
       CxPlatFree(cc->CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
     }
+}
+
+/*
+ * Parse 'sslkeylogfile' option and set QUIC_PARAM_CONN_TLS_SECRETS conn
+ * options for sslkeylogfile dump.
+ *
+ * alloc and update:
+ * c_ctx->TlsSecrets = TlsSecrets;
+ * c_ctx->ssl_keylogfile = keylogfile;
+ *
+ * usually they are not inuse (NULL), so we use heap memory.
+ * Caller should ensure they are freed after use.
+ *
+ */
+void
+parse_sslkeylogfile_option(ErlNifEnv *env,
+                           ERL_NIF_TERM eoptions,
+                           QuicerConnCTX *c_ctx)
+{
+  QUIC_STATUS Status;
+
+  char *keylogfile = str_from_map(
+      env, ATOM_SSL_KEYLOGFILE_NAME, &eoptions, NULL, PATH_MAX + 1);
+
+  if (!keylogfile)
+    {
+      return;
+    }
+
+  // Allocate the TLS secrets
+  QUIC_TLS_SECRETS *TlsSecrets
+      = CXPLAT_ALLOC_NONPAGED(sizeof(QUIC_TLS_SECRETS), QUICER_TLS_SECRETS);
+
+  if (!TlsSecrets)
+    {
+      return;
+    }
+
+  CxPlatZeroMemory(TlsSecrets, sizeof(QUIC_TLS_SECRETS));
+
+  // Set conn opt QUIC_PARAM_CONN_TLS_SECRETS
+  if (QUIC_FAILED(Status = MsQuic->SetParam(c_ctx->Connection,
+                                            QUIC_PARAM_CONN_TLS_SECRETS,
+                                            sizeof(QUIC_TLS_SECRETS),
+                                            TlsSecrets)))
+    {
+      // unlikely
+      CXPLAT_FREE(keylogfile, QUICER_TRACE);
+      keylogfile = NULL;
+      CXPLAT_FREE(TlsSecrets, QUICER_TLS_SECRETS);
+      TlsSecrets = NULL;
+      fprintf(stderr,
+              "failed to enable secret logging: %s",
+              QuicStatusToString(Status));
+    }
+
+  // @TODO: check if old ssl_keylogfile/TlsSecrets is set, free it?
+  c_ctx->TlsSecrets = TlsSecrets;
+  c_ctx->ssl_keylogfile = keylogfile;
 }

@@ -256,6 +256,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Start build CredConfig from with listen opts
   QUIC_CREDENTIAL_CONFIG CredConfig;
+  CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
 
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
@@ -264,7 +265,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_QUIC_TLS);
     }
 
-  if (!parse_verify_options_server(env, options, &CredConfig))
+  if (!parse_verify_options(env, options, &CredConfig, TRUE))
     {
       return ERROR_TUPLE_2(ATOM_VERIFY);
     }
