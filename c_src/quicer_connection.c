@@ -1355,20 +1355,12 @@ handle_connection_event_peer_needs_streams(
   assert(QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  /* reserved for the future upgrade
-  ERL_NIF_TERM props_name[] = { Event->PEER_NEEDS_STREAMS.Bidirectional ?
-  ATOM_BIDI_STREAMS : ATOM_UNIDI_STREAMS }; ERL_NIF_TERM props_value[] = {
-  enif_make_uint64(env, Event->PEER_NEEDS_STREAMS.StreamLimit) }; ERL_NIF_TERM
-  report = make_event_with_props(env, ATOM_PEER_NEEDS_STREAMS,
-                                              enif_make_resource(env, c_ctx),
-                                              props_name,
-                                              props_value,
-                                              1);
- */
   ERL_NIF_TERM report = make_event(env,
                                    ATOM_PEER_NEEDS_STREAMS,
                                    enif_make_resource(env, c_ctx),
-                                   ATOM_UNDEFINED);
+                                   Event->PEER_NEEDS_STREAMS.Bidirectional
+                                       ? ATOM_BIDI_STREAMS
+                                       : ATOM_UNIDI_STREAMS);
 
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;

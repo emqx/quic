@@ -113,11 +113,12 @@ local_address_changed(_C, _NewAddr, S) ->
 streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
     {ok, S}.
 
-peer_needs_streams(C, #{unidi_streams := Current}, S) ->
+peer_needs_streams(C, unidi_streams, S) ->
+    {ok, Current} = quicer:getopt(C, param_conn_local_unidi_stream_count),
     ok = quicer:setopt(C, param_conn_settings, #{peer_unidi_stream_count => Current + 1}),
     {ok, S};
-peer_needs_streams(C, #{bidi_streams := Current}, S) ->
-    ok = quicer:setopt(C, param_conn_settings, #{peer_bidi_stream_count => Current + 1}),
+peer_needs_streams(_C, bidi_streams, S) ->
+    %% leave it for test case to unblock it, see tc_multi_streams_example_server_3
     {ok, S};
 %% for https://github.com/microsoft/msquic/issues/3120
 peer_needs_streams(_C, undefined, S) ->

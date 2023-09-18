@@ -1996,20 +1996,14 @@ tc_multi_streams_example_server_1(Config) ->
                               true = quicer:is_unidirectional(Flag),
                               Incoming
                           after 1000 ->
-                              %%ct:fail("no incoming stream")
-                              %% reenable the check when it is fixed.
-                              %% https://github.com/microsoft/msquic/issues/3120
-                              ok
+                              ct:fail("no incoming stream")
                           end,
                  receive
                    {quic, Data, Stm3In, DFlag} ->
                      ct:pal("~p is received from ~p with flag: ~p", [Data, Stm3In, DFlag]),
                      ?assertEqual(Data, <<"ping3">>)
                  after 1000 ->
-                     %% ct:fail("no incoming data")
-                     %% reenable the check when it is fixed.
-                     %% https://github.com/microsoft/msquic/issues/3120
-                     ok
+                     ct:fail("no incoming data")
                  end,
                  quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
                  receive
@@ -2020,7 +2014,7 @@ tc_multi_streams_example_server_1(Config) ->
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
-                   ?assertMatch([{pair, _, _}],
+                   ?assertMatch([{pair, _, _}, {pair, _, _}],
                                 ?find_pairs(
                                    #{ ?snk_kind := debug
                                     , event := handoff_stream
@@ -2033,7 +2027,7 @@ tc_multi_streams_example_server_1(Config) ->
                                     , stream := _STREAM0
                                     },
                                    Trace)),
-                   ?assertMatch([{pair, _, _}],
+                   ?assertMatch([{pair, _, _}, {pair, _, _}],
                                 ?find_pairs( #{ ?snk_kind := debug
                                               , event := handoff_stream
                                               , module := quicer
