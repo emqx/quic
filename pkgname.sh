@@ -29,10 +29,12 @@ esac
 ARCH="$(uname -m)"
 VSN="$(git describe --tags --exact-match | head -1)"
 
+OPENSSL=${QUIC_TLS:-openssl}
+
 if [ -z "$VSN" ]; then
     exit 0
 fi
 
 OTP="$(erl -noshell -eval 'io:format(erlang:system_info(otp_release)).' -s init stop)"
 
-echo "libquicer-${VSN}-otp${OTP}-${SYSTEM}-${ARCH}.gz"
+echo "libquicer-${VSN}-otp${OTP}-${OPENSSL}-${SYSTEM}-${ARCH}.gz"
