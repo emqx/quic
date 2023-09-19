@@ -13,12 +13,16 @@ jobs:
       matrix:
         otp:
           - 25.3.2-1
+        openssl:
+          - openssl3
+          - openssl
         os:
           - macos-12
           - macos-11
           - macos-12-arm64
     runs-on: ${{ matrix.os }}
     steps:
+
       - uses: emqx/setup-otp@v1.0.0
         with:
           os: ${{ matrix.os }}
@@ -30,7 +34,10 @@ jobs:
 
       - name: build release
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          QUIC_TLS: ${{ matrix.openssl }}
         run: |
+          export QUIC_TLS
           BUILD_RELEASE=1 make
 
       - uses: actions/upload-artifact@v3
