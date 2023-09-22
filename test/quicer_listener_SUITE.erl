@@ -466,10 +466,39 @@ tc_listener_stopped_when_owner_die(Config) ->
   %% Then the new listener can be closed
   ok = quicer:close_listener(L1).
 
+tc_verify_none_butwith_cacert(Config)->
+  Port = select_port(),
+  %% When Listener is configured with CA certfile but verify_none
+  LConfig = default_listener_opts(Config, verify_none),
+  ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
+                   , {stream_acceptors, 32}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, quicer_echo_server_stream_callback}
+               | default_stream_opts() ],
+  Options = {LConfig, ConnectionOpts, StreamOpts},
+  {ok, _QuicApp} = quicer:spawn_listener(?FUNCTION_NAME, Port, Options),
+
+  %% Then the connection should succeed
+  {ok, Conn} =
+    quicer:connect("localhost", Port,
+                   [ {verify, verify_none}
+                   , {peer_unidi_stream_count, 3}
+                   , {alpn, ["sample"]} | Config], 5000),
+  quicer:close_connection(Conn),
+  quicer:terminate_listener(?FUNCTION_NAME),
+  ok.
+
 select_port() ->
   Port = select_free_port(quic),
   timer:sleep(100),
   Port.
+
+default_listener_opts(Config, Verify) ->
+  DataDir = ?config(data_dir, Config),
+  [ {cacertfile, filename:join(DataDir, "ca.pem")}
+  , {conn_acceptors, 4}
+  , {verify, Verify} |
+    tl(default_listen_opts(Config)) ].
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
