@@ -92,7 +92,7 @@
                             cb_state()) -> cb_ret().
 %% Handle Stream Available, reflect number of streams flow control at peer.
 
--callback peer_needs_streams(connection_handle(), undefined, cb_state()) -> cb_ret().
+-callback peer_needs_streams(connection_handle(), unidi_streams | bidi_streams, cb_state()) -> cb_ret().
 %% Handle Peer needs streams that peer could not start new stream due to local flow control.
 
 -callback resumed(connection_handle(), SessionData:: binary() | false, cb_state()) -> cb_ret().
