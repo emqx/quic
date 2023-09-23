@@ -471,6 +471,9 @@ run_tc_conn_client_bad_cert(Config)->
         {error, stm_open_error, aborted} ->
           %% Depending on the timing, connection open could fail already.
           ok;
+        {error, stm_start_error, aborted} ->
+          %% Depending on the timing, connection open could fail already.
+          ok;
         {ok, Stm} ->
           case quicer:send(Stm, <<"ping">>) of
             {ok, 4} -> ok;
