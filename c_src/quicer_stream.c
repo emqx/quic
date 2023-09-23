@@ -676,6 +676,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   assert(bin->data != NULL);
   send_ctx->Buffer.Buffer = (uint8_t *)bin->data;
   send_ctx->Buffer.Length = (uint32_t)bin->size;
+  uint32_t bin_size = (uint32_t)bin->size;
 
   QUIC_STATUS Status;
   // note, SendBuffer as sendcontext, free the buffer while message is sent
@@ -689,7 +690,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   else
     {
-      res = SUCCESS(ETERM_UINT_64(bin->size));
+      res = SUCCESS(ETERM_UINT_64(bin_size));
       goto Exit;
     }
 ErrorExit:

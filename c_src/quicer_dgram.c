@@ -82,6 +82,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   //
 
   assert(bin->data != NULL);
+  uint32_t bin_size = (uint32_t)bin->size;
   dgram_send_ctx->Buffer.Buffer = (uint8_t *)bin->data;
   dgram_send_ctx->Buffer.Length = (uint32_t)bin->size;
 
@@ -99,7 +100,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   else
     {
       enif_mutex_unlock(c_ctx->lock);
-      return SUCCESS(ETERM_UINT_64(bin->size));
+      return SUCCESS(ETERM_UINT_64(bin_size));
     }
 }
 
