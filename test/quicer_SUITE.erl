@@ -33,7 +33,7 @@
          end_per_testcase/2]).
 
 %% test cases
--export([ tc_nif_module_load/1
+-export([tc_nif_module_load/1
         , tc_nif_module_unload/1
         , tc_nif_module_reload/1
         , tc_open_lib_test/1
@@ -271,11 +271,16 @@ tc_close_lib_test(_Config) ->
 tc_lib_registration_neg(_Config) ->
   ok = quicer:close_lib(),
   {error, badarg} = quicer:reg_open(),
-  ok = quicer:reg_close().
+  {error, badarg} = quicer:reg_close().
 
 tc_lib_registration(_Config) ->
   quicer:open_lib(),
-  ok = quicer:reg_open(),
+  case quicer:reg_open() of
+    {error, badarg} ->
+      quicer:reg_close();
+    ok ->
+      ok
+  end,
   ok = quicer:reg_close().
 
 tc_lib_registration_1(_Config) ->
@@ -306,7 +311,7 @@ tc_open_listener_inval_reg(Config) ->
   Port = select_port(),
   ok = quicer:reg_close(),
   ok = quicer:close_lib(),
-  {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
+  {error, quic_registration} = quicer:listen(Port, default_listen_opts(Config)),
   quicer:open_lib(),
   quicer:reg_open(),
   ok.

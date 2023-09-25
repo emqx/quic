@@ -22,6 +22,8 @@ limitations under the License.
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 
+extern QuicerRegistrationCTX *G_r_ctx;
+
 BOOLEAN parse_registration(ErlNifEnv *env,
                            ERL_NIF_TERM options,
                            QuicerRegistrationCTX **r_ctx);
@@ -325,7 +327,15 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       // quic_registration is not set, use global registration
       // msquic should reject if global registration is NULL (closed)
-      Registration = GRegistration;
+      if (G_r_ctx)
+        {
+          Registration = G_r_ctx->Registration;
+        }
+      else
+        {
+          ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+          goto exit;
+        }
     }
 
   // Now load server config

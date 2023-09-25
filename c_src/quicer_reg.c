@@ -16,41 +16,34 @@ limitations under the License.
 #include "quicer_reg.h"
 #include "quicer_nif.h"
 
-ERL_NIF_TERM
-new_registration2(ErlNifEnv *env,
-                  __unused_parm__ int argc,
-                  const ERL_NIF_TERM argv[])
-{
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
-  ERL_NIF_TERM ename = argv[0];
-  QUIC_REGISTRATION_CONFIG RegConfig
-      = { NULL, QUIC_EXECUTION_PROFILE_LOW_LATENCY };
+static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
+                              QUIC_REGISTRATION_CONFIG *RegConfig);
 
-  TP_NIF_3(start, 0, status);
-  if (argc == 2)
+extern BOOLEAN isLibOpened;
+QuicerRegistrationCTX *G_r_ctx = NULL;
+
+/*
+** For global registration only
+*/
+ERL_NIF_TERM
+registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  ERL_NIF_TERM eprofile = ATOM_UNDEFINED;
+  QUIC_REGISTRATION_CONFIG RegConfig
+      = { "global", QUIC_EXECUTION_PROFILE_LOW_LATENCY };
+  QUIC_STATUS status;
+  ERL_NIF_TERM res = ATOM_OK;
+
+  // if (!isLibOpened || G_r_ctx)
+  if (!isLibOpened || G_r_ctx)
     {
-      ERL_NIF_TERM eprofile = argv[1];
-      if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY))
-        {
-          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
-        }
-      else if (IS_SAME_TERM(eprofile,
-                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
-        {
-          RegConfig.ExecutionProfile
-              = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
-        }
-      else if (IS_SAME_TERM(eprofile,
-                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
-        {
-          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
-        }
-      else if (IS_SAME_TERM(eprofile,
-                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
-        {
-          RegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
-        }
-      else
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (argc == 1)
+    {
+      eprofile = argv[0];
+      if (!parse_reg_conf(eprofile, &RegConfig))
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
@@ -59,29 +52,97 @@ new_registration2(ErlNifEnv *env,
   QuicerRegistrationCTX *r_ctx = init_r_ctx();
   if (!r_ctx)
     {
-      ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  if (0 >= enif_get_string(
-          env, ename, r_ctx->name, UINT8_MAX + 1, ERL_NIF_LATIN1))
-    {
-      deinit_r_ctx(r_ctx);
-      destroy_r_ctx(r_ctx);
-      ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  // Open Registration
   if (QUIC_FAILED(
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
     {
-      // unlikely
-      TP_NIF_3(fail, 0, status);
-      deinit_r_ctx(r_ctx);
-      destroy_r_ctx(r_ctx);
-      return ERROR_TUPLE_2(ATOM_STATUS(status));
+      res = ERROR_TUPLE_2(ATOM_STATUS(status));
+      goto exit;
     }
-  TP_NIF_3(success, 0, status);
+
+  // Keep global registration context
+  // enif_keep_resource(r_ctx);
+  G_r_ctx = r_ctx;
+  return ATOM_OK;
+
+exit:
+  deinit_r_ctx(r_ctx);
+  destroy_r_ctx(r_ctx);
+  return res;
+}
+
+/*
+** For global registration only
+*/
+ERL_NIF_TERM
+deregistration(__unused_parm__ ErlNifEnv *env,
+               __unused_parm__ int argc,
+               __unused_parm__ const ERL_NIF_TERM argv[])
+{
+  int error_code = 0;
+  if (!isLibOpened)
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (G_r_ctx)
+    {
+      MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
+      G_r_ctx->Registration = NULL;
+      destroy_r_ctx(G_r_ctx);
+      G_r_ctx = NULL;
+    }
+
+  return ATOM_OK;
+}
+
+ERL_NIF_TERM
+new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+
+  ERL_NIF_TERM ename = argv[0];
+  ERL_NIF_TERM eprofile = argv[1];
+  QUIC_REGISTRATION_CONFIG RegConfig
+      = { NULL, QUIC_EXECUTION_PROFILE_LOW_LATENCY };
+
+  QUIC_STATUS status;
+  ERL_NIF_TERM res = ATOM_OK;
+
+  if (!parse_reg_conf(eprofile, &RegConfig))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  QuicerRegistrationCTX *r_ctx = init_r_ctx();
+  if (!r_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
+  if (argc == 2
+      && 0 >= enif_get_string(
+             env, ename, r_ctx->name, UINT8_MAX + 1, ERL_NIF_LATIN1))
+    {
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto exit;
+    }
+
+  RegConfig.AppName = r_ctx->name;
+  if (QUIC_FAILED(
+          status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
+    {
+      res = ERROR_TUPLE_2(ATOM_STATUS(status));
+      goto exit;
+    }
+
   return SUCCESS(enif_make_resource(env, r_ctx));
+
+exit:
+  deinit_r_ctx(r_ctx);
+  destroy_r_ctx(r_ctx);
+  return res;
 }
 
 ERL_NIF_TERM
@@ -141,4 +202,31 @@ get_registration_name1(ErlNifEnv *env,
     }
 
   return SUCCESS(enif_make_string(env, r_ctx->name, ERL_NIF_LATIN1));
+}
+
+BOOLEAN
+parse_reg_conf(ERL_NIF_TERM eprofile, QUIC_REGISTRATION_CONFIG *RegConfig)
+{
+  if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY))
+    {
+      RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
+    }
+  else if (IS_SAME_TERM(eprofile,
+                        ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
+    {
+      RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
+    }
+  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
+    {
+      RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
+    }
+  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
+    {
+      RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+    }
+  else
+    {
+      return FALSE;
+    }
+  return TRUE;
 }

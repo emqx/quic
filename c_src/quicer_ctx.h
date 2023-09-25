@@ -36,6 +36,8 @@ typedef struct QuicerRegistrationCTX
   HQUIC Registration;
   BOOLEAN is_released;
   char name[UINT8_MAX + 1];
+  CXPLAT_LIST_ENTRY Listeners;
+  CXPLAT_LIST_ENTRY Connections;
 } QuicerRegistrationCTX;
 
 /*

@@ -18,6 +18,12 @@ limitations under the License.
 #include <erl_nif.h>
 
 ERL_NIF_TERM
+registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
+deregistration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
 new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
