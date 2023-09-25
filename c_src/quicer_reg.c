@@ -19,7 +19,6 @@ limitations under the License.
 static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
-extern BOOLEAN isLibOpened;
 QuicerRegistrationCTX *G_r_ctx = NULL;
 
 /*
@@ -34,8 +33,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS status;
   ERL_NIF_TERM res = ATOM_OK;
 
-  // if (!isLibOpened || G_r_ctx)
-  if (!isLibOpened || G_r_ctx)
+  if (!MsQuic || G_r_ctx)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -82,7 +80,7 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   int error_code = 0;
-  if (!isLibOpened)
+  if (!MsQuic)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -90,7 +88,6 @@ deregistration(__unused_parm__ ErlNifEnv *env,
   if (G_r_ctx)
     {
       MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
-      G_r_ctx->Registration = NULL;
       destroy_r_ctx(G_r_ctx);
       G_r_ctx = NULL;
     }

@@ -771,9 +771,8 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
 extern QuicerRegistrationCTX *G_r_ctx;
 
 const QUIC_API_TABLE *MsQuic = NULL;
-
-// @todo, these flags are not threads safe, wrap it in a context
-BOOLEAN isLibOpened = FALSE;
+// Mutex for MsQuic
+ErlNifMutex *MsQuicLock = NULL;
 
 ErlNifResourceType *ctx_reg_t = NULL;
 ErlNifResourceType *ctx_listener_t = NULL;
@@ -967,6 +966,11 @@ on_load(ErlNifEnv *env,
 {
   int ret_val = 0;
 
+  if (!MsQuicLock)
+  {
+    MsQuicLock = enif_mutex_create("msquic_lock");
+  }
+
 // init atoms in use.
 #define ATOM(name, val)                                                       \
   {                                                                           \
@@ -1054,11 +1058,13 @@ on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
       MsQuic->RegistrationClose(G_r_ctx->Registration);
       G_r_ctx = NULL;
     }
-  if (isLibOpened)
+  if (MsQuic)
     {
       MsQuicClose(MsQuic);
-      isLibOpened = FALSE;
+      MsQuic = NULL;
     }
+  // @TODO memleak here
+  //enif_mutex_destroy(MsQuicLock);
 }
 
 static ERL_NIF_TERM
@@ -1070,11 +1076,16 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM res = ATOM_FALSE;
   ERL_NIF_TERM lttngLib = argv[0];
   char lttngPath[PATH_MAX] = { 0 };
-
-  if (isLibOpened)
+  if (MsQuicLock == NULL)
+    {
+      return ATOM_OK;
+    }
+  enif_mutex_lock(MsQuicLock);
+  if (MsQuic)
     {
       TP_NIF_3(skip, 0, 2);
-      return SUCCESS(res);
+      res =  SUCCESS(res);
+      goto exit;
     }
 
   // @todo external call for static link
@@ -1086,25 +1097,27 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   //
   if (QUIC_FAILED(status = MsQuicOpen2(&MsQuic)))
     {
-      isLibOpened = FALSE;
-      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
+      MsQuic = NULL;
+      res = ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
+      goto exit;
     }
 
-  isLibOpened = TRUE;
   TP_NIF_3(success, 0, 2);
 
-  res = ATOM_TRUE;
+  res = SUCCESS(ATOM_TRUE);
 
   if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
     {
       // loading lttng lib is optional, ok to fail
       if (dlopen(lttngPath, (unsigned)RTLD_NOW | (unsigned)RTLD_GLOBAL))
         {
-          res = ATOM_DEBUG;
+          res = SUCCESS(ATOM_DEBUG);
         }
     }
 
-  return SUCCESS(res);
+exit:
+  enif_mutex_unlock(MsQuicLock);
+  return res;
 }
 
 static ERL_NIF_TERM
@@ -1112,15 +1125,22 @@ closeLib(__unused_parm__ ErlNifEnv *env,
          __unused_parm__ int argc,
          __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  if (isLibOpened && MsQuic)
+  if (MsQuicLock == NULL)
     {
-      // @todo ensure registration is closed first
-      //
-      TP_NIF_3(do_close, 0, isLibOpened);
-      MsQuicClose(MsQuic);
-      isLibOpened = false;
+      return ATOM_OK;
     }
-
+  enif_mutex_lock(MsQuicLock);
+  if (MsQuic)
+    {
+      TP_NIF_3(do_close, MsQuic, 0);
+      if (G_r_ctx)
+        {
+          deregistration(env, argc, argv);
+        }
+      MsQuicClose(MsQuic);
+      MsQuic = NULL;
+    }
+  enif_mutex_unlock(MsQuicLock);
   return ATOM_OK;
 }
 

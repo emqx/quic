@@ -260,8 +260,8 @@ tc_open_lib_test(_Config) ->
   {ok, false} = quicer:open_lib().
 
 tc_close_lib_test(_Config) ->
+  ok = quicer:reg_close(),
   {ok, false} = quicer:open_lib(),
-  %% @todo  close reg before close lib
   ok = quicer:reg_close(),
   ok = quicer:close_lib(),
   ok = quicer:close_lib(),
@@ -310,7 +310,6 @@ tc_lib_re_registration(_Config) ->
 tc_open_listener_inval_reg(Config) ->
   Port = select_port(),
   ok = quicer:reg_close(),
-  ok = quicer:close_lib(),
   {error, quic_registration} = quicer:listen(Port, default_listen_opts(Config)),
   quicer:open_lib(),
   quicer:reg_open(),
