@@ -26,7 +26,8 @@ BOOLEAN
 parse_verify_options(ErlNifEnv *env,
                      ERL_NIF_TERM options,
                      QUIC_CREDENTIAL_CONFIG *CredConfig,
-                     BOOLEAN is_server);
+                     BOOLEAN is_server,
+                     _Out_ BOOLEAN *is_verify);
 
 BOOLEAN
 parse_cacertfile_option(ErlNifEnv *env,

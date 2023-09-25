@@ -88,15 +88,22 @@ parse_cert_options(ErlNifEnv *env,
 /*
  * Parse verify option for listener (server)
  *  verify : boolean() | undefined
+ *  output *is_verify if is_verify is not NULL
  */
 BOOLEAN
 parse_verify_options(ErlNifEnv *env,
                      ERL_NIF_TERM options,
                      QUIC_CREDENTIAL_CONFIG *CredConfig,
-                     BOOLEAN is_server)
+                     BOOLEAN is_server,
+                     _Out_ BOOLEAN *is_verify)
 {
 
   BOOLEAN verify = load_verify(env, &options, FALSE);
+
+  if (is_verify)
+    {
+      *is_verify = verify;
+    }
 
   if (!verify)
     {

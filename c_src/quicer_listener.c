@@ -265,7 +265,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_QUIC_TLS);
     }
 
-  if (!parse_verify_options(env, options, &CredConfig, TRUE))
+  BOOLEAN is_verify = FALSE;
+  if (!parse_verify_options(env, options, &CredConfig, TRUE, &is_verify))
     {
       return ERROR_TUPLE_2(ATOM_VERIFY);
     }
@@ -284,7 +285,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  if (cacertfile)
+  if (is_verify && cacertfile)
     {
       l_ctx->cacertfile = cacertfile;
       // We do our own certificate verification against the certificates

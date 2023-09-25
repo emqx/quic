@@ -306,7 +306,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   parse_cert_options(env, *options, &CredConfig);
 
   // If Verify Peer...
-  if (!parse_verify_options(env, *options, &CredConfig, FALSE))
+  if (!parse_verify_options(env, *options, &CredConfig, FALSE, NULL))
     {
       return ERROR_TUPLE_2(ATOM_VERIFY);
     }

@@ -23,8 +23,10 @@ limitations under the License.
 #include <openssl/x509.h>
 #include <unistd.h>
 
+#ifdef DEBUG
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
+#endif
 
 extern inline const char *QuicStatusToString(QUIC_STATUS Status);
 
