@@ -18,6 +18,7 @@ limitations under the License.
 
 // alloc/dealloc ctx should be done in the callbacks.
 extern QuicerRegistrationCTX *G_r_ctx;
+
 QuicerRegistrationCTX *
 init_r_ctx()
 {
@@ -31,8 +32,6 @@ init_r_ctx()
   r_ctx->env = enif_alloc_env();
   r_ctx->Registration = NULL;
   r_ctx->is_released = FALSE;
-  CxPlatListInitializeHead(&r_ctx->Listeners);
-  CxPlatListInitializeHead(&r_ctx->Connections);
   return r_ctx;
 }
 

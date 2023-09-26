@@ -513,7 +513,7 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         }
       else
         {
-          return ERROR_TUPLE_2(ATOM_REG_FAILED);
+          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
         }
       r_ctx = NULL;
     }

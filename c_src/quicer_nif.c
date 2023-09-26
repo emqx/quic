@@ -33,6 +33,9 @@ static ERL_NIF_TERM stream_controlling_process(ErlNifEnv *env,
                                                const ErlNifPid *caller,
                                                const ERL_NIF_TERM *pid);
 
+static ERL_NIF_TERM
+closeLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 /*
 ** atoms in use, initialized while load nif
 */
@@ -54,6 +57,7 @@ ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
 ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
 ERL_NIF_TERM ATOM_BADARG;
+ERL_NIF_TERM ATOM_LIB_UNINITIALIZED;
 ERL_NIF_TERM ATOM_CONN_OPEN_ERROR;
 ERL_NIF_TERM ATOM_CONN_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_OPEN_ERROR;
@@ -430,6 +434,7 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
   ATOM(ATOM_LISTENER_START_ERROR, listener_start_error);                      \
   ATOM(ATOM_BADARG, badarg);                                                  \
+  ATOM(ATOM_LIB_UNINITIALIZED, lib_uninitialized);                            \
   ATOM(ATOM_CONN_OPEN_ERROR, conn_open_error);                                \
   ATOM(ATOM_CONN_START_ERROR, conn_start_error);                              \
   ATOM(ATOM_STREAM_OPEN_ERROR, stm_open_error);                               \
@@ -769,6 +774,7 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_UNDEFINED, undefined);
 
 extern QuicerRegistrationCTX *G_r_ctx;
+extern ErlNifMutex *GRegLock;
 
 const QUIC_API_TABLE *MsQuic = NULL;
 // Mutex for MsQuic
@@ -948,7 +954,7 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerRegistrationCTX *reg_ctx = (QuicerRegistrationCTX *)obj;
   deinit_r_ctx(reg_ctx);
-  if (reg_ctx->Registration)
+  if (MsQuic && reg_ctx->Registration)
     {
       MsQuic->RegistrationClose(reg_ctx->Registration);
     }
@@ -966,10 +972,16 @@ on_load(ErlNifEnv *env,
 {
   int ret_val = 0;
 
+  // Library initialization, library scope
   if (!MsQuicLock)
-  {
-    MsQuicLock = enif_mutex_create("msquic_lock");
-  }
+    {
+      MsQuicLock = enif_mutex_create("msquic_lock");
+    }
+
+  if (!GRegLock)
+    {
+      GRegLock = enif_mutex_create("global_reg_lock");
+    }
 
 // init atoms in use.
 #define ATOM(name, val)                                                       \
@@ -1052,19 +1064,10 @@ on_upgrade(ErlNifEnv *env,
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
-  if (G_r_ctx)
-    {
-      // @TODO memleak here
-      MsQuic->RegistrationClose(G_r_ctx->Registration);
-      G_r_ctx = NULL;
-    }
-  if (MsQuic)
-    {
-      MsQuicClose(MsQuic);
-      MsQuic = NULL;
-    }
-  // @TODO memleak here
-  //enif_mutex_destroy(MsQuicLock);
+  closeLib(env, 0, NULL);
+  // @TODO reserved for upgrade
+  // enif_mutex_destroy(GRegLock);
+  // enif_mutex_destroy(MsQuicLock);
 }
 
 static ERL_NIF_TERM
@@ -1078,19 +1081,16 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   char lttngPath[PATH_MAX] = { 0 };
   if (MsQuicLock == NULL)
     {
-      return ATOM_OK;
+      return ERROR_TUPLE_2(ATOM_LIB_UNINITIALIZED);
     }
   enif_mutex_lock(MsQuicLock);
   if (MsQuic)
     {
+      // already opened
       TP_NIF_3(skip, 0, 2);
-      res =  SUCCESS(res);
+      res = SUCCESS(res);
       goto exit;
     }
-
-  // @todo external call for static link
-  CxPlatSystemLoad();
-  MsQuicLibraryLoad();
 
   //
   // Open a handle to the library and get the API function table.
@@ -1127,19 +1127,31 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 {
   if (MsQuicLock == NULL)
     {
-      return ATOM_OK;
+      return ERROR_TUPLE_2(ATOM_LIB_UNINITIALIZED);
     }
   enif_mutex_lock(MsQuicLock);
   if (MsQuic)
     {
       TP_NIF_3(do_close, MsQuic, 0);
-      if (G_r_ctx)
+
+      enif_mutex_lock(GRegLock);
+      // end of the world
+      if (G_r_ctx && !G_r_ctx->is_released)
         {
-          deregistration(env, argc, argv);
+          // Make MsQuic debug check pass:
+          //   Zero Registration when closing MsQuic
+          MsQuic->RegistrationClose(G_r_ctx->Registration);
+          G_r_ctx->Registration = NULL;
+          G_r_ctx->is_released = TRUE;
+          destroy_r_ctx(G_r_ctx);
+          G_r_ctx = NULL;
         }
+      enif_mutex_unlock(GRegLock);
+
       MsQuicClose(MsQuic);
       MsQuic = NULL;
     }
+
   enif_mutex_unlock(MsQuicLock);
   return ATOM_OK;
 }

@@ -20,6 +20,7 @@ static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
 QuicerRegistrationCTX *G_r_ctx = NULL;
+ErlNifMutex *GRegLock = NULL;
 
 /*
 ** For global registration only
@@ -33,16 +34,18 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS status;
   ERL_NIF_TERM res = ATOM_OK;
 
-  if (!MsQuic || G_r_ctx)
+  if (!MsQuic || !GRegLock || G_r_ctx)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  enif_mutex_lock(GRegLock);
   if (argc == 1)
     {
       eprofile = argv[0];
       if (!parse_reg_conf(eprofile, &RegConfig))
         {
+          enif_mutex_unlock(GRegLock);
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
     }
@@ -50,6 +53,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QuicerRegistrationCTX *r_ctx = init_r_ctx();
   if (!r_ctx)
     {
+      enif_mutex_unlock(GRegLock);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -60,14 +64,16 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
-  // Keep global registration context
-  // enif_keep_resource(r_ctx);
   G_r_ctx = r_ctx;
+  enif_mutex_unlock(GRegLock);
+
+  // nif owns the global registration
+  // thus not return to the erlang side
   return ATOM_OK;
 
 exit:
-  deinit_r_ctx(r_ctx);
   destroy_r_ctx(r_ctx);
+  enif_mutex_unlock(GRegLock);
   return res;
 }
 
@@ -80,18 +86,19 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   int error_code = 0;
-  if (!MsQuic)
+  if (!MsQuic || !GRegLock)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (G_r_ctx)
+  enif_mutex_lock(GRegLock);
+  if (G_r_ctx && !G_r_ctx->is_released)
     {
       MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
       destroy_r_ctx(G_r_ctx);
       G_r_ctx = NULL;
     }
-
+  enif_mutex_unlock(GRegLock);
   return ATOM_OK;
 }
 
@@ -137,7 +144,6 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   return SUCCESS(enif_make_resource(env, r_ctx));
 
 exit:
-  deinit_r_ctx(r_ctx);
   destroy_r_ctx(r_ctx);
   return res;
 }
