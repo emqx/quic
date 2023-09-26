@@ -774,7 +774,7 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_UNDEFINED, undefined);
 
 extern QuicerRegistrationCTX *G_r_ctx;
-extern ErlNifMutex *GRegLock;
+extern pthread_mutex_t GRegLock;
 
 const QUIC_API_TABLE *MsQuic = NULL;
 // Mutex for MsQuic
@@ -978,11 +978,6 @@ on_load(ErlNifEnv *env,
       MsQuicLock = enif_mutex_create("msquic_lock");
     }
 
-  if (!GRegLock)
-    {
-      GRegLock = enif_mutex_create("global_reg_lock");
-    }
-
 // init atoms in use.
 #define ATOM(name, val)                                                       \
   {                                                                           \
@@ -1134,7 +1129,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
     {
       TP_NIF_3(do_close, MsQuic, 0);
 
-      enif_mutex_lock(GRegLock);
+      pthread_mutex_lock(&GRegLock);
       // end of the world
       if (G_r_ctx && !G_r_ctx->is_released)
         {
@@ -1146,7 +1141,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
           destroy_r_ctx(G_r_ctx);
           G_r_ctx = NULL;
         }
-      enif_mutex_unlock(GRegLock);
+      pthread_mutex_unlock(&GRegLock);
 
       MsQuicClose(MsQuic);
       MsQuic = NULL;

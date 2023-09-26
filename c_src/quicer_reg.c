@@ -20,7 +20,7 @@ static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
 QuicerRegistrationCTX *G_r_ctx = NULL;
-ErlNifMutex *GRegLock = NULL;
+pthread_mutex_t GRegLock = PTHREAD_MUTEX_INITIALIZER;
 
 /*
 ** For global registration only
@@ -34,18 +34,19 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS status;
   ERL_NIF_TERM res = ATOM_OK;
 
-  if (!MsQuic || !GRegLock || G_r_ctx)
+  if (!MsQuic || G_r_ctx)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(GRegLock);
+  pthread_mutex_lock(&GRegLock);
+
   if (argc == 1)
     {
       eprofile = argv[0];
       if (!parse_reg_conf(eprofile, &RegConfig))
         {
-          enif_mutex_unlock(GRegLock);
+          pthread_mutex_unlock(&GRegLock);
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
     }
@@ -53,7 +54,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QuicerRegistrationCTX *r_ctx = init_r_ctx();
   if (!r_ctx)
     {
-      enif_mutex_unlock(GRegLock);
+      pthread_mutex_unlock(&GRegLock);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -65,7 +66,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   G_r_ctx = r_ctx;
-  enif_mutex_unlock(GRegLock);
+  pthread_mutex_unlock(&GRegLock);
 
   // nif owns the global registration
   // thus not return to the erlang side
@@ -73,7 +74,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 exit:
   destroy_r_ctx(r_ctx);
-  enif_mutex_unlock(GRegLock);
+  pthread_mutex_unlock(&GRegLock);
   return res;
 }
 
@@ -86,19 +87,19 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
   int error_code = 0;
-  if (!MsQuic || !GRegLock)
+  if (!MsQuic)
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(GRegLock);
+  pthread_mutex_lock(&GRegLock);
   if (G_r_ctx && !G_r_ctx->is_released)
     {
       MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
       destroy_r_ctx(G_r_ctx);
       G_r_ctx = NULL;
     }
-  enif_mutex_unlock(GRegLock);
+  pthread_mutex_unlock(&GRegLock);
   return ATOM_OK;
 }
 
