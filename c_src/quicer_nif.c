@@ -778,7 +778,7 @@ extern pthread_mutex_t GRegLock;
 
 const QUIC_API_TABLE *MsQuic = NULL;
 // Mutex for MsQuic
-ErlNifMutex *MsQuicLock = NULL;
+pthread_mutex_t MsQuicLock = PTHREAD_MUTEX_INITIALIZER;
 
 ErlNifResourceType *ctx_reg_t = NULL;
 ErlNifResourceType *ctx_listener_t = NULL;
@@ -972,12 +972,6 @@ on_load(ErlNifEnv *env,
 {
   int ret_val = 0;
 
-  // Library initialization, library scope
-  if (!MsQuicLock)
-    {
-      MsQuicLock = enif_mutex_create("msquic_lock");
-    }
-
 // init atoms in use.
 #define ATOM(name, val)                                                       \
   {                                                                           \
@@ -1060,9 +1054,6 @@ static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
   closeLib(env, 0, NULL);
-  // @TODO reserved for upgrade
-  // enif_mutex_destroy(GRegLock);
-  // enif_mutex_destroy(MsQuicLock);
 }
 
 static ERL_NIF_TERM
@@ -1074,11 +1065,8 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM res = ATOM_FALSE;
   ERL_NIF_TERM lttngLib = argv[0];
   char lttngPath[PATH_MAX] = { 0 };
-  if (MsQuicLock == NULL)
-    {
-      return ERROR_TUPLE_2(ATOM_LIB_UNINITIALIZED);
-    }
-  enif_mutex_lock(MsQuicLock);
+
+  pthread_mutex_lock(&MsQuicLock);
   if (MsQuic)
     {
       // already opened
@@ -1111,7 +1099,7 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
 exit:
-  enif_mutex_unlock(MsQuicLock);
+  pthread_mutex_unlock(&MsQuicLock);
   return res;
 }
 
@@ -1120,11 +1108,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
          __unused_parm__ int argc,
          __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  if (MsQuicLock == NULL)
-    {
-      return ERROR_TUPLE_2(ATOM_LIB_UNINITIALIZED);
-    }
-  enif_mutex_lock(MsQuicLock);
+  pthread_mutex_lock(&MsQuicLock);
   if (MsQuic)
     {
       TP_NIF_3(do_close, MsQuic, 0);
@@ -1147,7 +1131,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
       MsQuic = NULL;
     }
 
-  enif_mutex_unlock(MsQuicLock);
+  pthread_mutex_unlock(&MsQuicLock);
   return ATOM_OK;
 }
 
