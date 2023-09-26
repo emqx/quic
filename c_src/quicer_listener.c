@@ -276,6 +276,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (!parse_cacertfile_option(env, options, &cacertfile))
     {
       // TLS opt error not file content error
+      free(cacertfile);
       return ERROR_TUPLE_2(ATOM_CACERTFILE);
     }
 
@@ -284,6 +285,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!l_ctx)
     {
+      free(cacertfile);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -410,6 +412,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   return OK_TUPLE_2(listenHandle);
 
 exit: // errors..
+  free(cacertfile);
   free_certificate(&CredConfig);
   destroy_l_ctx(l_ctx);
   return ret;
