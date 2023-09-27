@@ -103,7 +103,9 @@ init_per_testcase(_TestCase, Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
-end_per_testcase(_TestCase, _Config) ->
+end_per_testcase(_TestCase, Config) ->
+  RegH = proplists:get_value(quic_registration, Config, global),
+  [quicer:close_listener(L, 1000) || L <- quicer:get_listeners(RegH)],
   ok.
 
 %%--------------------------------------------------------------------
@@ -487,6 +489,14 @@ tc_verify_none_butwith_cacert(Config)->
   quicer:close_connection(Conn),
   quicer:terminate_listener(?FUNCTION_NAME),
   ok.
+
+tc_get_listeners_from_reg(Config) ->
+  Port = select_port(),
+  RegH = proplists:get_value(quic_registration, Config, global),
+  {ok, L1} = quicer:listen(Port, default_listen_opts(Config)),
+  Port2 = select_port(),
+  {ok, L2} = quicer:listen(Port2, default_listen_opts(Config)),
+  ?assertEqual([L2, L1], quicer:get_listeners(RegH)).
 
 select_port() ->
   Port = select_free_port(quic),

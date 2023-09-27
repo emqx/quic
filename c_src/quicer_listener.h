@@ -35,4 +35,7 @@ stop_listener1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM
 close_listener1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
+ERL_NIF_TERM
+get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 #endif // __QUICER_LISTENER_H_

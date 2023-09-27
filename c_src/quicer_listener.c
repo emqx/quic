@@ -571,3 +571,34 @@ exit:
 
   return ret;
 }
+
+ERL_NIF_TERM
+get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  if (argc == 0)
+    {
+      r_ctx = G_r_ctx;
+    }
+  else
+    {
+      if (!enif_get_resource(env, argv[0], ctx_reg_t, (void **)&r_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  ERL_NIF_TERM res = enif_make_list(env, 0);
+
+  enif_mutex_lock(r_ctx->lock);
+  CXPLAT_LIST_ENTRY *Entry = r_ctx->Listeners.Flink;
+  while (Entry != &r_ctx->Listeners)
+    {
+      QuicerListenerCTX *l_ctx = CXPLAT_CONTAINING_RECORD(
+          Entry, QuicerListenerCTX, RegistrationLink);
+      res = enif_make_list_cell(env, enif_make_resource(env, l_ctx), res);
+      Entry = Entry->Flink;
+    }
+  enif_mutex_unlock(r_ctx->lock);
+
+  return res;
+}
