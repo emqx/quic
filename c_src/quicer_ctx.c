@@ -32,6 +32,9 @@ init_r_ctx()
   r_ctx->env = enif_alloc_env();
   r_ctx->Registration = NULL;
   r_ctx->is_released = FALSE;
+  r_ctx->lock = enif_mutex_create("quicer:r_ctx");
+  CxPlatListInitializeHead(&r_ctx->Listeners);
+  CxPlatListInitializeHead(&r_ctx->Connections);
   return r_ctx;
 }
 
@@ -39,6 +42,7 @@ void
 deinit_r_ctx(QuicerRegistrationCTX *r_ctx)
 {
   enif_free_env(r_ctx->env);
+  enif_mutex_destroy(r_ctx->lock);
 }
 
 void
@@ -67,6 +71,7 @@ init_l_ctx()
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   l_ctx->r_ctx = NULL;
+  CxPlatListInitializeHead(&l_ctx->RegistrationLink);
   return l_ctx;
 }
 
@@ -93,6 +98,23 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
 void
 destroy_l_ctx(QuicerListenerCTX *l_ctx)
 {
+  QuicerRegistrationCTX *r_ctx;
+  if (l_ctx->r_ctx)
+    {
+      r_ctx = l_ctx->r_ctx;
+    }
+  else
+    {
+      r_ctx = G_r_ctx;
+    }
+
+  if (r_ctx)
+    {
+      enif_mutex_lock(r_ctx->lock);
+      CxPlatListEntryRemove(&l_ctx->RegistrationLink);
+      enif_mutex_unlock(r_ctx->lock);
+    }
+
   // @note, Destroy config asap as it holds rundown
   // ref count in registration
   destroy_config_ctx(l_ctx->config_resource);

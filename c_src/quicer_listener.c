@@ -245,6 +245,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   HQUIC Registration = NULL;
   char *cacertfile = NULL;
 
+  QuicerRegistrationCTX *target_r_ctx = NULL;
+
   if (!enif_is_map(env, options))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -324,9 +326,12 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       // quic_registration is set
       enif_keep_resource(l_ctx->r_ctx);
       Registration = l_ctx->r_ctx->Registration;
+      target_r_ctx = l_ctx->r_ctx;
     }
   else
     {
+      target_r_ctx = G_r_ctx;
+
       // quic_registration is not set, use global registration
       // msquic should reject if global registration is NULL (closed)
       if (G_r_ctx)
@@ -378,6 +383,13 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   l_ctx->is_closed = FALSE;
 
+  // Link to registration
+  if (target_r_ctx)
+    {
+      enif_mutex_lock(target_r_ctx->lock);
+      CxPlatListInsertTail(&target_r_ctx->Listeners, &l_ctx->RegistrationLink);
+      enif_mutex_unlock(target_r_ctx->lock);
+    }
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
