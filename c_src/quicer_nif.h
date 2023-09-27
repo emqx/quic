@@ -41,7 +41,6 @@ limitations under the License.
 
 // Global registration
 // @todo avoid use globals
-extern HQUIC GRegistration;
 extern const QUIC_API_TABLE *MsQuic;
 extern QUIC_REGISTRATION_CONFIG GRegConfig;
 

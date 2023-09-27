@@ -17,6 +17,7 @@ limitations under the License.
 #include "quicer_ctx.h"
 
 // alloc/dealloc ctx should be done in the callbacks.
+extern QuicerRegistrationCTX *G_r_ctx;
 
 QuicerRegistrationCTX *
 init_r_ctx()
@@ -81,7 +82,7 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
     {
       destroy_config_ctx(l_ctx->config_resource);
     }
-  if (l_ctx->r_ctx && l_ctx->r_ctx->Registration != GRegistration)
+  if (l_ctx->r_ctx && l_ctx->r_ctx != G_r_ctx)
     {
       enif_release_resource(l_ctx->r_ctx);
     }

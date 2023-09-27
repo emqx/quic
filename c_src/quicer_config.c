@@ -20,7 +20,7 @@ limitations under the License.
 #include "quicer_tls.h"
 #include <msquichelper.h>
 
-extern BOOLEAN isRegistered;
+extern QuicerRegistrationCTX *G_r_ctx;
 
 static ERL_NIF_TERM get_stream_opt(ErlNifEnv *env,
                                    QuicerStreamCTX *s_ctx,
@@ -217,7 +217,7 @@ ServerLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
 
-  if (!isRegistered && (Registration == GRegistration))
+  if (!G_r_ctx)
     {
       return ATOM_REG_FAILED;
     }
@@ -273,7 +273,7 @@ ClientLoadConfiguration(ErlNifEnv *env,
   QUIC_SETTINGS Settings = { 0 };
   ERL_NIF_TERM ret = ATOM_OK;
 
-  if (!isRegistered && (Registration == GRegistration))
+  if (!G_r_ctx)
     {
       return ATOM_REG_FAILED;
     }

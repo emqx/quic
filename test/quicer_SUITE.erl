@@ -219,7 +219,11 @@ end_per_testcase(tc_close_lib_test, _Config) ->
   quicer:open_lib();
 end_per_testcase(tc_lib_registration, _Config) ->
   quicer:reg_open();
+end_per_testcase(tc_lib_registration_1, _Config) ->
+  quicer:reg_open();
 end_per_testcase(tc_lib_re_registration, _Config) ->
+  quicer:reg_open();
+end_per_testcase(tc_lib_re_registration_neg, _Config) ->
   quicer:reg_open();
 end_per_testcase(tc_open_listener_neg_1, _Config) ->
   quicer:open_lib(),
@@ -260,8 +264,8 @@ tc_open_lib_test(_Config) ->
   {ok, false} = quicer:open_lib().
 
 tc_close_lib_test(_Config) ->
+  ok = quicer:reg_close(),
   {ok, false} = quicer:open_lib(),
-  %% @todo  close reg before close lib
   ok = quicer:reg_close(),
   ok = quicer:close_lib(),
   ok = quicer:close_lib(),
@@ -271,15 +275,20 @@ tc_close_lib_test(_Config) ->
 tc_lib_registration_neg(_Config) ->
   ok = quicer:close_lib(),
   {error, badarg} = quicer:reg_open(),
-  ok = quicer:reg_close().
+  {error, badarg} = quicer:reg_close().
 
 tc_lib_registration(_Config) ->
   quicer:open_lib(),
-  ok = quicer:reg_open(),
+  case quicer:reg_open() of
+    {error, badarg} ->
+      quicer:reg_close();
+    ok ->
+      ok
+  end,
   ok = quicer:reg_close().
 
 tc_lib_registration_1(_Config) ->
-  ok =quicer:reg_close(),
+  ok = quicer:reg_close(),
   {error, badarg} = quicer:reg_open(foo),
   ok = quicer:reg_open(quic_execution_profile_low_latency),
   ok = quicer:reg_close(),
@@ -305,8 +314,7 @@ tc_lib_re_registration(_Config) ->
 tc_open_listener_inval_reg(Config) ->
   Port = select_port(),
   ok = quicer:reg_close(),
-  ok = quicer:close_lib(),
-  {error, config_error, reg_failed} = quicer:listen(Port, default_listen_opts(Config)),
+  {error, quic_registration} = quicer:listen(Port, default_listen_opts(Config)),
   quicer:open_lib(),
   quicer:reg_open(),
   ok.
@@ -815,7 +823,7 @@ dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram) ->
   receive
     {quic, <<"pong">>, Conn, Flag} when is_integer(Flag) ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, true);
-    {quic, <<"pong">>, _Stream, Flag} ->
+    {quic, <<"pong">>, _Stream, _Flag} ->
       dgram_client_recv_loop(Conn, true, ReceivedViaDgram);
     {quic, dgram_state_changed, Conn, #{dgram_send_enabled := true, dgram_max_len := _Size}} ->
       dgram_client_recv_loop(Conn, ReceivedOnStream, ReceivedViaDgram);

@@ -33,6 +33,9 @@ static ERL_NIF_TERM stream_controlling_process(ErlNifEnv *env,
                                                const ErlNifPid *caller,
                                                const ERL_NIF_TERM *pid);
 
+static ERL_NIF_TERM
+closeLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 /*
 ** atoms in use, initialized while load nif
 */
@@ -54,6 +57,7 @@ ERL_NIF_TERM ATOM_BAD_MON;
 ERL_NIF_TERM ATOM_LISTENER_OPEN_ERROR;
 ERL_NIF_TERM ATOM_LISTENER_START_ERROR;
 ERL_NIF_TERM ATOM_BADARG;
+ERL_NIF_TERM ATOM_LIB_UNINITIALIZED;
 ERL_NIF_TERM ATOM_CONN_OPEN_ERROR;
 ERL_NIF_TERM ATOM_CONN_START_ERROR;
 ERL_NIF_TERM ATOM_STREAM_OPEN_ERROR;
@@ -430,6 +434,7 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_LISTENER_OPEN_ERROR, listener_open_error);                        \
   ATOM(ATOM_LISTENER_START_ERROR, listener_start_error);                      \
   ATOM(ATOM_BADARG, badarg);                                                  \
+  ATOM(ATOM_LIB_UNINITIALIZED, lib_uninitialized);                            \
   ATOM(ATOM_CONN_OPEN_ERROR, conn_open_error);                                \
   ATOM(ATOM_CONN_START_ERROR, conn_start_error);                              \
   ATOM(ATOM_STREAM_OPEN_ERROR, stm_open_error);                               \
@@ -768,12 +773,12 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_QUIC_DATAGRAM_SEND_CANCELED, dgram_send_canceled);                \
   ATOM(ATOM_UNDEFINED, undefined);
 
-HQUIC GRegistration = NULL;
-const QUIC_API_TABLE *MsQuic = NULL;
+extern QuicerRegistrationCTX *G_r_ctx;
+extern pthread_mutex_t GRegLock;
 
-// @todo, these flags are not threads safe, wrap it in a context
-BOOLEAN isRegistered = false;
-BOOLEAN isLibOpened = false;
+const QUIC_API_TABLE *MsQuic = NULL;
+// Mutex for MsQuic
+pthread_mutex_t MsQuicLock = PTHREAD_MUTEX_INITIALIZER;
 
 ErlNifResourceType *ctx_reg_t = NULL;
 ErlNifResourceType *ctx_listener_t = NULL;
@@ -935,7 +940,7 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerConfigCTX *config_ctx = (QuicerConfigCTX *)obj;
   // Check if Registration is closed or not
-  if (GRegistration && config_ctx->Configuration)
+  if (G_r_ctx && config_ctx->Configuration)
     {
       MsQuic->ConfigurationClose(config_ctx->Configuration);
     }
@@ -949,7 +954,7 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerRegistrationCTX *reg_ctx = (QuicerRegistrationCTX *)obj;
   deinit_r_ctx(reg_ctx);
-  if (reg_ctx->Registration)
+  if (MsQuic && reg_ctx->Registration)
     {
       MsQuic->RegistrationClose(reg_ctx->Registration);
     }
@@ -1048,18 +1053,7 @@ on_upgrade(ErlNifEnv *env,
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
-  // @TODO We want registration context and APIs for it
-  if (isRegistered)
-    {
-      MsQuic->RegistrationClose(GRegistration);
-      isRegistered = FALSE;
-    }
-
-  if (isLibOpened)
-    {
-      MsQuicClose(MsQuic);
-      isLibOpened = FALSE;
-    }
+  closeLib(env, 0, NULL);
 }
 
 static ERL_NIF_TERM
@@ -1072,40 +1066,41 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM lttngLib = argv[0];
   char lttngPath[PATH_MAX] = { 0 };
 
-  if (isLibOpened)
+  pthread_mutex_lock(&MsQuicLock);
+  if (MsQuic)
     {
+      // already opened
       TP_NIF_3(skip, 0, 2);
-      return SUCCESS(res);
+      res = SUCCESS(res);
+      goto exit;
     }
-
-  // @todo external call for static link
-  CxPlatSystemLoad();
-  MsQuicLibraryLoad();
 
   //
   // Open a handle to the library and get the API function table.
   //
   if (QUIC_FAILED(status = MsQuicOpen2(&MsQuic)))
     {
-      isLibOpened = false;
-      return ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
+      MsQuic = NULL;
+      res = ERROR_TUPLE_3(ATOM_OPEN_FAILED, ATOM_STATUS(status));
+      goto exit;
     }
 
-  isLibOpened = true;
   TP_NIF_3(success, 0, 2);
 
-  res = ATOM_TRUE;
+  res = SUCCESS(ATOM_TRUE);
 
   if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
     {
       // loading lttng lib is optional, ok to fail
       if (dlopen(lttngPath, (unsigned)RTLD_NOW | (unsigned)RTLD_GLOBAL))
         {
-          res = ATOM_DEBUG;
+          res = SUCCESS(ATOM_DEBUG);
         }
     }
 
-  return SUCCESS(res);
+exit:
+  pthread_mutex_unlock(&MsQuicLock);
+  return res;
 }
 
 static ERL_NIF_TERM
@@ -1113,83 +1108,30 @@ closeLib(__unused_parm__ ErlNifEnv *env,
          __unused_parm__ int argc,
          __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  if (isLibOpened && MsQuic)
+  pthread_mutex_lock(&MsQuicLock);
+  if (MsQuic)
     {
-      // @todo ensure registration is closed first
-      //
-      TP_NIF_3(do_close, 0, isLibOpened);
+      TP_NIF_3(do_close, MsQuic, 0);
+
+      pthread_mutex_lock(&GRegLock);
+      // end of the world
+      if (G_r_ctx && !G_r_ctx->is_released)
+        {
+          // Make MsQuic debug check pass:
+          //   Zero Registration when closing MsQuic
+          MsQuic->RegistrationClose(G_r_ctx->Registration);
+          G_r_ctx->Registration = NULL;
+          G_r_ctx->is_released = TRUE;
+          destroy_r_ctx(G_r_ctx);
+          G_r_ctx = NULL;
+        }
+      pthread_mutex_unlock(&GRegLock);
+
       MsQuicClose(MsQuic);
-      isLibOpened = false;
+      MsQuic = NULL;
     }
 
-  return ATOM_OK;
-}
-
-/*
-** For global registration only
-*/
-static ERL_NIF_TERM
-registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
-{
-  QUIC_STATUS status = QUIC_STATUS_SUCCESS;
-  ERL_NIF_TERM profile = argv[0];
-
-  if (isRegistered || !isLibOpened)
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  if (argc == 1)
-    {
-      if (IS_SAME_TERM(profile, ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY))
-        {
-          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
-        }
-      else if (IS_SAME_TERM(profile,
-                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
-        {
-          GRegConfig.ExecutionProfile
-              = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
-        }
-      else if (IS_SAME_TERM(profile,
-                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
-        {
-          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
-        }
-      else if (IS_SAME_TERM(profile,
-                            ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
-        {
-          GRegConfig.ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
-        }
-      else
-        {
-          return ERROR_TUPLE_2(ATOM_BADARG);
-        }
-    }
-  // Open global registration
-  if (QUIC_FAILED(status
-                  = MsQuic->RegistrationOpen(&GRegConfig, &GRegistration)))
-    {
-      isRegistered = false;
-      TP_NIF_3(fail, 0, status);
-      return ERROR_TUPLE_3(ATOM_REG_FAILED, ETERM_INT(status));
-    }
-  TP_NIF_3(success, 0, status);
-  isRegistered = true;
-  return ATOM_OK;
-}
-
-static ERL_NIF_TERM
-deregistration(__unused_parm__ ErlNifEnv *env,
-               __unused_parm__ int argc,
-               __unused_parm__ const ERL_NIF_TERM argv[])
-{
-  if (isRegistered && GRegistration)
-    {
-      MsQuic->RegistrationClose(GRegistration);
-      GRegistration = NULL;
-      isRegistered = false;
-    }
+  pthread_mutex_unlock(&MsQuicLock);
   return ATOM_OK;
 }
 

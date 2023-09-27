@@ -23,6 +23,8 @@ limitations under the License.
 #include <openssl/x509.h>
 #include <unistd.h>
 
+extern QuicerRegistrationCTX *G_r_ctx;
+
 #ifdef DEBUG
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
@@ -505,7 +507,14 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (argc == 0)
     {
-      registration = GRegistration;
+      if (G_r_ctx)
+        {
+          registration = G_r_ctx->Registration;
+        }
+      else
+        {
+          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+        }
       r_ctx = NULL;
     }
   else
@@ -522,7 +531,14 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         }
       else
         {
-          registration = GRegistration;
+          if (G_r_ctx)
+            {
+              registration = G_r_ctx->Registration;
+            }
+          else
+            {
+              return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+            }
         }
     }
 
@@ -619,7 +635,14 @@ async_connect3(ErlNifEnv *env,
             }
           else
             {
-              Registration = GRegistration;
+              if (G_r_ctx)
+                {
+                  Registration = G_r_ctx->Registration;
+                }
+              else
+                {
+                  return ERROR_TUPLE_2(ATOM_REG_FAILED);
+                }
             }
         }
       else
@@ -649,7 +672,14 @@ async_connect3(ErlNifEnv *env,
         {
           // quic_registration is not set, use global registration
           // msquic should reject if global registration is NULL (closed)
-          Registration = GRegistration;
+          if (G_r_ctx && G_r_ctx->Registration)
+            {
+              Registration = G_r_ctx->Registration;
+            }
+          else
+            {
+              Registration = NULL;
+            }
         }
 
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
