@@ -256,8 +256,8 @@ tc_nif_module_reload(_Config) ->
   M = quicer_nif,
   c:l(M),
   {module, M} = c:l(M),
-  %% code:purge(M),
-  %% true = code:delete(M),
+  code:purge(M),
+  true = code:delete(M),
   ok.
 
 tc_open_lib_test(_Config) ->
