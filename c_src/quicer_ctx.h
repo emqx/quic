@@ -36,6 +36,9 @@ typedef struct QuicerRegistrationCTX
   HQUIC Registration;
   BOOLEAN is_released;
   char name[UINT8_MAX + 1];
+  ErlNifMutex *lock;
+  CXPLAT_LIST_ENTRY Listeners;
+  CXPLAT_LIST_ENTRY Connections;
 } QuicerRegistrationCTX;
 
 /*
@@ -65,6 +68,7 @@ typedef struct QuicerListenerCTX
   BOOLEAN is_closed;
   BOOLEAN is_stopped;
   BOOLEAN allow_insecure;
+  CXPLAT_LIST_ENTRY RegistrationLink;
   void *reserved1;
   void *reserved2;
   void *reserved3;

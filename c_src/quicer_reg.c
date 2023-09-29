@@ -86,6 +86,7 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
+  // @TODO error_code should be configurable
   int error_code = 0;
   if (!MsQuic)
     {
@@ -96,6 +97,11 @@ deregistration(__unused_parm__ ErlNifEnv *env,
   if (G_r_ctx && !G_r_ctx->is_released)
     {
       MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
+      // Do not defer the closing the global registration
+      // to resource dealloc callback because a common scenario is to
+      // close the lib after close the global registration.
+      MsQuic->RegistrationClose(G_r_ctx->Registration);
+      G_r_ctx->Registration = NULL;
       destroy_r_ctx(G_r_ctx);
       G_r_ctx = NULL;
     }

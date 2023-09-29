@@ -52,6 +52,8 @@
 %% For tests only
 -export([ open_connection/0
         , open_connection/1
+        , get_listeners/0
+        , get_listeners/1
         ]).
 
 -on_load(init/0).
@@ -275,6 +277,14 @@ controlling_process(_H, _P) ->
 -spec peercert(connection_handle()  | stream_handle()) ->
         {ok, Cert:: public_key:der_encoded()} | {error, any()}.
 peercert(_Handle) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_listeners() -> [listener_handle()].
+get_listeners() ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_listeners(reg_handle()) -> [listener_handle()] | {error, badarg}.
+get_listeners(_RegHandle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 %% Internals

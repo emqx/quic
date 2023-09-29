@@ -28,11 +28,11 @@ xref:
 
 .PHONY: eunit
 eunit:
-	$(REBAR) eunit -v -c --cover_export_name eunit
+	$(REBAR) eunit -v -c --cover_export_name eunit 
 
 .PHONY: ct
 ct:
-	QUICER_USE_SNK=1 $(REBAR) as test ct -v
+	QUICER_USE_SNK=1 $(REBAR) as test ct -v --readable=true
 
 .PHONY: cover
 cover: eunit

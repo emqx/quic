@@ -112,6 +112,8 @@
 -export([ get_conn_rid/1
         , get_stream_rid/1
         , open_connection/0
+        , get_listeners/0
+        , get_listeners/1
         ]).
 
 -export([ spawn_listener/3 %% start application over quic
@@ -960,6 +962,18 @@ listeners() ->
                  quicer_listener:listen_on()}) -> {ok, pid()} | {error, not_found}.
 listener(Name) ->
   quicer_listener_sup:listener(Name).
+
+%% @doc Get a list listeners under global registration
+-spec get_listeners() -> quicer_nif:get_listeners().
+get_listeners() ->
+  quicer_nif:get_listeners().
+
+%% @doc Get a list of listeners under registration handle
+-spec get_listeners(Reg | global) -> quicer_nif:get_listeners(Reg).
+get_listeners(global) ->
+  quicer_nif:get_listeners();
+get_listeners(Reg) ->
+  quicer_nif:get_listeners(Reg).
 
 %% @doc set controlling process for Connection/Stream.
 %% mimic {@link ssl:controlling_process/2}

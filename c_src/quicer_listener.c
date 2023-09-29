@@ -245,6 +245,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   HQUIC Registration = NULL;
   char *cacertfile = NULL;
 
+  QuicerRegistrationCTX *target_r_ctx = NULL;
+
   if (!enif_is_map(env, options))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -324,9 +326,12 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       // quic_registration is set
       enif_keep_resource(l_ctx->r_ctx);
       Registration = l_ctx->r_ctx->Registration;
+      target_r_ctx = l_ctx->r_ctx;
     }
   else
     {
+      target_r_ctx = G_r_ctx;
+
       // quic_registration is not set, use global registration
       // msquic should reject if global registration is NULL (closed)
       if (G_r_ctx)
@@ -378,6 +383,13 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   l_ctx->is_closed = FALSE;
 
+  // Link to registration
+  if (target_r_ctx)
+    {
+      enif_mutex_lock(target_r_ctx->lock);
+      CxPlatListInsertTail(&target_r_ctx->Listeners, &l_ctx->RegistrationLink);
+      enif_mutex_unlock(target_r_ctx->lock);
+    }
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
@@ -558,4 +570,35 @@ exit:
   enif_mutex_unlock(l_ctx->lock);
 
   return ret;
+}
+
+ERL_NIF_TERM
+get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  if (argc == 0)
+    {
+      r_ctx = G_r_ctx;
+    }
+  else
+    {
+      if (!enif_get_resource(env, argv[0], ctx_reg_t, (void **)&r_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  ERL_NIF_TERM res = enif_make_list(env, 0);
+
+  enif_mutex_lock(r_ctx->lock);
+  CXPLAT_LIST_ENTRY *Entry = r_ctx->Listeners.Flink;
+  while (Entry != &r_ctx->Listeners)
+    {
+      QuicerListenerCTX *l_ctx = CXPLAT_CONTAINING_RECORD(
+          Entry, QuicerListenerCTX, RegistrationLink);
+      res = enif_make_list_cell(env, enif_make_resource(env, l_ctx), res);
+      Entry = Entry->Flink;
+    }
+  enif_mutex_unlock(r_ctx->lock);
+
+  return res;
 }
