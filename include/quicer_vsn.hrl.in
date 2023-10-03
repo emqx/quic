@@ -1,0 +1,4 @@
+-ifndef(QUICER_VSN_HRL).
+-define(QUICER_VSN_HRL, true).
+-define(QUICER_ABI_VERSION, @QUICER_ABI_VERSION@).
+-endif.

@@ -1,0 +1,6 @@
+#ifndef __QUICER_VSN_H_
+#define __QUICER_VSN_H_
+
+#define QUICER_ABI_VERSION @QUICER_ABI_VERSION@
+
+#endif //__QUICER_VSN_H_

@@ -19,6 +19,7 @@ limitations under the License.
 #include <dlfcn.h>
 
 #include "quicer_listener.h"
+#include "quicer_vsn.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -1034,9 +1035,21 @@ open_resources(ErlNifEnv *env)
 static int
 on_load(ErlNifEnv *env,
         __unused_parm__ void **priv_data,
-        __unused_parm__ ERL_NIF_TERM loadinfo)
+        ERL_NIF_TERM loadinfo)
 {
   int ret_val = 0;
+
+  unsigned load_vsn = 0;
+
+  if (!enif_get_uint(env, loadinfo, &load_vsn))
+  {
+    load_vsn = 0;
+  }
+
+  if (load_vsn != QUICER_ABI_VERSION)
+  {
+    return -1;
+  }
 
   init_atoms(env);
 

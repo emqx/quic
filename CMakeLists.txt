@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.16)
 
 project(quicer)
 
+## NIF library ABI version
+## Bump manually when ABI changes
+set(QUICER_ABI_VERSION 1)
+
 SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
 
@@ -74,6 +78,16 @@ set(QUIC_BUILD_PERF "OFF")
 
 set(QUIC_TLS_SECRETS_SUPPORT "ON")
 
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/quicer_vsn.hrl.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/quicer_vsn.hrl
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/c_src/quicer_vsn.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/c_src/quicer_vsn.h
+)
+
 # src files
 set(SOURCES
   c_src/quicer_nif.c
@@ -106,7 +120,8 @@ add_compile_options(-DSO_ATTACH_REUSEPORT_CBPF=51)
 
 # for lttng, quicer_tp.h
 include_directories(c_src)
-
+# for templ files
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/c_src/)
 add_subdirectory(msquic)
 
 add_library(quicer_static STATIC ${SOURCES})
@@ -149,7 +164,7 @@ add_dependencies(quicer_static msquic)
 set_target_properties(quicer_nif
     PROPERTIES
         LIBRARY_OUTPUT_NAME quicer_nif
-        VERSION ${QUICER_VERSION}
+        VERSION ${QUICER_ABI_VERSION}-${QUICER_VERSION}
 )
 include(GNUInstallDirs)
 install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
