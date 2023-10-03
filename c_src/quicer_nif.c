@@ -961,25 +961,21 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
-/*
-** on_load is called when the NIF library is loaded and no previously loaded
-*  library exists for this module.
-*/
-static int
-on_load(ErlNifEnv *env,
-        __unused_parm__ void **priv_data,
-        __unused_parm__ ERL_NIF_TERM loadinfo)
+static void
+init_atoms(ErlNifEnv *env)
 {
-  int ret_val = 0;
-
-// init atoms in use.
+  // init atoms in use.
 #define ATOM(name, val)                                                       \
   {                                                                           \
     (name) = enif_make_atom(env, #val);                                       \
   }
   INIT_ATOMS
 #undef ATOM
+}
 
+static void
+open_resources(ErlNifEnv *env)
+{
   ErlNifResourceFlags flags
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
 
@@ -1029,6 +1025,22 @@ on_load(ErlNifEnv *env,
                                            &streamInit, // init callbacks
                                            flags,
                                            NULL);
+}
+
+/*
+** on_load is called when the NIF library is loaded and no previously loaded
+*  library exists for this module.
+*/
+static int
+on_load(ErlNifEnv *env,
+        __unused_parm__ void **priv_data,
+        __unused_parm__ ERL_NIF_TERM loadinfo)
+{
+  int ret_val = 0;
+
+  init_atoms(env);
+
+  open_resources(env);
 
   return ret_val;
 }
