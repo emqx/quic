@@ -56,6 +56,7 @@
         , get_listeners/1
         ]).
 
+%% @NOTE: In embedded mode, first all modules are loaded. Then all on_load functions are called.
 -on_load(init/0).
 
 -include_lib("kernel/include/file.hrl").

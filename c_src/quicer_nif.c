@@ -963,7 +963,7 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 
 /*
 ** on_load is called when the NIF library is loaded and no previously loaded
-*library exists for this module.
+*  library exists for this module.
 */
 static int
 on_load(ErlNifEnv *env,
@@ -1034,9 +1034,19 @@ on_load(ErlNifEnv *env,
 }
 
 /*
-** on_upgrade is called when the NIF library is loaded and there is old code of
-*this module with a loaded NIF library.
-*/
+ * on_upgrade is called when the NIF library is loaded and there is old code of
+ *  this module with a loaded NIF library.
+ *
+ *  But new code could be the same as old code, that is, the same msquic
+ *  library is mapped into process memory. To distinguish the two cases, the
+ *  `MsQuic` API handle is checked since it is init as NULL for new loading. If
+ *  MsQuic is NULL, then it is a new load, that two msquic libraries (new and
+ *  old) are mapped into process memory, If MsQuic is not NULL, then it is
+ *  already initilized and there is still one msquic library in process memory.
+ *
+ *  In any case above, we return success.
+ */
+
 static int
 on_upgrade(ErlNifEnv *env,
            void **priv_data,
@@ -1047,9 +1057,58 @@ on_upgrade(ErlNifEnv *env,
 }
 
 /*
-** unload is called when the module code that the NIF library belongs to is
-*purged as old. New code of the same module may or may not exist.
-*/
+** on_unload is called when the module code that the NIF library belongs to is
+*  purged as old.
+*
+*  New code of the same module may or may not exist.
+*
+*  But there are three cases:
+*
+*  Case A: No new code of the same module exists.
+*          arg `priv_data` is not NULL.
+*
+*          It is ok to teardown the MsQuic with API handle and then close the
+*          API handle.
+*
+*  Case B: New code of the same module exists and it uses the same NIF DSO.
+*          arg `priv_data` is NULL.
+*
+*          It could be checked with `quicer:nif_mapped()`
+*
+*          It is *NOT* ok to teardown the MsQuic since the new code is
+*          still using it.
+*
+*  Case C: New code of the same module exists and it uses different NIF DSO.
+*          arg `priv_data` is not NULL.
+*          AND
+*          &MsQuic != the 'lib_api_ptr' in priv_data
+*
+*          This could be checked with `quicer:nif_mapped()`
+*
+*          It is ok to teardown the MsQuic with API handle and then close the
+*          API handle.
+
+*
+*  @NOTE 1. This callback will *NOT* be called when the module is purged
+*           while there are opening resources.
+*           When new code of the same module exists, the resources will be
+*           taken over by the new code thus it will get called for the
+*           old code.
+*
+*  @NOTE 2. The `MsQuic` and `GRegistration` are in library scope.
+*
+*  @NOTE 3: It is very important to shutdown all the MsQuic Registrations
+*           before return to avoid unexpected behaviour after NIF DSO is
+*           unmapped by OS.
+*
+*  @NOTE 4: For safty, it is ok to dlopen the shared library by calling
+*           quicer:dlopen/1, so we will have a refcnt on it and it won't
+*           be unmapped by OS.
+*
+*  @NOTE 5: 'same NIF DSO' means same shared library file that is managed
+*           by OS.
+*           Two copies of the same shared library in OS are different NIF DSOs.
+*  */
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
