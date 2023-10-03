@@ -5,6 +5,10 @@ project(quicer)
 SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
 
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/priv/ CACHE PATH "..." FORCE)
+endif()
+
 # For cerl picking up the OTP_ROOT
 if (DEFINED ENV{Erlang_OTP_ROOT_DIR})
   SET(Erlang_OTP_ROOT_DIR $ENV{Erlang_OTP_ROOT_DIR})
@@ -13,6 +17,12 @@ EXECUTE_PROCESS(
         COMMAND         erl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt
         OUTPUT_VARIABLE Erlang_OTP_ROOT_DIR
         )
+endif()
+
+if (DEFINED ENV{QUICER_VERSION})
+  set(QUICER_VERSION $ENV{QUICER_VERSION})
+else()
+  set(QUICER_VERSION "0")
 endif()
 
 if (DEFINED ENV{CMAKE_BUILD_TYPE})
@@ -138,10 +148,9 @@ add_dependencies(quicer_static msquic)
 
 set_target_properties(quicer_nif
     PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/priv/
+        LIBRARY_OUTPUT_NAME quicer_nif
+        VERSION ${QUICER_VERSION}
 )
+include(GNUInstallDirs)
+install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
 
-if (QUIC_ENABLE_LOGGING STREQUAL "ON" AND QUIC_LOGGING_TYPE STREQUAL "lttng")
-  set_target_properties(msquic.lttng PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/priv)
-  set_target_properties(msquic.lttng PROPERTIES LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/priv)
-endif()

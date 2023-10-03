@@ -89,7 +89,7 @@ init() ->
         {ok, debug} | %% opened with lttng debug library loaded (if present)
         {error, open_failed, atom_reason()}.
 open_lib() ->
-  LibFile = case locate_lib(priv_dir(), "libmsquic.lttng.so") of
+  LibFile = case locate_lib(priv_dir(), "lib/libmsquic.lttng.so") of
               {ok, File} ->
                 File;
               {error, _} ->

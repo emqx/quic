@@ -17,6 +17,7 @@ build() {
     ./get-msquic.sh "$MSQUIC_VERSION"
     cmake -B c_build
     make -j "$JOBS" -C c_build
+    make install -C c_build
     ## MacOS
     if [ -f priv/libquicer_nif.dylib ]; then
         # https://developer.apple.com/forums/thread/696460
