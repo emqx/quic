@@ -120,8 +120,16 @@
         , terminate_listener/1
         ]).
 
+%% versions
+-export([abi_version/0]).
+
 -type connection_opts() :: proplists:proplist() | quicer_connection:opts().
 -type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
+
+%% @doc Return ABI version of the library.
+-spec abi_version() -> quicer_nif:abi_version().
+abi_version() ->
+  quicer_nif:abi_version().
 
 %% @doc Quicer library must be opened before any use.
 %%

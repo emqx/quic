@@ -144,6 +144,9 @@
         , tc_peercert_client_nocert/1
         , tc_peercert_server/1
         , tc_peercert_server_nocert/1
+
+        %% Versions test
+        , tc_abi_version/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -2495,6 +2498,9 @@ tc_peercert_server_nocert(Config) ->
   SPid ! done,
   ensure_server_exit_normal(Ref),
   ok.
+
+tc_abi_version(Config) ->
+  ?assertEqual(1, quicer:abi_version()).
 
 %%% ====================
 %%% Internal helpers
