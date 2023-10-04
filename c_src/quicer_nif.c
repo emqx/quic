@@ -1038,23 +1038,26 @@ on_load(ErlNifEnv *env,
         ERL_NIF_TERM loadinfo)
 {
   int ret_val = 0;
-
   unsigned load_vsn = 0;
 
+  TP_NIF_3(start, &MsQuic, 0);
   if (!enif_get_uint(env, loadinfo, &load_vsn))
   {
     load_vsn = 0;
   }
 
+  // This check avoid erlang module loaded
+  // incompatible NIF library
   if (load_vsn != QUICER_ABI_VERSION)
   {
-    return -1;
+    TP_NIF_3(end, &MsQuic, 1);
+    return 1; // any value except 0 is error
   }
 
   init_atoms(env);
-
   open_resources(env);
 
+  TP_NIF_3(end, &MsQuic, 0);
   return ret_val;
 }
 
@@ -1137,7 +1140,8 @@ on_upgrade(ErlNifEnv *env,
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
-  closeLib(env, 0, NULL);
+  // @TODO clean all the leakages before close the lib
+  //closeLib(env, 0, NULL);
 }
 
 static ERL_NIF_TERM

@@ -58,6 +58,9 @@
 
 -export([abi_version/0]).
 
+%% for test
+-export([init/1]).
+
 %% @NOTE: In embedded mode, first all modules are loaded. Then all on_load functions are called.
 -on_load(init/0).
 
@@ -65,6 +68,7 @@
 -include("quicer.hrl").
 -include("quicer_types.hrl").
 -include("quicer_vsn.hrl").
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -spec abi_version() -> integer().
 abi_version() ->
@@ -72,24 +76,37 @@ abi_version() ->
 
 -spec init() -> ok.
 init() ->
+  ABIVsn = case persistent_term:get({'_quicer_overrides_', abi_version}, undefined) of
+        undefined -> abi_version();
+        Vsn -> Vsn
+    end,
+  init(ABIVsn).
+
+init(ABIVsn) ->
   NifName = "libquicer_nif",
   {ok, Niflib} = locate_lib(priv_dir(), NifName),
-  ok = erlang:load_nif(Niflib, ?QUICER_ABI_VERSION),
-  %% It could cause segfault if MsQuic library is not opened nor registered.
-  %% here we have added dummy calls, and it should cover most of cases
-  %% unless caller wants to call erlang:load_nif/1 and then call quicer_nif
-  %% without opened library to suicide.
-  %%
-  %% Note, we could do same dummy calls in nif instead but it might mess up the reference counts.
-  {ok, _} = open_lib(),
-  %% dummy reg open
-  case reg_open() of
-    ok -> ok;
-    {error, badarg} ->
-      %% already opened
-      ok
+  case erlang:load_nif(Niflib, ABIVsn) of
+      ok ->
+          %% It could cause segfault if MsQuic library is not opened nor registered.
+          %% here we have added dummy calls, and it should cover most of cases
+          %% unless caller wants to call erlang:load_nif/1 and then call quicer_nif
+          %% without opened library to suicide.
+          %%
+          %% Note, we could do same dummy calls in nif instead but it might mess up the reference counts.
+          {ok, _} = open_lib(),
+          %% dummy reg open
+          case reg_open() of
+              ok -> ok;
+              {error, badarg} ->
+                  %% already opened
+                  ok
+          end;
+      {error, _Reason} = Res->
+          %% load fail, but beam will keep using current vsn if presents.
+          ?tp_ignore_side_effects_in_prod(debug,
+                                          #{module => ?MODULE, event => init, result => Res}),
+          Res
   end.
-
 -spec open_lib() ->
         {ok, true}  | %% opened
         {ok, false} | %% already opened
