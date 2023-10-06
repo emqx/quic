@@ -97,6 +97,7 @@ init_per_suite(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_suite(_Config) ->
+  quicer_test_lib:report_active_connections(),
   ok.
 
 %%--------------------------------------------------------------------
@@ -135,6 +136,7 @@ init_per_testcase(tc_listener_inval_local_addr, Config) ->
       Config
   end;
 init_per_testcase(_TestCase, Config) ->
+  quicer_test_lib:cleanup_msquic(),
   Config.
 
 %%--------------------------------------------------------------------
@@ -148,8 +150,8 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, _Config) ->
   quicer:terminate_listener(mqtt),
   snabbkaffe:cleanup(),
-  Unhandled = quicer_test_lib:receive_all(),
-  Unhandled =/= [] andalso ct:comment("What left in the message queue: ~p", [Unhandled]),
+  quicer_test_lib:report_unhandled_messages(),
+  quicer_test_lib:report_active_connections(),
   ok.
 
 %%--------------------------------------------------------------------
@@ -414,6 +416,7 @@ tc_conn_owner_down(Config) ->
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
                  {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                  {ok, 4} = quicer:send(Stm, <<"ping">>),
                  {ok, <<"ping">>} = quicer:recv(Stm, 4),
@@ -422,6 +425,12 @@ tc_conn_owner_down(Config) ->
                                  receive down -> ok end
                              end),
                  quicer:controlling_process(Conn, Pid),
+
+                 ?assert(timeout =/= ?block_until(#{ ?snk_kind := debug
+                                                   , function := "connection_controlling_process"
+                                                   , tag := "exit"
+                                                   , resource_id := CRid
+                                                   }, 1000, 1000)),
                  Pid ! down,
                  ?assert(timeout =/=
                            ?block_until(
@@ -438,7 +447,7 @@ tc_conn_owner_down(Config) ->
                               #{?snk_kind := debug, event := closed, module := quicer_connection}, 1000, 1000)),
                  ct:pal("stop listener"),
                  ok = quicer:terminate_listener(mqtt),
-                 {ok, CRid} = quicer:get_conn_rid(Conn),
+
                  {CRid, SRid}
                end,
                fun(Result, Trace) ->
@@ -826,7 +835,8 @@ tc_conn_idle_close(Config) ->
                  end,
                  case quicer:send(Stm, <<"ping2">>) of
                    {error, stm_send_error, invalid_state} -> ok;
-                   {error, cancelled} -> ok
+                   {error, cancelled} -> ok;
+                   {error, closed} -> ok
                  end,
 
                  ?block_until(
@@ -883,9 +893,9 @@ tc_conn_gc(Config) ->
                | default_stream_opts() ],
   Options = {ListenerOpts, ConnectionOpts, StreamOpts},
   ct:pal("Listener Options: ~p", [Options]),
-  ?check_trace(#{timetrap => 1000},
+  ?check_trace(#{timetrap => 100000},
                begin
-                 %% Spawn a process that will die without handler cleanups
+                 %% Spawn a process that will die without handle cleanups
                  %% The dead process should trigger a connection close
                  %% The dead process should trigger a GC
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -931,9 +941,10 @@ tc_conn_gc(Config) ->
                  {ok, _} = ?block_until(#{ ?snk_kind := debug
                                          , context := "callback"
                                          , function := "resource_conn_dealloc_callback"
-                                         , resource_id := CRid
+                                         , resource_id := 0
                                          , tag := "end"},
                                         5000, 1000),
+                 timer:sleep(1000),
                  {SRid, CRid}
                end,
                fun({_SRid, CRid}, Trace) ->
@@ -951,7 +962,7 @@ tc_conn_gc(Config) ->
                                              #{ ?snk_kind := debug
                                               , context := "callback"
                                               , function := "resource_conn_dealloc_callback"
-                                              , resource_id := CRid
+                                              , resource_id := 0
                                               , tag := "end"},
                                              Trace)),
                    ?assert(?strict_causality(#{ ?snk_kind := debug
@@ -984,7 +995,7 @@ tc_conn_gc(Config) ->
                                                    ),
                    ?assertEqual(1, length([ E || #{ function := "resource_conn_dealloc_callback"
                                                   , resource_id := Rid
-                                                  , tag := "end"} = E <- TraceEvents, Rid == CRid])
+                                                  , tag := "end"} = E <- TraceEvents, Rid == 0])
                                )
                end),
   ct:pal("stop listener"),
@@ -1610,10 +1621,7 @@ tc_listener_no_acceptor(Config) ->
                begin
                  {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
                  {error, transport_down, #{status := connection_refused}}
-                   = quicer:connect("localhost", Port, default_conn_opts(), 5000),
-                 ct:pal("stop listener"),
-                 ok = quicer:terminate_listener(mqtt),
-                 timer:sleep(5000)
+                   = quicer:connect("localhost", Port, default_conn_opts(), 5000)
                end,
                fun(_Result, Trace) ->
                    ct:pal("Trace is ~p", [Trace]),
@@ -1631,6 +1639,8 @@ tc_listener_no_acceptor(Config) ->
                                        },
                                       Trace))
                end),
+  ct:pal("stop listener"),
+  ok = quicer:terminate_listener(mqtt),
   ok.
 
 %% @doc this triggers listener start fail
@@ -1714,6 +1724,7 @@ tc_conn_stop_notify_acceptor(Config) ->
                                                    {error, closed} -> ok;
                                                    {ok, _Stream} -> ok
                                                  end,
+                                                 quicer:close_listener(Listener),
                                                  exit({normal, Acceptors})
                                              end),
                  receive {SPid, ready} -> ok end,

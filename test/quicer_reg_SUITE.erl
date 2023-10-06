@@ -90,7 +90,7 @@ init_per_testcase(_TestCase, Config) ->
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
     erlang:garbage_collect(self(), [{type, major}]),
-    timer:sleep(1000),
+    quicer_test_lib:report_active_connections(),
     ok.
 
 %%--------------------------------------------------------------------
@@ -167,7 +167,8 @@ tc_shutdown_3_abnormal(_Config) ->
     {ok, Reg} = quicer:new_registration(Name, Profile),
     ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, 1, 2)),
     ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, 1, foo)),
-    ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, true, -1)).
+    ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, true, -1)),
+    ok = quicer:shutdown_registration(Reg).
 
 tc_shutdown_ok(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),

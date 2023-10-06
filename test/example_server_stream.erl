@@ -82,7 +82,10 @@ peer_send_aborted(Stream, ErrorCode, #{is_unidir := true, is_local := false} = S
     {ok, S}.
 
 peer_send_shutdown(Stream, _Flags, S) ->
-    ok = quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0),
+    case quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0) of
+        ok -> ok;
+        {error, _} -> ok
+    end,
     {ok, S}.
 
 send_complete(_Stream, false, S) ->

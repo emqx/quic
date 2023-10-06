@@ -94,13 +94,23 @@ handle_stream_data(Stream, Bin, _Opts, #{ sent_bytes := Cnt
                                         } = State) ->
     case maps:get(is_echo_new_stream, StreamOpts, false) of
         false ->
-            {ok, Size} = quicer:send(Stream, echo_msg(Bin, State)),
-            {ok, State#{ sent_bytes => Cnt + Size }};
+            case quicer:send(Stream, echo_msg(Bin, State)) of
+                {ok, Size} ->
+                    {ok, State#{ sent_bytes => Cnt + Size }};
+                _ ->
+                    %% handle error in test aborted.
+                    {ok, State}
+            end;
         true ->
             %% echo reply with a new stream from server to client.
             {ok, EchoStream} = quicer:start_stream(Conn, StreamOpts),
-            {ok, Size} = quicer:send(EchoStream, echo_msg(Bin, State)),
-            {ok, State#{ sent_bytes => Cnt + Size, echo_stream => EchoStream }}
+            case quicer:send(EchoStream, echo_msg(Bin, State)) of
+                {ok, Size} ->
+                    {ok, State#{ sent_bytes => Cnt + Size, echo_stream => EchoStream }};
+                _ ->
+                    %% handle error in test aborted.
+                    {ok, State}
+            end
     end;
 handle_stream_data(Stream, Bin, _Opts, #{ sent_bytes := Cnt
                                         , echo_stream := _Ignore

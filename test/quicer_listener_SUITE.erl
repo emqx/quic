@@ -45,6 +45,7 @@ suite() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
+  application:ensure_all_started(quicer),
   quicer_test_lib:generate_tls_certs(Config),
   Config.
 
@@ -79,7 +80,9 @@ init_per_group(suite_reg, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_group(suite_reg, Config) ->
-  quicer:shutdown_registration(proplists:get_value(quic_registration, Config));
+  Reg = proplists:get_value(quic_registration, Config),
+  quicer:shutdown_registration(Reg),
+  ok = quicer:close_registration(Reg);
 end_per_group(_GroupName, _Config) ->
   ok.
 
@@ -93,6 +96,7 @@ end_per_group(_GroupName, _Config) ->
 %%--------------------------------------------------------------------
 init_per_testcase(_TestCase, Config) ->
   application:ensure_all_started(quicer),
+  quicer_test_lib:cleanup_msquic(),
   Config.
 
 %%--------------------------------------------------------------------
@@ -106,6 +110,7 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
   RegH = proplists:get_value(quic_registration, Config, global),
   [quicer:close_listener(L, 1000) || L <- quicer:get_listeners(RegH)],
+  quicer_test_lib:report_active_connections(),
   ok.
 
 %%--------------------------------------------------------------------
