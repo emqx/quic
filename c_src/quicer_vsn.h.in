@@ -1,6 +1,8 @@
 #ifndef __QUICER_VSN_H_
 #define __QUICER_VSN_H_
 
+// clang-format off
 #define QUICER_ABI_VERSION @QUICER_ABI_VERSION@
+// clang-format on
 
 #endif //__QUICER_VSN_H_

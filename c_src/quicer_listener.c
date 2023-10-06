@@ -23,6 +23,7 @@ limitations under the License.
 #include <openssl/x509.h>
 
 extern QuicerRegistrationCTX *G_r_ctx;
+extern pthread_mutex_t GRegLock;
 
 BOOLEAN parse_registration(ErlNifEnv *env,
                            ERL_NIF_TERM options,
@@ -576,8 +577,15 @@ ERL_NIF_TERM
 get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerRegistrationCTX *r_ctx = NULL;
-  if (argc == 0)
+  ERL_NIF_TERM res = enif_make_list(env, 0);
+  if (argc == 0) // use global registration
     {
+      pthread_mutex_lock(&GRegLock);
+      if (!G_r_ctx)
+        {
+          pthread_mutex_unlock(&GRegLock);
+          return res;
+        }
       r_ctx = G_r_ctx;
     }
   else
@@ -587,8 +595,6 @@ get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
     }
-  ERL_NIF_TERM res = enif_make_list(env, 0);
-
   enif_mutex_lock(r_ctx->lock);
   CXPLAT_LIST_ENTRY *Entry = r_ctx->Listeners.Flink;
   while (Entry != &r_ctx->Listeners)
@@ -600,5 +606,9 @@ get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   enif_mutex_unlock(r_ctx->lock);
 
+  if (argc == 0) // use global registration
+    {
+      pthread_mutex_unlock(&GRegLock);
+    }
   return res;
 }

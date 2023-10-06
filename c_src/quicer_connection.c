@@ -376,6 +376,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
   if (is_destroy)
     {
+      // MsQuic->SetCallbackHandler(Connection, NULL, NULL);
+      c_ctx->Connection = NULL;
+      MsQuic->ConnectionClose(Connection);
+      if (c_ctx->config_resource)
+        {
+          enif_release_resource(c_ctx->config_resource);
+          c_ctx->config_resource = NULL;
+        }
       destroy_c_ctx(c_ctx);
     }
   return status;
@@ -485,6 +493,13 @@ ServerConnectionCallback(HQUIC Connection,
 
   if (is_destroy)
     {
+      c_ctx->Connection = NULL;
+      MsQuic->ConnectionClose(Connection);
+      if (c_ctx->config_resource)
+        {
+          enif_release_resource(c_ctx->config_resource);
+          c_ctx->config_resource = NULL;
+        }
       destroy_c_ctx(c_ctx);
     }
 
@@ -806,7 +821,15 @@ async_connect3(ErlNifEnv *env,
       */
       // c_ctx->is_closed = TRUE;
 
-      c_ctx->Connection = NULL;
+      if (Status != QUIC_STATUS_INVALID_PARAMETER)
+        {
+          c_ctx->Connection = NULL;
+        }
+
+      if (c_ctx->config_resource)
+        {
+          destroy_config_ctx(c_ctx->config_resource);
+        }
 
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
       TP_NIF_3(start_fail, (uintptr_t)(c_ctx->Connection), Status);
@@ -1054,6 +1077,11 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
   if (!c_ctx)
     {
       return QUIC_STATUS_INTERNAL_ERROR;
+    }
+
+  if (!c_ctx->Connection)
+    {
+      return QUIC_STATUS_INVALID_STATE;
     }
 
   if (QUIC_FAILED(

@@ -254,10 +254,8 @@ deinit_s_ctx(QuicerStreamCTX *s_ctx)
 void
 destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
+  assert(!s_ctx->Stream);
   enif_free_env(s_ctx->imm_env);
-  // Since enif_release_resource is async call,
-  // we should demon the owner now!
-  enif_demonitor_process(s_ctx->env, s_ctx, &s_ctx->owner_mon);
   enif_release_resource(s_ctx);
 }
 

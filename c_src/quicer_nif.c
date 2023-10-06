@@ -804,10 +804,12 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
     {
       l_ctx->is_stopped = TRUE;
       // We only stop here, but not close it, because possible subsequent
-      // scenarios a. Some pid could still start the stopped listener with nif
-      // handle b. Some pid could still close the stopped listener with nif
+      // scenarios:
+      // a. Some pid could still start the stopped listener with nif
       // handle
-      // 3. We close it in resource_listener_dealloc_callback anyway.
+      // b. Some pid could still close the stopped listener with nif
+      // handle
+      // c. We close it in resource_listener_dealloc_callback anyway.
       MsQuic->ListenerStop(l_ctx->Listener);
     }
   enif_mutex_unlock(l_ctx->lock);
@@ -836,6 +838,10 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
       // We must close listener since there is no chance that any erlang
       // process is able to access the listener via any l_ctx
       MsQuic->ListenerClose(l_ctx->Listener);
+    }
+  else
+    {
+      TP_CB_3(skip, (uintptr_t)l_ctx->Listener, 0);
     }
 
   if (l_ctx->cacertfile)
@@ -1042,17 +1048,17 @@ on_load(ErlNifEnv *env,
 
   TP_NIF_3(start, &MsQuic, 0);
   if (!enif_get_uint(env, loadinfo, &load_vsn))
-  {
-    load_vsn = 0;
-  }
+    {
+      load_vsn = 0;
+    }
 
   // This check avoid erlang module loaded
   // incompatible NIF library
   if (load_vsn != QUICER_ABI_VERSION)
-  {
-    TP_NIF_3(end, &MsQuic, 1);
-    return 1; // any value except 0 is error
-  }
+    {
+      TP_NIF_3(end, &MsQuic, 1);
+      return 1; // any value except 0 is error
+    }
 
   init_atoms(env);
   open_resources(env);
@@ -1141,7 +1147,7 @@ static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
   // @TODO clean all the leakages before close the lib
-  //closeLib(env, 0, NULL);
+  // closeLib(env, 0, NULL);
 }
 
 static ERL_NIF_TERM
@@ -1518,7 +1524,7 @@ static ErlNifFunc nif_funcs[] = {
   { "close_lib", 0, closeLib, 0 },
   { "reg_open", 0, registration, 0 },
   { "reg_open", 1, registration, 0 },
-  { "reg_close", 0, deregistration, 0 },
+  { "reg_close", 0, deregistration, 1 },
   { "new_registration", 2, new_registration2, 0},
   { "shutdown_registration", 1, shutdown_registration_x, 0},
   { "shutdown_registration", 3, shutdown_registration_x, 0},
