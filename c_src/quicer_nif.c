@@ -1147,7 +1147,7 @@ static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
   // @TODO clean all the leakages before close the lib
-  // closeLib(env, 0, NULL);
+  closeLib(env, 0, NULL);
 }
 
 static ERL_NIF_TERM

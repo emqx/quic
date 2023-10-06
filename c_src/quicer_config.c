@@ -773,9 +773,9 @@ getopt3(ErlNifEnv *env,
       // Get global option without using any ctx
       // We are risking using a closed lib
       if (MsQuic)
-      {
-        res = get_global_opt(env, NULL, eopt);
-      }
+        {
+          res = get_global_opt(env, NULL, eopt);
+        }
       pthread_mutex_unlock(&MsQuicLock);
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
