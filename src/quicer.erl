@@ -114,6 +114,7 @@
         , open_connection/0
         , get_listeners/0
         , get_listeners/1
+        , close_registration/1
         ]).
 
 -export([ spawn_listener/3 %% start application over quic
@@ -171,6 +172,12 @@ shutdown_registration(Handle) ->
         quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
 shutdown_registration(Handle, IsSilent, ErrCode) ->
   quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
+
+%% @doc close a registration.
+-spec close_registration(Handle) ->
+        quicer_nif:close_registration(Handle).
+close_registration(Handle) ->
+  quicer_nif:close_registration(Handle).
 
 %% @doc get registration name
 -spec get_registration_name(Handle) ->

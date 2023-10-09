@@ -30,6 +30,9 @@ ERL_NIF_TERM
 shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
+close_registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
 get_registration_name1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 #endif // QUICER_REG_H_

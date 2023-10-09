@@ -200,6 +200,26 @@ shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM *argv)
 }
 
 ERL_NIF_TERM
+close_registration(ErlNifEnv *env,
+                   __unused_parm__ int argc,
+                   const ERL_NIF_TERM argv[])
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  HQUIC Registration = NULL;
+  ERL_NIF_TERM ectx = argv[0];
+  if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+  enif_mutex_lock(r_ctx->lock);
+  Registration = r_ctx->Registration;
+  r_ctx->Registration = NULL;
+  enif_mutex_unlock(r_ctx->lock);
+  MsQuic->RegistrationClose(Registration);
+  return ATOM_OK;
+}
+
+ERL_NIF_TERM
 get_registration_name1(ErlNifEnv *env,
                        __unused_parm__ int argc,
                        const ERL_NIF_TERM argv[])
