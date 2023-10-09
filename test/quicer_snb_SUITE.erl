@@ -947,7 +947,19 @@ tc_conn_gc(Config) ->
                  timer:sleep(1000),
                  {SRid, CRid}
                end,
-               fun({_SRid, CRid}, Trace) ->
+               fun({_SRid, CRid}, Trace0) ->
+                   Trace = flush_previous_run(Trace0, fun(#{ ?snk_kind := debug
+                                                           , context := "callback"
+                                                           , function := "ClientConnectionCallback"
+                                                           , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
+                                                           , resource_id := Rid
+                                                           , tag := "event"
+                                                           }) when Rid == CRid ->
+                                                          true;
+                                                         (_) ->
+                                                          false
+                                                      end
+                                             ),
                    ct:pal("Trace is ~p", [Trace]),
                    ct:pal("Target SRid: ~p, CRid: ~p", [_SRid, CRid]),
                    %% check that at client side, GC is triggered after connection close.
@@ -979,23 +991,9 @@ tc_conn_gc(Config) ->
                                               , mark := ?QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE
                                               , tag := "event"},
                                              Trace)),
-
-
-                   TraceEvents = flush_previous_run(Trace, fun(#{ ?snk_kind := debug
-                                                                , context := "callback"
-                                                                , function := "ClientConnectionCallback"
-                                                                , mark := ?QUIC_CONNECTION_EVENT_CONNECTED
-                                                                , resource_id := Rid
-                                                                , tag := "event"
-                                                                }) when Rid == CRid ->
-                                                               true;
-                                                              (_) ->
-                                                               false
-                                                           end
-                                                   ),
                    ?assertEqual(1, length([ E || #{ function := "resource_conn_dealloc_callback"
                                                   , resource_id := Rid
-                                                  , tag := "end"} = E <- TraceEvents, Rid == 0])
+                                                  , tag := "end"} = E <- Trace, Rid == 0])
                                )
                end),
   ct:pal("stop listener"),

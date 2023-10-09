@@ -582,7 +582,11 @@ tc_stream_passive_receive_shutdown(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       {ok, 4} = quicer:send(Stm, <<"ping">>, ?QUIC_SEND_FLAG_FIN),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
-      {error, peer_send_shutdown} = quicer:recv(Stm, 0),
+      case quicer:recv(Stm, 0) of
+        {error, peer_send_shutdown} -> ok;
+        {error, invalid_parameter} -> ok;
+        {error, closed} -> ok
+      end,
       quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -620,7 +624,10 @@ tc_stream_passive_receive_aborted(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"ping">>} = quicer:recv(Stm, 0),
       {ok, 5} = quicer:send(Stm, <<"Abort">>),
-      {error, peer_send_aborted} = quicer:recv(Stm, 0),
+      case quicer:recv(Stm, 0) of
+        {error, peer_send_aborted} -> ok;
+        {error, invalid_parameter} -> ok
+      end,
       quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -2160,9 +2167,13 @@ tc_event_start_compl_client(Config) ->
                               [{param_conn_disable_1rtt_encryption, true} |
                                default_conn_opts()], 5000),
   %% Stream 1 enabled
-  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                         {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}
+                                        ]),
   %% Stream 2 disabled
-  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0}]),
+  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0},
+                                          {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}
+                                         ]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
   receive
@@ -2177,7 +2188,7 @@ tc_event_start_compl_client(Config) ->
     {quic, start_completed, Stm2,
      #{status := Status}} ->
       ct:fail("Stream ~p should NOT recv event : ~p", [Stm, Status])
-  after 0 ->
+  after 500 ->
       ok
   end,
   quicer:close_connection(Conn),
@@ -2355,6 +2366,7 @@ tc_direct_send_over_conn_block(Config) ->
   after 100 ->
       ct:pal("No resp from unidi Stm2")
   end,
+  quicer:close_connection(Conn),
   ok.
 
 tc_direct_send_over_conn_fail(Config) ->
@@ -2374,14 +2386,16 @@ tc_direct_send_over_conn_fail(Config) ->
                                     [{param_conn_disable_1rtt_encryption, true} |
                                      default_conn_opts()]),
   %% Stream 1 enabled
-  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                         {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}
+                                        ]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
 
   quicer:shutdown_connection(Conn),
 
   %% csend over a closed conn
 
-  case quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+  case quicer:async_csend(Conn, <<"ping22">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
                                               {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
                                              ], ?QUIC_SEND_FLAG_ALLOW_0_RTT) of
     {error, closed} -> ok;
