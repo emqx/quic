@@ -230,6 +230,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
+      s_ctx->Stream = NULL;
       MsQuic->SetCallbackHandler(Stream, NULL, NULL);
     }
 
@@ -238,7 +239,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       // must be called after mutex unlock,
-      s_ctx->Stream = NULL;
       MsQuic->StreamClose(Stream);
       destroy_s_ctx(s_ctx);
     }
@@ -551,6 +551,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
 
       res = ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, ATOM_STATUS(Status));
+      s_ctx->Stream = NULL;
       goto ErrorExit;
     }
 
@@ -822,12 +823,13 @@ shutdown_stream3(ErlNifEnv *env,
       ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  enif_mutex_lock(s_ctx->lock);
   if (QUIC_FAILED(Status
                   = MsQuic->StreamShutdown(s_ctx->Stream, flags, app_errcode)))
     {
       ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-
+  enif_mutex_unlock(s_ctx->lock);
   return ret;
 }
 

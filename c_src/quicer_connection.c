@@ -327,7 +327,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // @see async_connect3
       status = handle_connection_event_shutdown_complete(c_ctx, Event);
       is_destroy = TRUE;
-      c_ctx->is_closed = TRUE; // client shutdown completed
       break;
 
     case QUIC_CONNECTION_EVENT_PEER_ADDRESS_CHANGED:
@@ -372,17 +371,22 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       break;
     }
   enif_clear_env(env);
+
+  QuicerConfigCTX *conf_ctx = c_ctx->config_resource;
+  if (is_destroy)
+    {
+      c_ctx->is_closed = TRUE; // client shutdown completed
+      c_ctx->Connection = NULL;
+      c_ctx->config_resource = NULL;
+    }
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
     {
-      // MsQuic->SetCallbackHandler(Connection, NULL, NULL);
-      c_ctx->Connection = NULL;
       MsQuic->ConnectionClose(Connection);
-      if (c_ctx->config_resource)
+      if (conf_ctx)
         {
-          enif_release_resource(c_ctx->config_resource);
-          c_ctx->config_resource = NULL;
+          enif_release_resource(conf_ctx);
         }
       destroy_c_ctx(c_ctx);
     }
@@ -442,7 +446,6 @@ ServerConnectionCallback(HQUIC Connection,
       // safely cleaned up.
       //
       status = handle_connection_event_shutdown_complete(c_ctx, Event);
-      c_ctx->is_closed = TRUE; // server shutdown_complete
       is_destroy = TRUE;
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -489,16 +492,22 @@ ServerConnectionCallback(HQUIC Connection,
       break;
     }
   enif_clear_env(env);
+
+  QuicerConfigCTX *conf_ctx = c_ctx->config_resource;
+  if (is_destroy)
+    {
+      c_ctx->Connection = NULL;
+      c_ctx->is_closed = TRUE; // server shutdown_complete
+      c_ctx->config_resource = NULL;
+    }
   enif_mutex_unlock(c_ctx->lock);
 
   if (is_destroy)
     {
-      c_ctx->Connection = NULL;
       MsQuic->ConnectionClose(Connection);
-      if (c_ctx->config_resource)
+      if (conf_ctx)
         {
-          enif_release_resource(c_ctx->config_resource);
-          c_ctx->config_resource = NULL;
+          enif_release_resource(conf_ctx);
         }
       destroy_c_ctx(c_ctx);
     }
@@ -813,13 +822,6 @@ async_connect3(ErlNifEnv *env,
     {
       AcceptorDestroy(c_ctx->owner);
       c_ctx->owner = NULL;
-
-      /* Although MsQuic internally close the connection after failed to start,
-         we still do not need to set is_closed here, we expect callback to set
-         it while handling the shutdown complete event otherwise could cause
-         race cond.
-      */
-      // c_ctx->is_closed = TRUE;
 
       if (Status != QUIC_STATUS_INVALID_PARAMETER)
         {

@@ -215,7 +215,10 @@ deinit_config_ctx(QuicerConfigCTX *config_ctx)
 void
 destroy_config_ctx(QuicerConfigCTX *config_ctx)
 {
-  enif_release_resource(config_ctx);
+  if (config_ctx)
+    {
+      enif_release_resource(config_ctx);
+    }
 }
 
 QuicerStreamCTX *
