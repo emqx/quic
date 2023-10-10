@@ -803,13 +803,16 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
   if (!l_ctx->is_closed && !l_ctx->is_stopped && l_ctx->Listener)
     {
       l_ctx->is_stopped = TRUE;
+      /*
       // We only stop here, but not close it, because possible subsequent
       // scenarios:
       // a. Some pid could still start the stopped listener with nif
-      // handle
+      // handle.
       // b. Some pid could still close the stopped listener with nif
-      // handle
-      // c. We close it in resource_listener_dealloc_callback anyway.
+      // handle.
+      // c. We close it in resource_listener_dealloc_callback anyway when
+      // Listener term get GC.
+      */
       MsQuic->ListenerStop(l_ctx->Listener);
     }
   enif_mutex_unlock(l_ctx->lock);
@@ -903,7 +906,6 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   assert(s_ctx->is_closed == TRUE);
   if (s_ctx->Stream)
     {
-
       MsQuic->StreamClose(s_ctx->Stream);
     }
 

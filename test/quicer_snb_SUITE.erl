@@ -1023,13 +1023,13 @@ tc_conn_no_gc(Config) ->
                  {ok, Conn} = quicer:connect("localhost", Port, [{idle_timeout_ms, 1000}, 
                                                                  {verify, none},
                                                                  {alpn, ["sample"]}], 5000),
+                 {ok, CRid} = quicer:get_conn_rid(Conn),
                  _Child = spawn_link(fun() ->
                                          {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
                                          {ok, 4} = quicer:async_send(Stm, <<"ping">>),
                                          {ok, <<"ping">>} = quicer:recv(Stm, 4),
                                          quicer:shutdown_connection(Conn, 0, 0)
                                      end),
-                 {ok, CRid} = quicer:get_conn_rid(Conn),
                  %% Server Process
                  {ok, #{resource_id := SRid}}
                    = ?block_until(#{ ?snk_kind := debug

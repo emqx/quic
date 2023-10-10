@@ -770,8 +770,9 @@ getopt3(ErlNifEnv *env,
   if (IS_SAME_TERM(ATOM_QUIC_GLOBAL, ctx))
     {
       pthread_mutex_lock(&MsQuicLock);
-      // Get global option without using any ctx
-      // We are risking using a closed lib
+      // In a env that while there is no allocated NIF resources (reg, conf,
+      // listener, conn, stream), VM may unload the module causes unloading DSO
+      // in parallel.
       if (MsQuic)
         {
           res = get_global_opt(env, NULL, eopt);
