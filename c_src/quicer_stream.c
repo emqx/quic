@@ -354,8 +354,11 @@ async_start_stream2(ErlNifEnv *env,
   //
   if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream, start_flag)))
     {
-      // note, stream call back would close the stream
-      // destroy_s_ctx should not be called here
+      HQUIC Stream = s_ctx->Stream;
+      enif_mutex_lock(s_ctx->lock);
+      s_ctx->is_closed = TRUE;
+      enif_mutex_unlock(s_ctx->lock);
+      MsQuic->StreamClose(Stream);
       return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
   // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
