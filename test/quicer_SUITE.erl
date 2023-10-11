@@ -584,7 +584,6 @@ tc_stream_passive_receive_shutdown(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       case quicer:recv(Stm, 0) of
         {error, peer_send_shutdown} -> ok;
-        {error, invalid_parameter} -> ok;
         {error, closed} -> ok
       end,
       quicer:close_connection(Conn),
@@ -626,7 +625,7 @@ tc_stream_passive_receive_aborted(Config) ->
       {ok, 5} = quicer:send(Stm, <<"Abort">>),
       case quicer:recv(Stm, 0) of
         {error, peer_send_aborted} -> ok;
-        {error, invalid_parameter} -> ok
+        {error, closed} -> ok
       end,
       quicer:close_connection(Conn),
       SPid ! done,

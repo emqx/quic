@@ -736,6 +736,12 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
   enif_mutex_lock(s_ctx->lock);
 
+  if ( !s_ctx->Stream )
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto Exit;
+    }
+
   if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
     {
       res = ERROR_TUPLE_2(ATOM_EINVAL);
