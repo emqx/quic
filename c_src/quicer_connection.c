@@ -527,7 +527,7 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
   QuicerRegistrationCTX *r_ctx = NULL;
   HQUIC registration = NULL;
-  ERL_NIF_TERM options = argv[1];
+  ERL_NIF_TERM options = argv[0];
 
   if (argc == 0)
     {
