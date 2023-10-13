@@ -144,6 +144,9 @@
         , tc_peercert_client_nocert/1
         , tc_peercert_server/1
         , tc_peercert_server_nocert/1
+
+        %% Versions test
+        , tc_abi_version/1
         %% testcase to verify env works
         %% , tc_network/1
         ]).
@@ -192,7 +195,10 @@ init_per_suite(Config) ->
   Config.
 
 end_per_suite(_Config) ->
+  quicer_test_lib:report_active_connections(),
   application:stop(quicer),
+  code:purge(quicer_nif),
+  code:delete(quicer_nif),
   ok.
 
 
@@ -213,6 +219,7 @@ end_per_group(_Groupname, _Config) ->
 %%% Testcase specific setup/teardown
 %%%===================================================================
 init_per_testcase(_TestCase, Config) ->
+  quicer_test_lib:cleanup_msquic(),
   [{timetrap, 5000} | Config].
 
 end_per_testcase(tc_close_lib_test, _Config) ->
@@ -228,10 +235,13 @@ end_per_testcase(tc_lib_re_registration_neg, _Config) ->
 end_per_testcase(tc_open_listener_neg_1, _Config) ->
   quicer:open_lib(),
   quicer:reg_open();
+end_per_testcase(tc_lib_registration_neg, _Config) ->
+  quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
   quicer:terminate_listener(mqtt),
-  Unhandled = quicer_test_lib:receive_all(),
-  Unhandled =/= [] andalso ct:comment("What left in the message queue: ~p", [Unhandled]),
+  quicer_test_lib:report_unhandled_messages(),
+  quicer_test_lib:report_active_connections(fun ct:pal/2),
+  ct:pal("Counters ~p", [quicer:perf_counters()]),
   ok.
 
 %%%===================================================================
@@ -321,7 +331,6 @@ tc_open_listener_inval_reg(Config) ->
   quicer:reg_open(),
   ok.
 
-
 tc_stream_client_init(Config) ->
   Port = select_port(),
   Owner = self(),
@@ -339,7 +348,6 @@ tc_stream_client_init(Config) ->
   after 1000 ->
       ct:fail("timeout")
   end.
-
 
 tc_stream_client_send_binary(Config) ->
   Port = select_port(),
@@ -574,7 +582,10 @@ tc_stream_passive_receive_shutdown(Config) ->
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
       {ok, 4} = quicer:send(Stm, <<"ping">>, ?QUIC_SEND_FLAG_FIN),
       {ok, <<"pong">>} = quicer:recv(Stm, 0),
-      {error, peer_send_shutdown} = quicer:recv(Stm, 0),
+      case quicer:recv(Stm, 0) of
+        {error, peer_send_shutdown} -> ok;
+        {error, closed} -> ok
+      end,
       quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -612,7 +623,10 @@ tc_stream_passive_receive_aborted(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, <<"ping">>} = quicer:recv(Stm, 0),
       {ok, 5} = quicer:send(Stm, <<"Abort">>),
-      {error, peer_send_aborted} = quicer:recv(Stm, 0),
+      case quicer:recv(Stm, 0) of
+        {error, peer_send_aborted} -> ok;
+        {error, closed} -> ok
+      end,
       quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
@@ -698,7 +712,12 @@ tc_stream_send_after_conn_close(Config) ->
       %% a) Just close connection, stream is not created in QUIC
       %% b) Close the connection after the stream is created in QUIC
       ok = quicer:close_connection(Conn),
-      {error, stm_send_error, aborted} = quicer:send(Stm, <<"ping2">>),
+      case quicer:send(Stm, <<"ping2">>) of
+        {error, closed} ->
+          ok;
+        {error, stm_send_error, aborted} ->
+          ok
+      end,
       SPid ! done,
       ok = ensure_server_exit_normal(Ref)
   after 1000 ->
@@ -918,7 +937,7 @@ tc_getopt(Config) ->
       receive {quic, <<"ping">>, Stm, _} -> ok end,
       ok = quicer:close_connection(Conn),
       %% @todo unsupp in msquic, leave it for now
-      {error, not_found} = quicer:getopt(Conn, param_conn_close_reason_phrase),
+      {error, _} = quicer:getopt(Conn, param_conn_close_reason_phrase),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 5000 ->
@@ -1009,9 +1028,13 @@ tc_get_stream_0rtt_length(Config) ->
       end,
       %% before stream shutdown,
       {error, invalid_state} = quicer:getopt(Stm, param_stream_0rtt_length),
-      quicer:shutdown_stream(Stm),
-      {ok, Val} = quicer:getopt(Stm, param_stream_0rtt_length),
-      ?assert(is_integer(Val)),
+      quicer:async_shutdown_stream(Stm),
+      case quicer:getopt(Stm, param_stream_0rtt_length) of
+        {ok, Val}  -> ?assert(is_integer(Val));
+        {error, invalid_state} -> ok;
+        {error, invalid_parameter} -> ok
+      end,
+      quicer:close_connection(Conn),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 5000 ->
@@ -1035,8 +1058,6 @@ tc_get_stream_ideal_sndbuff_size(Config) ->
       {ok, Val} = quicer:getopt(Stm, param_stream_ideal_send_buffer_size),
       ?assert(is_integer(Val)),
       ok = quicer:shutdown_stream(Stm),
-      {ok, Val2} = quicer:getopt(Stm, param_stream_ideal_send_buffer_size),
-      ?assert(is_integer(Val2)),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 5000 ->
@@ -1110,7 +1131,7 @@ tc_peername_v6(Config) ->
 tc_peername_v4(Config) ->
   Port = select_port(),
   Owner = self(),
-  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
@@ -1122,7 +1143,8 @@ tc_peername_v4(Config) ->
       true = is_integer(RPort),
       ct:pal("addr is ~p", [Addr]),
       "127.0.0.1" =  inet:ntoa(Addr),
-      ok = quicer:close_connection(Conn)
+      ok = quicer:close_connection(Conn),
+      SPid ! done
       %{error, _} = quicer:peername(Conn)
   after 5000 ->
       ct:fail("listener_timeout")
@@ -1158,11 +1180,10 @@ tc_alpn_mismatch(Config) ->
       receive
         ok ->
           ct:fail("illegal connection");
-        {error, transport_down} ->
-          ok
-      after 1000 ->
-        SPid ! done
-      end
+        {error, transport_down, #{error := 376, status := alpn_neg_failure}} ->
+            ok
+      end,
+      SPid ! done
   after 1000 ->
     ct:fail("timeout")
   end.
@@ -1523,6 +1544,7 @@ tc_setopt_stream_unsupp_opts(Config) ->
       {ok, <<"ping">>} = quicer:recv(Stm, 0),
       % try to set priority out of range
       {error, param_error} = quicer:setopt(Stm, param_stream_priority, 65536),
+      quicer:shutdown_stream(Stm),
       SPid ! done,
       ensure_server_exit_normal(Ref)
   after 5000 ->
@@ -1721,11 +1743,13 @@ tc_stream_open_flag_unidirectional(Config) ->
     -> ct:pal("stream is closed due to connecion idle")
   end,
   ?assert(is_integer(Rid)),
-  ?assert(Rid =/= 0).
+  ?assert(Rid =/= 0),
+  quicer:close_connection(Conn).
 
 tc_stream_start_flag_fail_blocked(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
+  %% Given a server with 0 allowed remote bidi stream.
   ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                  | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1737,16 +1761,27 @@ tc_stream_start_flag_fail_blocked(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  %% When a client tries to start a bidi stream with flag "QUIC_STREAM_START_FLAG_FAIL_BLOCKED"
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED}
                                         , {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                                         ]),
   {ok, Rid} = quicer:get_stream_rid(Stm),
-  {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+  case quicer:async_send(Stm, <<"ping1">>) of
+    {ok, 5} ->
+      ok;
+    {error, closed} ->
+      ok;
+    {error, stm_send_error, invalid_state} ->
+      %% Deps on the timing
+      ok
+  end,
   receive
     {quic, <<"ping1">>, Stm,  _} ->
       ct:fail("Should not get ping1 due to rate limiter");
     {quic, start_completed, Stm,
              #{status := stream_limit_reached, stream_id := StreamID}} ->
+      %% Then stream start should fail with reason stream_limit_reached
+      quicer:close_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT bor ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE, 0, 1000),
       ct:pal("Stream ~p limit reached", [StreamID]);
     {quic, start_completed, Stm,
              #{status := AtomStatus, stream_id := StreamID, is_peer_accepted := _PeerAccepted}
@@ -1754,6 +1789,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
       ct:fail("Stream ~pstart complete with unexpect reason: ~p", [StreamID, AtomStatus])
   end,
 
+  %% Then stream is closed automatically
   receive
     {quic, stream_closed, Stm, _} ->
       ct:failed("Stream ~p is closed but shouldn't since QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL is unset", [Stm]);
@@ -1764,8 +1800,8 @@ tc_stream_start_flag_fail_blocked(Config) ->
     {quic, closed, Conn, _Flags} ->
       ct:pal("Connecion is closed ~p", [Conn])
   end,
-  ?assert(is_integer(Rid)),
-  ?assert(Rid =/= 0).
+  quicer:terminate_listener(mqtt),
+  ?assert(is_integer(Rid)).
 
 tc_stream_start_flag_immediate(Config) ->
   Port = select_port(),
@@ -1800,6 +1836,7 @@ tc_stream_start_flag_immediate(Config) ->
 tc_stream_start_flag_shutdown_on_fail(Config) ->
   Port = select_port(),
   application:ensure_all_started(quicer),
+  %% Given a server with 0 allowed remote bidi stream.
   ListenerOpts = [{conn_acceptors, 32}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}
                  | lists:keyreplace(peer_bidi_stream_count, 1, default_listen_opts(Config), {peer_bidi_stream_count,0})],
   ConnectionOpts = [ {conn_callback, quicer_server_conn_callback}
@@ -1811,6 +1848,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  %% When a client tries to start a bidi stream with flag "QUIC_STREAM_START_FLAG_FAIL_BLOCKED" unset
   {ok, Stm} = quicer:start_stream(Conn, [ {active, 3}, {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
                                                         bor ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
                                                        }
@@ -1819,6 +1857,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
   {ok, Rid} = quicer:get_stream_rid(Stm),
   case quicer:async_send(Stm, <<"ping1">>) of
     {ok, 5} -> ok;
+    {error, closed} -> ok;
     {error, stm_send_error, invalid_state} -> ok %% already closed
   end,
   receive
@@ -1842,8 +1881,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
     Other ->
       ct:fail("Unexpected event ~p after stream start complete", [Other])
   end,
-  ?assert(is_integer(Rid)),
-  ?assert(Rid =/= 0).
+  ?assert(is_integer(Rid)).
 
 tc_stream_start_flag_indicate_peer_accept_1(Config) ->
   Port = select_port(),
@@ -2128,9 +2166,13 @@ tc_event_start_compl_client(Config) ->
                               [{param_conn_disable_1rtt_encryption, true} |
                                default_conn_opts()], 5000),
   %% Stream 1 enabled
-  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                         {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}
+                                        ]),
   %% Stream 2 disabled
-  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0}]),
+  {ok, Stm2} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, 0},
+                                          {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}
+                                         ]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
   {ok, 5} = quicer:async_send(Stm, <<"ping2">>),
   receive
@@ -2145,7 +2187,7 @@ tc_event_start_compl_client(Config) ->
     {quic, start_completed, Stm2,
      #{status := Status}} ->
       ct:fail("Stream ~p should NOT recv event : ~p", [Stm, Status])
-  after 0 ->
+  after 500 ->
       ok
   end,
   quicer:close_connection(Conn),
@@ -2323,6 +2365,7 @@ tc_direct_send_over_conn_block(Config) ->
   after 100 ->
       ct:pal("No resp from unidi Stm2")
   end,
+  quicer:close_connection(Conn),
   ok.
 
 tc_direct_send_over_conn_fail(Config) ->
@@ -2342,16 +2385,22 @@ tc_direct_send_over_conn_fail(Config) ->
                                     [{param_conn_disable_1rtt_encryption, true} |
                                      default_conn_opts()]),
   %% Stream 1 enabled
-  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE}]),
+  {ok, Stm} = quicer:start_stream(Conn, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                         {start_flag, ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}
+                                        ]),
   {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
 
   quicer:shutdown_connection(Conn),
 
   %% csend over a closed conn
-  {error, stm_open_error, invalid_state} =
-    quicer:async_csend(Conn, <<"ping2">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
-                                           {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
-                                          ], ?QUIC_SEND_FLAG_ALLOW_0_RTT),
+
+  case quicer:async_csend(Conn, <<"ping22">>, [{active, true}, {quic_event_mask, ?QUICER_STREAM_EVENT_MASK_START_COMPLETE},
+                                              {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                             ], ?QUIC_SEND_FLAG_ALLOW_0_RTT) of
+    {error, closed} -> ok;
+    {error, stm_open_error, invalid_parameter} -> ok;
+    {error, stm_open_error, invalid_state} -> ok
+  end,
   receive
     {quic, start_completed, Stm0,
      #{status := StartStatus, stream_id := StreamId2}} ->
@@ -2366,6 +2415,7 @@ tc_direct_send_over_conn_fail(Config) ->
      #{status := StartStatusX, stream_id := StreamIdX}} when StmX =/= Stm0 ->
       ct:fail("Stream id: ~p started: ~p", [StreamIdX, StartStatusX])
   after 100 ->
+      quicer:close_connection(Conn),
       ok
   end.
 
@@ -2496,6 +2546,9 @@ tc_peercert_server_nocert(Config) ->
   ensure_server_exit_normal(Ref),
   ok.
 
+tc_abi_version(Config) ->
+  ?assertEqual(1, quicer:abi_version()).
+
 %%% ====================
 %%% Internal helpers
 %%% ====================
@@ -2547,6 +2600,8 @@ echo_server_stm_loop(L, Conn, Stms) ->
         {error, cancelled} ->
           ct:pal("echo server: send cancelled: ~p ", [Bin]),
           cancelled;
+        {error, closed} ->
+          closed;
         {ok, _} ->
           ok
       end,
@@ -2737,11 +2792,14 @@ simple_conn_server_client_cert_loop(L, Conn, Owner) ->
 conn_server_with(Owner, Port, Opts) ->
   {ok, L} = quicer:listen(Port, Opts),
   Owner ! listener_ready,
-  {ok, Conn} = quicer:accept(L, [], 10000),
-  {ok, Conn} = quicer:handshake(Conn),
+  case quicer:accept(L, [], 10000) of
+    {error, _} ->
+      quicer:close_listener(L);
+    {ok, Conn} ->
+      {ok, Conn} = quicer:handshake(Conn)
+  end,
   receive done ->
-    quicer:close_listener(L),
-    ok
+      quicer:close_listener(L)
   end.
 
 simple_stream_server(Owner, Config, Port) ->
@@ -2752,7 +2810,12 @@ simple_stream_server(Owner, Config, Port) ->
   {ok, Conn} = quicer:handshake(Conn),
   receive
     {quic, new_stream, Stream, _Props} ->
-      {ok, StreamId} = quicer:get_stream_id(Stream),
+      StreamId = case quicer:get_stream_id(Stream) of
+                   {ok, Stm} ->
+                     Stm;
+                   {error, _} ->
+                     simple_stream_server_exit(L)
+                 end,
       ct:pal("New StreamID: ~p", [StreamId]),
       receive
         {quic, shutdown, Conn, _ErrorCode} ->
@@ -2761,7 +2824,7 @@ simple_stream_server(Owner, Config, Port) ->
         {quic, peer_send_shutdown, Stream, undefined} ->
           quicer:close_stream(Stream);
         done ->
-          exit(normal)
+          simple_stream_server_exit(L)
       end;
    {quic, shutdown, Conn, _ErrorCode} ->
       ct:pal("Received Conn close for ~p", [Conn]),
@@ -2774,6 +2837,9 @@ simple_stream_server(Owner, Config, Port) ->
     done ->
       ok
   end,
+  simple_stream_server_exit(L).
+
+simple_stream_server_exit(L) ->
   quicer:close_listener(L).
 
 

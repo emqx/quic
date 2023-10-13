@@ -13,15 +13,12 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
-
--module(quicer_reg_SUITE).
-
--include_lib("common_test/include/ct.hrl").
--include_lib("stdlib/include/assert.hrl").
+-module(quicer_upgrade_SUITE).
 
 -compile(export_all).
--compile(nowarn_export_all).
 
+-include_lib("common_test/include/ct.hrl").
+-include_lib("eunit/include/eunit.hrl").
 %%--------------------------------------------------------------------
 %% @spec suite() -> Info
 %% Info = [tuple()]
@@ -38,6 +35,8 @@ suite() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
+    %% close all listeners under global registration
+    [quicer:close_listener(L, 1000) || L <- quicer:get_listeners()],
     Config.
 
 %%--------------------------------------------------------------------
@@ -77,8 +76,13 @@ end_per_group(_GroupName, _Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
-init_per_testcase(_TestCase, Config) ->
-    Config.
+init_per_testcase(TestCase, Config) ->
+    case erlang:function_exported(?MODULE, TestCase, 2) of
+        false ->
+            Config;
+        true ->
+            ?MODULE:TestCase(init, Config)
+    end.
 
 %%--------------------------------------------------------------------
 %% @spec end_per_testcase(TestCase, Config0) ->
@@ -89,7 +93,6 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
-    erlang:garbage_collect(self(), [{type, major}]),
     quicer_test_lib:report_active_connections(),
     ok.
 
@@ -119,13 +122,6 @@ groups() ->
 %%--------------------------------------------------------------------
 all() ->
     quicer_test_lib:all_tcs(?MODULE).
-%%--------------------------------------------------------------------
-%% @spec TestCase() -> Info
-%% Info = [tuple()]
-%% @end
-%%--------------------------------------------------------------------
-%% my_test_case() ->
-%%     [].
 
 %%--------------------------------------------------------------------
 %% @spec TestCase(Config0) ->
@@ -136,63 +132,106 @@ all() ->
 %% Comment = term()
 %% @end
 %%--------------------------------------------------------------------
-tc_new_reg(Config) ->
-    {Pid, Ref} = erlang:spawn_monitor(fun() -> do_tc_new_reg(Config) end),
-    receive
-        {'DOWN', Ref, process, Pid, Reason} ->
-            ?assertEqual(normal, Reason)
-    end.
+tc_nif_module_is_loaded(_Config) ->
+    ?assertMatch({file, _}, code:is_loaded(quicer_nif)).
 
-do_tc_new_reg(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    quicer:shutdown_registration(Reg),
+tc_nif_module_purge(init, Config) ->
+    %% When we have both old code and new code
+    case code:load_file(quicer_nif) of
+        {module, quicer_nif} ->
+            ok;
+        {error, not_purged} ->
+            ok
+    end,
+    Config.
+tc_nif_module_purge(_Config) ->
+    %% Then purge old code should success (test nif lib no crash)
+    ?assertEqual(false, code:purge(quicer_nif)).
+
+tc_nif_no_old_module_purge(init, Config) ->
+    %% Give there is no old code of quicer_nif present
+    code:purge(quicer_nif),
+    Config.
+tc_nif_no_old_module_purge(_Config) ->
+    %% Then purge non existing old code should success (test nif lib no crash)
+    ?assertEqual(false, code:purge(quicer_nif)).
+
+tc_nif_module_reload(init, Config) ->
+    %% Given no old code of quicer_nif present
+    code:purge(quicer_nif),
+    Config.
+tc_nif_module_reload(_Config) ->
+    %% When reload quicer_nif with same module file
+    %% Then load success
+    ?assertEqual({module, quicer_nif}, code:load_file(quicer_nif)).
+
+tc_nif_module_load_current(init, Config) ->
+    %% Given no new/old code of quicer_nif present
+    ensure_module_no_code(quicer_nif),
+    Config.
+tc_nif_module_load_current(_Config) ->
+    %% When load quicer_nif, it should success
+    ?assertEqual({module, quicer_nif}, code:load_file(quicer_nif)).
+
+tc_nif_module_softpurge(init, Config) ->
+    %% When we have both old code and new code
+    case code:load_file(quicer_nif) of
+        {module, quicer_nif} ->
+            ok;
+        {error, not_purged} ->
+            ok
+    end,
+    Config.
+tc_nif_module_softpurge(_Config) ->
+    ?assertEqual(true, code:soft_purge(quicer_nif)).
+
+tc_nif_module_no_reinit(_Config) ->
+    %% Given quicer_nif is not loaded
+    ensure_module_no_code(quicer_nif),
+    Res = {error, {reload, "NIF library already loaded (reload disallowed since OTP 20)."}},
+    %% When calling quicer_nif:init/1 with ABI version 1
+    %% Then it should still fail
+    ?assertEqual(Res, quicer_nif:init(1)).
+
+tc_nif_module_load_fail_dueto_mismatch_abiversion(init, Config) ->
+    %% Given quicer_nif is not loaded
+    ensure_module_no_code(quicer_nif),
+    %% When _quicer_overrides_ provides ABI version 0 which is reserved
+    persistent_term:put({'_quicer_overrides_', abi_version}, 0),
+    Config.
+tc_nif_module_load_fail_dueto_mismatch_abiversion(_Config) ->
+    %% Then load quicer_nif should fail due to abi version mismatch
+    ?assertEqual({error, on_load_failure}, code:load_file(quicer_nif)),
+    persistent_term:erase({'_quicer_overrides_', abi_version}).
+
+tc_nif_module_upgrade_fail_dueto_mismatch_abiversion(init, Config) ->
+    %% Given quicer_nif has current code
+    ensure_module_current_vsn(quicer_nif),
+    %% When _quicer_overrides_ provides ABI version 0 which is reserved
+    persistent_term:put({'_quicer_overrides_', abi_version}, 0),
+    Config.
+tc_nif_module_upgrade_fail_dueto_mismatch_abiversion(_Config) ->
+    %% Then upgrade quicer_nif should fail due to abi version mismatch
+    ?assertEqual({error, on_load_failure}, code:load_file(quicer_nif)),
+    persistent_term:erase({'_quicer_overrides_', abi_version}),
+    %% Then quicer_nif should still be loaded
+    ?assertMatch({file, _}, code:is_loaded(quicer_nif)).
+
+%% Helpers
+
+%% @doc ensure neither old nor new code is present
+ensure_module_no_code(Module) ->
+    %% purge old if any
+    code:purge(Module),
+    %% current become old
+    code:delete(Module),
+    %% assert no current.
+    not_loaded = code:module_status(Module),
+    %% force purge this old
+    _ = code:purge(Module).
+
+%% @doc ensure only current code is present
+ensure_module_current_vsn(Module) ->
+    ensure_module_no_code(Module),
+    _ = code:load_file(Module),
     ok.
-
-tc_shutdown_reg_1(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    ok = quicer:shutdown_registration(Reg),
-    ok.
-
-tc_shutdown_1_abnormal(_Config) ->
-    ?assertEqual({error, badarg}, quicer:shutdown_registration(erlang:make_ref())),
-    ?assertEqual({error, badarg}, quicer:shutdown_registration(1)).
-
-tc_shutdown_3_abnormal(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, 1, 2)),
-    ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, 1, foo)),
-    ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, true, -1)),
-    ok = quicer:shutdown_registration(Reg).
-
-tc_shutdown_ok(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    ok = quicer:shutdown_registration(Reg).
-
-tc_shutdown_twice(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    ok = quicer:shutdown_registration(Reg),
-    ok = quicer:shutdown_registration(Reg).
-
-tc_shutdown_with_reason(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    ok = quicer:shutdown_registration(Reg, false, 123).
-
-tc_get_reg_name(_Config) ->
-    Name = atom_to_list(?FUNCTION_NAME),
-    Profile = quic_execution_profile_low_latency,
-    {ok, Reg} = quicer:new_registration(Name, Profile),
-    ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)),
-    ok = quicer:shutdown_registration(Reg),
-    ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)).

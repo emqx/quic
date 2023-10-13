@@ -21,6 +21,7 @@ limitations under the License.
 #include <msquichelper.h>
 
 extern QuicerRegistrationCTX *G_r_ctx;
+extern pthread_mutex_t MsQuicLock;
 
 static ERL_NIF_TERM get_stream_opt(ErlNifEnv *env,
                                    QuicerStreamCTX *s_ctx,
@@ -768,7 +769,15 @@ getopt3(ErlNifEnv *env,
 
   if (IS_SAME_TERM(ATOM_QUIC_GLOBAL, ctx))
     {
-      res = get_global_opt(env, NULL, eopt);
+      pthread_mutex_lock(&MsQuicLock);
+      // In a env that while there is no allocated NIF resources (reg, conf,
+      // listener, conn, stream), VM may unload the module causes unloading DSO
+      // in parallel.
+      if (MsQuic)
+        {
+          res = get_global_opt(env, NULL, eopt);
+        }
+      pthread_mutex_unlock(&MsQuicLock);
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {

@@ -13,26 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -------------------------------------------------------------------*/
-#ifndef QUICER_REG_H_
-#define QUICER_REG_H_
-#include <erl_nif.h>
+#ifndef __QUICER_VSN_H_
+#define __QUICER_VSN_H_
 
-ERL_NIF_TERM
-registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+// clang-format off
+#define QUICER_ABI_VERSION @QUICER_ABI_VERSION@
+// clang-format on
 
-ERL_NIF_TERM
-deregistration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-
-ERL_NIF_TERM
-new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-
-ERL_NIF_TERM
-shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-
-ERL_NIF_TERM
-close_registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-
-ERL_NIF_TERM
-get_registration_name1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
-
-#endif // QUICER_REG_H_
+#endif //__QUICER_VSN_H_

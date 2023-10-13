@@ -19,6 +19,7 @@ limitations under the License.
 #include <dlfcn.h>
 
 #include "quicer_listener.h"
+#include "quicer_vsn.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -802,11 +803,16 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
   if (!l_ctx->is_closed && !l_ctx->is_stopped && l_ctx->Listener)
     {
       l_ctx->is_stopped = TRUE;
+      /*
       // We only stop here, but not close it, because possible subsequent
-      // scenarios a. Some pid could still start the stopped listener with nif
-      // handle b. Some pid could still close the stopped listener with nif
-      // handle
-      // 3. We close it in resource_listener_dealloc_callback anyway.
+      // scenarios:
+      // a. Some pid could still start the stopped listener with nif
+      // handle.
+      // b. Some pid could still close the stopped listener with nif
+      // handle.
+      // c. We close it in resource_listener_dealloc_callback anyway when
+      // Listener term get GC.
+      */
       MsQuic->ListenerStop(l_ctx->Listener);
     }
   enif_mutex_unlock(l_ctx->lock);
@@ -835,6 +841,10 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
       // We must close listener since there is no chance that any erlang
       // process is able to access the listener via any l_ctx
       MsQuic->ListenerClose(l_ctx->Listener);
+    }
+  else
+    {
+      TP_CB_3(skip, (uintptr_t)l_ctx->Listener, 0);
     }
 
   if (l_ctx->cacertfile)
@@ -880,8 +890,10 @@ resource_conn_down_callback(__unused_parm__ ErlNifEnv *env,
       && !enif_compare_pids(&c_ctx->owner->Pid, DeadPid))
     {
       TP_CB_3(start, (uintptr_t)c_ctx->Connection, (uintptr_t)ctx);
+      enif_mutex_lock(c_ctx->lock);
       MsQuic->ConnectionShutdown(
           c_ctx->Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+      enif_mutex_unlock(c_ctx->lock);
       TP_CB_3(end, (uintptr_t)c_ctx->Connection, (uintptr_t)ctx);
     }
 }
@@ -913,6 +925,7 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   QuicerStreamCTX *s_ctx = ctx;
 
+  enif_mutex_lock(s_ctx->lock);
   if (s_ctx && s_ctx->owner && DeadPid
       && !enif_compare_pids(&s_ctx->owner->Pid, DeadPid))
     {
@@ -931,6 +944,7 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
           TP_CB_3(shutdown_success, (uintptr_t)s_ctx->Stream, status);
         }
     }
+  enif_mutex_unlock(s_ctx->lock);
 }
 
 void
@@ -961,25 +975,21 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
-/*
-** on_load is called when the NIF library is loaded and no previously loaded
-*library exists for this module.
-*/
-static int
-on_load(ErlNifEnv *env,
-        __unused_parm__ void **priv_data,
-        __unused_parm__ ERL_NIF_TERM loadinfo)
+static void
+init_atoms(ErlNifEnv *env)
 {
-  int ret_val = 0;
-
-// init atoms in use.
+  // init atoms in use.
 #define ATOM(name, val)                                                       \
   {                                                                           \
     (name) = enif_make_atom(env, #val);                                       \
   }
   INIT_ATOMS
 #undef ATOM
+}
 
+static void
+open_resources(ErlNifEnv *env)
+{
   ErlNifResourceFlags flags
       = (ErlNifResourceFlags)(ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
 
@@ -1029,14 +1039,55 @@ on_load(ErlNifEnv *env,
                                            &streamInit, // init callbacks
                                            flags,
                                            NULL);
+}
 
+/*
+** on_load is called when the NIF library is loaded and no previously loaded
+*  library exists for this module.
+*/
+static int
+on_load(ErlNifEnv *env,
+        __unused_parm__ void **priv_data,
+        ERL_NIF_TERM loadinfo)
+{
+  int ret_val = 0;
+  unsigned load_vsn = 0;
+
+  TP_NIF_3(start, &MsQuic, 0);
+  if (!enif_get_uint(env, loadinfo, &load_vsn))
+    {
+      load_vsn = 0;
+    }
+
+  // This check avoid erlang module loaded
+  // incompatible NIF library
+  if (load_vsn != QUICER_ABI_VERSION)
+    {
+      TP_NIF_3(end, &MsQuic, 1);
+      return 1; // any value except 0 is error
+    }
+
+  init_atoms(env);
+  open_resources(env);
+
+  TP_NIF_3(end, &MsQuic, 0);
   return ret_val;
 }
 
 /*
-** on_upgrade is called when the NIF library is loaded and there is old code of
-*this module with a loaded NIF library.
-*/
+ * on_upgrade is called when the NIF library is loaded and there is old code of
+ *  this module with a loaded NIF library.
+ *
+ *  But new code could be the same as old code, that is, the same msquic
+ *  library is mapped into process memory. To distinguish the two cases, the
+ *  `MsQuic` API handle is checked since it is init as NULL for new loading. If
+ *  MsQuic is NULL, then it is a new load, that two msquic libraries (new and
+ *  old) are mapped into process memory, If MsQuic is not NULL, then it is
+ *  already initilized and there is still one msquic library in process memory.
+ *
+ *  In any case above, we return success.
+ */
+
 static int
 on_upgrade(ErlNifEnv *env,
            void **priv_data,
@@ -1047,12 +1098,62 @@ on_upgrade(ErlNifEnv *env,
 }
 
 /*
-** unload is called when the module code that the NIF library belongs to is
-*purged as old. New code of the same module may or may not exist.
-*/
+** on_unload is called when the module code that the NIF library belongs to is
+*  purged as old.
+*
+*  New code of the same module may or may not exist.
+*
+*  But there are three cases:
+*
+*  Case A: No new code of the same module exists.
+*          arg `priv_data` is not NULL.
+*
+*          It is ok to teardown the MsQuic with API handle and then close the
+*          API handle.
+*
+*  Case B: New code of the same module exists and it uses the same NIF DSO.
+*          arg `priv_data` is NULL.
+*
+*          It could be checked with `quicer:nif_mapped()`
+*
+*          It is *NOT* ok to teardown the MsQuic since the new code is
+*          still using it.
+*
+*  Case C: New code of the same module exists and it uses different NIF DSO.
+*          arg `priv_data` is not NULL.
+*          AND
+*          &MsQuic != the 'lib_api_ptr' in priv_data
+*
+*          This could be checked with `quicer:nif_mapped()`
+*
+*          It is ok to teardown the MsQuic with API handle and then close the
+*          API handle.
+
+*
+*  @NOTE 1. This callback will *NOT* be called when the module is purged
+*           while there are opening resources.
+*           When new code of the same module exists, the resources will be
+*           taken over by the new code thus it will get called for the
+*           old code.
+*
+*  @NOTE 2. The `MsQuic` and `GRegistration` are in library scope.
+*
+*  @NOTE 3: It is very important to shutdown all the MsQuic Registrations
+*           before return to avoid unexpected behaviour after NIF DSO is
+*           unmapped by OS.
+*
+*  @NOTE 4: For safty, it is ok to dlopen the shared library by calling
+*           quicer:dlopen/1, so we will have a refcnt on it and it won't
+*           be unmapped by OS.
+*
+*  @NOTE 5: 'same NIF DSO' means same shared library file that is managed
+*           by OS.
+*           Two copies of the same shared library in OS are different NIF DSOs.
+*  */
 static void
 on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 {
+  // @TODO clean all the leakages before close the lib
   closeLib(env, 0, NULL);
 }
 
@@ -1430,10 +1531,11 @@ static ErlNifFunc nif_funcs[] = {
   { "close_lib", 0, closeLib, 0 },
   { "reg_open", 0, registration, 0 },
   { "reg_open", 1, registration, 0 },
-  { "reg_close", 0, deregistration, 0 },
+  { "reg_close", 0, deregistration, 1 },
   { "new_registration", 2, new_registration2, 0},
   { "shutdown_registration", 1, shutdown_registration_x, 0},
   { "shutdown_registration", 3, shutdown_registration_x, 0},
+  { "close_registration", 1, close_registration, 1},
   { "get_registration_name", 1, get_registration_name1, 0},
   { "listen", 2, listen2, 0},
   { "start_listener", 3, start_listener3, 0},

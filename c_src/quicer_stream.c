@@ -130,12 +130,14 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
+      s_ctx->Stream = NULL;
     }
 
   enif_mutex_unlock(s_ctx->lock);
 
   if (is_destroy)
     {
+      MsQuic->StreamClose(Stream);
       // must be called after mutex unlock
       destroy_s_ctx(s_ctx);
     }
@@ -228,6 +230,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
+      s_ctx->Stream = NULL;
+      MsQuic->SetCallbackHandler(Stream, NULL, NULL);
     }
 
   enif_mutex_unlock(s_ctx->lock);
@@ -235,6 +239,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       // must be called after mutex unlock,
+      MsQuic->StreamClose(Stream);
       destroy_s_ctx(s_ctx);
     }
   return status;
@@ -341,6 +346,7 @@ async_start_stream2(ErlNifEnv *env,
 
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
+  res = enif_make_copy(env, s_ctx->eHandle);
 
   //
   // Starts the bidirectional stream. By default, the peer is not notified of
@@ -348,13 +354,13 @@ async_start_stream2(ErlNifEnv *env,
   //
   if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream, start_flag)))
     {
-      // note, stream call back would close the stream
-      // destroy_s_ctx should not be called here
+      HQUIC Stream = s_ctx->Stream;
+      enif_mutex_lock(s_ctx->lock);
+      s_ctx->is_closed = TRUE;
+      enif_mutex_unlock(s_ctx->lock);
+      MsQuic->StreamClose(Stream);
       return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
     }
-
-  res = enif_make_copy(env, s_ctx->eHandle);
-
   // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
   // must be done in the worker callback (for
   // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
@@ -548,6 +554,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
 
       res = ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, ATOM_STATUS(Status));
+      s_ctx->Stream = NULL;
       goto ErrorExit;
     }
 
@@ -664,6 +671,11 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   enif_mutex_lock(s_ctx->lock);
+  if (!s_ctx->Stream)
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto ErrorExit;
+    }
 
   send_ctx->s_ctx = s_ctx;
 
@@ -723,6 +735,12 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
   enif_mutex_lock(s_ctx->lock);
+
+  if ( !s_ctx->Stream )
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto Exit;
+    }
 
   if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
     {
@@ -814,12 +832,13 @@ shutdown_stream3(ErlNifEnv *env,
       ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  enif_mutex_lock(s_ctx->lock);
   if (QUIC_FAILED(Status
                   = MsQuic->StreamShutdown(s_ctx->Stream, flags, app_errcode)))
     {
       ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-
+  enif_mutex_unlock(s_ctx->lock);
   return ret;
 }
 
@@ -1000,7 +1019,6 @@ handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
   assert(env);
   assert(QUIC_STREAM_EVENT_START_COMPLETE == Event->Type);
   // Only for Local initiated stream
-  s_ctx->is_closed = FALSE;
   if (s_ctx->event_mask & QUICER_STREAM_EVENT_MASK_START_COMPLETE)
     {
       ERL_NIF_TERM props_name[]

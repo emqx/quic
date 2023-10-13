@@ -22,6 +22,7 @@
         , new_registration/2
         , shutdown_registration/1
         , shutdown_registration/3
+        , close_registration/1
         , get_registration_name/1
         , listen/2
         , start_listener/3
@@ -56,39 +57,64 @@
         , get_listeners/1
         ]).
 
+-export([abi_version/0]).
+
+%% for test
+-export([init/1]).
+
+%% @NOTE: In embedded mode, first all modules are loaded. Then all on_load functions are called.
 -on_load(init/0).
 
 -include_lib("kernel/include/file.hrl").
 -include("quicer.hrl").
 -include("quicer_types.hrl").
+-include("quicer_vsn.hrl").
+-include_lib("snabbkaffe/include/snabbkaffe.hrl").
+
+-spec abi_version() -> integer().
+abi_version() ->
+  ?QUICER_ABI_VERSION.
 
 -spec init() -> ok.
 init() ->
+  ABIVsn = case persistent_term:get({'_quicer_overrides_', abi_version}, undefined) of
+        undefined -> abi_version();
+        Vsn -> Vsn
+    end,
+  init(ABIVsn).
+
+init(ABIVsn) ->
   NifName = "libquicer_nif",
   {ok, Niflib} = locate_lib(priv_dir(), NifName),
-  ok = erlang:load_nif(Niflib, 0),
-  %% It could cause segfault if MsQuic library is not opened nor registered.
-  %% here we have added dummy calls, and it should cover most of cases
-  %% unless caller wants to call erlang:load_nif/1 and then call quicer_nif
-  %% without opened library to suicide.
-  %%
-  %% Note, we could do same dummy calls in nif instead but it might mess up the reference counts.
-  {ok, _} = open_lib(),
-  %% dummy reg open
-  case reg_open() of
-    ok -> ok;
-    {error, badarg} ->
-      %% already opened
-      ok
+  case erlang:load_nif(Niflib, ABIVsn) of
+      ok ->
+          %% It could cause segfault if MsQuic library is not opened nor registered.
+          %% here we have added dummy calls, and it should cover most of cases
+          %% unless caller wants to call erlang:load_nif/1 and then call quicer_nif
+          %% without opened library to suicide.
+          %%
+          %% Note, we could do same dummy calls in nif instead but it might mess up the reference counts.
+          {ok, _} = open_lib(),
+          %% dummy reg open
+          case reg_open() of
+              ok -> ok;
+              {error, badarg} ->
+                  %% already opened
+                  ok
+          end;
+      {error, _Reason} = Res->
+          %% load fail, but beam will keep using current vsn if presents.
+          ?tp_ignore_side_effects_in_prod(debug,
+                                          #{module => ?MODULE, event => init, result => Res}),
+          Res
   end.
-
 -spec open_lib() ->
         {ok, true}  | %% opened
         {ok, false} | %% already opened
         {ok, debug} | %% opened with lttng debug library loaded (if present)
         {error, open_failed, atom_reason()}.
 open_lib() ->
-  LibFile = case locate_lib(priv_dir(), "libmsquic.lttng.so") of
+  LibFile = case locate_lib(priv_dir(), "lib/libmsquic.lttng.so") of
               {ok, File} ->
                 File;
               {error, _} ->
@@ -129,6 +155,10 @@ shutdown_registration(_Handle) ->
 -spec shutdown_registration(reg_handle(), IsSilent::boolean(), ErrorCode::uint64())
                            -> ok | {error | badarg}.
 shutdown_registration(_Handle, _IsSilent, _ErrorCode) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec close_registration(reg_handle()) -> ok | {error | badarg}.
+close_registration(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec get_registration_name(reg_handle()) -> {ok, string()} | {error, badarg}.

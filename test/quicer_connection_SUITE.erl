@@ -58,6 +58,8 @@ init_per_suite(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_suite(_Config) ->
+    code:purge(quicer_nif),
+    code:delete(quicer_nif),
     ok.
 
 %%--------------------------------------------------------------------
@@ -83,7 +85,9 @@ init_per_group(suite_reg, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_group(suite_reg, Config) ->
-  quicer:shutdown_registration(proplists:get_value(quic_registration, Config));
+  Reg = proplists:get_value(quic_registration, Config),
+  quicer:shutdown_registration(Reg),
+  ok = quicer:close_registration(Reg);
 end_per_group(_GroupName, _Config) ->
   ok.
 
@@ -96,6 +100,8 @@ end_per_group(_GroupName, _Config) ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_testcase(_TestCase, Config) ->
+    application:ensure_all_started(quicer),
+    quicer_test_lib:cleanup_msquic(),
     Config.
 
 %%--------------------------------------------------------------------
@@ -107,6 +113,8 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
+    quicer_test_lib:report_active_connections(),
+    ct:pal("Counters ~p", [quicer:perf_counters()]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -478,7 +486,8 @@ run_tc_conn_client_bad_cert(Config)->
           case quicer:send(Stm, <<"ping">>) of
             {ok, 4} -> ok;
             {error, cancelled} -> ok;
-            {error, stm_send_error, aborted} -> ok
+            {error, stm_send_error, aborted} -> ok;
+            {error, closed} -> ok
           end,
           receive
             {quic, transport_shutdown, _Ref,
@@ -572,7 +581,7 @@ tc_conn_controlling_process(Config) ->
 tc_conn_opt_ideal_processor(Config) ->
   Port = select_port(),
   Owner = self(),
-  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
@@ -580,7 +589,8 @@ tc_conn_opt_ideal_processor(Config) ->
       {ok, 4} = quicer:send(Stm, <<"ping">>),
       {ok, Processor} = quicer:getopt(Conn, param_conn_ideal_processor),
       ?assert(is_integer(Processor)),
-      ok = quicer:close_connection(Conn)
+      ok = quicer:close_connection(Conn),
+      SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -588,7 +598,7 @@ tc_conn_opt_ideal_processor(Config) ->
 tc_conn_opt_share_udp_binding(Config) ->
   Port = select_port(),
   Owner = self(),
-  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
@@ -598,7 +608,8 @@ tc_conn_opt_share_udp_binding(Config) ->
       ?assert(is_boolean(IsShared)),
       {error, invalid_state} = quicer:setopt(Conn, param_conn_share_udp_binding, not IsShared),
       {ok, IsShared} = quicer:getopt(Conn, param_conn_share_udp_binding),
-      ok = quicer:close_connection(Conn)
+      ok = quicer:close_connection(Conn),
+      SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -606,7 +617,7 @@ tc_conn_opt_share_udp_binding(Config) ->
 tc_conn_opt_local_bidi_stream_count(Config) ->
   Port = select_port(),
   Owner = self(),
-  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
@@ -615,7 +626,8 @@ tc_conn_opt_local_bidi_stream_count(Config) ->
       {ok, Cnt} = quicer:getopt(Conn, param_conn_local_bidi_stream_count),
       ?assert(is_integer(Cnt)),
       {error, invalid_parameter} = quicer:setopt(Conn, param_conn_local_bidi_stream_count, Cnt + 2),
-      ok = quicer:close_connection(Conn)
+      ok = quicer:close_connection(Conn),
+      SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -623,7 +635,7 @@ tc_conn_opt_local_bidi_stream_count(Config) ->
 tc_conn_opt_local_uni_stream_count(Config) ->
   Port = select_port(),
   Owner = self(),
-  {_SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
   receive
     listener_ready ->
       {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
@@ -632,7 +644,8 @@ tc_conn_opt_local_uni_stream_count(Config) ->
       {ok, Cnt} = quicer:getopt(Conn, param_conn_local_unidi_stream_count),
       ?assert(is_integer(Cnt)),
       {error, invalid_parameter} = quicer:setopt(Conn, param_conn_local_unidi_stream_count, Cnt + 2),
-      ok = quicer:close_connection(Conn)
+      ok = quicer:close_connection(Conn),
+      SPid ! done
   after 5000 ->
       ct:fail("listener_timeout")
   end.
@@ -788,7 +801,8 @@ echo_server(Owner, Config, Port)->
           end
       end,
       ct:pal("echo server stream accepted", []),
-      echo_server_stm_loop(L, Conn, [Stm]);
+      catch echo_server_stm_loop(L, Conn, [Stm]),
+      quicer:close_listener(L);
     {error, listener_start_error, 200000002} ->
       ct:pal("echo_server: listener_start_error", []),
       timer:sleep(100),
@@ -815,6 +829,8 @@ echo_server_stm_loop(L, Conn, Stms) ->
         {error, cancelled} ->
           ct:pal("echo server: send cancelled: ~p ", [Bin]),
           cancelled;
+        {error, closed} ->
+          closed;
         {ok, _} ->
           ok
       end,
@@ -868,8 +884,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
       echo_server_stm_loop(L, Conn, NewStmList);
     done ->
       ct:pal("echo server shutting down", []),
-      quicer:async_close_connection(Conn),
-      quicer:close_listener(L)
+      quicer:async_close_connection(Conn)
   end.
 
 default_conn_opts(Config) ->

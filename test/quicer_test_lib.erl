@@ -30,7 +30,12 @@
          select_free_port/1,
          flush/1,
          ensure_server_exit_normal/1,
-         ensure_server_exit_normal/2
+         ensure_server_exit_normal/2,
+
+         report_active_connections/0,
+         report_active_connections/1,
+
+         report_unhandled_messages/0
         ]).
 
 
@@ -39,6 +44,13 @@
         , default_conn_opts/0
         , default_stream_opts/0
         ]).
+
+%% cleanups
+-export([ reset_global_reg/0
+        , shutdown_all_listeners/0
+        , cleanup_msquic/0
+        ]).
+
 
 %% ct helper
 -export([all_tcs/1]).
@@ -345,6 +357,36 @@ ensure_server_exit_normal(MonRef, Timeout) ->
       ct:fail("server still running", [])
   end.
 
+-spec report_active_connections() -> _.
+report_active_connections() ->
+  report_active_connections(fun ct:comment/2).
+report_active_connections(LogFun) ->
+  erlang:garbage_collect(),
+  {ok, Cnts} = quicer:perf_counters(),
+  ActiveStrms = proplists:get_value(strm_active, Cnts),
+  ActiveConns = proplists:get_value(conn_active, Cnts),
+  0 =/= (ActiveStrms + ActiveConns) andalso
+    LogFun("active conns: ~p, strms: ~p", [ActiveConns, ActiveStrms]).
+
+-spec report_unhandled_messages() -> ok.
+report_unhandled_messages() ->
+  Unhandled = quicer_test_lib:receive_all(),
+  Unhandled =/= [] andalso
+    ct:comment("What left in the message queue: ~p", [Unhandled]).
+
+-spec cleanup_msquic() -> ok.
+cleanup_msquic() ->
+  shutdown_all_listeners(),
+  reset_global_reg(),
+  ok.
+
+reset_global_reg()->
+  quicer:reg_close(),
+  quicer:reg_open().
+
+shutdown_all_listeners() ->
+  lists:foreach(fun quicer:shutdown_listener/1,
+                quicer:listeners()).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

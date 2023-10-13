@@ -114,14 +114,23 @@
         , open_connection/0
         , get_listeners/0
         , get_listeners/1
+        , close_registration/1
         ]).
 
 -export([ spawn_listener/3 %% start application over quic
         , terminate_listener/1
         ]).
 
+%% versions
+-export([abi_version/0]).
+
 -type connection_opts() :: proplists:proplist() | quicer_connection:opts().
 -type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
+
+%% @doc Return ABI version of the library.
+-spec abi_version() -> quicer_nif:abi_version().
+abi_version() ->
+  quicer_nif:abi_version().
 
 %% @doc Quicer library must be opened before any use.
 %%
@@ -163,6 +172,12 @@ shutdown_registration(Handle) ->
         quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
 shutdown_registration(Handle, IsSilent, ErrCode) ->
   quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
+
+%% @doc close a registration.
+-spec close_registration(Handle) ->
+        quicer_nif:close_registration(Handle).
+close_registration(Handle) ->
+  quicer_nif:close_registration(Handle).
 
 %% @doc get registration name
 -spec get_registration_name(Handle) ->
