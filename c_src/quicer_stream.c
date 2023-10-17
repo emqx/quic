@@ -333,17 +333,18 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
-  if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
-                                              open_flag,
-                                              ClientStreamCallback,
-                                              s_ctx,
-                                              &(s_ctx->Stream))))
+  enif_mutex_lock(c_ctx->lock);
+  Status = MsQuic->StreamOpen(c_ctx->Connection,
+                              open_flag,
+                              ClientStreamCallback,
+                              s_ctx,
+                              &(s_ctx->Stream));
+  enif_mutex_unlock(c_ctx->lock);
+  if (QUIC_FAILED(Status))
     {
-
       res = ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
-
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
   res = enif_make_copy(env, s_ctx->eHandle);
@@ -352,15 +353,19 @@ async_start_stream2(ErlNifEnv *env,
   // Starts the bidirectional stream. By default, the peer is not notified of
   // the stream being started until data is sent on the stream.
   //
-  if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream, start_flag)))
+  enif_mutex_lock(s_ctx->lock);
+  HQUIC Stream = s_ctx->Stream;
+  Status = MsQuic->StreamStart(Stream, start_flag);
+  if (QUIC_FAILED(Status))
     {
-      HQUIC Stream = s_ctx->Stream;
-      enif_mutex_lock(s_ctx->lock);
       s_ctx->is_closed = TRUE;
+      s_ctx->Stream = NULL;
       enif_mutex_unlock(s_ctx->lock);
       MsQuic->StreamClose(Stream);
-      return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
+      res = ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
+      goto ErrorExit;
     }
+  enif_mutex_unlock(s_ctx->lock);
   // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
   // must be done in the worker callback (for
   // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
@@ -736,7 +741,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
   enif_mutex_lock(s_ctx->lock);
 
-  if ( !s_ctx->Stream )
+  if (!s_ctx->Stream)
     {
       res = ERROR_TUPLE_2(ATOM_CLOSED);
       goto Exit;

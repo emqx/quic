@@ -781,15 +781,21 @@ getopt3(ErlNifEnv *env,
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
+      enif_mutex_lock(((QuicerStreamCTX *)q_ctx)->lock);
       res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
+      enif_mutex_unlock(((QuicerStreamCTX *)q_ctx)->lock);
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
+      enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
       res = get_connection_opt(env, (QuicerConnCTX *)q_ctx, eopt, elevel);
+      enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
     }
   else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
     {
+      enif_mutex_lock(((QuicerListenerCTX *)q_ctx)->lock);
       res = get_listener_opt(env, (QuicerListenerCTX *)q_ctx, eopt, elevel);
+      enif_mutex_unlock(((QuicerListenerCTX *)q_ctx)->lock);
     }
   else
     { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
@@ -1884,14 +1890,11 @@ get_listener_opt(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(l_ctx->lock);
   if (l_ctx->is_closed)
     {
-      enif_mutex_unlock(l_ctx->lock);
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
   enif_keep_resource(l_ctx);
-  enif_mutex_unlock(l_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {

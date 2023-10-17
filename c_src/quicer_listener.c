@@ -337,19 +337,20 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   else
     {
-      target_r_ctx = G_r_ctx;
-
       // quic_registration is not set, use global registration
-      // msquic should reject if global registration is NULL (closed)
-      if (G_r_ctx)
+      target_r_ctx = G_r_ctx;
+      pthread_mutex_lock(&GRegLock);
+
+      if (!G_r_ctx)
         {
-          Registration = G_r_ctx->Registration;
-        }
-      else
-        {
+          pthread_mutex_unlock(&GRegLock);
           ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
           goto exit;
         }
+
+      enif_keep_resource(G_r_ctx);
+      Registration = G_r_ctx->Registration;
+      pthread_mutex_unlock(&GRegLock);
     }
 
   // Now load server config
