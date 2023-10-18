@@ -25,7 +25,7 @@ limitations under the License.
 
 extern QuicerRegistrationCTX *G_r_ctx;
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(QUICER_LOGGING_STDOUT)
 extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 #endif
