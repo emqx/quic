@@ -56,6 +56,8 @@ typedef struct QuicerListenerCTX
   QuicerConfigCTX *config_resource;
   QuicerRegistrationCTX *r_ctx;
   HQUIC Listener;
+  // track lifetime of Connection handle
+  CXPLAT_REF_COUNT ref_count;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
   ErlNifMonitor owner_mon;
@@ -176,5 +178,8 @@ BOOLEAN get_stream_handle(QuicerStreamCTX *s_ctx);
 
 void put_conn_handle(QuicerConnCTX *c_ctx);
 BOOLEAN get_conn_handle(QuicerConnCTX *c_ctx);
+
+void put_listener_handle(QuicerListenerCTX *l_ctx);
+BOOLEAN get_listener_handle(QuicerListenerCTX *l_ctx);
 
 #endif // __QUICER_CTX_H_

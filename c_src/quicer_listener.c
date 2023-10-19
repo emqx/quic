@@ -294,6 +294,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       free_certificate(&CredConfig);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
+  CxPlatRefInitialize(&l_ctx->ref_count);
 
   if (is_verify && cacertfile)
     {
@@ -490,20 +491,14 @@ stop_listener1(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  enif_mutex_lock(l_ctx->lock);
-  if (!l_ctx->Listener)
+  if (!get_listener_handle(l_ctx))
     {
       ret = ERROR_TUPLE_2(ATOM_CLOSED);
-      goto exit;
+      return ret; // follow otp behaviour?
     }
-  else if (!l_ctx->is_stopped)
-    {
-      l_ctx->is_stopped = TRUE;
-      // void return
-      MsQuic->ListenerStop(l_ctx->Listener);
-    }
-exit:
-  enif_mutex_unlock(l_ctx->lock);
+  l_ctx->is_stopped = TRUE;
+  MsQuic->ListenerStop(l_ctx->Listener);
+  put_listener_handle(l_ctx);
   return ret;
 }
 

@@ -342,3 +342,22 @@ get_conn_handle(QuicerConnCTX *c_ctx)
 {
   return CxPlatRefIncrementNonZero(&c_ctx->ref_count, 1);
 }
+
+inline void
+put_listener_handle(QuicerListenerCTX *l_ctx)
+{
+  if (CxPlatRefDecrement(&l_ctx->ref_count) && l_ctx->Listener)
+    {
+      HQUIC Listener = l_ctx->Listener;
+      enif_mutex_lock(l_ctx->lock);
+      l_ctx->Listener = NULL;
+      enif_mutex_unlock(l_ctx->lock);
+      MsQuic->ListenerClose(Listener);
+    }
+}
+
+inline BOOLEAN
+get_listener_handle(QuicerListenerCTX *l_ctx)
+{
+  return CxPlatRefIncrementNonZero(&l_ctx->ref_count, 1);
+}

@@ -981,9 +981,9 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
       if (!get_conn_handle((QuicerConnCTX *)q_ctx))
-      {
-        return ERROR_TUPLE_2(ATOM_CLOSED);
-      }
+        {
+          return ERROR_TUPLE_2(ATOM_CLOSED);
+        }
       Handle = (((QuicerConnCTX *)q_ctx))->Connection;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       Status = MsQuic->GetParam(Handle, Param, &addrSize, &addr);
