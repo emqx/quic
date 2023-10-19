@@ -56,6 +56,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         }
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
+      CxPlatRefInitialize(&(c_ctx->ref_count));
 
       if (l_ctx->trusted_store)
         {

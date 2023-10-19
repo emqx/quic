@@ -384,14 +384,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     {
       enif_mutex_lock(c_ctx->lock);
       c_ctx->is_closed = TRUE; // client shutdown completed
-      c_ctx->Connection = NULL;
       c_ctx->config_resource = NULL;
       enif_mutex_unlock(c_ctx->lock);
     }
 
   if (is_destroy)
     {
-      MsQuic->ConnectionClose(Connection);
+      put_conn_handle(c_ctx);
       if (conf_ctx)
         {
           enif_release_resource(conf_ctx);
@@ -505,15 +504,14 @@ ServerConnectionCallback(HQUIC Connection,
   if (is_destroy)
     {
       enif_mutex_lock(c_ctx->lock);
-      c_ctx->Connection = NULL;
       c_ctx->is_closed = TRUE; // server shutdown_complete
       c_ctx->config_resource = NULL;
       enif_mutex_unlock(c_ctx->lock);
     }
 
-  if (is_destroy)
+  if (is_destroy) // merge with upper ,remove if...
     {
-      MsQuic->ConnectionClose(Connection);
+      put_conn_handle(c_ctx);
       if (conf_ctx)
         {
           enif_release_resource(conf_ctx);
@@ -609,6 +607,7 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
+  CxPlatRefInitialize(&(c_ctx->ref_count));
   eHandle = enif_make_resource(env, c_ctx);
   return SUCCESS(eHandle);
 
@@ -765,6 +764,7 @@ async_connect3(ErlNifEnv *env,
       else
         {
           assert(c_ctx->is_closed);
+          CxPlatRefInitialize(&c_ctx->ref_count);
           res = parse_conn_resume_ticket(env, eoptions, c_ctx);
           // we could only lock it after resume ticket is set
           enif_mutex_lock(c_ctx->lock);
@@ -774,7 +774,6 @@ async_connect3(ErlNifEnv *env,
           goto Error;
         }
     }
-
   c_ctx->is_closed = FALSE; // connection opened.
 
   // optional set sslkeylogfile
@@ -803,6 +802,12 @@ async_connect3(ErlNifEnv *env,
   // input ERL TERM so that we don't need to call ClientLoadConfiguration
   assert(!c_ctx->is_closed && c_ctx->Connection);
 
+  assert(c_ctx->owner);
+
+  // Monitor owner before start, so we don't need to race with callbacks
+  // after start the connection
+  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
+
   // c_ctx->lock should be taken to prevent parallel access from callback as
   // work trigged by starting of the connection.
   if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
@@ -830,8 +835,6 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-  assert(c_ctx->owner);
-  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
   eHandle = enif_make_resource(env, c_ctx);
 
   enif_mutex_unlock(r_ctx->lock);
@@ -953,10 +956,16 @@ shutdown_connection3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(c_ctx->lock);
-  MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
-  enif_mutex_unlock(c_ctx->lock);
-  return ATOM_OK;
+  if (get_conn_handle(c_ctx))
+    {
+      MsQuic->ConnectionShutdown(c_ctx->Connection, flags, app_errcode);
+      put_conn_handle(c_ctx);
+      return ATOM_OK;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
 }
 
 ERL_NIF_TERM
@@ -971,11 +980,14 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
 
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
-      enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
+      if (!get_conn_handle((QuicerConnCTX *)q_ctx))
+      {
+        return ERROR_TUPLE_2(ATOM_CLOSED);
+      }
       Handle = (((QuicerConnCTX *)q_ctx))->Connection;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       Status = MsQuic->GetParam(Handle, Param, &addrSize, &addr);
-      enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
+      put_conn_handle((QuicerConnCTX *)q_ctx);
     }
   else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx))
     {
@@ -1305,7 +1317,9 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   // @TODO Generally, we rely on outer caller to clean the env,
   // or we should clean the env in this function.
   env = s_ctx->env;
+  get_conn_handle(c_ctx);
   s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
+  CxPlatRefInitialize(&(s_ctx->ref_count));
 
   ACCEPTOR *acc = AcceptorDequeue(c_ctx->acceptor_queue);
 

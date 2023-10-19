@@ -760,7 +760,7 @@ getopt3(ErlNifEnv *env,
   ERL_NIF_TERM elevel = argv[2];
 
   void *q_ctx;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_CLOSED);
 
   if (!enif_is_atom(env, eopt))
     {
@@ -781,15 +781,19 @@ getopt3(ErlNifEnv *env,
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
-      enif_mutex_lock(((QuicerStreamCTX *)q_ctx)->lock);
-      res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
-      enif_mutex_unlock(((QuicerStreamCTX *)q_ctx)->lock);
+      if (get_stream_handle(q_ctx))
+        {
+          res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
+          put_stream_handle(q_ctx);
+        }
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
-      enif_mutex_lock(((QuicerConnCTX *)q_ctx)->lock);
-      res = get_connection_opt(env, (QuicerConnCTX *)q_ctx, eopt, elevel);
-      enif_mutex_unlock(((QuicerConnCTX *)q_ctx)->lock);
+      if (get_conn_handle(q_ctx))
+        {
+          res = get_connection_opt(env, (QuicerConnCTX *)q_ctx, eopt, elevel);
+          put_conn_handle(q_ctx);
+        }
     }
   else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
     {
