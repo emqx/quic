@@ -309,10 +309,10 @@ put_stream_handle(QuicerStreamCTX *s_ctx)
   if (CxPlatRefDecrement(&s_ctx->ref_count) && s_ctx->Stream)
     {
       HQUIC Stream = s_ctx->Stream;
-      enif_mutex_lock(s_ctx->lock);
       Stream = s_ctx->Stream;
       s_ctx->Stream = NULL;
-      enif_mutex_unlock(s_ctx->lock);
+      s_ctx->is_closed = TRUE;
+      MsQuic->SetCallbackHandler(Stream, NULL, NULL);
       MsQuic->StreamClose(Stream);
       assert(s_ctx->c_ctx != NULL);
       put_conn_handle(s_ctx->c_ctx);
@@ -331,9 +331,9 @@ put_conn_handle(QuicerConnCTX *c_ctx)
   if (CxPlatRefDecrement(&c_ctx->ref_count) && c_ctx->Connection)
     {
       HQUIC Connection = c_ctx->Connection;
-      enif_mutex_lock(c_ctx->lock);
       c_ctx->Connection = NULL;
-      enif_mutex_unlock(c_ctx->lock);
+      c_ctx->is_closed = TRUE;
+      MsQuic->SetCallbackHandler(Connection, NULL, NULL);
       MsQuic->ConnectionClose(Connection);
     }
 }
@@ -350,9 +350,7 @@ put_listener_handle(QuicerListenerCTX *l_ctx)
   if (CxPlatRefDecrement(&l_ctx->ref_count) && l_ctx->Listener)
     {
       HQUIC Listener = l_ctx->Listener;
-      enif_mutex_lock(l_ctx->lock);
       l_ctx->Listener = NULL;
-      enif_mutex_unlock(l_ctx->lock);
       MsQuic->ListenerClose(Listener);
     }
 }

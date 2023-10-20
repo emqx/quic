@@ -436,8 +436,9 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
-      MsQuic->ListenerClose(l_ctx->Listener);
+      HQUIC Listener = l_ctx->Listener;
       l_ctx->Listener = NULL;
+      MsQuic->ListenerClose(Listener);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
       goto exit;
     }

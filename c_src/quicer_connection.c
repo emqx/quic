@@ -660,7 +660,7 @@ async_connect3(ErlNifEnv *env,
   // Check option 'handle' for opened connection
   if (enif_get_map_value(env, eoptions, ATOM_HANDLE, &eHandle))
     {
-      // Reuse c_ctx from existing connecion handle
+      /* Reuse c_ctx from existing connecion handle */
       if (enif_get_resource(env, eHandle, ctx_connection_t, (void **)&c_ctx))
         {
           assert(c_ctx->is_closed);
@@ -668,40 +668,53 @@ async_connect3(ErlNifEnv *env,
           // r_ctx is already kept in open_connectionX
           r_ctx = c_ctx->r_ctx;
           is_reuse_handle = TRUE;
+          if (!get_reg_handle(r_ctx))
+            {
+              return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+            }
         }
       else
         {
           return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
         }
     }
-  else // we create new c_ctx and set owner
+  else
     {
+      /* Alloc new c_ctx */
+      assert(!is_reuse_handle);
       assert(!c_ctx);
       assert(!r_ctx);
+
       c_ctx = init_c_ctx();
 
       // Get Reg for c_ctx, quic_registration is optional
       if (!parse_registration(env, eoptions, &c_ctx->r_ctx))
         {
-          res = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
-          goto Error;
+          enif_release_resource(c_ctx);
+          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
         }
 
       r_ctx = c_ctx->r_ctx ? c_ctx->r_ctx : G_r_ctx;
-      enif_keep_resource(r_ctx);
 
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
         {
-          res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-          goto Error;
+          enif_release_resource(c_ctx);
+          return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
         }
 
       // set owner
       if (!enif_self(env, &(c_ctx->owner->Pid)))
         {
-          res = ERROR_TUPLE_2(ATOM_BAD_PID);
-          goto Error;
+          enif_release_resource(c_ctx);
+          return ERROR_TUPLE_2(ATOM_BAD_PID);
         }
+
+      if (!get_reg_handle(r_ctx))
+        {
+          enif_release_resource(c_ctx);
+          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+        }
+      enif_keep_resource(r_ctx);
     }
 
   assert(r_ctx);
@@ -714,7 +727,7 @@ async_connect3(ErlNifEnv *env,
     {
       enif_mutex_lock(c_ctx->lock);
     }
-  enif_mutex_lock(r_ctx->lock);
+
   Registration = r_ctx->Registration;
   assert(c_ctx->owner);
 
@@ -843,11 +856,11 @@ async_connect3(ErlNifEnv *env,
 
   eHandle = enif_make_resource(env, c_ctx);
 
-  enif_mutex_unlock(r_ctx->lock);
   enif_mutex_unlock(c_ctx->lock);
   return SUCCESS(eHandle);
 
-Error:;
+Error:
+  put_reg_handle(r_ctx);
   HQUIC Connection = c_ctx->Connection;
   if (Connection)
     {
@@ -863,9 +876,7 @@ Error:;
 
   // Error exit, it must be closed or Handle is NULL
   assert(c_ctx->is_closed || NULL == c_ctx->Connection);
-
   enif_mutex_unlock(c_ctx->lock);
-  enif_mutex_unlock(r_ctx->lock);
 
   if (Connection)
     {
@@ -880,7 +891,6 @@ Error:;
     {
       enif_release_resource(r_ctx);
     }
-
   return res;
 }
 
@@ -1142,7 +1152,9 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
 
   // A monitor is automatically removed when it triggers or when the
   // resource is deallocated.
+  enif_mutex_lock(c_ctx->lock);
   enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
+  enif_mutex_unlock(c_ctx->lock);
 
   ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
 

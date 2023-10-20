@@ -828,7 +828,6 @@ void
 resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)obj;
-
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
 
   // Unlike other resources, it is safe to close listener here
@@ -908,7 +907,7 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
   TP_CB_3(start, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
   assert(s_ctx->is_closed == TRUE);
-  if (s_ctx->Stream)
+  if (s_ctx->Stream && !s_ctx->is_closed)
     {
       MsQuic->StreamClose(s_ctx->Stream);
     }

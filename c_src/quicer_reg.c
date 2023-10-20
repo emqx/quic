@@ -61,6 +61,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
     {
+      enif_release_resource(r_ctx);
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
       goto exit;
     }
@@ -216,6 +217,7 @@ close_registration(ErlNifEnv *env,
   r_ctx->Registration = NULL;
   enif_mutex_unlock(r_ctx->lock);
   MsQuic->RegistrationClose(Registration);
+  destroy_r_ctx(r_ctx);
   return ATOM_OK;
 }
 

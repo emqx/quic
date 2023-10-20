@@ -279,7 +279,6 @@ async_start_stream2(ErlNifEnv *env,
           // if set must be valid.
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
-      // @TODO set event mask for some flags
     }
 
   // optional start_flag,
@@ -488,6 +487,11 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  if (!get_conn_handle(c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
   // Allocate ctxs
   QuicerStreamCTX *s_ctx = init_s_ctx();
   if (!s_ctx)
@@ -497,10 +501,6 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   // release in resource_stream_dealloc_callback
   enif_keep_resource(c_ctx);
-  if (!get_conn_handle(c_ctx))
-    {
-      return ERROR_TUPLE_2(ATOM_CLOSED);
-    }
   s_ctx->c_ctx = c_ctx;
 
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
