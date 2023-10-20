@@ -110,6 +110,7 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
 
   if (r_ctx)
     {
+      put_reg_handle(r_ctx);
       enif_mutex_lock(r_ctx->lock);
       CxPlatListEntryRemove(&l_ctx->RegistrationLink);
       enif_mutex_unlock(r_ctx->lock);
@@ -360,4 +361,16 @@ inline BOOLEAN
 get_listener_handle(QuicerListenerCTX *l_ctx)
 {
   return CxPlatRefIncrementNonZero(&l_ctx->ref_count, 1);
+}
+
+inline void
+put_reg_handle(QuicerRegistrationCTX *r_ctx)
+{
+  CxPlatRefDecrement(&r_ctx->ref_count);
+}
+
+inline BOOLEAN
+get_reg_handle(QuicerRegistrationCTX *r_ctx)
+{
+  return CxPlatRefIncrementNonZero(&r_ctx->ref_count, 1);
 }

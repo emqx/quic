@@ -334,6 +334,11 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       // quic_registration is set
       enif_keep_resource(l_ctx->r_ctx);
+      if (!get_reg_handle(l_ctx->r_ctx))
+        {
+          ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+          goto exit;
+        }
       Registration = l_ctx->r_ctx->Registration;
       target_r_ctx = l_ctx->r_ctx;
     }
@@ -351,6 +356,11 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
         }
 
       enif_keep_resource(G_r_ctx);
+      if (!get_reg_handle(G_r_ctx))
+        {
+          ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+          goto exit;
+        }
       Registration = G_r_ctx->Registration;
       pthread_mutex_unlock(&GRegLock);
     }

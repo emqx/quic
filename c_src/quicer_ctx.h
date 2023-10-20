@@ -34,6 +34,8 @@ typedef struct QuicerRegistrationCTX
 {
   ErlNifEnv *env;
   HQUIC Registration;
+  // Tracking lifetime of Registration handle
+  CXPLAT_REF_COUNT ref_count;
   BOOLEAN is_released;
   char name[UINT8_MAX + 1];
   ErlNifMutex *lock;
@@ -181,5 +183,8 @@ BOOLEAN get_conn_handle(QuicerConnCTX *c_ctx);
 
 void put_listener_handle(QuicerListenerCTX *l_ctx);
 BOOLEAN get_listener_handle(QuicerListenerCTX *l_ctx);
+
+void put_reg_handle(QuicerRegistrationCTX *r_ctx);
+BOOLEAN get_reg_handle(QuicerRegistrationCTX *r_ctx);
 
 #endif // __QUICER_CTX_H_

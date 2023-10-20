@@ -554,6 +554,11 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       r_ctx = G_r_ctx;
     }
 
+  if (!get_reg_handle(r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+    }
+
   QuicerConnCTX *c_ctx = init_c_ctx();
 
   if (!c_ctx)
