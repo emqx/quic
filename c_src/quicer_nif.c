@@ -800,7 +800,8 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
   TP_CB_3(start, (uintptr_t)l_ctx->Listener, 0);
   // Hold lock for the race of ListenerClose and ListenerStop call
   enif_mutex_lock(l_ctx->lock);
-  if (!l_ctx->is_closed && !l_ctx->is_stopped && l_ctx->Listener)
+  if (!l_ctx->is_closed && !l_ctx->is_stopped && l_ctx->Listener
+      && get_listener_handle(l_ctx))
     {
       l_ctx->is_stopped = TRUE;
       /*
@@ -814,6 +815,7 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
       // Listener term get GC.
       */
       MsQuic->ListenerStop(l_ctx->Listener);
+      put_listener_handle(l_ctx);
     }
   enif_mutex_unlock(l_ctx->lock);
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
@@ -886,16 +888,18 @@ resource_conn_down_callback(__unused_parm__ ErlNifEnv *env,
                             __unused_parm__ ErlNifMonitor *mon)
 {
   QuicerConnCTX *c_ctx = ctx;
+  enif_mutex_lock(c_ctx->lock);
   if (c_ctx && c_ctx->owner && DeadPid
-      && !enif_compare_pids(&c_ctx->owner->Pid, DeadPid))
+      && !enif_compare_pids(&c_ctx->owner->Pid, DeadPid)
+      && get_conn_handle(c_ctx))
     {
       TP_CB_3(start, (uintptr_t)c_ctx->Connection, (uintptr_t)ctx);
-      enif_mutex_lock(c_ctx->lock);
       MsQuic->ConnectionShutdown(
           c_ctx->Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
-      enif_mutex_unlock(c_ctx->lock);
+      put_conn_handle(c_ctx);
       TP_CB_3(end, (uintptr_t)c_ctx->Connection, (uintptr_t)ctx);
     }
+  enif_mutex_unlock(c_ctx->lock);
 }
 
 void
@@ -927,7 +931,8 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
 
   enif_mutex_lock(s_ctx->lock);
   if (s_ctx && s_ctx->owner && DeadPid
-      && !enif_compare_pids(&s_ctx->owner->Pid, DeadPid))
+      && !enif_compare_pids(&s_ctx->owner->Pid, DeadPid)
+      && get_stream_handle(s_ctx))
     {
       TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
       if (QUIC_FAILED(status = MsQuic->StreamShutdown(
@@ -943,6 +948,7 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
         {
           TP_CB_3(shutdown_success, (uintptr_t)s_ctx->Stream, status);
         }
+      put_stream_handle(s_ctx);
     }
   enif_mutex_unlock(s_ctx->lock);
 }

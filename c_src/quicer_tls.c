@@ -214,6 +214,7 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
       free((char *)cc->CertificateFile->CertificateFile);
       free((char *)cc->CertificateFile->PrivateKeyFile);
       CxPlatFree(cc->CertificateFile, QUICER_CERTIFICATE_FILE);
+      cc->CertificateFile = NULL;
     }
   else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED == cc->Type)
     {
@@ -222,6 +223,7 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
       free((char *)cc->CertificateFileProtected->PrivateKeyPassword);
       CxPlatFree(cc->CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
+      cc->CertificateFileProtected = NULL;
     }
 }
 

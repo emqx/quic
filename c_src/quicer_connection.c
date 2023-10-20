@@ -744,6 +744,7 @@ async_connect3(ErlNifEnv *env,
           goto Error;
         }
       free(cacertfile);
+      cacertfile = NULL;
     }
 
   // convert eoptions to Configuration
