@@ -76,13 +76,14 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
           Status = QUIC_STATUS_UNREACHABLE;
           // We are going to reject the connection,
-          // we will not be the owner this connection
+          // we will not be the owner of this connection
           // msquic will close the Connection Handle internally.
           // Set it to NULL to avoid close it in resource_conn_dealloc_callback
+          // or in the put_conn_handle.
           c_ctx->Connection = NULL;
-
+          put_conn_handle(c_ctx);
           // However, we still need to free the c_ctx
-          // note, we don't hold the lock of c_ctx since it is new conn.
+          // @NOTE: we don't hold the lock of c_ctx since it is new conn.
           enif_release_resource(c_ctx);
           goto Error;
         }
