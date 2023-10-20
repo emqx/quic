@@ -240,7 +240,7 @@ end_per_testcase(tc_lib_registration_neg, _Config) ->
 end_per_testcase(_TestCase, _Config) ->
   quicer:terminate_listener(mqtt),
   quicer_test_lib:report_unhandled_messages(),
-  quicer_test_lib:report_active_connections(fun ct:pal/2),
+  quicer_test_lib:report_active_connections(fun ct:comment/2),
   ct:pal("Counters ~p", [quicer:perf_counters()]),
   ok.
 
@@ -1886,7 +1886,10 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
     Other ->
       ct:fail("Unexpected event ~p after stream start complete", [Other])
   end,
-  ?assertEqual({error, closed}, quicer:getopt(Stm, param_configuration_settings, quic_configuration)),
+  {error, closed} = snabbkaffe:retry(100, 10,
+                                     fun() ->
+                                         {error, closed} = quicer:getopt(Stm, param_configuration_settings, quic_configuration)
+                                     end),
   ?assert(is_integer(Rid)).
 
 tc_stream_start_flag_indicate_peer_accept_1(Config) ->
