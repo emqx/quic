@@ -386,10 +386,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       c_ctx->is_closed = TRUE; // client shutdown completed
       c_ctx->config_resource = NULL;
       enif_mutex_unlock(c_ctx->lock);
-    }
 
-  if (is_destroy)
-    {
       put_conn_handle(c_ctx);
       if (conf_ctx)
         {
@@ -507,10 +504,7 @@ ServerConnectionCallback(HQUIC Connection,
       c_ctx->is_closed = TRUE; // server shutdown_complete
       c_ctx->config_resource = NULL;
       enif_mutex_unlock(c_ctx->lock);
-    }
 
-  if (is_destroy) // merge with upper ,remove if...
-    {
       put_conn_handle(c_ctx);
       if (conf_ctx)
         {
@@ -518,7 +512,6 @@ ServerConnectionCallback(HQUIC Connection,
         }
       destroy_c_ctx(c_ctx);
     }
-
   return status;
 }
 
