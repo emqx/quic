@@ -781,22 +781,38 @@ getopt3(ErlNifEnv *env,
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
+      if (!get_stream_handle(q_ctx))
+        {
+          goto Exit;
+        }
       res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
+      put_stream_handle(q_ctx);
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
+      if (!get_conn_handle(q_ctx))
+        {
+          goto Exit;
+        }
       res = get_connection_opt(env, (QuicerConnCTX *)q_ctx, eopt, elevel);
+      put_conn_handle(q_ctx);
     }
   else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
     {
+      if (!get_listener_handle(q_ctx))
+        {
+          goto Exit;
+        }
       res = get_listener_opt(env, (QuicerListenerCTX *)q_ctx, eopt, elevel);
+      put_listener_handle(q_ctx);
     }
   else
     { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
   return res;
+Exit:
+  return ERROR_TUPLE_2(ATOM_CLOSED);
 }
 
 ERL_NIF_TERM
@@ -863,18 +879,33 @@ setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
+      if (!get_stream_handle(q_ctx))
+        {
+          goto Exit;
+        }
       res = set_stream_opt(
           env, (QuicerStreamCTX *)q_ctx, eopt, evalue, elevel);
+      put_stream_handle(q_ctx);
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
+      if (!get_conn_handle(q_ctx))
+        {
+          goto Exit;
+        }
       res = set_connection_opt(
           env, (QuicerConnCTX *)q_ctx, eopt, evalue, elevel);
+      put_conn_handle(q_ctx);
     }
   else if (enif_get_resource(env, ctx, ctx_listener_t, &q_ctx))
     {
+      if (!get_listener_handle(q_ctx))
+        {
+          goto Exit;
+        }
       res = set_listener_opt(
           env, (QuicerListenerCTX *)q_ctx, eopt, evalue, elevel);
+      put_listener_handle(q_ctx);
     }
   else
     { //@todo support GLOBAL, REGISTRATION and CONFIGURATION
@@ -882,6 +913,8 @@ setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   return res;
+Exit:
+  return ERROR_TUPLE_2(ATOM_CLOSED);
 }
 
 bool
@@ -1884,14 +1917,11 @@ get_listener_opt(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(l_ctx->lock);
   if (l_ctx->is_closed)
     {
-      enif_mutex_unlock(l_ctx->lock);
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
   enif_keep_resource(l_ctx);
-  enif_mutex_unlock(l_ctx->lock);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {

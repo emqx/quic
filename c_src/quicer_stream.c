@@ -130,14 +130,13 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
   if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
-      s_ctx->Stream = NULL;
     }
 
   enif_mutex_unlock(s_ctx->lock);
 
   if (is_destroy)
     {
-      MsQuic->StreamClose(Stream);
+      put_stream_handle(s_ctx);
       // must be called after mutex unlock
       destroy_s_ctx(s_ctx);
     }
@@ -230,7 +229,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
-      s_ctx->Stream = NULL;
       MsQuic->SetCallbackHandler(Stream, NULL, NULL);
     }
 
@@ -239,7 +237,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       // must be called after mutex unlock,
-      MsQuic->StreamClose(Stream);
+      put_stream_handle(s_ctx);
       destroy_s_ctx(s_ctx);
     }
   return status;
@@ -281,7 +279,6 @@ async_start_stream2(ErlNifEnv *env,
           // if set must be valid.
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
-      // @TODO set event mask for some flags
     }
 
   // optional start_flag,
@@ -296,9 +293,12 @@ async_start_stream2(ErlNifEnv *env,
       // @TODO set event mask for some flags
     }
 
-  //
-  // note, s_ctx is not shared yet, thus no locking is needed.
-  //
+  if (!get_conn_handle(c_ctx))
+    {
+      //@TODO maybe other error like conn_closed?
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
   QuicerStreamCTX *s_ctx = init_s_ctx();
 
   if (!s_ctx)
@@ -311,7 +311,6 @@ async_start_stream2(ErlNifEnv *env,
 
   enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
-
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
 
@@ -333,42 +332,54 @@ async_start_stream2(ErlNifEnv *env,
       goto ErrorExit;
     }
 
-  if (QUIC_FAILED(Status = MsQuic->StreamOpen(c_ctx->Connection,
-                                              open_flag,
-                                              ClientStreamCallback,
-                                              s_ctx,
-                                              &(s_ctx->Stream))))
-    {
+  Status = MsQuic->StreamOpen(c_ctx->Connection,
+                              open_flag,
+                              ClientStreamCallback,
+                              s_ctx,
+                              &(s_ctx->Stream));
+  CxPlatRefInitialize(&s_ctx->ref_count);
 
+  if (QUIC_FAILED(Status))
+    {
       res = ERROR_TUPLE_3(ATOM_STREAM_OPEN_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
-
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
   res = enif_make_copy(env, s_ctx->eHandle);
 
   //
-  // Starts the bidirectional stream. By default, the peer is not notified of
+  // Starts the stream. By default, the peer is not notified of
   // the stream being started until data is sent on the stream.
   //
-  if (QUIC_FAILED(Status = MsQuic->StreamStart(s_ctx->Stream, start_flag)))
+  //
+  // We need to take a refcnt to avoid handle get closed as the StreamStart
+  // may trigger callback in another thread.
+  if (!get_stream_handle(s_ctx))
     {
-      HQUIC Stream = s_ctx->Stream;
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto ErrorExit;
+    }
+  HQUIC Stream = s_ctx->Stream;
+  Status = MsQuic->StreamStart(Stream, start_flag);
+  put_stream_handle(s_ctx);
+
+  if (QUIC_FAILED(Status))
+    {
       enif_mutex_lock(s_ctx->lock);
       s_ctx->is_closed = TRUE;
       enif_mutex_unlock(s_ctx->lock);
-      MsQuic->StreamClose(Stream);
-      return ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
+      res = ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
+      goto ErrorExit;
     }
   // NOTE: Set is_closed to FALSE (s_ctx->is_closed = FALSE;)
   // must be done in the worker callback (for
   // QUICER_STREAM_EVENT_MASK_START_COMPLETE) to avoid race cond.
-  //
   return SUCCESS(res);
 
 ErrorExit:
   destroy_s_ctx(s_ctx);
+  put_conn_handle(c_ctx);
   return res;
 }
 
@@ -476,6 +487,11 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  if (!get_conn_handle(c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
   // Allocate ctxs
   QuicerStreamCTX *s_ctx = init_s_ctx();
   if (!s_ctx)
@@ -557,7 +573,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       s_ctx->Stream = NULL;
       goto ErrorExit;
     }
-
+  CxPlatRefInitialize(&(s_ctx->ref_count));
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
@@ -590,6 +606,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
                                               send_ctx)))
     {
       enif_mutex_unlock(s_ctx->lock);
+      put_stream_handle(s_ctx);
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
@@ -607,6 +624,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 ErrorExit:
   destroy_send_ctx(send_ctx);
   destroy_s_ctx(s_ctx);
+  put_conn_handle(c_ctx);
   // Do not close the stream here, it will be done
   // in resource_stream_dealloc_callback triggered by
   // destroy_s_ctx
@@ -736,7 +754,7 @@ recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
   enif_mutex_lock(s_ctx->lock);
 
-  if ( !s_ctx->Stream )
+  if (!s_ctx->Stream)
     {
       res = ERROR_TUPLE_2(ATOM_CLOSED);
       goto Exit;
@@ -832,13 +850,16 @@ shutdown_stream3(ErlNifEnv *env,
       ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_mutex_lock(s_ctx->lock);
+  if (!get_stream_handle(s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
   if (QUIC_FAILED(Status
                   = MsQuic->StreamShutdown(s_ctx->Stream, flags, app_errcode)))
     {
       ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-  enif_mutex_unlock(s_ctx->lock);
+  put_stream_handle(s_ctx);
   return ret;
 }
 

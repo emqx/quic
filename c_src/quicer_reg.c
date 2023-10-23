@@ -23,7 +23,7 @@ QuicerRegistrationCTX *G_r_ctx = NULL;
 pthread_mutex_t GRegLock = PTHREAD_MUTEX_INITIALIZER;
 
 /*
-** For global registration only
+** Open global registration.
 */
 ERL_NIF_TERM
 registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
@@ -61,10 +61,11 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
     {
+      enif_release_resource(r_ctx);
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
       goto exit;
     }
-
+  CxPlatRefInitialize(&r_ctx->ref_count);
   G_r_ctx = r_ctx;
   pthread_mutex_unlock(&GRegLock);
 
@@ -147,7 +148,7 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
       goto exit;
     }
-
+  CxPlatRefInitialize(&r_ctx->ref_count);
   return SUCCESS(enif_make_resource(env, r_ctx));
 
 exit:
@@ -216,6 +217,7 @@ close_registration(ErlNifEnv *env,
   r_ctx->Registration = NULL;
   enif_mutex_unlock(r_ctx->lock);
   MsQuic->RegistrationClose(Registration);
+  destroy_r_ctx(r_ctx);
   return ATOM_OK;
 }
 
@@ -231,7 +233,10 @@ get_registration_name1(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  return SUCCESS(enif_make_string(env, r_ctx->name, ERL_NIF_LATIN1));
+  enif_mutex_lock(r_ctx->lock);
+  ERL_NIF_TERM name = enif_make_string(env, r_ctx->name, ERL_NIF_LATIN1);
+  enif_mutex_unlock(r_ctx->lock);
+  return SUCCESS(name);
 }
 
 BOOLEAN

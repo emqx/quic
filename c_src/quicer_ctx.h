@@ -34,6 +34,8 @@ typedef struct QuicerRegistrationCTX
 {
   ErlNifEnv *env;
   HQUIC Registration;
+  // Tracking lifetime of Registration handle
+  CXPLAT_REF_COUNT ref_count;
   BOOLEAN is_released;
   char name[UINT8_MAX + 1];
   ErlNifMutex *lock;
@@ -56,6 +58,8 @@ typedef struct QuicerListenerCTX
   QuicerConfigCTX *config_resource;
   QuicerRegistrationCTX *r_ctx;
   HQUIC Listener;
+  // track lifetime of Connection handle
+  CXPLAT_REF_COUNT ref_count;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
   ErlNifMonitor owner_mon;
@@ -94,6 +98,8 @@ typedef struct QuicerConnCTX
   QUIC_TLS_SECRETS *TlsSecrets;
   QUIC_BUFFER *ResumptionTicket;
   BOOLEAN is_closed;
+  // track lifetime of Connection handle
+  CXPLAT_REF_COUNT ref_count;
   uint32_t event_mask;
   char *ssl_keylogfile;
   X509 *peer_cert;
@@ -123,6 +129,8 @@ typedef struct QuicerStreamCTX
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
   _CTX_CALLBACK_WRITE_ BOOLEAN is_recv_pending;
   BOOLEAN is_closed;
+  // Track lifetime of Stream handle
+  CXPLAT_REF_COUNT ref_count;
   uint32_t event_mask;
   void *reserved1;
   void *reserved2;
@@ -166,5 +174,17 @@ void destroy_send_ctx(QuicerStreamSendCTX *send_ctx);
 
 QuicerDgramSendCTX *init_dgram_send_ctx();
 void destroy_dgram_send_ctx(QuicerDgramSendCTX *dgram_send_ctx);
+
+void put_stream_handle(QuicerStreamCTX *s_ctx);
+BOOLEAN get_stream_handle(QuicerStreamCTX *s_ctx);
+
+void put_conn_handle(QuicerConnCTX *c_ctx);
+BOOLEAN get_conn_handle(QuicerConnCTX *c_ctx);
+
+void put_listener_handle(QuicerListenerCTX *l_ctx);
+BOOLEAN get_listener_handle(QuicerListenerCTX *l_ctx);
+
+void put_reg_handle(QuicerRegistrationCTX *r_ctx);
+BOOLEAN get_reg_handle(QuicerRegistrationCTX *r_ctx);
 
 #endif // __QUICER_CTX_H_

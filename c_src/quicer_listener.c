@@ -56,6 +56,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         }
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
+      CxPlatRefInitialize(&(c_ctx->ref_count));
 
       if (l_ctx->trusted_store)
         {
@@ -75,13 +76,14 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
           Status = QUIC_STATUS_UNREACHABLE;
           // We are going to reject the connection,
-          // we will not be the owner this connection
+          // we will not be the owner of this connection
           // msquic will close the Connection Handle internally.
           // Set it to NULL to avoid close it in resource_conn_dealloc_callback
+          // or in the put_conn_handle.
           c_ctx->Connection = NULL;
-
+          put_conn_handle(c_ctx);
           // However, we still need to free the c_ctx
-          // note, we don't hold the lock of c_ctx since it is new conn.
+          // @NOTE: we don't hold the lock of c_ctx since it is new conn.
           enif_release_resource(c_ctx);
           goto Error;
         }
@@ -280,6 +282,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       // TLS opt error not file content error
       free(cacertfile);
+      cacertfile = NULL;
       free_certificate(&CredConfig);
       return ERROR_TUPLE_2(ATOM_CACERTFILE);
     }
@@ -290,9 +293,11 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (!l_ctx)
     {
       free(cacertfile);
+      cacertfile = NULL;
       free_certificate(&CredConfig);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
+  CxPlatRefInitialize(&l_ctx->ref_count);
 
   if (is_verify && cacertfile)
     {
@@ -312,6 +317,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   else
     { // since we don't use cacertfile, free it
       free(cacertfile);
+      cacertfile = NULL;
     }
 
   // Set owner for l_ctx
@@ -332,24 +338,35 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     {
       // quic_registration is set
       enif_keep_resource(l_ctx->r_ctx);
+      if (!get_reg_handle(l_ctx->r_ctx))
+        {
+          ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+          goto exit;
+        }
       Registration = l_ctx->r_ctx->Registration;
       target_r_ctx = l_ctx->r_ctx;
     }
   else
     {
-      target_r_ctx = G_r_ctx;
-
       // quic_registration is not set, use global registration
-      // msquic should reject if global registration is NULL (closed)
-      if (G_r_ctx)
+      target_r_ctx = G_r_ctx;
+      pthread_mutex_lock(&GRegLock);
+
+      if (!G_r_ctx)
         {
-          Registration = G_r_ctx->Registration;
+          pthread_mutex_unlock(&GRegLock);
+          ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+          goto exit;
         }
-      else
+
+      enif_keep_resource(G_r_ctx);
+      if (!get_reg_handle(G_r_ctx))
         {
           ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
           goto exit;
         }
+      Registration = G_r_ctx->Registration;
+      pthread_mutex_unlock(&GRegLock);
     }
 
   // Now load server config
@@ -420,8 +437,9 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
               l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
-      MsQuic->ListenerClose(l_ctx->Listener);
+      HQUIC Listener = l_ctx->Listener;
       l_ctx->Listener = NULL;
+      MsQuic->ListenerClose(Listener);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
       goto exit;
     }
@@ -488,20 +506,14 @@ stop_listener1(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  enif_mutex_lock(l_ctx->lock);
-  if (!l_ctx->Listener)
+  if (!get_listener_handle(l_ctx))
     {
       ret = ERROR_TUPLE_2(ATOM_CLOSED);
-      goto exit;
+      return ret; // follow otp behaviour?
     }
-  else if (!l_ctx->is_stopped)
-    {
-      l_ctx->is_stopped = TRUE;
-      // void return
-      MsQuic->ListenerStop(l_ctx->Listener);
-    }
-exit:
-  enif_mutex_unlock(l_ctx->lock);
+  l_ctx->is_stopped = TRUE;
+  MsQuic->ListenerStop(l_ctx->Listener);
+  put_listener_handle(l_ctx);
   return ret;
 }
 

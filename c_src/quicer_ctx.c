@@ -110,6 +110,7 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
 
   if (r_ctx)
     {
+      put_reg_handle(r_ctx);
       enif_mutex_lock(r_ctx->lock);
       CxPlatListEntryRemove(&l_ctx->RegistrationLink);
       enif_mutex_unlock(r_ctx->lock);
@@ -257,7 +258,6 @@ deinit_s_ctx(QuicerStreamCTX *s_ctx)
 void
 destroy_s_ctx(QuicerStreamCTX *s_ctx)
 {
-  assert(!s_ctx->Stream);
   enif_free_env(s_ctx->imm_env);
   enif_release_resource(s_ctx);
 }
@@ -301,4 +301,74 @@ destroy_dgram_send_ctx(QuicerDgramSendCTX *dgram_send_ctx)
 {
   enif_free_env(dgram_send_ctx->env);
   CXPLAT_FREE(dgram_send_ctx, QUICER_DGRAM_SEND_CTX);
+}
+
+inline void
+put_stream_handle(QuicerStreamCTX *s_ctx)
+{
+  if (CxPlatRefDecrement(&s_ctx->ref_count) && s_ctx->Stream)
+    {
+      HQUIC Stream = s_ctx->Stream;
+      Stream = s_ctx->Stream;
+      s_ctx->Stream = NULL;
+      s_ctx->is_closed = TRUE;
+      MsQuic->SetCallbackHandler(Stream, NULL, NULL);
+      MsQuic->StreamClose(Stream);
+      assert(s_ctx->c_ctx != NULL);
+      put_conn_handle(s_ctx->c_ctx);
+    }
+}
+
+inline BOOLEAN
+get_stream_handle(QuicerStreamCTX *s_ctx)
+{
+  return CxPlatRefIncrementNonZero(&s_ctx->ref_count, 1);
+}
+
+inline void
+put_conn_handle(QuicerConnCTX *c_ctx)
+{
+  if (CxPlatRefDecrement(&c_ctx->ref_count) && c_ctx->Connection)
+    {
+      HQUIC Connection = c_ctx->Connection;
+      c_ctx->Connection = NULL;
+      c_ctx->is_closed = TRUE;
+      MsQuic->SetCallbackHandler(Connection, NULL, NULL);
+      MsQuic->ConnectionClose(Connection);
+    }
+}
+
+inline BOOLEAN
+get_conn_handle(QuicerConnCTX *c_ctx)
+{
+  return CxPlatRefIncrementNonZero(&c_ctx->ref_count, 1);
+}
+
+inline void
+put_listener_handle(QuicerListenerCTX *l_ctx)
+{
+  if (CxPlatRefDecrement(&l_ctx->ref_count) && l_ctx->Listener)
+    {
+      HQUIC Listener = l_ctx->Listener;
+      l_ctx->Listener = NULL;
+      MsQuic->ListenerClose(Listener);
+    }
+}
+
+inline BOOLEAN
+get_listener_handle(QuicerListenerCTX *l_ctx)
+{
+  return CxPlatRefIncrementNonZero(&l_ctx->ref_count, 1);
+}
+
+inline void
+put_reg_handle(QuicerRegistrationCTX *r_ctx)
+{
+  CxPlatRefDecrement(&r_ctx->ref_count);
+}
+
+inline BOOLEAN
+get_reg_handle(QuicerRegistrationCTX *r_ctx)
+{
+  return CxPlatRefIncrementNonZero(&r_ctx->ref_count, 1);
 }

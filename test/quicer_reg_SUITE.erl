@@ -196,3 +196,14 @@ tc_get_reg_name(_Config) ->
     ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)),
     ok = quicer:shutdown_registration(Reg),
     ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)).
+
+tc_close_with_opened_conn(_Config) ->
+    Name = atom_to_list(?FUNCTION_NAME),
+    Profile = quic_execution_profile_low_latency,
+    {ok, Reg} = quicer:new_registration(Name, Profile),
+    {ok, Conn} = quicer_nif:open_connection(#{quic_registration => Reg}),
+    %% @NOTE This is a hack to make sure the connection is abled to be closed
+    %%       which is triggered by the registration close
+    _ = timer:apply_after(1000, quicer, connect,
+                          ["localhost", 5060, [{alpn, ["sample"]}, {handle, Conn}], 1000]),
+    ?assertEqual(ok, quicer:close_registration(Reg)).

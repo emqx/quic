@@ -240,7 +240,7 @@ end_per_testcase(tc_lib_registration_neg, _Config) ->
 end_per_testcase(_TestCase, _Config) ->
   quicer:terminate_listener(mqtt),
   quicer_test_lib:report_unhandled_messages(),
-  quicer_test_lib:report_active_connections(fun ct:pal/2),
+  quicer_test_lib:report_active_connections(fun ct:comment/2),
   ct:pal("Counters ~p", [quicer:perf_counters()]),
   ok.
 
@@ -1032,7 +1032,7 @@ tc_get_stream_0rtt_length(Config) ->
       case quicer:getopt(Stm, param_stream_0rtt_length) of
         {ok, Val}  -> ?assert(is_integer(Val));
         {error, invalid_state} -> ok;
-        {error, invalid_parameter} -> ok
+        {error, closed} -> ok
       end,
       quicer:close_connection(Conn),
       SPid ! done,
@@ -1211,6 +1211,9 @@ tc_idle_timeout(Config) ->
           ok;
         {error, stm_open_error, invalid_state} ->
           %% Invalid state
+          ok;
+        {error, closed} ->
+          %% Conn is closed
           ok;
         {ok, _Stream} ->
           ok
@@ -1679,7 +1682,8 @@ tc_strm_opt_active_badarg(Config) ->
   ct:pal("Listener Options: ~p", [Options]),
   {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
   {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
-  {error, badarg} = quicer:start_stream(Conn, [{active, twice}]).
+  {error, badarg} = quicer:start_stream(Conn, [{active, twice}]),
+  ok.
 
 tc_get_conn_rid(Config) ->
   Port = select_port(),
@@ -1861,6 +1865,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
     {error, stm_send_error, invalid_state} -> ok %% already closed
   end,
   receive
+    %% THEN we should recv event `start_completed' with status: `stream_limit_reached'
     {quic, start_completed, Stm,
              #{status := stream_limit_reached, stream_id := StreamID}} ->
       ct:pal("Stream ~p limit reached", [StreamID]);
@@ -1881,6 +1886,10 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
     Other ->
       ct:fail("Unexpected event ~p after stream start complete", [Other])
   end,
+  {error, closed} = snabbkaffe:retry(100, 10,
+                                     fun() ->
+                                         {error, closed} = quicer:getopt(Stm, param_configuration_settings, quic_configuration)
+                                     end),
   ?assert(is_integer(Rid)).
 
 tc_stream_start_flag_indicate_peer_accept_1(Config) ->
