@@ -69,7 +69,6 @@
 -include("quicer.hrl").
 -include("quicer_types.hrl").
 -include("quicer_vsn.hrl").
--include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 -spec abi_version() -> integer().
 abi_version() ->
@@ -103,9 +102,6 @@ init(ABIVsn) ->
                   ok
           end;
       {error, _Reason} = Res->
-          %% load fail, but beam will keep using current vsn if presents.
-          ?tp_ignore_side_effects_in_prod(debug,
-                                          #{module => ?MODULE, event => init, result => Res}),
           Res
   end.
 -spec open_lib() ->

@@ -46,17 +46,10 @@ download() {
 
     echo "$(cat "_packages/${PKGNAME}.sha256") _packages/${PKGNAME}" | sha256sum -c || return 1
 
-    gzip -c -d "_packages/${PKGNAME}" > "$TARGET_SO"
-    erlc -I include src/quicer_nif.erl
-    if erl -noshell -eval '[_|_]=quicer_nif:module_info(), halt(0).'; then
-        res=0
-    else
-        # failed to load, build from source
-        rm -f $TARGET_SO
-        res=1
-    fi
-    rm -f quicer_nif.beam
-    return $res
+    tar zxvf "_packages/${PKGNAME}" -C $(dirname "$TARGET_SO")
+    VSN=$(echo "${PKGNAME}" | cut -d '-' -f 2)
+    [[ -f "priv/libquicer_nif.so.*-${VSN}" ]]
+    return $?
 }
 
 release() {
@@ -66,7 +59,7 @@ release() {
     fi
     mkdir -p _packages
     TARGET_PKG="_packages/${PKGNAME}"
-    gzip -c "$TARGET_SO" > "$TARGET_PKG"
+    tar czvf "$TARGET_PKG" -C $(dirname "$TARGET_SO") --exclude include --exclude share --exclude .gitignore .
     # use openssl but not sha256sum command because in some macos env it does not exist
     if command -v openssl; then
         openssl dgst -sha256 "${TARGET_PKG}" | cut -d ' ' -f 2  > "${TARGET_PKG}.sha256"
