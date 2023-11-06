@@ -83,7 +83,7 @@ set(QUIC_TLS_SECRETS_SUPPORT "ON")
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/quicer_vsn.hrl.in
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/quicer_vsn.hrl
+    ${CMAKE_CURRENT_SOURCE_DIR}/priv/quicer_vsn.hrl
 )
 
 configure_file(
@@ -167,7 +167,8 @@ add_dependencies(quicer_static msquic)
 set_target_properties(quicer_nif
     PROPERTIES
         LIBRARY_OUTPUT_NAME quicer_nif
-        VERSION ${QUICER_ABI_VERSION}-${QUICER_VERSION}
+        VERSION ${QUICER_VERSION}
+        SOVERSION ${QUICER_ABI_VERSION}
 )
 include(GNUInstallDirs)
 install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
