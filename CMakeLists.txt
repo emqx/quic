@@ -82,12 +82,12 @@ set(QUIC_BUILD_PERF "OFF")
 set(QUIC_TLS_SECRETS_SUPPORT "ON")
 
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/quicer_vsn.hrl.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/templates/quicer_vsn.hrl.in
     ${CMAKE_CURRENT_SOURCE_DIR}/priv/quicer_vsn.hrl
 )
 
 configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/c_src/quicer_vsn.h.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/templates/quicer_vsn.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/c_src/quicer_vsn.h
 )
 
