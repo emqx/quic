@@ -24,6 +24,7 @@ distclean:
 	$(REBAR) unlock --all
 	rm -rf _build erl_crash.dump rebar3.crashdump
 	rm -rf c_build/*
+	rm -rf priv/*
 
 .PHONY: xref
 xref:
