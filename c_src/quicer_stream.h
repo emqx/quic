@@ -21,6 +21,8 @@ limitations under the License.
 #include "quicer_internal.h"
 #include "quicer_nif.h"
 
+#define UNSET_STREAMID 0xFFFFFFFFFFFFFFF
+
 typedef enum QUICER_SEND_FLAGS
 {
   QUICER_SEND_FLAGS_SYNC = 0x1000

@@ -233,6 +233,7 @@ init_s_ctx()
     }
   CxPlatZeroMemory(s_ctx, sizeof(QuicerStreamCTX));
   s_ctx->magic = 0xefefefef; // 4025479151
+  s_ctx->StreamID = UNSET_STREAMID;
   s_ctx->env = enif_alloc_env();
   s_ctx->imm_env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
@@ -371,4 +372,15 @@ inline BOOLEAN
 get_reg_handle(QuicerRegistrationCTX *r_ctx)
 {
   return CxPlatRefIncrementNonZero(&r_ctx->ref_count, 1);
+}
+
+void
+cache_stream_id(QuicerStreamCTX *s_ctx)
+{
+  uint32_t bufferlen = sizeof(s_ctx->StreamID);
+  if (QUIC_FAILED(MsQuic->GetParam(
+          s_ctx->Stream, QUIC_PARAM_STREAM_ID, &bufferlen, &s_ctx->StreamID)))
+    {
+      s_ctx->StreamID = UNSET_STREAMID;
+    }
 }

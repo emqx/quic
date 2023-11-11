@@ -781,6 +781,11 @@ getopt3(ErlNifEnv *env,
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
+      if (ATOM_QUIC_PARAM_STREAM_ID == eopt
+          && ((QuicerStreamCTX *)q_ctx)->StreamID != UNSET_STREAMID)
+        {
+          return SUCCESS(ETERM_UINT_64(((QuicerStreamCTX *)q_ctx)->StreamID));
+        }
       if (!get_stream_handle(q_ctx))
         {
           goto Exit;
