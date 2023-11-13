@@ -97,6 +97,7 @@
         , tc_strm_opt_active_badarg/1
         , tc_conn_opt_sslkeylogfile/1
         , tc_get_stream_id/1
+        , tc_get_stream_id_after_close/1
         , tc_getstat/1
         , tc_getstat_closed/1
         , tc_peername_v4/1
@@ -1008,6 +1009,29 @@ tc_get_stream_id(Config) ->
       {error, param_error} = quicer:get_stream_id(Conn),
       ok = quicer:close_connection(Conn),
       SPid ! done,
+      ensure_server_exit_normal(Ref)
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end.
+
+tc_get_stream_id_after_close(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  receive
+    listener_ready ->
+      {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+      {ok, Stm} = quicer:start_stream(Conn, []),
+      {ok, Stm2} = quicer:start_stream(Conn, []),
+      {ok, 4} = quicer:send(Stm, <<"ping">>),
+      {ok, 4} = quicer:send(Stm2, <<"ping">>),
+      ok = quicer:close_stream(Stm),
+      {ok, 0} = quicer:get_stream_id(Stm),
+      {ok, 4} = quicer:get_stream_id(Stm2),
+      ok = quicer:close_connection(Conn),
+      SPid ! done,
+      {ok, 0} = quicer:get_stream_id(Stm),
+      {ok, 4} = quicer:get_stream_id(Stm2),
       ensure_server_exit_normal(Ref)
   after 5000 ->
       ct:fail("listener_timeout")
@@ -2696,6 +2720,8 @@ ping_pong_server_stm_loop(L, Conn, Stm) ->
     {quic, peer_send_shutdown, Stm, undefined} ->
       ct:pal("closing stream"),
       quicer:close_stream(Stm),
+      ?assertNotEqual({error, closed},
+                      quicer:get_stream_id(Stm)),
       ping_pong_server_stm_loop(L, Conn, Stm);
     {quic, shutdown, Conn, ErrorCode} ->
       ct:pal("closing conn: ~p", [ErrorCode]),

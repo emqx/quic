@@ -362,6 +362,7 @@ async_start_stream2(ErlNifEnv *env,
     }
   HQUIC Stream = s_ctx->Stream;
   Status = MsQuic->StreamStart(Stream, start_flag);
+  cache_stream_id(s_ctx);
   put_stream_handle(s_ctx);
 
   if (QUIC_FAILED(Status))
@@ -1048,7 +1049,7 @@ handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
           = { atom_status(env, Event->START_COMPLETE.Status),
               enif_make_uint64(env, Event->START_COMPLETE.ID),
               ATOM_BOOLEAN(Event->START_COMPLETE.PeerAccepted) };
-
+      cache_stream_id(s_ctx);
       report = make_event_with_props(env,
                                      ATOM_START_COMPLETE,
                                      enif_make_copy(env, s_ctx->eHandle),

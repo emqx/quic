@@ -1359,6 +1359,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
 
   s_ctx->owner = acc;
   s_ctx->is_closed = FALSE;
+  cache_stream_id(s_ctx);
 
   ERL_NIF_TERM props_name[] = { ATOM_FLAGS, ATOM_IS_ORPHAN };
   ERL_NIF_TERM props_value[]

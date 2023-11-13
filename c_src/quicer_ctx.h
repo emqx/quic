@@ -112,6 +112,7 @@ typedef struct QuicerStreamCTX
   uint32_t magic;
   QuicerConnCTX *c_ctx;
   HQUIC Stream;
+  uint64_t StreamID;
   ACCEPTOR *owner;
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
@@ -186,5 +187,7 @@ BOOLEAN get_listener_handle(QuicerListenerCTX *l_ctx);
 
 void put_reg_handle(QuicerRegistrationCTX *r_ctx);
 BOOLEAN get_reg_handle(QuicerRegistrationCTX *r_ctx);
+
+void cache_stream_id(QuicerStreamCTX *s_ctx);
 
 #endif // __QUICER_CTX_H_
