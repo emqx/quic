@@ -86,6 +86,7 @@ typedef struct QuicerConnCTX
   // for client, alloc on its own
   QuicerConfigCTX *config_resource;
   QuicerRegistrationCTX *r_ctx;
+  CXPLAT_LIST_ENTRY RegistrationLink;
   HQUIC Connection;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;

@@ -55,6 +55,8 @@
         , open_connection/1
         , get_listeners/0
         , get_listeners/1
+        , get_connections/0
+        , get_connections/1
         ]).
 
 -export([abi_version/0]).
@@ -310,7 +312,15 @@ get_listeners() ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec get_listeners(reg_handle()) -> [listener_handle()] | {error, badarg}.
-get_listeners(_RegHandle) ->
+get_listeners(_) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_connections() -> [connection_handle()].
+get_connections() ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_connections(reg_handle()) -> [connection_handle()] | {error, badarg}.
+get_connections(_RegHandle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 %% Internals

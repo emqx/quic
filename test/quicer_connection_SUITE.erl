@@ -650,6 +650,39 @@ tc_conn_opt_local_uni_stream_count(Config) ->
       ct:fail("listener_timeout")
   end.
 
+tc_conn_list(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+  Reg = proplists:get_value(quic_registration, Config, undefined),
+  receive
+    listener_ready ->
+      case Reg of
+        undefined ->
+          ?assertEqual(0, length(quicer:get_connections()));
+        Reg ->
+          ?assertEqual(0, length(quicer:get_connections(Reg)))
+      end
+  after 5000 ->
+      ct:fail("listener_timeout")
+  end,
+  {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
+  {ok, Stm} = quicer:start_stream(Conn, []),
+  {ok, 4} = quicer:send(Stm, <<"ping">>),
+  {ok, Cnt} = quicer:getopt(Conn, param_conn_local_unidi_stream_count),
+  ?assert(is_integer(Cnt)),
+  Conns = case Reg of
+            undefined ->
+              quicer:get_connections();
+            Reg ->
+              quicer:get_connections(Reg)
+          end,
+  ?assertEqual(2, length(Conns)),
+
+  {ok, ClientName} = quicer:sockname(Conn),
+  ?assertMatch([{ok, ClientName}, {ok, {_, Port}}],
+               lists:map(fun quicer:peername/1, Conns)),
+  SPid ! done.
 
 %%%
 %%% Helpers

@@ -114,6 +114,8 @@
         , open_connection/0
         , get_listeners/0
         , get_listeners/1
+        , get_connections/0
+        , get_connections/1
         , close_registration/1
         ]).
 
@@ -989,6 +991,19 @@ get_listeners(global) ->
   quicer_nif:get_listeners();
 get_listeners(Reg) ->
   quicer_nif:get_listeners(Reg).
+
+
+%% @doc Get a list connections under global registration
+-spec get_connections() -> quicer_nif:get_connections().
+get_connections() ->
+  quicer_nif:get_connections().
+
+%% @doc Get a list of connections under registration handle
+-spec get_connections(Reg | global) -> quicer_nif:get_connections(Reg).
+get_connections(global) ->
+  quicer_nif:get_connections();
+get_connections(Reg) ->
+  quicer_nif:get_connections(Reg).
 
 %% @doc set controlling process for Connection/Stream.
 %% mimic {@link ssl:controlling_process/2}
