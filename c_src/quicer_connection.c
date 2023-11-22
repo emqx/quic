@@ -24,6 +24,7 @@ limitations under the License.
 #include <unistd.h>
 
 extern QuicerRegistrationCTX *G_r_ctx;
+extern pthread_mutex_t GRegLock;
 
 #if defined(DEBUG) && !defined(QUICER_LOGGING_STDOUT)
 extern inline void
@@ -606,6 +607,15 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   CxPlatRefInitialize(&(c_ctx->ref_count));
+
+  // link to registration
+  if (r_ctx)
+    {
+      enif_mutex_lock(r_ctx->lock);
+      CxPlatListInsertTail(&r_ctx->Connections, &c_ctx->RegistrationLink);
+      enif_mutex_unlock(r_ctx->lock);
+    }
+
   eHandle = enif_make_resource(env, c_ctx);
   return SUCCESS(eHandle);
 
@@ -787,6 +797,13 @@ async_connect3(ErlNifEnv *env,
         }
     }
   c_ctx->is_closed = FALSE; // connection opened.
+                            //
+  if (!is_reuse_handle && r_ctx)
+    {
+      enif_mutex_lock(r_ctx->lock);
+      CxPlatListInsertTail(&r_ctx->Connections, &c_ctx->RegistrationLink);
+      enif_mutex_unlock(r_ctx->lock);
+    }
 
   // optional set sslkeylogfile
   parse_sslkeylogfile_option(env, eoptions, c_ctx);
@@ -1668,6 +1685,50 @@ parse_conn_event_mask(ErlNifEnv *env,
         }
     }
   return ATOM_OK;
+}
+
+ERL_NIF_TERM
+get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  ERL_NIF_TERM res = enif_make_list(env, 0);
+  if (argc == 0) // use global registration
+    {
+      pthread_mutex_lock(&GRegLock);
+      if (!G_r_ctx)
+        {
+          pthread_mutex_unlock(&GRegLock);
+          return res;
+        }
+      r_ctx = G_r_ctx;
+    }
+  else
+    {
+      if (!enif_get_resource(env, argv[0], ctx_reg_t, (void **)&r_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  enif_mutex_lock(r_ctx->lock);
+  CXPLAT_LIST_ENTRY *Entry = r_ctx->Connections.Flink;
+  while (Entry != &r_ctx->Connections)
+    {
+      QuicerConnCTX *c_ctx
+          = CXPLAT_CONTAINING_RECORD(Entry, QuicerConnCTX, RegistrationLink);
+      if (get_conn_handle(c_ctx))
+        {
+          res = enif_make_list_cell(env, enif_make_resource(env, c_ctx), res);
+          put_conn_handle(c_ctx);
+        }
+      Entry = Entry->Flink;
+    }
+  enif_mutex_unlock(r_ctx->lock);
+
+  if (argc == 0) // use global registration
+    {
+      pthread_mutex_unlock(&GRegLock);
+    }
+  return res;
 }
 
 ///_* Emacs

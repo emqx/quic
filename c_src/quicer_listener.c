@@ -47,6 +47,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       // Note, c_ctx is newly init here, don't grab lock.
       //
       c_ctx = init_c_ctx();
+      c_ctx->r_ctx = l_ctx->r_ctx;
       ErlNifEnv *env = c_ctx->env;
 
       if (!c_ctx)
@@ -194,6 +195,23 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
+
+      QuicerRegistrationCTX *r_ctx;
+      if (l_ctx->r_ctx)
+        {
+          r_ctx = l_ctx->r_ctx;
+        }
+      else
+        {
+          r_ctx = G_r_ctx;
+        }
+
+      if (r_ctx)
+        {
+          enif_mutex_lock(r_ctx->lock);
+          CxPlatListInsertTail(&r_ctx->Connections, &c_ctx->RegistrationLink);
+          enif_mutex_unlock(r_ctx->lock);
+        }
 
       c_ctx->is_closed = FALSE; // new connection
       enif_clear_env(env);

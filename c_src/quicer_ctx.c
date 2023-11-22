@@ -153,6 +153,7 @@ init_c_ctx()
   c_ctx->is_closed = TRUE; // init
   c_ctx->config_resource = NULL;
   c_ctx->peer_cert = NULL;
+  CxPlatListInitializeHead(&c_ctx->RegistrationLink);
   return c_ctx;
 }
 
@@ -188,6 +189,21 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
       X509_STORE_free(c_ctx->trusted);
       c_ctx->trusted = NULL;
     }
+
+  QuicerRegistrationCTX *r_ctx;
+  if (c_ctx->r_ctx)
+    {
+      r_ctx = c_ctx->r_ctx;
+    }
+  else
+    {
+      r_ctx = G_r_ctx;
+    }
+
+  enif_mutex_lock(r_ctx->lock);
+  CxPlatListEntryRemove(&c_ctx->RegistrationLink);
+  enif_mutex_unlock(r_ctx->lock);
+
   enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
   enif_release_resource(c_ctx);
 }

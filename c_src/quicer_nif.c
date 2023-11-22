@@ -1568,7 +1568,9 @@ static ErlNifFunc nif_funcs[] = {
   { "get_conn_rid", 1, get_conn_rid1, 1},
   { "get_stream_rid", 1, get_stream_rid1, 1},
   { "get_listeners", 0, get_listenersX, 0},
-  { "get_listeners", 1, get_listenersX, 0}
+  { "get_listeners", 1, get_listenersX, 0},
+  { "get_connections", 0, get_connectionsX, 0},
+  { "get_connections", 1, get_connectionsX, 0},
   // clang-format on
 };
 
