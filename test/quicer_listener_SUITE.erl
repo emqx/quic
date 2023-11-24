@@ -503,6 +503,12 @@ tc_get_listeners_from_reg(Config) ->
   {ok, L2} = quicer:listen(Port2, default_listen_opts(Config)),
   ?assertEqual([L2, L1], quicer:get_listeners(RegH)).
 
+tc_get_listener_owner(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  ?assertEqual({ok, self()}, quicer:get_listener_owner(L)),
+  quicer:close_listener(L).
+
 select_port() ->
   Port = select_free_port(quic),
   timer:sleep(100),

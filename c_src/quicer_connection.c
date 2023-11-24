@@ -1731,6 +1731,30 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   return res;
 }
 
+ERL_NIF_TERM
+get_conn_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx = NULL;
+  ERL_NIF_TERM res = ATOM_UNDEFINED;
+  CXPLAT_FRE_ASSERT(argc == 1);
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(c_ctx->lock);
+  if (c_ctx->owner == NULL)
+    {
+      res = ERROR_TUPLE_2(ATOM_UNDEFINED);
+      goto exit;
+    }
+  res = SUCCESS(enif_make_pid(env, &(c_ctx->owner->Pid)));
+  ;
+exit:
+  enif_mutex_unlock(c_ctx->lock);
+  return res;
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

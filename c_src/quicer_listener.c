@@ -648,3 +648,19 @@ get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   return res;
 }
+
+ERL_NIF_TERM
+get_listener_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerListenerCTX *l_ctx;
+  ERL_NIF_TERM res = ATOM_UNDEFINED;
+  CXPLAT_FRE_ASSERT(argc == 1);
+  if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+  enif_mutex_lock(l_ctx->lock);
+  res = SUCCESS(enif_make_pid(env, &(l_ctx->listenerPid)));
+  enif_mutex_unlock(l_ctx->lock);
+  return res;
+}

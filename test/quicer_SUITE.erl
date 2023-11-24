@@ -66,6 +66,8 @@
         , tc_stream_active_switch_to_passive/1
         , tc_stream_controlling_process/1
         , tc_stream_controlling_process_demon/1
+        , tc_stream_get_owner_local/1
+        , tc_stream_get_owner_remote/1
 
         , tc_dgram_client_send/1
 
@@ -82,6 +84,7 @@
         , tc_getopt_global_lib_git_hash/1
         , tc_getopt_stream_active/1
         , tc_setopt/1
+        , tc_setopt_remote_addr/1
         , tc_getopt_settings/1
 
         %% @TODO following two tcs are failing due to:
@@ -1346,6 +1349,12 @@ tc_setopt(Config) ->
     ct:fail("listener_timeout")
   end.
 
+tc_setopt_remote_addr(_Config) ->
+  {ok, Conn} = quicer:open_connection(),
+  ok = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
+  ?assertEqual({ok, {{8,8,8,8}, 443}}, quicer:getopt(Conn, param_conn_remote_address)),
+  quicer:shutdown_connection(Conn).
+
 tc_setopt_bad_opt(_Config)->
   Port = select_port(),
   {error, badarg} = quicer:connect("localhost", Port,
@@ -2579,8 +2588,83 @@ tc_peercert_server_nocert(Config) ->
   ensure_server_exit_normal(Ref),
   ok.
 
-tc_abi_version(Config) ->
+tc_abi_version(_Config) ->
   ?assertEqual(1, quicer:abi_version()).
+
+tc_stream_get_owner_local(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                   fun() ->
+                       simple_conn_server(Owner, Config, Port)
+                   end),
+  receive listener_ready -> ok end,
+  {ok, Conn} = quicer:connect("localhost", Port,
+                              default_conn_opts(),
+                              5000),
+  {ok, {_, _}} = quicer:sockname(Conn),
+  {ok, Conn} = quicer:async_accept_stream(Conn, []),
+  {ok, Stm} = quicer:async_csend(Conn, <<"hello">>, [{active, true}], ?QUIC_SEND_FLAG_START),
+  ?assertEqual({ok, self()}, quicer:get_stream_owner(Stm)),
+  ok = quicer:close_stream(Stm),
+  _ = quicer:close_connection(Conn),
+  SPid ! done,
+  ensure_server_exit_normal(Ref),
+  ok.
+
+tc_stream_get_owner_remote(Config) ->
+  Port = select_port(),
+  Owner = self(),
+  {SPid, Ref} = spawn_monitor(
+                  fun() ->
+                      echo_server(Owner, Config, Port)
+                  end),
+  receive
+    listener_ready ->
+      ok
+  after 5000 ->
+    ct:fail("listener_timeout")
+  end,
+  {ok, Conn} = quicer:connect("127.0.0.1", Port,
+                              default_conn_opts() ++ [{peer_unidi_stream_count, 1}], 5000),
+  {ok, Stm0} = quicer:start_stream(Conn, [{active, true},
+                                          {start_flag, ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT},
+                                          {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                                         ]),
+  {ok, 5} = quicer:send(Stm0, <<"ping1">>),
+  receive
+    {quic, <<"ping1">>, Stm0, _} ->
+      ct:fail("We should not recv ping1 due to flow control: bidir stream 0")
+  after 1000 ->
+      ct:pal("recv ping1 timeout"),
+      SPid ! {flow_ctl, 10, 1}
+  end,
+  quicer:async_accept_stream(Conn, []),
+  %% check with server if peer addr is correct.
+  receive
+    {quic, peer_accepted, Stm0, undefined} ->
+      ct:pal("peer_accepted received")
+  after 1000 ->
+      ct:fail("peer_accepted timeout")
+  end,
+
+  %% Now we expect server initiat an Server -> Stream unidirectional stream
+  receive
+    {quic, new_stream, Stm1, #{ flags := Flags }} ->
+      ?assert(quicer:is_unidirectional(Flags)),
+      ?assertEqual({ok, self()}, quicer:get_stream_owner(Stm1)),
+      %% We also expect server send reply over new stream
+      receive
+        {quic, <<"ping1">>, Stm0, _} ->
+          ct:fail("Data recvd from client -> server unidirectional stream");
+        {quic, <<"ping1">>, Stm1, _} ->
+          ct:pal("Data recvd from server -> client unidirectional stream")
+      end
+  after 2000 ->
+      ct:fail("No new_stream for stream initiated from Server")
+  end,
+  SPid ! done,
+  ensure_server_exit_normal(Ref).
 
 %%% ====================
 %%% Internal helpers

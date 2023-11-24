@@ -684,6 +684,35 @@ tc_conn_list(Config) ->
                lists:map(fun quicer:peername/1, Conns)),
   SPid ! done.
 
+tc_get_conn_owner_client(_Config) ->
+  {ok, Conn} = quicer:open_connection(),
+  {ok, Pid} = quicer:get_conn_owner(Conn),
+  quicer:close_connection(Conn),
+  ?assertEqual(self(), Pid).
+
+tc_get_conn_owner_server(Config) ->
+  Port = select_port(),
+  {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+  {ok, L} = quicer:async_accept(L, #{}),
+  {ClientPid, CMref} = erlang:spawn_monitor(fun()->
+                                                {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 1000),
+                                                {ok, _Stm} = quicer:async_csend(Conn, <<"hello">>, [{active, true}], ?QUIC_SEND_FLAG_START),
+                                                receive
+                                                  done ->
+                                                    quicer:connection_close(Conn),
+                                                    ok
+                                                end
+                                            end),
+  receive
+    {quic, new_conn, SConn, _} ->
+      {ok, Pid} = quicer:get_conn_owner(SConn),
+      ?assertEqual(self(), Pid),
+      quicer:close_connection(SConn),
+      quicer:close_listener(L),
+      ClientPid ! done;
+    {'DOWN', CMref, process, ClientPid, Reason} -> ct:fail({client_fail, Reason})
+  end.
+
 %%%
 %%% Helpers
 %%%

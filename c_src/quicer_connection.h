@@ -57,4 +57,7 @@ peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 ERL_NIF_TERM
 get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
+ERL_NIF_TERM
+get_conn_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 #endif // __QUICER_CONNECTION_H_

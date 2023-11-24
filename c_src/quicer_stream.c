@@ -1247,6 +1247,29 @@ reset_stream_recv(QuicerStreamCTX *s_ctx)
   s_ctx->TotalBufferLength = 0;
 }
 
+ERL_NIF_TERM
+get_stream_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx;
+  ERL_NIF_TERM res = ATOM_UNDEFINED;
+  CXPLAT_FRE_ASSERT(argc == 1);
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(s_ctx->lock);
+  if (!s_ctx->owner)
+    {
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto exit;
+    }
+  res = SUCCESS(enif_make_pid(env, &(s_ctx->owner->Pid)));
+exit:
+  enif_mutex_unlock(s_ctx->lock);
+  return res;
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

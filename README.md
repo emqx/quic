@@ -51,6 +51,12 @@ export QUICER_USE_LTTNG=1
 make
 ```
 
+## BUILD with logging to stdout
+
+``` sh
+QUIC_LOGGING_TYPE=stdout make
+```
+
 ## Without DEBUG
 
 ``` sh
