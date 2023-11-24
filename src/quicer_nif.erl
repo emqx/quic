@@ -57,6 +57,9 @@
         , get_listeners/1
         , get_connections/0
         , get_connections/1
+        , get_conn_owner/1
+        , get_stream_owner/1
+        , get_listener_owner/1
         ]).
 
 -export([abi_version/0]).
@@ -305,6 +308,18 @@ controlling_process(_H, _P) ->
 -spec peercert(connection_handle()  | stream_handle()) ->
         {ok, Cert:: public_key:der_encoded()} | {error, any()}.
 peercert(_Handle) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_conn_owner(connection_handle()) -> {ok, pid()} | {error, undefined | badarg}.
+get_conn_owner(_) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_stream_owner(connection_handle()) -> {ok, pid()} | {error, undefined | badarg}.
+get_stream_owner(_) ->
+  erlang:nif_error(nif_library_not_loaded).
+
+-spec get_listener_owner(listener_handle()) -> {ok, pid()} | {error, undefined | badarg}.
+get_listener_owner(_) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec get_listeners() -> [listener_handle()].

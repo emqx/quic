@@ -117,6 +117,9 @@
         , get_connections/0
         , get_connections/1
         , close_registration/1
+        , get_conn_owner/1
+        , get_stream_owner/1
+        , get_listener_owner/1
         ]).
 
 -export([ spawn_listener/3 %% start application over quic
@@ -1004,6 +1007,18 @@ get_connections(global) ->
   quicer_nif:get_connections();
 get_connections(Reg) ->
   quicer_nif:get_connections(Reg).
+
+-spec get_conn_owner(C) -> quicer_nif:get_conn_owner(C).
+get_conn_owner(Conn) ->
+  quicer_nif:get_conn_owner(Conn).
+
+-spec get_stream_owner(S) -> quicer_nif:get_stream_owner(S).
+get_stream_owner(Stream) ->
+  quicer_nif:get_stream_owner(Stream).
+
+-spec get_listener_owner(L) -> quicer_nif:get_listener_owner(L).
+get_listener_owner(Listener) ->
+  quicer_nif:get_listener_owner(Listener).
 
 %% @doc set controlling process for Connection/Stream.
 %% mimic {@link ssl:controlling_process/2}

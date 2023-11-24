@@ -63,3 +63,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 ERL_NIF_TERM
 get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
 #endif // __QUICER_STREAM_H_
+
+ERL_NIF_TERM
+get_stream_owner1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
