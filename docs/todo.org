@@ -6,8 +6,6 @@
 
 Feature todo list, priority descending
 
-** Notify acceptors when listener is closed.
-
 ** Stream behavior should able to handle multiple streams
 One process could become the owner of multiple streams in the scenario
 that these streams are correlated.
@@ -15,14 +13,7 @@ that these streams are correlated.
 ** Impl ConfigurationLoadCredential
 Load QUIC_CREDENTIAL_CONFIG to configuration
 
-** quicer_stream proc should able to handle more streams
-
-** Close configurations in resource destroy callback
-
 ** Check shutdown connection wait for peer to close or not
-
-** DONE Hibernate connection owner process since connection process is mostly idling
-Doable via return value of callback fun.
 
 ** Get/Set Context
 with lock protection set/get the callback context.
@@ -30,14 +21,9 @@ with lock protection set/get the callback context.
 ** New API: open_send(connection_handle(), Data, Flags)
 Open stream over this connection and send without starting the stream
 
-** RegistrationShutdown
-API for registrationshutdown, shutdown all connections under registration
-
 ** Unintentional Transport Migration
 
 ** NIF Segfault recover
-
-** Different Application Profile (low latency, high throughput)
 
 ** NIF Upgrade
 
@@ -61,10 +47,6 @@ API for registrationshutdown, shutdown all connections under registration
 - make sending NST configurable
 
 - check types.
-
-- refactor DATAGRAM handling
-
-- Report StreamID in event: `new_stream`
 
 - Level of APIs
 

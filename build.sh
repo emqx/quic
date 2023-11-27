@@ -92,9 +92,3 @@ else
     fi
 fi
 
-## workaround for emqx forked rebar3
-if ([ -n $REBAR_DEPS_DIR ] && [ $(realpath -P "${REBAR_DEPS_DIR}/quicer/priv") != "${PWD}/priv" ]);
-then
-    cp  -r priv/* "${REBAR_DEPS_DIR}/quicer/priv/"
-    cp include/quicer_vsn.hrl "${REBAR_DEPS_DIR}/quicer/include/"
-fi

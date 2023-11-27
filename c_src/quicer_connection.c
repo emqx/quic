@@ -1749,7 +1749,6 @@ get_conn_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
   res = SUCCESS(enif_make_pid(env, &(c_ctx->owner->Pid)));
-  ;
 exit:
   enif_mutex_unlock(c_ctx->lock);
   return res;

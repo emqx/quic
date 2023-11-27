@@ -20,7 +20,7 @@
             , quicer_sup
             , quicer_nif]},
 
-  {licenses, ["Apache 2.0"]},
+  {licenses, ["Apache-2.0"]},
   {links, [{"Github", "https://github.com/emqx/quic"}]},
   {include_files, [ "CMakeLists.txt"
                   , "Makefile"
