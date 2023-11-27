@@ -173,3 +173,8 @@ set_target_properties(quicer_nif
 include(GNUInstallDirs)
 install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
 
+## workaround for emqx forked rebar3
+## For none-emqx rebar3, it should be just a noop of 'Up-to-date' instead of 'installing'
+if (DEFINED ENV{REBAR_DEPS_DIR})
+install(TARGETS quicer_nif LIBRARY DESTINATION $ENV{REBAR_DEPS_DIR}/quicer/priv/)
+endif()
