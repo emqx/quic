@@ -17,6 +17,7 @@
 -include("quicer_types.hrl").
 
 -export_type([ cb_ret/0
+             , cb_state/0
              ]).
 -type cb_ret() :: cb_ret_noreply() | cb_ret_reply().
 -type cb_state() :: term().

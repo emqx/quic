@@ -136,7 +136,7 @@ start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
 %% then handoff ownership to this process
 %%--------------------------------------------------------------------
 -spec start_link(Callback :: module(),
-                 Stream :: quicer:connection_handle(),
+                 Stream :: quicer:stream_handle(),
                  Conn :: quicer:connection_handle(),
                  StreamOpts :: map(),
                  Props :: new_stream_props()

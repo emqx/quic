@@ -33,9 +33,9 @@
                , alpn :: [string()]
                }).
 
+-export_type([listener_name/0]).
+
 -type listener_name() :: atom().
--type listen_on() :: inet:port_number() | string(). %% "127.0.0.1:8080"
--type listener_opts() :: map().
 
 %%%===================================================================
 %%% API
@@ -47,11 +47,11 @@
 %% @end
 %%--------------------------------------------------------------------
 -spec start_link(Name :: listener_name(),
-                 ListenOn :: listen_on(),
+                 ListenOn :: quicer:listen_on(),
                  Options ::
-                   { listener_opts()
-                   , quicer_connection:opts()
-                   , quicer_stream:stream_opts()
+                   { quicer:listener_opts()
+                   , quicer:conn_opts()
+                   , quicer:stream_opts()
                    }
                 ) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
@@ -89,7 +89,7 @@ init([Name, ListenOn, { #{conn_acceptors :=  N, alpn := Alpn} = LOpts,
     process_flag(trap_exit, true),
     {ok, L} = quicer:listen(ListenOn, maps:without([conn_acceptors], LOpts)),
     {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
-    [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
+    _ = [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
     {ok, #state{ name = Name
                , listener = L
                , conn_sup = ConnSup
@@ -156,5 +156,5 @@ handle_info(_Info, State) ->
                 State :: term()) -> any().
 terminate(_Reason, #state{listener = L}) ->
     %% nif listener has no owner process so we need to close it explicitly.
-    quicer:close_listener(L),
+    _ = quicer:close_listener(L),
     ok.

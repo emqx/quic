@@ -129,8 +129,19 @@
 %% versions
 -export([abi_version/0]).
 
--type connection_opts() :: proplists:proplist() | quicer_connection:opts().
--type listener_opts() :: proplists:proplist() | quicer_listener:listener_opts().
+
+%% export types
+-export_type([listener_handle/0,
+              listener_opts/0,
+              listen_on/0,
+              connection_handle/0,
+              conn_opts/0,
+              stream_handle/0,
+              stream_opts/0
+             ]).
+
+-type connection_opts() :: proplists:proplist() | conn_opts().
+-type listener_opts() :: proplists:proplist() | listen_opts().
 
 %% @doc Return ABI version of the library.
 -spec abi_version() -> quicer_nif:abi_version().
@@ -161,32 +172,32 @@ close_lib() ->
 
 
 %% @doc Create a new registration.
--spec new_registration(Name, Profile) ->
-        quicer_nif:new_registration(Name, Profile).
+-spec new_registration(string(), registration_profile()) ->
+        quicer_nif:new_registration().
 new_registration(Name, Profile) ->
   quicer_nif:new_registration(Name, Profile).
 
 %% @doc Shutdown a registration.
--spec shutdown_registration(Handle) ->
-        quicer_nif:shutdown_registration(Handle).
+-spec shutdown_registration(reg_handle()) ->
+        quicer_nif:shutdown_registration().
 shutdown_registration(Handle) ->
   quicer_nif:shutdown_registration(Handle).
 
 %% @doc Shutdown a registration with error code and silent flag.
--spec shutdown_registration(Handle, IsSilent, ErrCode) ->
-        quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
+-spec shutdown_registration(reg_handle(), boolean(), uint64()) ->
+        quicer_nif:shutdown_registration().
 shutdown_registration(Handle, IsSilent, ErrCode) ->
   quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
 
 %% @doc close a registration.
--spec close_registration(Handle) ->
-        quicer_nif:close_registration(Handle).
+-spec close_registration(reg_handle()) ->
+        quicer_nif:close_registration().
 close_registration(Handle) ->
   quicer_nif:close_registration(Handle).
 
 %% @doc get registration name
--spec get_registration_name(Handle) ->
-        quicer_nif:get_registration_name(Handle).
+-spec get_registration_name(reg_handle()) ->
+        quicer_nif:get_registration_name().
 get_registration_name(Handle) ->
   quicer_nif:get_registration_name(Handle).
 
@@ -288,7 +299,7 @@ listen(ListenOn, Opts) when is_map(Opts) ->
 close_listener(Listener) ->
   close_listener(Listener, 5000).
 
--spec close_listener(listener_handle(), timer:time()) ->
+-spec close_listener(listener_handle(), timeout()) ->
         ok | {error, badarg | closed | timeout}.
 close_listener(Listener, Timeout) ->
   case quicer_nif:close_listener(Listener) of
@@ -946,7 +957,7 @@ peername(Handle) ->
 %% @doc Peer Cert in DER-encoded binary
 %% mimic {@link ssl:peername/1}
 -spec peercert(connection_handle() | stream_handle()) ->
-        {ok, Cert:: public_key:der_encoded()} | {error, any()}.
+        {ok, CertDerEncoded :: binary()} | {error, any()}.
 peercert(Handle) ->
   quicer_nif:peercert(Handle).
 
@@ -971,7 +982,7 @@ open_connection() ->
 
 %% @doc list all listeners
 -spec listeners() -> [{{ quicer_listener:listener_name()
-                       , quicer_listener:listen_on()},
+                       , quicer:listen_on()},
                        pid()}].
 listeners() ->
   quicer_listener_sup:listeners().
@@ -979,7 +990,7 @@ listeners() ->
 %% @doc List listener with app name
 -spec listener(quicer_listener:listener_name()
               | {quicer_listener:listener_name(),
-                 quicer_listener:listen_on()}) -> {ok, pid()} | {error, not_found}.
+                 quicer:listen_on()}) -> {ok, pid()} | {error, not_found}.
 listener(Name) ->
   quicer_listener_sup:listener(Name).
 
@@ -989,7 +1000,7 @@ get_listeners() ->
   quicer_nif:get_listeners().
 
 %% @doc Get a list of listeners under registration handle
--spec get_listeners(Reg | global) -> quicer_nif:get_listeners(Reg).
+-spec get_listeners(reg_handle() | global) -> quicer_nif:get_listeners().
 get_listeners(global) ->
   quicer_nif:get_listeners();
 get_listeners(Reg) ->
@@ -1002,21 +1013,21 @@ get_connections() ->
   quicer_nif:get_connections().
 
 %% @doc Get a list of connections under registration handle
--spec get_connections(Reg | global) -> quicer_nif:get_connections(Reg).
+-spec get_connections(reg_handle() | global) -> quicer_nif:get_connections().
 get_connections(global) ->
   quicer_nif:get_connections();
 get_connections(Reg) ->
   quicer_nif:get_connections(Reg).
 
--spec get_conn_owner(C) -> quicer_nif:get_conn_owner(C).
+-spec get_conn_owner(connection_handle()) -> quicer_nif:get_owner().
 get_conn_owner(Conn) ->
   quicer_nif:get_conn_owner(Conn).
 
--spec get_stream_owner(S) -> quicer_nif:get_stream_owner(S).
+-spec get_stream_owner(stream_handle()) -> quicer_nif:get_owner().
 get_stream_owner(Stream) ->
   quicer_nif:get_stream_owner(Stream).
 
--spec get_listener_owner(L) -> quicer_nif:get_listener_owner(L).
+-spec get_listener_owner(listener_handle()) -> quicer_nif:get_owner().
 get_listener_owner(Listener) ->
   quicer_nif:get_listener_owner(Listener).
 
@@ -1071,7 +1082,7 @@ handoff_stream(Stream, NewOwner, HandoffData) ->
       ActiveN =/= false andalso quicer:setopt(Stream, active, false),
       Res = case forward_stream_msgs(Stream, NewOwner) of
               ok ->
-                quicer:controlling_process(Stream, NewOwner),
+                _ = quicer:controlling_process(Stream, NewOwner),
                 NewOwner ! {handoff_done, Stream, HandoffData},
                 ok;
               {error, _} = Other ->
