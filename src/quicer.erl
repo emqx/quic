@@ -107,6 +107,7 @@
         , new_fpbuffer/1
         , update_fpbuffer/2
         , defrag_fpbuffer/2
+        , is_set/2
         ]).
 %% Exports for test
 -export([ get_conn_rid/1
@@ -1218,6 +1219,12 @@ flush(QuicEventName, Handle) when is_atom(QuicEventName) ->
     {quic, QuicEventName, Handle, _} -> ok
   %% Event must come, do not timeout
   end.
+
+%% @doc Check if the bit mask is set in the integer.
+-spec is_set(integer(), integer()) -> boolean().
+is_set(Num, BitMask) when is_integer(Num)
+                              andalso is_integer(BitMask) ->
+    (Num band BitMask) =:= BitMask.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
