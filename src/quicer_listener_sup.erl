@@ -51,7 +51,7 @@ start_listener(AppName, Port, Options) ->
     supervisor:start_child(?MODULE, chid_spec(AppName, Port, Options)).
 
 stop_listener(AppName) ->
-    supervisor:terminate_child(?MODULE, ?CHILD_ID(AppName)),
+    _ = supervisor:terminate_child(?MODULE, ?CHILD_ID(AppName)),
     supervisor:delete_child(?MODULE, ?CHILD_ID(AppName)).
 
 -spec listeners() -> [{{atom(), integer()|string()}, pid()}].

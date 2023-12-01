@@ -86,9 +86,9 @@
                                  , key := file:filename()
                                  , keyfile := file:filename()
                                  , verify => none | peer | verify_peer | verify_none
-                                 , cacertfile => filelib:filename()
+                                 , cacertfile => file:filename()
                                  , password => string()
-                                 , sslkeylogfile => filelib:filename()
+                                 , sslkeylogfile => file:filename()
                                  , allow_insecure => boolean()
                                  , quic_registration => reg_handle()
                                  , conn_acceptors => non_neg_integer()
@@ -141,16 +141,16 @@
 
 -type conn_opts() :: quic_settings() |  #{ alpn := [string()]
                                          , conn_callback => module()
-                                         , cert => filelib:filename()
-                                         , certfile => filelib:filename()
-                                         , key => filelib:filename()
-                                         , keyfile => filelib:filename()
+                                         , cert => file:filename()
+                                         , certfile => file:filename()
+                                         , key => file:filename()
+                                         , keyfile => file:filename()
                                          , password => string()
                                          , verify => none | peer
                                          , handle => connection_handle() %% get NST from last connection, for reconnect.
                                          , nst => binary()
-                                         , cacertfile => filelib:filename()
-                                         , sslkeylogfile => filelib:filename()
+                                         , cacertfile => file:filename()
+                                         , sslkeylogfile => file:filename()
                                          , peer_bidi_stream_count => uint16()
                                          , peer_unidi_stream_count => uint16()
                                          , handshake_idle_timeout_ms => non_neg_integer()

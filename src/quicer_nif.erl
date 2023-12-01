@@ -67,6 +67,28 @@
 %% for test
 -export([init/1]).
 
+
+-export_type([ abi_version/0,
+               new_registration/0,
+               shutdown_registration/0,
+               close_registration/0,
+               get_registration_name/0,
+               get_listeners/0,
+               get_connections/0,
+               get_owner/0
+             ]).
+
+%% NIF fuction return types
+-type abi_version() :: integer().
+-type new_registration() :: {ok, reg_handle()} | {error, atom_reason()}.
+-type shutdown_registration() :: ok | {error, badarg}.
+-type close_registration() :: ok | {error, badarg}.
+-type get_registration_name() :: {ok, string()} | {error, badarg}.
+-type get_listeners() :: [listener_handle()].
+-type get_connections() :: [connection_handle()].
+-type get_owner() :: {ok, pid()} | {error, undefined | badarg}.
+
+
 %% @NOTE: In embedded mode, first all modules are loaded. Then all on_load functions are called.
 -on_load(init/0).
 
@@ -75,7 +97,7 @@
 -include("quicer_types.hrl").
 -include("quicer_vsn.hrl").
 
--spec abi_version() -> integer().
+-spec abi_version() -> abi_version().
 abi_version() ->
   ?QUICER_ABI_VERSION.
 
@@ -144,25 +166,24 @@ reg_close() ->
   erlang:nif_error(nif_library_not_loaded).
 
 
--spec new_registration(Name::string(), registration_profile()) ->
-          {ok, reg_handle()} | {error, atom_reason()}.
+-spec new_registration(Name::string(), Profile :: registration_profile()) -> new_registration().
 new_registration(_Name, _Profile) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec shutdown_registration(reg_handle()) -> ok | {error | badarg}.
+-spec shutdown_registration(reg_handle()) -> shutdown_registration().
 shutdown_registration(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec shutdown_registration(reg_handle(), IsSilent::boolean(), ErrorCode::uint64())
-                           -> ok | {error | badarg}.
+                           -> shutdown_registration().
 shutdown_registration(_Handle, _IsSilent, _ErrorCode) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec close_registration(reg_handle()) -> ok | {error | badarg}.
+-spec close_registration(reg_handle()) -> close_registration().
 close_registration(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_registration_name(reg_handle()) -> {ok, string()} | {error, badarg}.
+-spec get_registration_name(reg_handle()) -> get_registration_name().
 get_registration_name(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
@@ -306,27 +327,27 @@ controlling_process(_H, _P) ->
   erlang:nif_error(nif_library_not_loaded).
 
 -spec peercert(connection_handle()  | stream_handle()) ->
-        {ok, Cert:: public_key:der_encoded()} | {error, any()}.
+        {ok, CertDerEncoded :: binary()} | {error, any()}.
 peercert(_Handle) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_conn_owner(connection_handle()) -> {ok, pid()} | {error, undefined | badarg}.
+-spec get_conn_owner(connection_handle()) -> get_owner().
 get_conn_owner(_) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_stream_owner(connection_handle()) -> {ok, pid()} | {error, undefined | badarg}.
+-spec get_stream_owner(connection_handle()) -> get_owner().
 get_stream_owner(_) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_listener_owner(listener_handle()) -> {ok, pid()} | {error, undefined | badarg}.
+-spec get_listener_owner(listener_handle()) -> get_owner().
 get_listener_owner(_) ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_listeners() -> [listener_handle()].
+-spec get_listeners() -> get_listeners().
 get_listeners() ->
   erlang:nif_error(nif_library_not_loaded).
 
--spec get_listeners(reg_handle()) -> [listener_handle()] | {error, badarg}.
+-spec get_listeners(reg_handle()) -> get_listeners().
 get_listeners(_) ->
   erlang:nif_error(nif_library_not_loaded).
 

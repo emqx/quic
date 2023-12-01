@@ -10,8 +10,8 @@ jobs:
         os:
           - macos-12
         otp:
-          - 24
           - 25
+          - 26
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -67,8 +67,8 @@ jobs:
       fail-fast: false
       matrix:
         otp:
-          - 24.3.4
           - 25.3.2
+          - 26.1.2
         openssl:
           - openssl3
           - openssl

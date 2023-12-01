@@ -111,7 +111,7 @@ peer_needs_streams(_C, _UnidiOrBidi, S) ->
 connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
                          , stream_callback := Callback} = S) ->
     %% @TODO configurable behavior of spawing stream acceptor
-    quicer_stream:start_link(Callback, Conn, SOpts),
+    _ = quicer_stream:start_link(Callback, Conn, SOpts),
     {ok, S#{conn => Conn}};
 connected(_Connecion, _Flags, S) ->
     {ok, S}.

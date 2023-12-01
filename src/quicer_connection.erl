@@ -157,7 +157,7 @@ start_link(CallbackModule, {_Host, _Port} = Peer, {_COpts, _SOpts} = Opts) when 
 %% Get `CallbackModule` from conn_opts, key:`conn_callback` if `CallbackModule` is undefined,
 %% this is the entry for supervised acceptor.
 -spec start_link(CallbackModule :: undefined | module(),
-                 Listener ::quicer:listener_handle(),
+                 Listener :: quicer:listener_handle(),
                  ConnOpts :: term(),
                  Sup :: pid()) -> {ok, Pid :: pid()} |
           {error, Error :: {already_started, pid()}} |
