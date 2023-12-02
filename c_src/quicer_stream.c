@@ -652,10 +652,16 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  if (!get_stream_handle(s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
   if (!send_ctx)
     {
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      goto Exit;
     }
 
   ErlNifBinary *bin = &send_ctx->bin;
@@ -676,8 +682,8 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   else
     {
-      destroy_send_ctx(send_ctx);
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto ErrorExit;
     }
 
   ebin = enif_make_copy(send_ctx->env, ebin);
@@ -685,35 +691,27 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         || enif_inspect_binary(send_ctx->env, ebin, bin))
       || bin->size > UINT32_MAX)
     {
-      destroy_send_ctx(send_ctx);
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  enif_mutex_lock(s_ctx->lock);
-  if (!s_ctx->Stream)
-    {
-      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      res = ERROR_TUPLE_2(ATOM_BADARG);
       goto ErrorExit;
     }
-
-  send_ctx->s_ctx = s_ctx;
-
-  HQUIC Stream = s_ctx->Stream;
 
   //
   // Allocates and builds the buffer to send over the stream.
   //
-
+  send_ctx->s_ctx = s_ctx;
   assert(bin->data != NULL);
   send_ctx->Buffer.Buffer = (uint8_t *)bin->data;
   send_ctx->Buffer.Length = (uint32_t)bin->size;
   uint32_t bin_size = (uint32_t)bin->size;
 
+  assert(s_ctx->Stream);
+
   QUIC_STATUS Status;
   // note, SendBuffer as sendcontext, free the buffer while message is sent
   // confirmed.
-  if (QUIC_FAILED(Status = MsQuic->StreamSend(
-                      Stream, &send_ctx->Buffer, 1, sendflags, send_ctx)))
+  if (QUIC_FAILED(
+          Status = MsQuic->StreamSend(
+              s_ctx->Stream, &send_ctx->Buffer, 1, sendflags, send_ctx)))
     {
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
@@ -727,7 +725,7 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 ErrorExit:
   destroy_send_ctx(send_ctx);
 Exit:
-  enif_mutex_unlock(s_ctx->lock);
+  put_stream_handle(s_ctx);
   return res;
 }
 
