@@ -29,11 +29,9 @@ jobs:
         run: |
           export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
           brew install erlang@${{ matrix.otp }}
-      - name: install rebar3
-        run: |
-          wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
       - name: release build
         run: |
+          wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
           export PATH="$PWD:/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
