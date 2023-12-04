@@ -37,7 +37,6 @@ jobs:
       - name: install rebar3
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-          cp ./rebar3 /usr/local/bin/rebar3
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -47,7 +46,7 @@ jobs:
         env:
           QUIC_TLS: ${{ matrix.openssl }}
         run: |
-          export PATH="/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
+          export PATH="$PWD:/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           export QUIC_TLS
           BUILD_RELEASE=1 make
