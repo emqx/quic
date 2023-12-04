@@ -32,10 +32,9 @@ jobs:
       - name: install rebar3
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-          cp ./rebar3 /usr/local/bin/rebar3
       - name: release build
         run: |
-          export PATH="/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
+          export PATH="$PWD:/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
           # run sudo for getting coredump
