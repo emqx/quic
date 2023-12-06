@@ -1370,6 +1370,10 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
       // but that will buffer more in msquic stack and hit control limit.
       acc->active = ACCEPTOR_RECV_MODE_PASSIVE;
     }
+  else
+    {
+      TP_CB_3(acceptor_available, (uintptr_t)c_ctx->Connection, 0);
+    }
 
   assert(acc);
   acc_pid = &(acc->Pid);
@@ -1389,18 +1393,46 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
                                               props_name,
                                               props_value,
                                               2);
-  if (enif_send(NULL, acc_pid, NULL, report))
+  if (!enif_send(NULL, acc_pid, NULL, report))
     {
-      MsQuic->SetCallbackHandler(
-          Event->PEER_STREAM_STARTED.Stream, stream_callback, s_ctx);
-      // We should return success only when callback is set
-      return QUIC_STATUS_SUCCESS;
+      if (is_orphan)
+        {
+          // Connection acceptor is dead
+          // we don't need to destroy acceptor, we don't have the ownwership
+          return QUIC_STATUS_UNREACHABLE;
+        }
+      else
+        {
+          TP_CB_3(acceptor_down_fallback, (uintptr_t)c_ctx->Connection, 0);
+          // Lets try the the connection owner
+          //
+          // Destroy this dead acceptor
+          AcceptorDestroy(acc);
+          // Set is_orphan to true, connection owner takeover
+          props_value[1] = ATOM_TRUE;
+          acc = AcceptorAlloc();
+          CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
+          s_ctx->owner = acc;
+          // this is our protocol
+          acc->active = ACCEPTOR_RECV_MODE_PASSIVE;
+          acc_pid = &(acc->Pid);
+
+          report = make_event_with_props(env,
+                                         ATOM_NEW_STREAM,
+                                         enif_make_resource(env, s_ctx),
+                                         props_name,
+                                         props_value,
+                                         2);
+          if (!enif_send(NULL, acc_pid, NULL, report))
+            {
+              // Sad...
+              return QUIC_STATUS_UNREACHABLE;
+            }
+        }
     }
-  else
-    {
-      // NOTE: we must return non sucess status
-      return QUIC_STATUS_UNREACHABLE;
-    }
+  MsQuic->SetCallbackHandler(
+      Event->PEER_STREAM_STARTED.Stream, stream_callback, s_ctx);
+  return QUIC_STATUS_SUCCESS;
 }
 
 static QUIC_STATUS

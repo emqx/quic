@@ -31,6 +31,7 @@
 -export([ tc_app_echo_server/1,
           tc_slow_conn/1,
           tc_stream_owner_down/1,
+          tc_stream_acceptor_down/1,
           tc_conn_owner_down/1,
           tc_conn_close_flag_1/1,
           tc_conn_close_flag_2/1,
@@ -182,6 +183,7 @@ all() ->
   [ tc_app_echo_server
   , tc_slow_conn
   , tc_stream_owner_down
+  , tc_stream_acceptor_down
   , tc_conn_owner_down
   , tc_conn_close_flag_1
   , tc_conn_close_flag_2
@@ -399,6 +401,92 @@ tc_stream_owner_down(Config) ->
                                               },
                                              Trace))
                      end),
+  ok.
+
+
+tc_stream_acceptor_down(Config) ->
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  Port = select_port(),
+  application:ensure_all_started(quicer),
+  ListenerOpts = [{conn_acceptors, 32}, {peer_bidi_stream_count, 10},
+                  {peer_unidi_stream_count, 0} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+  ct:pal("Listener Options: ~p", [Options]),
+  ?check_trace(#{timetrap => 10000},
+               begin
+                 {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
+                 {ok, Conn} = quicer:connect("localhost", Port,
+                                             [{peer_bidi_stream_count, 10}, {peer_unidi_stream_count, 1} | default_conn_opts()], 5000),
+                 {ok, Stm} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, Stm2} = quicer:start_stream(Conn, [{active, true}]),
+                 {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
+                 ct:pal("ping1 sent"),
+                 {ok, 5} = quicer:async_send(Stm2, <<"ping2">>),
+                 ct:pal("ping2 sent"),
+                 receive
+                   {quic, <<"ping1">>, Stm,  _} -> ok
+                 after 100 -> ct:fail("no ping1")
+                 end,
+                 receive
+                   {quic, <<"ping2">>, Stm2,  _} -> ok
+                 after 100 -> ct:fail("no ping2")
+                 end,
+                 {DeadPid, DMRef } = spawn_monitor(fun() ->
+                                                  quicer:async_accept_stream(Conn, [])
+                                              end),
+                 %% GIVEN: one remote stream acceptor is DOWN
+                 receive
+                   {'DOWN', DMRef, process, DeadPid, normal} -> ok
+                 after 500 -> ct:fail("no DOWN message for dead pid")
+                 end,
+                 %% WHEN: We trigger peer (server) to initiate remote stream to us
+                 {ok, Stm3Out} = quicer:start_stream(Conn, [{active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]),
+                 quicer:async_send(Stm3Out, <<"ping3">>),
+                 Stm3In = receive
+                            %% THEN: This process is selected as stream owner fallback (is_orphan = true)
+                            {quic, new_stream, Incoming, #{flags := Flag, is_orphan := true}} ->
+                              ct:pal("incoming stream from server: ~p", [Incoming]),
+                              true = quicer:is_unidirectional(Flag),
+                              quicer:setopt(Incoming, active, true),
+                              Incoming
+                          after 1000 ->
+                              ct:fail("no incoming stream")
+                          end,
+                 receive
+                   {quic, Data, Stm3In, DFlag} ->
+                     ct:pal("~p is received from ~p with flag: ~p", [Data, Stm3In, DFlag]),
+                     ?assertEqual(Data, <<"ping3">>)
+                 after 1000 ->
+                     ct:fail("no incoming data")
+                 end,
+                 quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
+                 receive
+                   {quic, closed, Conn, _} ->
+                     ct:pal("Connecion is closed")
+                 end,
+                 quicer:shutdown_connection(Conn)
+               end,
+               fun(_Result, Trace) ->
+                   ct:pal("Trace is ~p", [Trace]),
+                   %% check that acceptor is first picked but it is down and fallback is triggered
+                   ?assert(?causality(#{ ?snk_kind := debug
+                                       , function := "handle_connection_event_peer_stream_started"
+                                       , tag := "acceptor_available"
+                                       , resource_id := _Rid
+                                       },
+                                      #{ ?snk_kind := debug
+                                       , function := "handle_connection_event_peer_stream_started"
+                                       , tag := "acceptor_down_fallback"
+                                       , resource_id := _Rid
+                                       },
+                                      Trace))
+               end),
   ok.
 
 
