@@ -1,8 +1,9 @@
 name: release
 
 on:
-  inputs:
-    ref:
+  workflow_dispatch:
+    inputs:
+      ref:
         description: 'Ref to release'
         required: false
         default: ''
