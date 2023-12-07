@@ -158,6 +158,7 @@
                                          , param_conn_disable_1rtt_encryption => boolean()
                                            %% Not working well
                                          , param_conn_local_address => string()
+                                         , _ => _ %% for Application defined options
                                          }.
 -type conn_shutdown_flag() :: ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE |
                               ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
@@ -168,6 +169,7 @@
                         , start_flag => stream_start_flags()
                         , event_mask => uint32()
                         , disable_fpbuffer => boolean()
+                        , _ => _ %% for Application defined options
                         }. %% @TODO expand
 
 -type stream_open_flags() ::  ?QUIC_STREAM_OPEN_FLAG_NONE |
