@@ -132,13 +132,37 @@
 
 
 %% export types
--export_type([listener_handle/0,
-              listener_opts/0,
+-export_type([%% handles
+              listener_handle/0,
               listen_on/0,
               connection_handle/0,
-              conn_opts/0,
               stream_handle/0,
-              stream_opts/0
+
+              %% Options
+              conn_opts/0,
+              stream_opts/0,
+              listener_opts/0,
+
+              %% Flags
+              stream_open_flags/0,
+              stream_start_flags/0,
+              stream_shutdown_flags/0,
+
+              %% Events Props
+              recv_data_props/0,
+              peer_accepted_props/0,
+              stream_closed_props/0,
+              stream_start_completed_props/0,
+              transport_shutdown_props/0,
+              conn_closed_props/0,
+              connected_props/0,
+              new_conn_props/0,
+              streams_available_props/0,
+              new_stream_props/0,
+
+              %% Suporting types
+              error_code/0,
+              quicer_addr/0
              ]).
 
 -type connection_opts() :: proplists:proplist() | conn_opts().
