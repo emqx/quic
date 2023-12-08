@@ -17,6 +17,10 @@
 %% @doc Stream initiated from local
 -module(quicer_local_stream).
 
+-export([start/3,
+         start_link/3]
+       ).
+
 -include("quicer_types.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,3 +78,11 @@
 
 -type cb_ret() :: quicer_stream:cb_ret().
 -type cb_state() :: quicer_stream:cb_state().
+
+-spec start_link(module(), connection_handle(), map()) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Opts) ->
+    quicer_stream:start_link(CallbackModule, Connection, Opts#{local => true}).
+
+-spec start(module(), connection_handle(), map()) -> gen_server:start_ret().
+start(CallbackModule, Connection, Opts) ->
+    quicer_stream:start(CallbackModule, Connection, Opts#{local => true}).

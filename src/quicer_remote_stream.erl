@@ -18,6 +18,12 @@
 
 -include("quicer_types.hrl").
 
+-export([start/3,
+         start_link/3,
+         start/5,
+         start_link/5
+        ]).
+
 -callback init_handoff(stream_handle(), stream_opts(), connection_handle(), new_stream_props()) -> cb_ret().
 %% Prepare callback state before ownership handoff
 
@@ -73,3 +79,19 @@
 
 -type cb_ret() :: quicer_stream:cb_ret().
 -type cb_state() :: quicer_stream:cb_state().
+
+-spec start_link(module(), connection_handle(), map()) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Opts) ->
+    quicer_stream:start_link(CallbackModule, Connection, Opts#{local => false}).
+
+-spec start(module(), connection_handle(), map()) -> gen_server:start_ret().
+start(CallbackModule, Connection, Opts) ->
+    quicer_stream:start(CallbackModule, Connection, Opts#{local => false}).
+
+-spec start_link(module(), connection_handle(), stream_handle(), map(), quicer:new_stream_props()) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Stream, Opts, Props) ->
+    quicer_stream:start_link(CallbackModule, Connection, Stream, Opts, Props).
+
+-spec start(module(), connection_handle(), stream_handle(), map(), quicer:new_stream_props()) -> gen_server:start_ret().
+start(CallbackModule, Connection, Stream, Opts, Props) ->
+    quicer_stream:start(CallbackModule, Connection, Stream, Opts, Props).
