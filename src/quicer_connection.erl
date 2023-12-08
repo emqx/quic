@@ -414,20 +414,6 @@ handle_info({quic, dgram_state_changed, C, Flags},
     ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => dgram_state_changed, flags => Flags}),
     default_cb_ret(M:datagram_state_changed(C, Flags, CBState), State);
 
-%%% ==============================================================
-%%% Handle messages for link/monitor
-%%% ==============================================================
-handle_info({'EXIT', _Pid, {shutdown, normal}}, State) ->
-    %% exit signal from stream
-    {noreply, State};
-
-handle_info({'EXIT', _Pid, {shutdown, _Other}}, State) ->
-    %% @todo
-    {noreply, State};
-
-handle_info({'EXIT', _Pid, normal}, State) ->
-    %% @todo
-    {noreply, State};
 handle_info(OtherInfo, #{callback := M,
                          callback_state := CBState} = State) ->
     default_cb_ret(M:handle_info(OtherInfo, CBState), State).
