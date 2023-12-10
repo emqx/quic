@@ -38,6 +38,8 @@
         , new_stream/3
         ]).
 
+-export([handle_info/2]).
+
 init(ConnOpts) when is_list(ConnOpts) ->
     init(maps:from_list(ConnOpts));
 init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
@@ -116,6 +118,8 @@ connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
 connected(_Connecion, _Flags, S) ->
     {ok, S}.
 
+handle_info({'EXIT', _Pid, _Reason}, State) ->
+    {ok, State}.
 
 %% Internals
 
