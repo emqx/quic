@@ -19,6 +19,11 @@ compile:
 .PHONY: clean
 clean: distclean
 
+
+fmt:
+	rebar3 fmt
+
+
 .PHONY: distclean
 distclean:
 	$(REBAR) unlock --all
