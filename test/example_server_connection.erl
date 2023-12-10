@@ -50,6 +50,8 @@
         , datagram_state_changed/3
         ]).
 
+-export([handle_info/2]).
+
 init(ConnOpts) when is_list(ConnOpts) ->
     init(maps:from_list(ConnOpts));
 init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
@@ -126,3 +128,6 @@ peer_needs_streams(_C, undefined, S) ->
 
 datagram_state_changed(_C, _Flags, S) ->
     {ok, S}.
+
+handle_info({'EXIT', _Pid, _Reason}, State) ->
+    {ok, State}.

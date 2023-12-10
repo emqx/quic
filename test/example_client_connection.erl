@@ -43,6 +43,8 @@
         , datagram_state_changed/3
         ]).
 
+-export([handle_info/2]).
+
 start_link(Host, Port, {_COpts, _SOpts} = Opts)->
     quicer_connection:start_link(?MODULE, {Host, Port}, Opts).
 
@@ -124,3 +126,6 @@ peer_needs_streams(C, #{bidi_streams := Current}, S) ->
 %% for https://github.com/microsoft/msquic/issues/3120
 peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
+
+handle_info({'EXIT', _Pid, _Reason}, State) ->
+    {ok, State}.
