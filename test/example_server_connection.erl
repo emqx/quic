@@ -63,7 +63,7 @@ closed(_Conn, _CloseProp, S) ->
     {stop, normal, S}.
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
-    case quicer_stream:start_link(example_server_stream, Conn, SOpts) of
+    case quicer_remote_stream:start_link(example_server_stream, Conn, SOpts) of
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
             {ok, S#{ conn => Conn
@@ -88,7 +88,7 @@ nst_received(_Conn, _Data, S) ->
 new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
                            , stream_opts := SOpts} = CBState) ->
     %% Spawn new stream
-    case quicer_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
+    case quicer_remote_stream:start(example_server_stream, Stream, Conn, SOpts, Flags, [{spawn_opt, [link]}]) of
         {ok, StreamOwner} ->
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
@@ -121,9 +121,6 @@ peer_needs_streams(C, unidi_streams, S) ->
     {ok, S};
 peer_needs_streams(_C, bidi_streams, S) ->
     %% leave it for test case to unblock it, see tc_multi_streams_example_server_3
-    {ok, S};
-%% for https://github.com/microsoft/msquic/issues/3120
-peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
 
 datagram_state_changed(_C, _Flags, S) ->

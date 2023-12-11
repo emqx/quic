@@ -54,13 +54,12 @@ init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
     init(S#{stream_opts := maps:from_list(SOpts)});
 init(#{conn := Conn, stream_opts := SOpts} = ConnOpts) when is_map(ConnOpts) ->
     %% for accepting
-    {ok, Stream2} = quicer_stream:start_link(example_client_stream, Conn, SOpts#{is_local => false}),
+    {ok, Stream2} = quicer_remote_stream:start(example_client_stream, Conn, SOpts, [{spawn_opt, [link]}]),
     %% for sending unidi_streams
-    {ok, Stream1} = quicer_stream:start_link(example_client_stream, Conn,
-                                             SOpts#{ is_local => true
-                                                   , open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL
-                                                   }),
-    {ok,_} = quicer_stream:send(Stream1, <<"ping_from_example">>, ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN),
+    {ok, Stream1} = quicer_local_stream:start(example_client_stream, Conn,
+                                              SOpts#{open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}, [{spawn_opt, [link]}]),
+
+    {ok, _} = quicer_stream:send(Stream1, <<"ping_from_example">>, ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN),
     {ok, ConnOpts#{master_stream_pair => {Stream1, Stream2}}}.
 
 closed(_Conn, #{is_peer_acked := true}, S)->
@@ -89,7 +88,7 @@ nst_received(_Conn, Data, S) ->
 new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
                            , stream_opts := SOpts} = CBState) ->
     %% Spawn new stream
-    case quicer_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
+    case quicer_remote_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
             quicer_connection:handoff_stream(Stream, StreamOwner),
             {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
@@ -122,9 +121,6 @@ peer_needs_streams(C, #{unidi_streams := Current}, S) ->
     {ok, S};
 peer_needs_streams(C, #{bidi_streams := Current}, S) ->
     ok = quicer:setopt(C, param_conn_settings, #{peer_bidi_stream_count => Current + 1}),
-    {ok, S};
-%% for https://github.com/microsoft/msquic/issues/3120
-peer_needs_streams(_C, undefined, S) ->
     {ok, S}.
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->

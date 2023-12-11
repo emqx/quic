@@ -89,12 +89,10 @@
 -export([ %% Start before conn handshake, with only Conn handle
           start_link/3
         , start_link/4
-        , start/3
         , start/4
           %% Start after conn handshake with new Stream Handle
         , start_link/5
         , start_link/6
-        , start/5
         , start/6
         , send/2
         , send/3
@@ -138,8 +136,6 @@ start_link(Callback, Conn, StreamOpts) ->
     start_link(Callback, Conn, StreamOpts, []).
 start_link(Callback, Conn, StreamOpts, GenStartOpts) when is_atom(Callback) ->
     gen_server:start_link(?MODULE, [Callback, Conn, StreamOpts], GenStartOpts).
-start(Callback, Conn, StreamOpts) ->
-    start(Callback, Conn, StreamOpts, []).
 start(Callback, Conn, StreamOpts, GenStartOpts) when is_atom(Callback) ->
     gen_server:start(?MODULE, [Callback, Conn, StreamOpts], GenStartOpts).
 
@@ -164,8 +160,6 @@ start_link(Callback, Stream, Conn, StreamOpts, Props, GenStartOpts)
        andalso is_map(Props) ->
     gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, Props, self()], GenStartOpts).
 
-start(Callback, Stream, Conn, StreamOpts, Props) ->
-    start(Callback, Stream, Conn, StreamOpts, Props, []).
 start(Callback, Stream, Conn, StreamOpts, Props, GenStartOpts)
   when Callback =/= undefined
        andalso is_atom(Callback)
