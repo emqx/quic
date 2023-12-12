@@ -121,10 +121,8 @@ handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, peer_stream := Peer
 
     case PeerStream of
         undefined ->
-            {ok, StreamProc} = quicer_stream:start_link(?MODULE, Conn,
-                                                        [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
-                                                        , {is_local, true}
-                                                        ]),
+            {ok, StreamProc} = quicer_local_stream:start_link(?MODULE, Conn,
+                                                        [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL} ]),
             {ok, _} = quicer_stream:send(StreamProc, Bin),
             {ok, State#{peer_stream := StreamProc}};
         StreamProc when is_pid(StreamProc) ->

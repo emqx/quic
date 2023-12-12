@@ -18,6 +18,14 @@
 
 -include("quicer_types.hrl").
 
+-export([start/4,
+         start_link/3,
+         start_link/4,
+         start/6,
+         start_link/5,
+         start_link/6
+        ]).
+
 -callback init_handoff(stream_handle(), stream_opts(), connection_handle(), new_stream_props()) -> cb_ret().
 %% Prepare callback state before ownership handoff
 
@@ -71,5 +79,30 @@
                     , handle_continue/2
                     ]).
 
+-type remote_stream_opts() :: stream_opts() | proplists:proplist().
 -type cb_ret() :: quicer_stream:cb_ret().
 -type cb_state() :: quicer_stream:cb_state().
+
+-spec start_link(module(), connection_handle(), remote_stream_opts()) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Opts) ->
+    start_link(CallbackModule, Connection, Opts#{is_local => false}, []).
+
+-spec start_link(module(), connection_handle(), remote_stream_opts(), [gen_server:start_opt()]) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Opts, StartOpts) ->
+    quicer_stream:start_link(CallbackModule, Connection, Opts#{is_local => false}, StartOpts).
+
+-spec start(module(), connection_handle(), remote_stream_opts(), [gen_server:start_opt()]) -> gen_server:start_ret().
+start(CallbackModule, Connection, Opts, StartOpts) ->
+    quicer_stream:start(CallbackModule, Connection, Opts#{is_local => false}, StartOpts).
+
+-spec start_link(module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props()) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Stream, Opts, Props) ->
+    start_link(CallbackModule, Connection, Stream, Opts, Props, []).
+
+-spec start_link(module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props(), [gen_server:start_opt()]) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Stream, Opts, Props, StartOpts) ->
+    quicer_stream:start_link(CallbackModule, Connection, Stream, Opts, Props#{is_local => false}, StartOpts).
+
+-spec start(module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props(), [gen_server:start_opt()]) -> gen_server:start_ret().
+start(CallbackModule, Connection, Stream, Opts, Props, StartOpts) ->
+    quicer_stream:start(CallbackModule, Connection, Stream, Opts, Props, StartOpts).

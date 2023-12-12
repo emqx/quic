@@ -17,6 +17,11 @@
 %% @doc Stream initiated from local
 -module(quicer_local_stream).
 
+-export([start/4,
+         start_link/3,
+         start_link/4
+        ]).
+
 -include("quicer_types.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,5 +77,21 @@
                     , handle_continue/2
                     ]).
 
+-type local_stream_opts() :: stream_opts() | proplists:proplist().
 -type cb_ret() :: quicer_stream:cb_ret().
 -type cb_state() :: quicer_stream:cb_state().
+
+-spec start_link(module(), connection_handle(), local_stream_opts()) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Opts) ->
+    start_link(CallbackModule, Connection, Opts, []).
+-spec start_link(module(), connection_handle(), local_stream_opts(), [gen_server:start_opt()]) -> gen_server:start_ret().
+start_link(CallbackModule, Connection, Opts, StartOpts) when is_list(Opts)->
+    start_link(CallbackModule, Connection, maps:from_list(Opts), StartOpts);
+start_link(CallbackModule, Connection, Opts, StartOpts) ->
+    quicer_stream:start_link(CallbackModule, Connection, Opts#{is_local => true}, StartOpts).
+
+-spec start(module(), connection_handle(), local_stream_opts(), [gen_server:start_opt()]) -> gen_server:start_ret().
+start(CallbackModule, Connection, Opts, StartOpts) when is_list(Opts) ->
+    start(CallbackModule, Connection, maps:from_list(Opts), StartOpts);
+start(CallbackModule, Connection, Opts, StartOpts) ->
+    quicer_stream:start(CallbackModule, Connection, Opts#{is_local => true}, StartOpts).

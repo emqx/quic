@@ -88,8 +88,12 @@
 %% API
 -export([ %% Start before conn handshake, with only Conn handle
           start_link/3
+        , start_link/4
+        , start/4
           %% Start after conn handshake with new Stream Handle
         , start_link/5
+        , start_link/6
+        , start/6
         , send/2
         , send/3
         ]).
@@ -128,8 +132,12 @@
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
-    gen_server:start_link(?MODULE, [Callback, Conn, StreamOpts], []).
+start_link(Callback, Conn, StreamOpts) ->
+    start_link(Callback, Conn, StreamOpts, []).
+start_link(Callback, Conn, StreamOpts, GenStartOpts) when is_atom(Callback) ->
+    gen_server:start_link(?MODULE, [Callback, Conn, StreamOpts], GenStartOpts).
+start(Callback, Conn, StreamOpts, GenStartOpts) when is_atom(Callback) ->
+    gen_server:start(?MODULE, [Callback, Conn, StreamOpts], GenStartOpts).
 
 %%--------------------------------------------------------------------
 %% @doc Start a new stream owner process and
@@ -144,11 +152,19 @@ start_link(Callback, Conn, StreamOpts) when is_atom(Callback) ->
           {error, Error :: {already_started, pid()}} |
           {error, Error :: term()} |
           ignore.
-start_link(Callback, Stream, Conn, StreamOpts, Props)
+start_link(Callback, Stream, Conn, StreamOpts, Props) ->
+    start_link(Callback, Stream, Conn, StreamOpts, Props, []).
+start_link(Callback, Stream, Conn, StreamOpts, Props, GenStartOpts)
   when Callback =/= undefined
        andalso is_atom(Callback)
        andalso is_map(Props) ->
-    gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, Props, self()], []).
+    gen_server:start_link(?MODULE, [Callback, Stream, Conn, StreamOpts, Props, self()], GenStartOpts).
+
+start(Callback, Stream, Conn, StreamOpts, Props, GenStartOpts)
+  when Callback =/= undefined
+       andalso is_atom(Callback)
+       andalso is_map(Props) ->
+    gen_server:start(?MODULE, [Callback, Stream, Conn, StreamOpts, Props, self()], GenStartOpts).
 
 -spec send(pid(), binary()) -> {ok, Length::non_neg_integer()} | {error, any()}.
 send(StreamProc, Data) ->
@@ -213,6 +229,7 @@ init([Callback, Conn, StreamOpts]) ->
                     {ok, InitState#{ stream => undefined
                                    , is_owner => false
                                    , is_local => false
+                                   , stream_opts => StreamOpts
                                    }};
                 {error, Reason} ->
                     {stop, Reason}
@@ -231,6 +248,7 @@ init([Callback, Conn, StreamOpts]) ->
                                           , is_owner => true
                                           , is_local => true
                                           , is_unidir => IsUni
+                                          , stream_opts => StreamOpts
                                           }
                                    }};
                 {error, Reason, SecReason} ->
@@ -249,7 +267,8 @@ init([Callback, Stream, Conn, StreamOpts, Props, PrevOwner]) ->
     process_flag(trap_exit, true),
     case Callback:init_handoff(Stream, StreamOpts, Conn, Props) of
         {ok, CBState} ->
-            State = #{ is_owner => false
+            State = #{ is_owner => false %% not yet takeover the ownership
+                     , is_local => false
                      , stream_opts => StreamOpts
                      , conn => Conn
                      , stream => Stream

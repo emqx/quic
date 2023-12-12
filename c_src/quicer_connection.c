@@ -1443,6 +1443,15 @@ handle_connection_event_streams_available(QuicerConnCTX *c_ctx,
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
 
+  if (c_ctx->event_mask & QUICER_CONNECTION_EVENT_MASK_NO_STREAMS_AVAILABLE)
+    {
+      TP_CB_3(streams_available, (uintptr_t)c_ctx->Connection, 0);
+      return QUIC_STATUS_SUCCESS;
+    }
+  else
+    {
+      TP_CB_3(streams_available, (uintptr_t)c_ctx->Connection, 1);
+    }
   ERL_NIF_TERM props_name[] = { ATOM_BIDI_STREAMS, ATOM_UNIDI_STREAMS };
   ERL_NIF_TERM props_value[]
       = { enif_make_uint64(env, Event->STREAMS_AVAILABLE.BidirectionalCount),

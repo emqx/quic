@@ -38,8 +38,8 @@
         , new_stream/3
         ]).
 
-init(ConnOpts) when is_list(ConnOpts) ->
-    init(maps:from_list(ConnOpts));
+-export([handle_info/2]).
+
 init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
     init(S#{stream_opts := maps:from_list(SOpts)});
 init(ConnOpts) when is_map(ConnOpts) ->
@@ -50,7 +50,7 @@ closed(_Conn, #{} = _Flags, S)->
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
     %% @TODO configurable behavior of spawning stream acceptor
-    case quicer_stream:start_link(maps:get(stream_callback, SOpts), Conn, SOpts) of
+    case quicer_remote_stream:start_link(maps:get(stream_callback, SOpts), Conn, SOpts) of
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
             {ok, S#{ conn => Conn
@@ -73,8 +73,8 @@ nst_received(_Conn, _Data, S) ->
 new_stream(Stream, #{is_orphan := true} = StreamProps,
            #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
     %% Spawn new stream
-    case quicer_stream:start_link(maps:get(stream_callback, SOpts), Stream, Conn,
-                                  SOpts, StreamProps)
+    case quicer_remote_stream:start_link(maps:get(stream_callback, SOpts), Stream, Conn,
+                                         SOpts, StreamProps)
     of
         {ok, StreamOwner} ->
             case quicer:handoff_stream(Stream, StreamOwner) of
@@ -116,6 +116,8 @@ connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
 connected(_Connecion, _Flags, S) ->
     {ok, S}.
 
+handle_info({'EXIT', _Pid, _Reason}, State) ->
+    {ok, State}.
 
 %% Internals
 
