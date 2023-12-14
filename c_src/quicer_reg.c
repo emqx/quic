@@ -246,16 +246,15 @@ parse_reg_conf(ERL_NIF_TERM eprofile, QUIC_REGISTRATION_CONFIG *RegConfig)
     {
       RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_LOW_LATENCY;
     }
-  else if (IS_SAME_TERM(eprofile,
-                        ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT))
+  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_MAX_THROUGHPUT))
     {
       RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
     }
-  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER))
+  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_SCAVENGER))
     {
       RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
     }
-  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME))
+  else if (IS_SAME_TERM(eprofile, ATOM_QUIC_EXECUTION_PROFILE_REAL_TIME))
     {
       RegConfig->ExecutionProfile = QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
     }

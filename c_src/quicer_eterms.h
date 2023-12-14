@@ -127,9 +127,9 @@ extern ERL_NIF_TERM ATOM_CACERTFILE;
 /*         msquic  execution profile for registration    */
 /*-------------------------------------------------------*/
 extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY; // Default
-extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
-extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
-extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_MAX_THROUGHPUT;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_SCAVENGER;
+extern ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_REAL_TIME;
 
 /*-----------------------------------------*/
 /*         msquic params starts             */

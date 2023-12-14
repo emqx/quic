@@ -71,11 +71,7 @@
         conf_handle()       |
         reg_handle().
 
--type registration_profile() :: quic_execution_profile_low_latency |
-                                quic_execution_profile_max_throughput |
-                                quic_execution_profile_scavenger |
-                                quic_execution_profile_realtime.
-
+-type registration_profile() :: execution_profile().
 -type quic_handle_level() :: quic_tls | quic_configuration | false.
 
 -type listen_on() :: inet:port_number() | string().
@@ -304,9 +300,9 @@
 
 -type execution_profile() ::
         quic_execution_profile_low_latency |
-        quic_execution_profile_type_max_throughput |
-        quic_execution_profile_type_scavenger |
-        quic_execution_profile_type_realtime.
+        quic_execution_profile_max_throughput |
+        quic_execution_profile_scavenger |
+        quic_execution_profile_real_time.
 
 %% Connection Event Props
 -type new_conn_props() :: #{ version      := integer()
