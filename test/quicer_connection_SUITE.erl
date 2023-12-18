@@ -462,6 +462,86 @@ tc_conn_client_bad_cert(Config) ->
       ct:fail({run_error, Error})
   end.
 
+tc_datagram_disallowed(Config) ->
+  Port = select_port(),
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  ListenerOpts = [{conn_acceptors, 4} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               , {disable_fpbuffer, true}
+               | default_stream_opts() ],
+  %% GIVEN: A listener with datagram_receive_enabled = false
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+  {ok, _} = quicer:spawn_listener(mqtt, Port, Options),
+  %% WHEN: Client send dgram data
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  %% THEN: It get an error
+  ?assertEqual({error, dgram_send_error, invalid_state}, quicer:send_dgram(Conn, <<"dg_ping">>)),
+  quicer:shutdown_connection(Conn),
+  ok.
+
+tc_datagram_peer_allowed(Config) ->
+  Port = select_port(),
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  %% GIVEN: A listener with datagram_receive_enabled = 1 (true)
+  ListenerOpts = [{conn_acceptors, 4}, {datagram_receive_enabled, 1} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               , {disable_fpbuffer, true}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+  {ok, _} = quicer:spawn_listener(mqtt, Port, Options),
+  %% WHEN: A client send_dgram
+  {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+  %% THEN: It should success
+  ?assertEqual({ok, 7}, quicer:send_dgram(Conn, <<"dg_ping">>)),
+
+  receive
+    %% THEN: the client should not recv dgram from peer as the receiving is disabled
+    {quic, Data, _Conn, _Flag} when is_binary(Data) ->
+      ct:fail("client side dgram recv timeout")
+  after 500 ->
+      ok
+  end,
+  quicer:shutdown_connection(Conn),
+  ok.
+
+tc_datagram_local_peer_allowed(Config) ->
+  Port = select_port(),
+  ServerConnCallback = example_server_connection,
+  ServerStreamCallback = example_server_stream,
+  %% GIVEN: A listener with datagram_receive_enabled = 1 (true)
+  ListenerOpts = [{conn_acceptors, 4}, {datagram_receive_enabled, 1} | default_listen_opts(Config)],
+  ConnectionOpts = [ {conn_callback, ServerConnCallback}
+                   , {stream_acceptors, 2}
+                     | default_conn_opts()],
+  StreamOpts = [ {stream_callback, ServerStreamCallback}
+               , {disable_fpbuffer, true}
+               | default_stream_opts() ],
+  Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+  {ok, _} = quicer:spawn_listener(mqtt, Port, Options),
+  %% WHEN: Client connect with datagram_receive_enabled = 1 (true)
+  {ok, Conn} = quicer:connect("localhost", Port, [{datagram_receive_enabled, 1} | default_conn_opts()], 5000),
+  ?assertEqual({ok, 7}, quicer:send_dgram(Conn, <<"dg_ping">>)),
+  receive
+    %% THEN: the client is able to receive the dgram from server
+    {quic, <<"dg_ping">>, Conn, Flag} ->
+      ?assertEqual(0, Flag)
+  after 1000 ->
+     ct:fail("client side dgram recv timeout")
+  end,
+  quicer:shutdown_connection(Conn),
+  ok.
+
 run_tc_conn_client_bad_cert(Config)->
   Port = select_port(),
   Owner = self(),

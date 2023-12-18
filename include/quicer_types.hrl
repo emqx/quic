@@ -384,4 +384,8 @@
                              | ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS %% Acknowledged after being suspected lost
                              | ?QUIC_DATAGRAM_SEND_CANCELED.             %% Send cancelled
 
+-type dgram_state() :: #{ dgram_send_enabled := boolean()
+                        , dgram_max_len := uint64()
+                        }.
+
 -endif. %% QUICER_TYPES_HRL

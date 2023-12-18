@@ -47,7 +47,8 @@
         , resumed/3
         , nst_received/3
         , new_stream/3
-        , datagram_state_changed/3
+        , dgram_state_changed/3
+        , dgram_recv/4
         ]).
 
 -export([handle_info/2]).
@@ -123,7 +124,16 @@ peer_needs_streams(_C, bidi_streams, S) ->
     %% leave it for test case to unblock it, see tc_multi_streams_example_server_3
     {ok, S}.
 
-datagram_state_changed(_C, _Flags, S) ->
+dgram_state_changed(_C, _Flags, S) ->
+    {ok, S}.
+
+dgram_recv(C, Bin, _Flag, S) ->
+    %% maybe peer didn't enable,
+    case quicer:send_dgram(C, Bin) of
+        {ok, _} -> ok;
+        Error -> %% for testing when peer disable the receiving
+            ct:pal("send dgram error: ~p~n", [Error])
+    end,
     {ok, S}.
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->

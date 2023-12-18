@@ -40,7 +40,7 @@
         , resumed/3
         , nst_received/3
         , new_stream/3
-        , datagram_state_changed/3
+        , dgram_state_changed/3
         ]).
 
 -export([handle_info/2]).
@@ -96,7 +96,7 @@ new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
             Other
     end.
 
-datagram_state_changed(_Conn, _Flags, S) ->
+dgram_state_changed(_Conn, _Flags, S) ->
     ?tp(debug, #{module => ?MODULE, conn => _Conn, flags => state, event => dgram_state_changed}),
     {ok, S}.
 
