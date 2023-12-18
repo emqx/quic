@@ -150,9 +150,9 @@ ERL_NIF_TERM ATOM_CACERTFILE;
 /*         msquic  execution profile for registration    */
 /*-------------------------------------------------------*/
 ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY; // Default
-ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT;
-ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER;
-ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_MAX_THROUGHPUT;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_SCAVENGER;
+ERL_NIF_TERM ATOM_QUIC_EXECUTION_PROFILE_REAL_TIME;
 
 /*-----------------------------------------*/
 /*         msquic params starts             */
@@ -512,11 +512,11 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   /*-------------------------------------------------------*/                 \
   ATOM(ATOM_QUIC_EXECUTION_PROFILE_LOW_LATENCY,                               \
        quic_execution_profile_low_latency);                                   \
-  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_MAX_THROUGHPUT,                       \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_MAX_THROUGHPUT,                            \
        quic_execution_profile_max_throughput);                                \
-  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_SCAVENGER,                            \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_SCAVENGER,                                 \
        quic_execution_profile_scavenger);                                     \
-  ATOM(ATOM_QUIC_EXECUTION_PROFILE_TYPE_REAL_TIME,                            \
+  ATOM(ATOM_QUIC_EXECUTION_PROFILE_REAL_TIME,                                 \
        quic_execution_profile_real_time);                                     \
   /*-----------------------------------------*/                               \
   /*         msquic params starts            */                               \

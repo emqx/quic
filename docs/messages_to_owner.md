@@ -284,6 +284,8 @@ and the stream active mode is set to false (passive mode).
 
 More streams are available due to flow control from the peer.
 
+If you don't want this event, set 'QUICER_CONNECTION_EVENT_MASK_NO_STREAMS_AVAILABLE'
+
 `Available = Max - Used`
 
 ```erlang
@@ -315,7 +317,7 @@ Peer wants to open more streams but cannot due to flow control
 with connection handle and integer flag
 
 ```erlang
-{quic, binary(), connection_handle(), flag :: non_neg_integer()}
+{quic, binary(), connection_handle(), Flags :: non_neg_integer()}
 ```
 
 ### DATAGRAM send completed, success or fail.

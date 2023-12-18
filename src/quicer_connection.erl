@@ -107,6 +107,12 @@
 -callback nst_received(connection_handle(), TicketBin :: binary(), cb_state()) -> cb_ret().
 %% Client only, New session ticket received,
 
+-callback dgram_state_changed(connection_handle(),  dgram_state(), cb_state()) -> cb_ret().
+%% Handle Datagram State Changed event.
+
+-callback dgram_recv(connection_handle(), DataBin :: binary(), Flags :: non_neg_integer(), cb_state()) -> cb_ret().
+%% Handle Unreliable Datagram of RFC 9221.
+
 -callback handle_call(Req::term(), From::gen_server:from(), cb_state()) -> cb_ret().
 
 -callback handle_info(Info::term(), cb_state()) -> cb_ret().
@@ -120,6 +126,8 @@
                     , handle_continue/2
                     , peer_needs_streams/3 %% require newer MsQuic
                     , nst_received/3       %% client only
+                    , dgram_state_changed/3 %% because dgram could be off
+                    , dgram_recv/4          %% because dgram could be off
                     ]).
 %% Handle API call with callback state.
 
@@ -412,7 +420,12 @@ handle_info({quic, nst_received, C, TicketBin},
 handle_info({quic, dgram_state_changed, C, Flags},
             #{callback := M, callback_state := CBState} = State) ->
     ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => dgram_state_changed, flags => Flags}),
-    default_cb_ret(M:datagram_state_changed(C, Flags, CBState), State);
+    default_cb_ret(M:dgram_state_changed(C, Flags, CBState), State);
+
+handle_info({quic, Bin, C, Flags},
+            #{conn := C, callback := M, callback_state := CBState} = State) when is_binary(Bin) ->
+    ?tp_ignore_side_effects_in_prod(debug, #{module => ?MODULE, conn => C, event => dgram_recv, flags => Flags}),
+    default_cb_ret(M:dgram_recv(C, Bin, Flags, CBState), State);
 
 handle_info(OtherInfo, #{callback := M,
                          callback_state := CBState} = State) ->

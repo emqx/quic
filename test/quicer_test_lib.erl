@@ -385,7 +385,8 @@ reset_global_reg()->
   quicer:reg_open().
 
 shutdown_all_listeners() ->
-  lists:foreach(fun quicer:shutdown_listener/1,
+  lists:foreach(fun({{Id, _ListenOn}, _Pid}) ->
+                    quicer:terminate_listener(Id) end,
                 quicer:listeners()).
 
 %%%_* Emacs ====================================================================
