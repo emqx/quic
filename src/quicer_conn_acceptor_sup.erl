@@ -34,12 +34,15 @@
 %% Starts the supervisor
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(ListenerH :: quicer:listener_handle(),
-                 ConnOpts::map()) -> {ok, Pid :: pid()} |
-          {error, {already_started, Pid :: pid()}} |
-          {error, {shutdown, term()}} |
-          {error, term()} |
-          ignore.
+-spec start_link(
+    ListenerH :: quicer:listener_handle(),
+    ConnOpts :: map()
+) ->
+    {ok, Pid :: pid()}
+    | {error, {already_started, Pid :: pid()}}
+    | {error, {shutdown, term()}}
+    | {error, term()}
+    | ignore.
 start_link(ListenerH, ConnOpts) ->
     supervisor:start_link(?MODULE, [ListenerH, ConnOpts]).
 
@@ -57,21 +60,22 @@ start_link(ListenerH, ConnOpts) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(Args :: term()) ->
-          {ok, {SupFlags :: supervisor:sup_flags(),
-                [ChildSpec :: supervisor:child_spec()]}} |
-          ignore.
+    {ok, {SupFlags :: supervisor:sup_flags(), [ChildSpec :: supervisor:child_spec()]}}
+    | ignore.
 init([ListenerH, Opts]) ->
-    SupFlags = #{strategy => simple_one_for_one,
-                 intensity => 1,
-                 period => 5},
+    SupFlags = #{
+        strategy => simple_one_for_one,
+        intensity => 1,
+        period => 5
+    },
 
-    OneChild = #{id => ignored,
-                 start => {quicer_connection, start_link,
-                           [undefined, ListenerH, Opts]},
-                 restart => temporary,
-                 shutdown => 5000,
-                 type => worker
-                } ,
+    OneChild = #{
+        id => ignored,
+        start => {quicer_connection, start_link, [undefined, ListenerH, Opts]},
+        restart => temporary,
+        shutdown => 5000,
+        type => worker
+    },
 
     {ok, {SupFlags, [OneChild]}}.
 

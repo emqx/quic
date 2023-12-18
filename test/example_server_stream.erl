@@ -17,19 +17,20 @@
 
 -behavior(quicer_stream).
 
--export([ init_handoff/4
-        , post_handoff/3
-        , new_stream/3
-        , start_completed/3
-        , send_complete/3
-        , peer_send_shutdown/3
-        , peer_send_aborted/3
-        , peer_receive_aborted/3
-        , send_shutdown_complete/3
-        , stream_closed/3
-        , peer_accepted/3
-        , passive/3
-        ]).
+-export([
+    init_handoff/4,
+    post_handoff/3,
+    new_stream/3,
+    start_completed/3,
+    send_complete/3,
+    peer_send_shutdown/3,
+    peer_send_aborted/3,
+    peer_receive_aborted/3,
+    send_shutdown_complete/3,
+    stream_closed/3,
+    peer_accepted/3,
+    passive/3
+]).
 
 -export([handle_stream_data/4]).
 
@@ -39,12 +40,13 @@
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
-    InitState = #{ stream => Stream
-                 , conn => Conn
-                 , peer_stream => undefined
-                 , is_local => false
-                 , is_unidir => quicer:is_unidirectional(Flags)
-                 },
+    InitState = #{
+        stream => Stream,
+        conn => Conn,
+        peer_stream => undefined,
+        is_local => false,
+        is_unidir => quicer:is_unidirectional(Flags)
+    },
     ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
     {ok, InitState}.
 
@@ -53,11 +55,13 @@ post_handoff(Stream, _PostData, State) ->
     {ok, State}.
 
 new_stream(Stream, #{flags := Flags}, Conn) ->
-    InitState = #{ stream => Stream
-                  , conn => Conn
-                  , peer_stream => undefined
-                  , is_local => false
-                  , is_unidir => quicer:is_unidirectional(Flags)},
+    InitState = #{
+        stream => Stream,
+        conn => Conn,
+        peer_stream => undefined,
+        is_local => false,
+        is_unidir => quicer:is_unidirectional(Flags)
+    },
     {ok, InitState}.
 
 peer_accepted(_Stream, _Flags, S) ->
@@ -68,7 +72,6 @@ peer_receive_aborted(Stream, ErrorCode, #{is_unidir := false} = S) ->
     %% we abort send with same reason
     quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, ErrorCode),
     {ok, S};
-
 peer_receive_aborted(Stream, ErrorCode, #{is_unidir := true, is_local := true} = S) ->
     quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, ErrorCode),
     {ok, S}.
@@ -94,35 +97,41 @@ send_complete(_Stream, true = _IsCanceled, S) ->
     ct:pal("~p : send is canceled", [?FUNCTION_NAME]),
     {ok, S}.
 
-
 send_shutdown_complete(_Stream, _Flags, S) ->
     ct:pal("~p : stream send is complete", [?FUNCTION_NAME]),
     {ok, S}.
 
 start_completed(_Stream, #{status := success, stream_id := StreamId}, S) ->
     {ok, S#{stream_id => StreamId}};
-start_completed(_Stream, #{status := Other }, S) ->
+start_completed(_Stream, #{status := Other}, S) ->
     %% or we could retry
     {stop, {start_fail, Other}, S}.
 
-handle_stream_data(Stream, <<"flow_control.enable_bidi">> = Bin, _Flags, #{is_unidir := true, conn := Conn} = State) ->
+handle_stream_data(
+    Stream, <<"flow_control.enable_bidi">> = Bin, _Flags, #{is_unidir := true, conn := Conn} = State
+) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
     ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => 2}),
     {ok, State};
 handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     %% for bidir stream, we just echo in place.
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => bidir}),
-    ct:pal("Server recv: ~p from ~p", [Bin, Stream] ),
+    ct:pal("Server recv: ~p from ~p", [Bin, Stream]),
     {ok, _} = quicer:send(Stream, Bin),
     {ok, State};
-handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, peer_stream := PeerStream, conn := Conn} = State) ->
+handle_stream_data(
+    Stream, Bin, _Flags, #{is_unidir := true, peer_stream := PeerStream, conn := Conn} = State
+) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
-    ct:pal("Server recv: ~p from ~p", [Bin, Stream] ),
+    ct:pal("Server recv: ~p from ~p", [Bin, Stream]),
 
     case PeerStream of
         undefined ->
-            {ok, StreamProc} = quicer_local_stream:start_link(?MODULE, Conn,
-                                                        [ {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL} ]),
+            {ok, StreamProc} = quicer_local_stream:start_link(
+                ?MODULE,
+                Conn,
+                [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]
+            ),
             {ok, _} = quicer_stream:send(StreamProc, Bin),
             {ok, State#{peer_stream := StreamProc}};
         StreamProc when is_pid(StreamProc) ->
@@ -130,22 +139,29 @@ handle_stream_data(Stream, Bin, _Flags, #{is_unidir := true, peer_stream := Peer
             {ok, State}
     end.
 
-passive(_Stream, undefined, S)->
+passive(_Stream, undefined, S) ->
     ct:fail("Steam go into passive mode"),
     {ok, S}.
 
-stream_closed(_Stream, #{ is_conn_shutdown := IsConnShutdown
-                        , is_app_closing := IsAppClosing
-                        , is_shutdown_by_app := IsAppShutdown
-                        , is_closed_remotely := IsRemote
-                        , status := Status
-                        , error := Code
-                        }, S) when is_boolean(IsConnShutdown) andalso
-                                   is_boolean(IsAppClosing) andalso
-                                   is_boolean(IsAppShutdown) andalso
-                                   is_boolean(IsRemote) andalso
-                                   is_atom(Status) andalso
-                                   is_integer(Code) ->
+stream_closed(
+    _Stream,
+    #{
+        is_conn_shutdown := IsConnShutdown,
+        is_app_closing := IsAppClosing,
+        is_shutdown_by_app := IsAppShutdown,
+        is_closed_remotely := IsRemote,
+        status := Status,
+        error := Code
+    },
+    S
+) when
+    is_boolean(IsConnShutdown) andalso
+        is_boolean(IsAppClosing) andalso
+        is_boolean(IsAppShutdown) andalso
+        is_boolean(IsRemote) andalso
+        is_atom(Status) andalso
+        is_integer(Code)
+->
     {stop, normal, S}.
 
 handle_call(_Request, _From, S) ->

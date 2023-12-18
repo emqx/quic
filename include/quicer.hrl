@@ -13,7 +13,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
-
+%%% % @noformat
 -ifndef(QUICER_HRL).
 -define(QUICER_HRL, true).
 

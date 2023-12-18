@@ -18,24 +18,26 @@
 
 -include("quicer_types.hrl").
 
--export([start/4,
-         start_link/3,
-         start_link/4,
-         start/6,
-         start_link/5,
-         start_link/6
-        ]).
+-export([
+    start/4,
+    start_link/3,
+    start_link/4,
+    start/6,
+    start_link/5,
+    start_link/6
+]).
 
--callback init_handoff(stream_handle(), stream_opts(), connection_handle(), new_stream_props()) -> cb_ret().
+-callback init_handoff(stream_handle(), stream_opts(), connection_handle(), new_stream_props()) ->
+    cb_ret().
 %% Prepare callback state before ownership handoff
 
--callback post_handoff(stream_handle(), PostInfo::term(), cb_state()) -> cb_ret().
+-callback post_handoff(stream_handle(), PostInfo :: term(), cb_state()) -> cb_ret().
 %% Post handoff with PostData if any. Most common action is to set the stream mode to active.
 
 -callback new_stream(stream_handle(), new_stream_props(), connection_handle()) -> cb_ret().
 %% Stream accepter is assigned to the owner of the new stream
 
--callback send_complete(stream_handle(), IsCanceled::boolean(), cb_state()) -> cb_ret().
+-callback send_complete(stream_handle(), IsCanceled :: boolean(), cb_state()) -> cb_ret().
 %% Handle send completed.
 
 -callback peer_send_shutdown(stream_handle(), undefined, cb_state()) -> cb_ret().
@@ -47,7 +49,7 @@
 -callback peer_receive_aborted(stream_handle(), error_code(), cb_state()) -> cb_ret().
 %% Handle stream peer_receive_aborted
 
--callback send_shutdown_complete(stream_handle(), IsGraceful::boolean(), cb_state()) -> cb_ret().
+-callback send_shutdown_complete(stream_handle(), IsGraceful :: boolean(), cb_state()) -> cb_ret().
 %% Handle stream send_shutdown_complete.
 %% Happen immediately on an abortive send or after a graceful send has been acknowledged by the peer.
 
@@ -60,24 +62,25 @@
 -callback handle_stream_data(stream_handle(), binary(), recv_data_props(), cb_state()) -> cb_ret().
 %% Stream handle data
 
--callback handle_call(Req::term(), gen_server:from(), cb_state()) -> cb_ret().
+-callback handle_call(Req :: term(), gen_server:from(), cb_state()) -> cb_ret().
 %% Handle API call with callback state.
 
--callback handle_continue(Cont::term(), cb_state()) -> cb_ret().
+-callback handle_continue(Cont :: term(), cb_state()) -> cb_ret().
 %% Handle continue from other callbacks with callback state.
 
--callback handle_info(Info::term(), cb_state()) -> cb_ret().
+-callback handle_info(Info :: term(), cb_state()) -> cb_ret().
 %% Handle unhandled info with callback state.
 
--optional_callbacks([ init_handoff/4
-                    , post_handoff/3
-                    , new_stream/3
-                    , send_complete/3
-                    , handle_stream_data/4
-                    , handle_call/3
-                    , handle_info/2
-                    , handle_continue/2
-                    ]).
+-optional_callbacks([
+    init_handoff/4,
+    post_handoff/3,
+    new_stream/3,
+    send_complete/3,
+    handle_stream_data/4,
+    handle_call/3,
+    handle_info/2,
+    handle_continue/2
+]).
 
 -type remote_stream_opts() :: stream_opts() | proplists:proplist().
 -type cb_ret() :: quicer_stream:cb_ret().
@@ -87,22 +90,42 @@
 start_link(CallbackModule, Connection, Opts) ->
     start_link(CallbackModule, Connection, Opts#{is_local => false}, []).
 
--spec start_link(module(), connection_handle(), remote_stream_opts(), [gen_server:start_opt()]) -> gen_server:start_ret().
+-spec start_link(module(), connection_handle(), remote_stream_opts(), [gen_server:start_opt()]) ->
+    gen_server:start_ret().
 start_link(CallbackModule, Connection, Opts, StartOpts) ->
     quicer_stream:start_link(CallbackModule, Connection, Opts#{is_local => false}, StartOpts).
 
--spec start(module(), connection_handle(), remote_stream_opts(), [gen_server:start_opt()]) -> gen_server:start_ret().
+-spec start(module(), connection_handle(), remote_stream_opts(), [gen_server:start_opt()]) ->
+    gen_server:start_ret().
 start(CallbackModule, Connection, Opts, StartOpts) ->
     quicer_stream:start(CallbackModule, Connection, Opts#{is_local => false}, StartOpts).
 
--spec start_link(module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props()) -> gen_server:start_ret().
+-spec start_link(
+    module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props()
+) -> gen_server:start_ret().
 start_link(CallbackModule, Connection, Stream, Opts, Props) ->
     start_link(CallbackModule, Connection, Stream, Opts, Props, []).
 
--spec start_link(module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props(), [gen_server:start_opt()]) -> gen_server:start_ret().
+-spec start_link(
+    module(),
+    connection_handle(),
+    stream_handle(),
+    remote_stream_opts(),
+    quicer:new_stream_props(),
+    [gen_server:start_opt()]
+) -> gen_server:start_ret().
 start_link(CallbackModule, Connection, Stream, Opts, Props, StartOpts) ->
-    quicer_stream:start_link(CallbackModule, Connection, Stream, Opts, Props#{is_local => false}, StartOpts).
+    quicer_stream:start_link(
+        CallbackModule, Connection, Stream, Opts, Props#{is_local => false}, StartOpts
+    ).
 
--spec start(module(), connection_handle(), stream_handle(), remote_stream_opts(), quicer:new_stream_props(), [gen_server:start_opt()]) -> gen_server:start_ret().
+-spec start(
+    module(),
+    connection_handle(),
+    stream_handle(),
+    remote_stream_opts(),
+    quicer:new_stream_props(),
+    [gen_server:start_opt()]
+) -> gen_server:start_ret().
 start(CallbackModule, Connection, Stream, Opts, Props, StartOpts) ->
     quicer_stream:start(CallbackModule, Connection, Stream, Opts, Props, StartOpts).

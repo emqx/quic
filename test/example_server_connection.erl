@@ -14,7 +14,6 @@
 %% limitations under the License.
 %%--------------------------------------------------------------------
 
-
 %% @doc example server connection
 %% Function Spec:
 %% 1. Spawn a control stream acceptor
@@ -32,24 +31,25 @@
 -include("quicer_types.hrl").
 
 %% Callback init
--export([ init/1 ]).
+-export([init/1]).
 
 %% Connection Callbacks
--export([ new_conn/3
-        , connected/3
-        , transport_shutdown/3
-        , shutdown/3
-        , closed/3
-        , local_address_changed/3
-        , peer_address_changed/3
-        , streams_available/3
-        , peer_needs_streams/3
-        , resumed/3
-        , nst_received/3
-        , new_stream/3
-        , dgram_state_changed/3
-        , dgram_recv/4
-        ]).
+-export([
+    new_conn/3,
+    connected/3,
+    transport_shutdown/3,
+    shutdown/3,
+    closed/3,
+    local_address_changed/3,
+    peer_address_changed/3,
+    streams_available/3,
+    peer_needs_streams/3,
+    resumed/3,
+    nst_received/3,
+    new_stream/3,
+    dgram_state_changed/3,
+    dgram_recv/4
+]).
 
 -export([handle_info/2]).
 
@@ -67,8 +67,10 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
     case quicer_remote_stream:start_link(example_server_stream, Conn, SOpts) of
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
-            {ok, S#{ conn => Conn
-                   , streams => [{Pid, undefined}]}};
+            {ok, S#{
+                conn => Conn,
+                streams => [{Pid, undefined}]
+            }};
         {error, _} = Error ->
             Error
     end.
@@ -76,8 +78,7 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
 connected(_Conn, _Flags, S) ->
     {ok, S}.
 
-resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
-  when is_function(ResumeFun) ->
+resumed(Conn, Data, #{resumed_callback := ResumeFun} = S) when is_function(ResumeFun) ->
     ResumeFun(Conn, Data, S);
 resumed(_Conn, _Data, S) ->
     {ok, S}.
@@ -85,15 +86,25 @@ resumed(_Conn, _Data, S) ->
 nst_received(_Conn, _Data, S) ->
     {stop, no_nst_for_server, S}.
 
-
-new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
-                           , stream_opts := SOpts} = CBState) ->
+new_stream(
+    Stream,
+    Flags,
+    #{
+        conn := Conn,
+        streams := Streams,
+        stream_opts := SOpts
+    } = CBState
+) ->
     %% Spawn new stream
-    case quicer_remote_stream:start(example_server_stream, Stream, Conn, SOpts, Flags, [{spawn_opt, [link]}]) of
+    case
+        quicer_remote_stream:start(example_server_stream, Stream, Conn, SOpts, Flags, [
+            {spawn_opt, [link]}
+        ])
+    of
         {ok, StreamOwner} ->
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
-                    {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams ] }};
+                    {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
                 false ->
                     {error, handoff_fail}
             end;
@@ -131,8 +142,8 @@ dgram_recv(C, Bin, _Flag, S) ->
     %% maybe peer didn't enable,
     case quicer:send_dgram(C, Bin) of
         {ok, _} -> ok;
-        Error -> %% for testing when peer disable the receiving
-            ct:pal("send dgram error: ~p~n", [Error])
+        %% for testing when peer disable the receiving
+        Error -> ct:pal("send dgram error: ~p~n", [Error])
     end,
     {ok, S}.
 

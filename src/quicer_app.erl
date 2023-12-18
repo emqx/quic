@@ -16,9 +16,10 @@
 
 -behaviour(application).
 
--export([ start/2
-        , stop/1
-        ]).
+-export([
+    start/2,
+    stop/1
+]).
 
 start(_StartType, _StartArgs) ->
     _ = quicer:open_lib(),

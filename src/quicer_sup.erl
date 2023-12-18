@@ -33,11 +33,12 @@
 %% Starts the supervisor
 %% @end
 %%--------------------------------------------------------------------
--spec start_link() -> {ok, Pid :: pid()} |
-          {error, {already_started, Pid :: pid()}} |
-          {error, {shutdown, term()}} |
-          {error, term()} |
-          ignore.
+-spec start_link() ->
+    {ok, Pid :: pid()}
+    | {error, {already_started, Pid :: pid()}}
+    | {error, {shutdown, term()}}
+    | {error, term()}
+    | ignore.
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
@@ -55,21 +56,22 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(Args :: term()) ->
-          {ok, {SupFlags :: supervisor:sup_flags(),
-                [ChildSpec :: supervisor:child_spec()]}} |
-          ignore.
+    {ok, {SupFlags :: supervisor:sup_flags(), [ChildSpec :: supervisor:child_spec()]}}
+    | ignore.
 init([]) ->
+    SupFlags = #{
+        strategy => one_for_one,
+        intensity => 1,
+        period => 5
+    },
 
-    SupFlags = #{strategy => one_for_one,
-                 intensity => 1,
-                 period => 5},
-
-    Child = #{id => quicer_listener_sup,
-              start => {quicer_listener_sup, start_link, []},
-              restart => transient,
-              shutdown => infinity,
-              type => supervisor
-             },
+    Child = #{
+        id => quicer_listener_sup,
+        start => {quicer_listener_sup, start_link, []},
+        restart => transient,
+        shutdown => infinity,
+        type => supervisor
+    },
 
     {ok, {SupFlags, [Child]}}.
 
