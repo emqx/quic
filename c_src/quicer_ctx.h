@@ -66,7 +66,9 @@ typedef struct QuicerListenerCTX
   ErlNifEnv *env;
   ErlNifMutex *lock;
   char *cacertfile;
+#if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE *trusted_store;
+#endif
   // Listener handle closed flag
   // false means the handle is invalid
   BOOLEAN is_closed;
@@ -93,11 +95,15 @@ typedef struct QuicerConnCTX
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
+#if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE *trusted;
-  // Connection handle closed flag
-  // false means the handle is invalid
+#else
+  char *cacertfile;
+#endif // !QUICER_USE_TRUSTED_STORE
   QUIC_TLS_SECRETS *TlsSecrets;
   QUIC_BUFFER *ResumptionTicket;
+  // Connection handle closed flag
+  // false means the handle is invalid
   BOOLEAN is_closed;
   // track lifetime of Connection handle
   CXPLAT_REF_COUNT ref_count;

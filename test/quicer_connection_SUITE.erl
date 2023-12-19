@@ -459,7 +459,7 @@ run_tc_conn_custom_ca_other(Config) ->
         listener_ready ->
             {error, transport_down, #{
                 error := _ErrorCode,
-                status := bad_certificate
+                status := handshake_failure
             }} =
                 quicer:connect(
                     "localhost",
@@ -646,7 +646,7 @@ run_tc_conn_client_bad_cert(Config) ->
                     end,
                     receive
                         {quic, transport_shutdown, _Ref, #{
-                            error := _ErrorCode, status := bad_certificate
+                            error := _ErrorCode, status := handshake_failure
                         }} ->
                             _ = flush([])
                     after 2000 ->

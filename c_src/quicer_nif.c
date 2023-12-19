@@ -1356,6 +1356,9 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
             case TLS1_AD_BAD_CERTIFICATE_HASH_VALUE:
               eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
               break;
+            case SSL_AD_DECRYPT_ERROR:
+              eterm = ATOM_QUIC_STATUS_HANDSHAKE_FAILURE;
+              break;
             default:
               eterm = enif_make_tuple2(
                   env, ATOM_UNKNOWN_TLS_STATUS_CODE, ETERM_UINT_64(tlserror));
