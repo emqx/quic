@@ -16,35 +16,40 @@
 -module(quicer_lib).
 -include("quicer_types.hrl").
 
--export_type([ cb_ret/0
-             , cb_state/0
-             ]).
+-export_type([
+    cb_ret/0,
+    cb_state/0
+]).
 -type cb_ret() :: cb_ret_noreply() | cb_ret_reply().
 -type cb_state() :: term().
 
--type cb_ret_reply() :: {reply, Reply::term(), cb_state()} |
-                        {reply, Reply::term(), cb_state(), action()} |
-                        cb_ret_stop_reply().
+-type cb_ret_reply() ::
+    {reply, Reply :: term(), cb_state()}
+    | {reply, Reply :: term(), cb_state(), action()}
+    | cb_ret_stop_reply().
 
--type cb_ret_noreply() :: {ok, cb_state()}                    %% ok and update cb_state
-                        | {error, Reason::term(), cb_state()} %% error handling per callback
-                        | {action(), cb_state()}
-                        | cb_ret_stop_noreply().
+%% ok and update cb_state
+-type cb_ret_noreply() ::
+    {ok, cb_state()}
+    %% error handling per callback
+    | {error, Reason :: term(), cb_state()}
+    | {action(), cb_state()}
+    | cb_ret_stop_noreply().
 
 -type cb_ret_stop_noreply() :: {stop, Reason :: term(), cb_state()}.
--type cb_ret_stop_reply()   :: {stop, Reason :: term(), Reply :: term(), cb_state()}.
+-type cb_ret_stop_reply() :: {stop, Reason :: term(), Reply :: term(), cb_state()}.
 
 -type action() :: hibernate | timeout() | {continue, Continue :: term()}.
 
 -export([default_cb_ret/2]).
 
--spec default_cb_ret(cb_ret(), State::term()) ->
-          {reply, NewState :: term()} |
-          {reply, NewState :: term(), action()} |
-          {noreply, NewState :: term()} |
-          {noreply, NewState :: term(), action()} |
-          {stop, Reason :: term(), Reply::term(), NewState :: term()} |
-          {stop, Reason :: term(), NewState :: term()}.
+-spec default_cb_ret(cb_ret(), State :: term()) ->
+    {reply, NewState :: term()}
+    | {reply, NewState :: term(), action()}
+    | {noreply, NewState :: term()}
+    | {noreply, NewState :: term(), action()}
+    | {stop, Reason :: term(), Reply :: term(), NewState :: term()}
+    | {stop, Reason :: term(), NewState :: term()}.
 default_cb_ret({ok, NewCBState}, State) ->
     %% ok
     {noreply, State#{callback_state := NewCBState}};

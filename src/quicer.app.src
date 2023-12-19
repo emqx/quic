@@ -1,34 +1,36 @@
-{application, quicer,
- [{description, "msquic nif binding"},
-  {vsn, "git"},
-  {registered, []},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {mod, {quicer_app, []}},
-  {env,[]},
-  {modules, [ quicer
-            , quicer_app
-            , quicer_lib
-            , quicer_listener
-            , quicer_listener_sup
-            , quicer_connection
-            , quicer_conn_acceptor_sup
-            , quicer_server_conn_callback
-            , quicer_stream
-            , quicer_sup
-            , quicer_nif]},
+{application, quicer, [
+    {description, "msquic nif binding"},
+    {vsn, "git"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {mod, {quicer_app, []}},
+    {env, []},
+    {modules, [
+        quicer,
+        quicer_app,
+        quicer_lib,
+        quicer_listener,
+        quicer_listener_sup,
+        quicer_connection,
+        quicer_conn_acceptor_sup,
+        quicer_server_conn_callback,
+        quicer_stream,
+        quicer_sup,
+        quicer_nif
+    ]},
 
-  {licenses, ["Apache-2.0"]},
-  {links, [{"Github", "https://github.com/emqx/quic"}]},
-  {include_files, [ "CMakeLists.txt"
-                  , "Makefile"
-                  , "get-msquic.sh"
-                  , "c_build"
-                  , "build.sh"
-                  , "pkgname.sh"
-                  ]},
-  {exclude_regexps, ["priv/.*.so"]}
-
- ]}.
+    {licenses, ["Apache-2.0"]},
+    {links, [{"Github", "https://github.com/emqx/quic"}]},
+    {include_files, [
+        "CMakeLists.txt",
+        "Makefile",
+        "get-msquic.sh",
+        "c_build",
+        "build.sh",
+        "pkgname.sh"
+    ]},
+    {exclude_regexps, ["priv/.*.so"]}
+]}.

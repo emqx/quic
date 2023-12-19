@@ -17,20 +17,21 @@
 
 -behavior(quicer_stream).
 
--export([ init_handoff/4
-        , post_handoff/3
-        , new_stream/3
-        , start_completed/3
-        , send_complete/3
-        , peer_send_shutdown/3
-        , peer_send_aborted/3
-        , peer_receive_aborted/3
-        , send_shutdown_complete/3
-        , stream_closed/3
-        , peer_accepted/3
-        , passive/3
-        , handle_call/3
-        ]).
+-export([
+    init_handoff/4,
+    post_handoff/3,
+    new_stream/3,
+    start_completed/3,
+    send_complete/3,
+    peer_send_shutdown/3,
+    peer_send_aborted/3,
+    peer_receive_aborted/3,
+    send_shutdown_complete/3,
+    stream_closed/3,
+    peer_accepted/3,
+    passive/3,
+    handle_call/3
+]).
 
 -export([handle_stream_data/4]).
 
@@ -46,8 +47,12 @@ post_handoff(Stream, _PostData, State) ->
     {ok, State}.
 
 new_stream(Stream, #{flags := Flags}, Conn) ->
-    {ok, #{ stream => Stream, conn => Conn, is_local => false
-          , is_unidir => quicer:is_unidirectional(Flags)}}.
+    {ok, #{
+        stream => Stream,
+        conn => Conn,
+        is_local => false,
+        is_unidir => quicer:is_unidirectional(Flags)
+    }}.
 
 peer_accepted(_Stream, _Flags, S) ->
     %% we just ignore it
@@ -57,7 +62,6 @@ peer_receive_aborted(Stream, ErrorCode, #{is_unidir := false} = S) ->
     %% we abort send with same reason
     quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, ErrorCode),
     {ok, S};
-
 peer_receive_aborted(Stream, ErrorCode, #{is_unidir := true, is_local := true} = S) ->
     quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, ErrorCode),
     {ok, S}.
@@ -90,39 +94,47 @@ start_completed(Stream, #{status := success, stream_id := StreamId} = P, S) ->
 start_completed(_Stream, #{status := stream_limit_reached, stream_id := StreamId}, S) ->
     %% BUG in msquic is_peer_accepted = true?
     {ok, S#{steam_id => StreamId}};
-
-start_completed(_Stream, #{status := Other }, S) ->
+start_completed(_Stream, #{status := Other}, S) ->
     %% or we could retry
     {stop, {start_fail, Other}, S}.
 
 %% Local stream, Unidir
 handle_stream_data(Stream, Bin, _Flags, #{is_local := true, is_unidir := false} = State) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => local_bidir}),
-    ct:pal("Client recv: ~p from ~p", [Bin, Stream] ),
+    ct:pal("Client recv: ~p from ~p", [Bin, Stream]),
     {ok, State};
 %% Remote stream
-handle_stream_data(Stream, Bin, _Flags, #{is_local := false, is_unidir := true, conn := _Conn} = State) ->
+handle_stream_data(
+    Stream, Bin, _Flags, #{is_local := false, is_unidir := true, conn := _Conn} = State
+) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => remote_unidir}),
-    ct:pal("Client recv: ~p from ~p", [Bin, Stream] ),
+    ct:pal("Client recv: ~p from ~p", [Bin, Stream]),
     {ok, State}.
 
-passive(Stream, undefined, S)->
+passive(Stream, undefined, S) ->
     ct:fail("Steam ~p go into passive mode", [Stream]),
     {ok, S}.
 
 handle_call(_Request, _From, S) ->
     {reply, {error, not_impl}, S}.
 
-stream_closed(_Stream, #{ is_conn_shutdown := IsConnShutdown
-                        , is_app_closing := IsAppClosing
-                        , is_shutdown_by_app := IsAppShutdown
-                        , is_closed_remotely := IsRemote
-                        , status := Status
-                        , error := Code
-                        }, S) when is_boolean(IsConnShutdown) andalso
-                                   is_boolean(IsAppClosing) andalso
-                                   is_boolean(IsAppShutdown) andalso
-                                   is_boolean(IsRemote) andalso
-                                   is_atom(Status) andalso
-                                   is_integer(Code) ->
+stream_closed(
+    _Stream,
+    #{
+        is_conn_shutdown := IsConnShutdown,
+        is_app_closing := IsAppClosing,
+        is_shutdown_by_app := IsAppShutdown,
+        is_closed_remotely := IsRemote,
+        status := Status,
+        error := Code
+    },
+    S
+) when
+    is_boolean(IsConnShutdown) andalso
+        is_boolean(IsAppClosing) andalso
+        is_boolean(IsAppShutdown) andalso
+        is_boolean(IsRemote) andalso
+        is_atom(Status) andalso
+        is_integer(Code)
+->
     {stop, normal, S}.

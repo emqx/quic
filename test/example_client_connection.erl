@@ -25,27 +25,28 @@
 -export([start_link/3]).
 
 %% Callback init
--export([ init/1 ]).
+-export([init/1]).
 
 %% Connection Callbacks
--export([ new_conn/3
-        , connected/3
-        , transport_shutdown/3
-        , shutdown/3
-        , closed/3
-        , local_address_changed/3
-        , peer_address_changed/3
-        , streams_available/3
-        , peer_needs_streams/3
-        , resumed/3
-        , nst_received/3
-        , new_stream/3
-        , dgram_state_changed/3
-        ]).
+-export([
+    new_conn/3,
+    connected/3,
+    transport_shutdown/3,
+    shutdown/3,
+    closed/3,
+    local_address_changed/3,
+    peer_address_changed/3,
+    streams_available/3,
+    peer_needs_streams/3,
+    resumed/3,
+    nst_received/3,
+    new_stream/3,
+    dgram_state_changed/3
+]).
 
 -export([handle_info/2]).
 
-start_link(Host, Port, {_COpts, _SOpts} = Opts)->
+start_link(Host, Port, {_COpts, _SOpts} = Opts) ->
     quicer_connection:start_link(?MODULE, {Host, Port}, Opts).
 
 init(ConnOpts) when is_list(ConnOpts) ->
@@ -54,17 +55,25 @@ init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
     init(S#{stream_opts := maps:from_list(SOpts)});
 init(#{conn := Conn, stream_opts := SOpts} = ConnOpts) when is_map(ConnOpts) ->
     %% for accepting
-    {ok, Stream2} = quicer_remote_stream:start(example_client_stream, Conn, SOpts, [{spawn_opt, [link]}]),
+    {ok, Stream2} = quicer_remote_stream:start(example_client_stream, Conn, SOpts, [
+        {spawn_opt, [link]}
+    ]),
     %% for sending unidi_streams
-    {ok, Stream1} = quicer_local_stream:start(example_client_stream, Conn,
-                                              SOpts#{open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}, [{spawn_opt, [link]}]),
+    {ok, Stream1} = quicer_local_stream:start(
+        example_client_stream,
+        Conn,
+        SOpts#{open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL},
+        [{spawn_opt, [link]}]
+    ),
 
-    {ok, _} = quicer_stream:send(Stream1, <<"ping_from_example">>, ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN),
+    {ok, _} = quicer_stream:send(
+        Stream1, <<"ping_from_example">>, ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN
+    ),
     {ok, ConnOpts#{master_stream_pair => {Stream1, Stream2}}}.
 
-closed(_Conn, #{is_peer_acked := true}, S)->
+closed(_Conn, #{is_peer_acked := true}, S) ->
     {stop, normal, S};
-closed(_Conn, #{is_peer_acked := false}, S)->
+closed(_Conn, #{is_peer_acked := false}, S) ->
     {stop, abnorml, S}.
 
 new_conn(_Conn, #{version := _Vsn}, #{stream_opts := _SOpts} = S) ->
@@ -76,8 +85,9 @@ connected(Conn, Flags, #{conn := Conn} = S) ->
     ct:pal("~p connected and expecting NST within 100ms", [?MODULE]),
     {100, maps:merge(S, Flags)}.
 
-resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
-  when is_function(ResumeFun) ->
+resumed(Conn, Data, #{resumed_callback := ResumeFun} = S) when
+    is_function(ResumeFun)
+->
     ResumeFun(Conn, Data, S);
 resumed(_Conn, _Data, S) ->
     {ok, S}.
@@ -85,13 +95,20 @@ resumed(_Conn, _Data, S) ->
 nst_received(_Conn, Data, S) ->
     {ok, S#{nst => Data}}.
 
-new_stream(Stream, Flags, #{ conn := Conn, streams := Streams
-                           , stream_opts := SOpts} = CBState) ->
+new_stream(
+    Stream,
+    Flags,
+    #{
+        conn := Conn,
+        streams := Streams,
+        stream_opts := SOpts
+    } = CBState
+) ->
     %% Spawn new stream
     case quicer_remote_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
             quicer_connection:handoff_stream(Stream, StreamOwner),
-            {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
+            {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
         Other ->
             Other
     end.
@@ -103,8 +120,9 @@ dgram_state_changed(_Conn, _Flags, S) ->
 shutdown(_Conn, _ErrorCode, S) ->
     {ok, S}.
 
-transport_shutdown(_C, #{ error := ErrorCode, status := Status}, S)
-  when is_integer(ErrorCode) andalso is_atom(Status) ->
+transport_shutdown(_C, #{error := ErrorCode, status := Status}, S) when
+    is_integer(ErrorCode) andalso is_atom(Status)
+->
     {ok, S}.
 
 peer_address_changed(_C, _NewAddr, S) ->

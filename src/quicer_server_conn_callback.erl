@@ -21,22 +21,23 @@
 -include("quicer_types.hrl").
 
 %% Callback init
--export([ init/1 ]).
+-export([init/1]).
 
 %% Connection Callbacks
--export([ new_conn/3
-        , connected/3
-        , transport_shutdown/3
-        , shutdown/3
-        , closed/3
-        , local_address_changed/3
-        , peer_address_changed/3
-        , streams_available/3
-        , peer_needs_streams/3
-        , resumed/3
-        , nst_received/3
-        , new_stream/3
-        ]).
+-export([
+    new_conn/3,
+    connected/3,
+    transport_shutdown/3,
+    shutdown/3,
+    closed/3,
+    local_address_changed/3,
+    peer_address_changed/3,
+    streams_available/3,
+    peer_needs_streams/3,
+    resumed/3,
+    nst_received/3,
+    new_stream/3
+]).
 
 -export([handle_info/2]).
 
@@ -45,7 +46,7 @@ init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
 init(ConnOpts) when is_map(ConnOpts) ->
     {ok, ConnOpts}.
 
-closed(_Conn, #{} = _Flags, S)->
+closed(_Conn, #{} = _Flags, S) ->
     {stop, normal, S}.
 
 new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
@@ -53,15 +54,18 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
     case quicer_remote_stream:start_link(maps:get(stream_callback, SOpts), Conn, SOpts) of
         {ok, Pid} ->
             ok = quicer:async_handshake(Conn),
-            {ok, S#{ conn => Conn
-                     %% @TODO track the streams?
-                   , streams => [{Pid, accepting}]}};
+            {ok, S#{
+                conn => Conn,
+                %% @TODO track the streams?
+                streams => [{Pid, accepting}]
+            }};
         {error, _} = Error ->
             Error
     end.
 
-resumed(Conn, Data, #{resumed_callback := ResumeFun} = S)
-  when is_function(ResumeFun) ->
+resumed(Conn, Data, #{resumed_callback := ResumeFun} = S) when
+    is_function(ResumeFun)
+->
     ResumeFun(Conn, Data, S);
 resumed(_Conn, _Data, S) ->
     {ok, S}.
@@ -70,16 +74,25 @@ nst_received(_Conn, _Data, S) ->
     {stop, no_nst_for_server, S}.
 
 %% handles stream when there is no stream acceptors.
-new_stream(Stream, #{is_orphan := true} = StreamProps,
-           #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState) ->
+new_stream(
+    Stream,
+    #{is_orphan := true} = StreamProps,
+    #{conn := Conn, streams := Streams, stream_opts := SOpts} = CBState
+) ->
     %% Spawn new stream
-    case quicer_remote_stream:start_link(maps:get(stream_callback, SOpts), Stream, Conn,
-                                         SOpts, StreamProps)
+    case
+        quicer_remote_stream:start_link(
+            maps:get(stream_callback, SOpts),
+            Stream,
+            Conn,
+            SOpts,
+            StreamProps
+        )
     of
         {ok, StreamOwner} ->
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
-                    {ok, CBState#{ streams := [ {StreamOwner, Stream} | Streams] }};
+                    {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
                 {error, _} = E ->
                     E
             end;
@@ -101,15 +114,24 @@ local_address_changed(_C, _NewAddr, S) ->
     {ok, S}.
 
 streams_available(_C, {BidirCnt, UnidirCnt}, S) ->
-    {ok, S# { peer_unidi_stream_count => UnidirCnt
-            , peer_bidi_stream_count => BidirCnt}}.
+    {ok, S#{
+        peer_unidi_stream_count => UnidirCnt,
+        peer_bidi_stream_count => BidirCnt
+    }}.
 
 %% @doc May integrate with App flow control
 peer_needs_streams(_C, _UnidiOrBidi, S) ->
     {ok, S}.
 
-connected(Conn, _Flags, #{ slow_start := false, stream_opts := SOpts
-                         , stream_callback := Callback} = S) ->
+connected(
+    Conn,
+    _Flags,
+    #{
+        slow_start := false,
+        stream_opts := SOpts,
+        stream_callback := Callback
+    } = S
+) ->
     %% @TODO configurable behavior of spawing stream acceptor
     _ = quicer_stream:start_link(Callback, Conn, SOpts),
     {ok, S#{conn => Conn}};
@@ -122,6 +144,5 @@ handle_info({'EXIT', _Pid, _Reason}, State) ->
 %% Internals
 
 -ifdef(EUNIT).
-
 
 -endif.

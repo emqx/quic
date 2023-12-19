@@ -28,7 +28,7 @@
 %% @end
 %%--------------------------------------------------------------------
 suite() ->
-    [{timetrap,{seconds,30}}].
+    [{timetrap, {seconds, 30}}].
 
 %%--------------------------------------------------------------------
 %% @spec init_per_suite(Config0) ->
@@ -204,6 +204,10 @@ tc_close_with_opened_conn(_Config) ->
     {ok, Conn} = quicer_nif:open_connection(#{quic_registration => Reg}),
     %% @NOTE This is a hack to make sure the connection is abled to be closed
     %%       which is triggered by the registration close
-    _ = timer:apply_after(1000, quicer, connect,
-                          ["localhost", 5060, [{alpn, ["sample"]}, {handle, Conn}], 1000]),
+    _ = timer:apply_after(
+        1000,
+        quicer,
+        connect,
+        ["localhost", 5060, [{alpn, ["sample"]}, {handle, Conn}], 1000]
+    ),
     ?assertEqual(ok, quicer:close_registration(Reg)).

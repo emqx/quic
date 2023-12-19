@@ -18,20 +18,27 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/3,
-         start_listener/3,
-         stop_listener/1
-        ]).
+-export([
+    start_link/3,
+    start_listener/3,
+    stop_listener/1
+]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2
+]).
 
--record(state, { name :: atom()
-               , listener :: quicer:listener_handle()
-               , conn_sup :: pid()
-               , alpn :: [string()]
-               }).
+-record(state, {
+    name :: atom(),
+    listener :: quicer:listener_handle(),
+    conn_sup :: pid(),
+    alpn :: [string()]
+}).
 
 -export_type([listener_name/0]).
 
@@ -46,17 +53,16 @@
 %% Starts the server
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(Name :: listener_name(),
-                 ListenOn :: quicer:listen_on(),
-                 Options ::
-                   { quicer:listener_opts()
-                   , quicer:conn_opts()
-                   , quicer:stream_opts()
-                   }
-                ) -> {ok, Pid :: pid()} |
-          {error, Error :: {already_started, pid()}} |
-          {error, Error :: term()} |
-          ignore.
+-spec start_link(
+    Name :: listener_name(),
+    ListenOn :: quicer:listen_on(),
+    Options ::
+        {quicer:listener_opts(), quicer:conn_opts(), quicer:stream_opts()}
+) ->
+    {ok, Pid :: pid()}
+    | {error, Error :: {already_started, pid()}}
+    | {error, Error :: term()}
+    | ignore.
 start_link(Name, ListenOn, Opts) ->
     gen_server:start_link({local, Name}, ?MODULE, [Name, ListenOn, Opts], []).
 
@@ -76,25 +82,26 @@ stop_listener(Name) ->
 %% Initializes the server
 %% @end
 %%--------------------------------------------------------------------
--spec init(Args :: term()) -> {ok, State :: term()} |
-          {ok, State :: term(), Timeout :: timeout()} |
-          {ok, State :: term(), hibernate} |
-          {stop, Reason :: term()} |
-          ignore.
+-spec init(Args :: term()) ->
+    {ok, State :: term()}
+    | {ok, State :: term(), Timeout :: timeout()}
+    | {ok, State :: term(), hibernate}
+    | {stop, Reason :: term()}
+    | ignore.
 
 init([Name, ListenOn, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
     init([Name, ListenOn, {maps:from_list(LOpts), COpts, SOpts}]);
-init([Name, ListenOn, { #{conn_acceptors :=  N, alpn := Alpn} = LOpts,
-                        _COpts, _SOpts} = Opts]) ->
+init([Name, ListenOn, {#{conn_acceptors := N, alpn := Alpn} = LOpts, _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
     {ok, L} = quicer:listen(ListenOn, maps:without([conn_acceptors], LOpts)),
     {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
     _ = [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
-    {ok, #state{ name = Name
-               , listener = L
-               , conn_sup = ConnSup
-               , alpn = Alpn
-               }}.
+    {ok, #state{
+        name = Name,
+        listener = L,
+        conn_sup = ConnSup,
+        alpn = Alpn
+    }}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -103,14 +110,14 @@ init([Name, ListenOn, { #{conn_acceptors :=  N, alpn := Alpn} = LOpts,
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_call(Request :: term(), From :: {pid(), term()}, State :: term()) ->
-          {reply, Reply :: term(), NewState :: term()} |
-          {reply, Reply :: term(), NewState :: term(), Timeout :: timeout()} |
-          {reply, Reply :: term(), NewState :: term(), hibernate} |
-          {noreply, NewState :: term()} |
-          {noreply, NewState :: term(), Timeout :: timeout()} |
-          {noreply, NewState :: term(), hibernate} |
-          {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
-          {stop, Reason :: term(), NewState :: term()}.
+    {reply, Reply :: term(), NewState :: term()}
+    | {reply, Reply :: term(), NewState :: term(), Timeout :: timeout()}
+    | {reply, Reply :: term(), NewState :: term(), hibernate}
+    | {noreply, NewState :: term()}
+    | {noreply, NewState :: term(), Timeout :: timeout()}
+    | {noreply, NewState :: term(), hibernate}
+    | {stop, Reason :: term(), Reply :: term(), NewState :: term()}
+    | {stop, Reason :: term(), NewState :: term()}.
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -122,10 +129,10 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_cast(Request :: term(), State :: term()) ->
-          {noreply, NewState :: term()} |
-          {noreply, NewState :: term(), Timeout :: timeout()} |
-          {noreply, NewState :: term(), hibernate} |
-          {stop, Reason :: term(), NewState :: term()}.
+    {noreply, NewState :: term()}
+    | {noreply, NewState :: term(), Timeout :: timeout()}
+    | {noreply, NewState :: term(), hibernate}
+    | {stop, Reason :: term(), NewState :: term()}.
 handle_cast(_Request, State) ->
     {noreply, State}.
 
@@ -136,10 +143,10 @@ handle_cast(_Request, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_info(Info :: timeout() | term(), State :: term()) ->
-          {noreply, NewState :: term()} |
-          {noreply, NewState :: term(), Timeout :: timeout()} |
-          {noreply, NewState :: term(), hibernate} |
-          {stop, Reason :: normal | term(), NewState :: term()}.
+    {noreply, NewState :: term()}
+    | {noreply, NewState :: term(), Timeout :: timeout()}
+    | {noreply, NewState :: term(), hibernate}
+    | {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -152,8 +159,10 @@ handle_info(_Info, State) ->
 %% with Reason. The return value is ignored.
 %% @end
 %%--------------------------------------------------------------------
--spec terminate(Reason :: normal | shutdown | {shutdown, term()} | term(),
-                State :: term()) -> any().
+-spec terminate(
+    Reason :: normal | shutdown | {shutdown, term()} | term(),
+    State :: term()
+) -> any().
 terminate(_Reason, #state{listener = L}) ->
     %% nif listener has no owner process so we need to close it explicitly.
     _ = quicer:close_listener(L),
