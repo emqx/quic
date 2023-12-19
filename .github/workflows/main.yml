@@ -2,8 +2,28 @@ name: ci
 on: [push, pull_request]
 
 jobs:
+  formatting-check:
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run clang-format style check for C/C++/Protobuf programs.
+      uses: jidicula/clang-format-action@v4.11.0
+      with:
+        clang-format-version: '13'
+        check-path: 'c_src'
+    - name: Prepare OTP and rebar3
+      uses: erlef/setup-beam@v1
+      with:
+        otp-version: 26
+        rebar3-version: 3.20.0
+    - name: Run erlfmt for erlang code
+      run: |
+        rebar3 fmt -c
+
   mac:
     timeout-minutes: 60
+    needs: formatting-check
     strategy:
       fail-fast: false
       matrix:
@@ -58,6 +78,7 @@ jobs:
 
 
   linux:
+    needs: formatting-check
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     strategy:
