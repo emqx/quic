@@ -337,6 +337,11 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 #else
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
       CredConfig.CaCertificateFile = cacertfile;
+#if defined(__APPLE__)
+      // This seems only needed for macOS
+      CredConfig.Flags
+          |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
+#endif // __APPLE__
 #endif // QUICER_USE_TRUSTED_STORE
     }
   else
