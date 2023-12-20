@@ -742,8 +742,8 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-    // parse opt cacertfile
 #ifdef QUICER_USE_TRUSTED_STORE
+  // parse opt cacertfile
   char *cacertfile = NULL;
   if (!parse_cacertfile_option(env, eoptions, &cacertfile))
     {
@@ -762,14 +762,6 @@ async_connect3(ErlNifEnv *env,
         }
       free(cacertfile);
       cacertfile = NULL;
-    }
-
-#else
-  if (!parse_cacertfile_option(env, eoptions, &c_ctx->cacertfile))
-    {
-      // TLS opt error not file content error
-      res = ERROR_TUPLE_2(ATOM_CACERTFILE);
-      goto Error;
     }
 #endif // QUICER_USE_TRUSTED_STORE
 

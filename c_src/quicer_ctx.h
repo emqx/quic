@@ -97,9 +97,7 @@ typedef struct QuicerConnCTX
   ErlNifMutex *lock;
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE *trusted;
-#else
-  char *cacertfile;
-#endif // !QUICER_USE_TRUSTED_STORE
+#endif // QUICER_USE_TRUSTED_STORE
   QUIC_TLS_SECRETS *TlsSecrets;
   QUIC_BUFFER *ResumptionTicket;
   // Connection handle closed flag

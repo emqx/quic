@@ -65,7 +65,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           X509_STORE_up_ref(l_ctx->trusted_store);
           c_ctx->trusted = l_ctx->trusted_store;
         }
-#endif // QUICER_ENABLE_DEBUG_MSG
+#endif // QUICER_USE_TRUSTED_STORE
       assert(l_ctx->config_resource);
       // Keep resource for c_ctx
       enif_keep_resource(l_ctx->config_resource);

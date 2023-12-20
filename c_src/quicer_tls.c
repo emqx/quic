@@ -208,10 +208,6 @@ build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
 }
 #endif // QUICER_USE_TRUSTED_STORE
 
-/*
- * Free certfile/certfileprotected of QUIC_CREDENTIAL_CONFIG
- *
- */
 void
 free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
 {
@@ -235,6 +231,12 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
       CxPlatFree(cc->CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
       cc->CertificateFileProtected = NULL;
+    }
+
+  if (cc->CaCertificateFile)
+    {
+      free((char *)cc->CaCertificateFile);
+      cc->CaCertificateFile = NULL;
     }
 }
 
