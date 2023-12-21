@@ -67,7 +67,6 @@ init_l_ctx()
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
 #if defined(QUICER_USE_TRUSTED_STORE)
-  l_ctx->cacertfile = NULL;
   l_ctx->trusted_store = NULL;
 #endif
   l_ctx->is_closed = TRUE;

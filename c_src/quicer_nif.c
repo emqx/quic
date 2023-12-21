@@ -847,14 +847,6 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
     {
       TP_CB_3(skip, (uintptr_t)l_ctx->Listener, 0);
     }
-
-#if defined(QUICER_USE_TRUSTED_STORE)
-  if (l_ctx->cacertfile)
-    {
-      free(l_ctx->cacertfile);
-      l_ctx->cacertfile = NULL;
-    }
-#endif // QUICER_USE_TRUSTED_STORE
   deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);

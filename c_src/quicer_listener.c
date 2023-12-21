@@ -282,6 +282,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Start build CredConfig from with listen opts
   QUIC_CREDENTIAL_CONFIG CredConfig;
+
+  // change from here
   CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
 
   CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
@@ -328,8 +330,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
 #if defined(QUICER_USE_TRUSTED_STORE)
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-      l_ctx->cacertfile = cacertfile;
-      if (!build_trustedstore(l_ctx->cacertfile, &l_ctx->trusted_store))
+      if (!build_trustedstore(cacertfile, &l_ctx->trusted_store))
         {
           ret = ERROR_TUPLE_2(ATOM_CERT_ERROR);
           goto exit;
@@ -410,6 +411,10 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                                 Registration,
                                 &l_ctx->config_resource->Configuration,
                                 &CredConfig);
+
+#if defined(QUICER_USE_TRUSTED_STORE)
+  free(cacertfile);
+#endif // QUICER_USE_TRUSTED_STORE
 
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
