@@ -67,7 +67,9 @@ init_l_ctx()
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
   l_ctx->cacertfile = NULL;
+#if defined(QUICER_USE_TRUSTED_STORE)
   l_ctx->trusted_store = NULL;
+#endif
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   l_ctx->r_ctx = NULL;
@@ -78,10 +80,12 @@ init_l_ctx()
 void
 deinit_l_ctx(QuicerListenerCTX *l_ctx)
 {
+#if defined(QUICER_USE_TRUSTED_STORE)
   if (l_ctx->trusted_store)
     {
       X509_STORE_free(l_ctx->trusted_store);
     }
+#endif // QUICER_USE_TRUSTED_STORE
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
   if (l_ctx->config_resource)
     {
@@ -145,7 +149,9 @@ init_c_ctx()
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
+#if defined(QUICER_USE_TRUSTED_STORE)
   c_ctx->trusted = NULL;
+#endif // QUICER_USE_TRUSTED_STORE
   c_ctx->TlsSecrets = NULL;
   c_ctx->ResumptionTicket = NULL;
   c_ctx->event_mask = 0;
@@ -161,11 +167,13 @@ void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
   enif_free_env(c_ctx->env);
+#if defined(QUICER_USE_TRUSTED_STORE)
   if (c_ctx->trusted != NULL)
     {
       X509_STORE_free(c_ctx->trusted);
       c_ctx->trusted = NULL;
     }
+#endif // QUICER_USE_TRUSTED_STORE
   if (c_ctx->config_resource)
     {
       enif_release_resource(c_ctx->config_resource);
@@ -182,14 +190,15 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
 void
 destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
-  // Since enif_release_resource is async call,
-  // we should demon the owner now!
+// Since enif_release_resource is async call,
+// we should demon the owner now!
+#if defined(QUICER_USE_TRUSTED_STORE)
   if (c_ctx->trusted != NULL)
     {
       X509_STORE_free(c_ctx->trusted);
       c_ctx->trusted = NULL;
     }
-
+#endif // QUICER_USE_TRUSTED_STORE
   QuicerRegistrationCTX *r_ctx;
   if (c_ctx->r_ctx)
     {

@@ -742,6 +742,7 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
+#ifdef QUICER_USE_TRUSTED_STORE
   // parse opt cacertfile
   char *cacertfile = NULL;
   if (!parse_cacertfile_option(env, eoptions, &cacertfile))
@@ -762,6 +763,7 @@ async_connect3(ErlNifEnv *env,
       free(cacertfile);
       cacertfile = NULL;
     }
+#endif // QUICER_USE_TRUSTED_STORE
 
   // convert eoptions to Configuration
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
@@ -1621,7 +1623,7 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
       X509_free(c_ctx->peer_cert);
     }
   c_ctx->peer_cert = X509_dup(cert);
-
+#if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_CTX *x509_ctx
       = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;
 
@@ -1638,6 +1640,7 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
   if (res <= 0)
     return QUIC_STATUS_BAD_CERTIFICATE;
   else
+#endif // QUICER_USE_TRUSTED_STORE
     return QUIC_STATUS_SUCCESS;
 
   /* @TODO validate SNI */

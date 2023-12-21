@@ -122,9 +122,17 @@ parse_verify_options(ErlNifEnv *env,
           ERL_NIF_TERM tmp;
           if (enif_get_map_value(env, options, ATOM_CACERTFILE, &tmp))
             {
+#if defined(QUICER_USE_TRUSTED_STORE)
               // cacertfile is set, use it for self validation.
               CredConfig->Flags
                   |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+#else
+              // cacertfile is set, use it for OpenSSL validation.
+              CredConfig->Flags
+                  |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
+              CredConfig->CaCertificateFile = str_from_map(
+                  env, ATOM_CACERTFILE, &options, NULL, PATH_MAX + 1);
+#endif // QUICER_USE_TRUSTED_STORE
               CredConfig->Flags
                   |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
             }
@@ -137,6 +145,7 @@ parse_verify_options(ErlNifEnv *env,
 
 /*
 ** Parse optional cacertfile option
+** @NOTE we alloc buffer for cacertfile, caller should free it
 */
 BOOLEAN
 parse_cacertfile_option(ErlNifEnv *env,
@@ -163,6 +172,7 @@ parse_cacertfile_option(ErlNifEnv *env,
   return TRUE;
 }
 
+#if defined(QUICER_USE_TRUSTED_STORE)
 BOOLEAN
 build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
 {
@@ -196,11 +206,8 @@ build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
   *trusted_store = store;
   return TRUE;
 }
+#endif // QUICER_USE_TRUSTED_STORE
 
-/*
- * Free certfile/certfileprotected of QUIC_CREDENTIAL_CONFIG
- *
- */
 void
 free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
 {
@@ -224,6 +231,12 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
       CxPlatFree(cc->CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
       cc->CertificateFileProtected = NULL;
+    }
+
+  if (cc->CaCertificateFile)
+    {
+      free((char *)cc->CaCertificateFile);
+      cc->CaCertificateFile = NULL;
     }
 }
 

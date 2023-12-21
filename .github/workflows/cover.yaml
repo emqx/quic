@@ -42,6 +42,21 @@ jobs:
         git-branch: ${{ github.ref_name }}
         git-commit: ${{ github.sha }}
 
+    - name: Run cover with feature switches
+      run: |
+        sudo apt-get install lcov
+        export QUICER_USE_TRUSTED_STORE=1
+        make cover
+
+    - name: Coveralls C
+      uses: coverallsapp/github-action@v2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        flag-name: run-c-lcov-feature
+        parallel: true
+        git-branch: ${{ github.ref_name }}
+        git-commit: ${{ github.sha }}
+
     - name: Coveralls Erl
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

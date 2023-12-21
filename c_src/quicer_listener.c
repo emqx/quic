@@ -59,12 +59,13 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
       CxPlatRefInitialize(&(c_ctx->ref_count));
 
+#if defined(QUICER_USE_TRUSTED_STORE)
       if (l_ctx->trusted_store)
         {
           X509_STORE_up_ref(l_ctx->trusted_store);
           c_ctx->trusted = l_ctx->trusted_store;
         }
-
+#endif // QUICER_USE_TRUSTED_STORE
       assert(l_ctx->config_resource);
       // Keep resource for c_ctx
       enif_keep_resource(l_ctx->config_resource);
@@ -324,16 +325,31 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       // in cacertfile
       // @see QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
       CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
 
+#if defined(QUICER_USE_TRUSTED_STORE)
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+      l_ctx->cacertfile = cacertfile;
       if (!build_trustedstore(l_ctx->cacertfile, &l_ctx->trusted_store))
         {
           ret = ERROR_TUPLE_2(ATOM_CERT_ERROR);
           goto exit;
         }
+#else
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
+      CredConfig.CaCertificateFile = cacertfile;
+#if defined(__APPLE__)
+      // This seems only needed for macOS
+      CredConfig.Flags
+          |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
+#endif // __APPLE__
+#endif // QUICER_USE_TRUSTED_STORE
     }
   else
-    { // since we don't use cacertfile, free it
+    { // NO verify peer
+#if !defined(QUICER_USE_TRUSTED_STORE)
+      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+#endif // QUICER_USE_TRUSTED_STORE
+      // since we don't use cacertfile, free it
       free(cacertfile);
       cacertfile = NULL;
     }

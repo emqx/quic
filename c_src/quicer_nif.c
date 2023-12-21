@@ -848,12 +848,13 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
       TP_CB_3(skip, (uintptr_t)l_ctx->Listener, 0);
     }
 
+#if defined(QUICER_USE_TRUSTED_STORE)
   if (l_ctx->cacertfile)
     {
       CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
       l_ctx->cacertfile = NULL;
     }
-
+#endif // QUICER_USE_TRUSTED_STORE
   deinit_l_ctx(l_ctx);
   // @TODO notify acceptors that the listener is closed
   TP_CB_3(end, (uintptr_t)l_ctx->Listener, 0);
@@ -1355,6 +1356,9 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
               break;
             case TLS1_AD_BAD_CERTIFICATE_HASH_VALUE:
               eterm = ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+              break;
+            case SSL_AD_DECRYPT_ERROR:
+              eterm = ATOM_QUIC_STATUS_HANDSHAKE_FAILURE;
               break;
             default:
               eterm = enif_make_tuple2(

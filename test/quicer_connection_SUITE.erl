@@ -456,22 +456,30 @@ run_tc_conn_custom_ca_other(Config) ->
         end
     ),
     receive
-        listener_ready ->
-            {error, transport_down, #{
-                error := _ErrorCode,
-                status := bad_certificate
-            }} =
-                quicer:connect(
-                    "localhost",
-                    Port,
-                    default_conn_opts_verify(Config, "other-ca"),
-                    5000
-                ),
-            SPid ! done,
-            ensure_server_exit_normal(Ref)
+        listener_ready -> ok
     after 1000 ->
         ct:fail("timeout")
-    end.
+    end,
+
+    Res = quicer:connect(
+        "localhost",
+        Port,
+        default_conn_opts_verify(Config, "other-ca"),
+        5000
+    ),
+
+    ?assertMatch(
+        {error, transport_down, #{
+            error := _ErrorCode,
+            status := Status
+        }} when
+            Status == handshake_failure;
+            Status == bad_certificate;
+            Status == cert_untrusted_root,
+        Res
+    ),
+    SPid ! done,
+    ensure_server_exit_normal(Ref).
 
 tc_conn_client_cert(Config) ->
     {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_client_cert(Config) end),
@@ -646,8 +654,12 @@ run_tc_conn_client_bad_cert(Config) ->
                     end,
                     receive
                         {quic, transport_shutdown, _Ref, #{
-                            error := _ErrorCode, status := bad_certificate
-                        }} ->
+                            error := _ErrorCode, status := Status
+                        }} when
+                            Status == handshake_failure;
+                            Status == bad_certificate;
+                            Status == cert_untrusted_root
+                        ->
                             _ = flush([])
                     after 2000 ->
                         Other = flush([]),

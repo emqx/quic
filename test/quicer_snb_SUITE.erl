@@ -2336,10 +2336,8 @@ tc_listener_no_acceptor(Config) ->
                     #{
                         ?snk_kind := debug,
                         context := "callback",
-                        function := "resource_conn_dealloc_callback",
-                        %% assert Connection is unset
-                        resource_id := 0,
-                        tag := "start"
+                        function := "handle_connection_event_shutdown_complete",
+                        tag := "shutdown_complete"
                     },
                     Trace
                 )

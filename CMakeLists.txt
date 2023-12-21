@@ -74,6 +74,11 @@ if (DEFINED ENV{QUICER_USE_SNK})
   add_compile_options(-DQUICER_USE_SNK)
 endif()
 
+if (DEFINED ENV{QUICER_USE_TRUSTED_STORE})
+  message(STATUS "Enable shared trusted store")
+  add_compile_options(-DQUICER_USE_TRUSTED_STORE)
+endif()
+
 if (DEFINED ENV{QUICER_USE_SANITIZERS})
   set(QUIC_ENABLE_SANITIZERS "ON")
   add_compile_options(-O1 -fno-omit-frame-pointer -fsanitize=address,leak,undefined)
