@@ -851,7 +851,7 @@ resource_listener_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 #if defined(QUICER_USE_TRUSTED_STORE)
   if (l_ctx->cacertfile)
     {
-      CXPLAT_FREE(l_ctx->cacertfile, QUICER_CACERTFILE);
+      free(l_ctx->cacertfile);
       l_ctx->cacertfile = NULL;
     }
 #endif // QUICER_USE_TRUSTED_STORE

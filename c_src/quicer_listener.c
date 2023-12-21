@@ -320,7 +320,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (is_verify && cacertfile)
     {
-      l_ctx->cacertfile = cacertfile;
+
       // We do our own certificate verification against the certificates
       // in cacertfile
       // @see QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
