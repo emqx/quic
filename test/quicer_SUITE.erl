@@ -2911,7 +2911,9 @@ tc_peercert_server(Config) ->
     PeerCert =
         receive
             {SPid, peercert, Cert} ->
-                Cert
+                Cert;
+            {quic, transport_shutdown, Conn, _} = M ->
+                ct:fail("conn fail : ~p", [M])
         end,
     OTPCert = public_key:pkix_decode_cert(PeerCert, otp),
     ct:pal("client cert is ~p", [OTPCert]),
