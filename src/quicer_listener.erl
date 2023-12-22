@@ -147,6 +147,8 @@ handle_cast(_Request, State) ->
     | {noreply, NewState :: term(), Timeout :: timeout()}
     | {noreply, NewState :: term(), hibernate}
     | {stop, Reason :: normal | term(), NewState :: term()}.
+handle_info({quic, listener_stopped, L}, #state{listener = L} = State) ->
+    {stop, normal, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 

@@ -65,7 +65,6 @@ typedef struct QuicerListenerCTX
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
-  char *cacertfile;
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE *trusted_store;
 #endif

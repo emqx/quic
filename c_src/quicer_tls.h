@@ -42,4 +42,10 @@ void free_certificate(QUIC_CREDENTIAL_CONFIG *cc);
 void parse_sslkeylogfile_option(ErlNifEnv *env,
                                 ERL_NIF_TERM options,
                                 QuicerConnCTX *c_ctx);
+
+ERL_NIF_TERM
+eoptions_to_cred_config(ErlNifEnv *env,
+                        ERL_NIF_TERM eoptions,
+                        QUIC_CREDENTIAL_CONFIG *CredConfig,
+                        X509_STORE **trusted_store);
 #endif // QUICER_TLS_H_

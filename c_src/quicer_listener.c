@@ -265,7 +265,6 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   QUIC_ADDR Address = {};
   HQUIC Registration = NULL;
-  char *cacertfile = NULL;
 
   QuicerRegistrationCTX *target_r_ctx = NULL;
 
@@ -282,28 +281,17 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Start build CredConfig from with listen opts
   QUIC_CREDENTIAL_CONFIG CredConfig;
-  CxPlatZeroMemory(&CredConfig, sizeof(CredConfig));
 
-  CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
+#if defined(QUICER_USE_TRUSTED_STORE)
+  X509_STORE *trusted_store = NULL;
+  ret = eoptions_to_cred_config(env, options, &CredConfig, &trusted_store);
+#else
+  ret = eoptions_to_cred_config(env, options, &CredConfig, NULL);
+#endif // QUICER_USE_TRUSTED_STORE
 
-  if (!parse_cert_options(env, options, &CredConfig))
+  if (!IS_SAME_TERM(ret, ATOM_OK))
     {
-      return ERROR_TUPLE_2(ATOM_QUIC_TLS);
-    }
-
-  BOOLEAN is_verify = FALSE;
-  if (!parse_verify_options(env, options, &CredConfig, TRUE, &is_verify))
-    {
-      return ERROR_TUPLE_2(ATOM_VERIFY);
-    }
-
-  if (!parse_cacertfile_option(env, options, &cacertfile))
-    {
-      // TLS opt error not file content error
-      free(cacertfile);
-      cacertfile = NULL;
-      free_certificate(&CredConfig);
-      return ERROR_TUPLE_2(ATOM_CACERTFILE);
+      return ERROR_TUPLE_2(ret);
     }
 
   // Now build l_ctx
@@ -311,48 +299,18 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (!l_ctx)
     {
-      free(cacertfile);
-      cacertfile = NULL;
       free_certificate(&CredConfig);
+#if defined(QUICER_USE_TRUSTED_STORE)
+      X509_STORE_free(trusted_store);
+#endif // QUICER_USE_TRUSTED_STORE
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
+#if defined(QUICER_USE_TRUSTED_STORE)
+  l_ctx->trusted_store = trusted_store;
+#endif // QUICER_USE_TRUSTED_STORE
   CxPlatRefInitialize(&l_ctx->ref_count);
 
-  if (is_verify && cacertfile)
-    {
-      l_ctx->cacertfile = cacertfile;
-      // We do our own certificate verification against the certificates
-      // in cacertfile
-      // @see QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
-
-#if defined(QUICER_USE_TRUSTED_STORE)
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-      l_ctx->cacertfile = cacertfile;
-      if (!build_trustedstore(l_ctx->cacertfile, &l_ctx->trusted_store))
-        {
-          ret = ERROR_TUPLE_2(ATOM_CERT_ERROR);
-          goto exit;
-        }
-#else
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
-      CredConfig.CaCertificateFile = cacertfile;
-#if defined(__APPLE__)
-      // This seems only needed for macOS
-      CredConfig.Flags
-          |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
-#endif // __APPLE__
-#endif // QUICER_USE_TRUSTED_STORE
-    }
-  else
-    { // NO verify peer
-#if !defined(QUICER_USE_TRUSTED_STORE)
-      CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-#endif // QUICER_USE_TRUSTED_STORE
-      // since we don't use cacertfile, free it
-      free(cacertfile);
-      cacertfile = NULL;
-    }
+  // *********  ANY ERROR below this line should goto `exit`   **************
 
   // Set owner for l_ctx
   if (!enif_self(env, &(l_ctx->listenerPid)))
@@ -404,16 +362,15 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
 
   // Now load server config
-  ERL_NIF_TERM estatus
-      = ServerLoadConfiguration(env,
+  ret = ServerLoadConfiguration(env,
                                 &options,
                                 Registration,
                                 &l_ctx->config_resource->Configuration,
                                 &CredConfig);
-
-  if (!IS_SAME_TERM(ATOM_OK, estatus))
+  if (!IS_SAME_TERM(ATOM_OK, ret))
     {
-      ret = ERROR_TUPLE_3(ATOM_CONFIG_ERROR, estatus);
+      // @TODO unsure 3 elem tuple is the best way to return error
+      ret = ERROR_TUPLE_3(ATOM_CONFIG_ERROR, ret);
       goto exit;
     }
 
@@ -435,19 +392,23 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                       &l_ctx->Listener)))
     {
       // Server Configuration should be destroyed
+      // @FIXME here leaks config?
+      // enif_release_resource(l_ctx->config_resource);
       l_ctx->config_resource->Configuration = NULL;
       ret = ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
       goto exit;
     }
   l_ctx->is_closed = FALSE;
 
-  // Link to registration
+  // Link to registration only when ListenerOpen success
   if (target_r_ctx)
     {
       enif_mutex_lock(target_r_ctx->lock);
       CxPlatListInsertTail(&target_r_ctx->Listeners, &l_ctx->RegistrationLink);
       enif_mutex_unlock(target_r_ctx->lock);
     }
+
+  // Now try to start listener
   unsigned alpn_buffer_length = 0;
   QUIC_BUFFER alpn_buffers[MAX_ALPN];
 
@@ -477,13 +438,16 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
       goto exit;
     }
-  ERL_NIF_TERM listenHandle = enif_make_resource(env, l_ctx);
 
+  ERL_NIF_TERM listenHandle = enif_make_resource(env, l_ctx);
+  // @TODO move it to earlier?
   free_certificate(&CredConfig);
   return OK_TUPLE_2(listenHandle);
 
 exit: // errors..
-  free(cacertfile);
+#if defined(QUICER_USE_TRUSTED_STORE)
+  X509_STORE_free(trusted_store);
+#endif // QUICER_USE_TRUSTED_STORE
   free_certificate(&CredConfig);
   destroy_l_ctx(l_ctx);
   return ret;

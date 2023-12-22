@@ -370,6 +370,18 @@ tc_stop_start_listener(Config) ->
     ok = snabbkaffe:retry(100, 10, fun() -> ok = quicer:start_listener(L, Port, LConf) end),
     ok = quicer:close_listener(L).
 
+tc_stop_start_listener_with_new_port(Config) ->
+    Port = select_port(),
+    LConf = default_listen_opts(Config),
+    {ok, L} = quicer:listen(Port, LConf),
+    ok = quicer:stop_listener(L),
+    Port2 = select_port(),
+    ok = snabbkaffe:retry(100, 10, fun() -> ok = quicer:start_listener(L, Port2, LConf) end),
+    {ok, Sock1} = gen_udp:open(Port),
+    ?assertMatch({error, eaddrinuse}, gen_udp:open(Port2)),
+    gen_udp:close(Sock1),
+    ok = quicer:close_listener(L).
+
 tc_stop_close_listener(Config) ->
     Port = select_port(),
     {ok, L} = quicer:listen(Port, default_listen_opts(Config)),

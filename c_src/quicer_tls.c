@@ -298,3 +298,100 @@ parse_sslkeylogfile_option(ErlNifEnv *env,
   c_ctx->TlsSecrets = TlsSecrets;
   c_ctx->ssl_keylogfile = keylogfile;
 }
+
+/*
+** Convert eterm options (a map) to QUIC_CREDENTIAL_CONFIG
+**
+** @NOTE We zero reset CredConfig
+** @NOTE Also build trusted store if needed
+*/
+ERL_NIF_TERM
+eoptions_to_cred_config(ErlNifEnv *env,
+                        ERL_NIF_TERM eoptions,
+                        QUIC_CREDENTIAL_CONFIG *CredConfig,
+                        X509_STORE **trusted_store)
+{
+  BOOLEAN is_verify = FALSE;
+  char *cacertfile = NULL;
+  ERL_NIF_TERM ret = ATOM_OK;
+
+  CXPLAT_FRE_ASSERT(CredConfig);
+
+#if defined(QUICER_USE_TRUSTED_STORE)
+  CXPLAT_FRE_ASSERT(trusted_store);
+#else
+  CXPLAT_FRE_ASSERT(trusted_store == NULL);
+#endif // QUICER_USE_TRUSTED_STORE
+
+  CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
+
+  CredConfig->Flags = QUIC_CREDENTIAL_FLAG_NONE;
+
+  // Handle the certificate, key, password options
+  if (!parse_cert_options(env, eoptions, CredConfig))
+    {
+      return ATOM_QUIC_TLS;
+    }
+
+  // Handle the `verify` options
+  if (!parse_verify_options(env, eoptions, CredConfig, TRUE, &is_verify))
+    {
+      ret = ATOM_VERIFY;
+      goto exit;
+      ;
+    }
+
+  // Hanlde the `cacertfile` options
+  if (!parse_cacertfile_option(env, eoptions, &cacertfile))
+    {
+      // TLS opt error not file content error
+      ret = ATOM_CACERTFILE;
+      goto exit;
+    }
+
+  // Set flags for certificate verification
+  if (is_verify && cacertfile)
+    { // === START of verify peer with cacertfile === //
+
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+
+#if defined(QUICER_USE_TRUSTED_STORE)
+      // We do our own verification with the cacert in trusted_store
+      // @see QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+      if (!build_trustedstore(cacertfile, trusted_store))
+        {
+          ret = ATOM_CERT_ERROR;
+          goto exit;
+        }
+      free(cacertfile);
+      cacertfile = NULL;
+#else
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
+      CredConfig->CaCertificateFile = cacertfile;
+#if defined(__APPLE__)
+      // This seems only needed for macOS
+      CredConfig->Flags
+          |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
+#endif // __APPLE__
+#endif // QUICER_USE_TRUSTED_STORE
+    }  // === END of verify peer with cacertfile === //
+  else
+    { // NO verify peer
+#if !defined(QUICER_USE_TRUSTED_STORE)
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+#endif // QUICER_USE_TRUSTED_STORE
+      // since we don't use cacertfile, free it
+      free(cacertfile);
+      cacertfile = NULL;
+    }
+  return ATOM_OK;
+
+exit:
+#if defined(QUICER_USE_TRUSTED_STORE)
+  free(cacertfile);
+  cacertfile = NULL;
+#endif // QUICER_USE_TRUSTED_STORE
+  free_certificate(CredConfig);
+  return ret;
+}
