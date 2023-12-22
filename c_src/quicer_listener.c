@@ -515,10 +515,9 @@ stop_listener1(ErlNifEnv *env,
   return ret;
 }
 
+// For simplicity, we do not support to switch the Registration
 ERL_NIF_TERM
-start_listener3(ErlNifEnv *env,
-                __unused_parm__ int argc,
-                const ERL_NIF_TERM argv[])
+start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM listener_handle = argv[0];
   ERL_NIF_TERM elisten_on = argv[1];
@@ -533,6 +532,8 @@ start_listener3(ErlNifEnv *env,
   // Return value
   ERL_NIF_TERM ret = ATOM_OK;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+
+  CXPLAT_FRE_ASSERT(argc == 3);
 
   if (!enif_get_resource(
           env, listener_handle, ctx_listener_t, (void **)&l_ctx))
@@ -566,12 +567,72 @@ start_listener3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_ALPN);
     }
 
+  QuicerConfigCTX *new_config_ctx = init_config_ctx();
+  if (!new_config_ctx)
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+    }
+
+  QUIC_CREDENTIAL_CONFIG CredConfig = { 0 };
+#if defined(QUICER_USE_TRUSTED_STORE)
+  X509_STORE *trusted_store = NULL;
+  ret = eoptions_to_cred_config(env, options, &CredConfig, &trusted_store);
+#else
+  ret = eoptions_to_cred_config(env, options, &CredConfig, NULL);
+#endif // QUICER_USE_TRUSTED_STORE
+
+  if (!IS_SAME_TERM(ret, ATOM_OK))
+    {
+      return ERROR_TUPLE_2(ret);
+    }
+
+  // ===================================================
+  // Safe to access l_ctx  now
+  // ===================================================
   enif_mutex_lock(l_ctx->lock);
+
   if (!l_ctx->Listener)
     {
       ret = ERROR_TUPLE_2(ATOM_CLOSED);
       goto exit;
     }
+
+  QuicerRegistrationCTX *target_r_ctx = NULL;
+
+  // This is a read, do not need to bump the ref count
+  target_r_ctx = l_ctx->r_ctx ? l_ctx->r_ctx : G_r_ctx;
+
+  ret = ServerLoadConfiguration(env,
+                                &options,
+                                target_r_ctx->Registration,
+                                &new_config_ctx->Configuration,
+                                &CredConfig);
+  free_certificate(&CredConfig);
+
+  if (!IS_SAME_TERM(ret, ATOM_OK))
+    {
+      enif_release_resource(new_config_ctx);
+      ret = ERROR_TUPLE_2(ret);
+      goto exit;
+    }
+
+  QuicerConfigCTX *old_config_ctx = l_ctx->config_resource;
+  l_ctx->config_resource = new_config_ctx;
+
+#if defined(QUICER_USE_TRUSTED_STORE)
+  /*@
+    FIXME: ongoing handshake will get segfault if we free it
+
+    free(l_ctx->trusted_store)
+
+    So, currently we allow leakage, possible solutions are:
+    a. need some refcnt for trusted_store
+    b. move trusted_store to config_resource
+    c. remove trusted_store (most likely)
+  */
+  l_ctx->trusted_store = trusted_store;
+#endif // QUICER_USE_TRUSTED_STORE
+  // No we swap the config
 
   if (QUIC_FAILED(
           Status = MsQuic->ListenerStart(
@@ -579,13 +640,16 @@ start_listener3(ErlNifEnv *env,
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
+      enif_release_resource(new_config_ctx);
       goto exit;
     }
   l_ctx->is_stopped = FALSE;
 
+  // the ongoing handshake will be completed with the old config
+  enif_release_resource(old_config_ctx);
+
 exit:
   enif_mutex_unlock(l_ctx->lock);
-
   return ret;
 }
 

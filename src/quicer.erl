@@ -265,7 +265,7 @@ reg_open(Profile) ->
 reg_close() ->
     quicer_nif:reg_close().
 
-%% @doc Start a stopped listener with listener handle.
+%% @doc Start a stopped listener with listener handle with new Options.
 -spec start_listener(listener_handle(), listen_on(), listen_opts()) ->
     {ok, pid()} | {error, any()}.
 start_listener(Listener, Port, Options) when is_list(Options) ->
