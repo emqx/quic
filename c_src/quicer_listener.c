@@ -410,7 +410,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Now try to start listener
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_BUFFER *alpn_buffers = NULL;
 
   // Allow insecure, default is false
   ERL_NIF_TERM eisInsecure;
@@ -420,16 +420,18 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       l_ctx->allow_insecure = TRUE;
     }
 
-  if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
+  if (!load_alpn(env, &options, &alpn_buffer_length, &alpn_buffers))
     {
       ret = ERROR_TUPLE_2(ATOM_ALPN);
       goto exit;
     }
 
   // Start Listener
-  if (QUIC_FAILED(
-          Status = MsQuic->ListenerStart(
-              l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
+  Status = MsQuic->ListenerStart(
+      l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address);
+  free_alpn_buffers(alpn_buffers, alpn_buffer_length);
+
+  if (QUIC_FAILED(Status))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       HQUIC Listener = l_ctx->Listener;
@@ -525,7 +527,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   QuicerListenerCTX *l_ctx;
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_BUFFER *alpn_buffers = NULL;
   QUIC_ADDR Address = {};
   int UdpPort = 0;
 
@@ -560,11 +562,6 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   else
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
-    {
-      return ERROR_TUPLE_2(ATOM_ALPN);
     }
 
   QuicerConfigCTX *new_config_ctx = init_config_ctx();
@@ -620,23 +617,23 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   l_ctx->config_resource = new_config_ctx;
 
 #if defined(QUICER_USE_TRUSTED_STORE)
-  /*@
-    FIXME: ongoing handshake will get segfault if we free it
-
-    free(l_ctx->trusted_store)
-
-    So, currently we allow leakage, possible solutions are:
-    a. need some refcnt for trusted_store
-    b. move trusted_store to config_resource
-    c. remove trusted_store (most likely)
-  */
+  X509_STORE_free(l_ctx->trusted_store);
   l_ctx->trusted_store = trusted_store;
 #endif // QUICER_USE_TRUSTED_STORE
-  // No we swap the config
+  // Now we swap the config
 
-  if (QUIC_FAILED(
-          Status = MsQuic->ListenerStart(
-              l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
+  if (!load_alpn(env, &options, &alpn_buffer_length, &alpn_buffers))
+    {
+      enif_release_resource(new_config_ctx);
+      ret = ERROR_TUPLE_2(ATOM_ALPN);
+      goto exit;
+    }
+  Status = MsQuic->ListenerStart(
+      l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address);
+
+  free_alpn_buffers(alpn_buffers, alpn_buffer_length);
+
+  if (QUIC_FAILED(Status))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));

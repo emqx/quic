@@ -289,6 +289,7 @@ generate_tls_certs(Config) ->
     gen_host_cert("client", "ca", DataDir),
     gen_ca(DataDir, "other-ca"),
     gen_host_cert("other-client", "other-ca", DataDir),
+    gen_host_cert("other-server", "other-ca", DataDir),
     gen_host_cert("server-password", "ca", DataDir, #{password => ?SERVER_KEY_PASSWORD}),
 
     %% New certs for TLS chain tests
