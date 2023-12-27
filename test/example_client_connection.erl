@@ -134,10 +134,12 @@ local_address_changed(_C, _NewAddr, S) ->
 streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
     {hibernate, S}.
 
-peer_needs_streams(C, #{unidi_streams := Current}, S) ->
+peer_needs_streams(C, unidi_streams, S) ->
+    {ok, Current} = quicer:getopt(C, param_conn_local_unidi_stream_count),
     ok = quicer:setopt(C, param_conn_settings, #{peer_unidi_stream_count => Current + 1}),
     {ok, S};
-peer_needs_streams(C, #{bidi_streams := Current}, S) ->
+peer_needs_streams(C, bidi_streams, S) ->
+    {ok, Current} = quicer:getopt(C, param_conn_local_bidi_stream_count),
     ok = quicer:setopt(C, param_conn_settings, #{peer_bidi_stream_count => Current + 1}),
     {ok, S}.
 

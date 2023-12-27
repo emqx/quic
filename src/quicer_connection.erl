@@ -215,7 +215,7 @@ start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_map
 start_link(CallbackModule, Listener, Opts, Sup) ->
     gen_server:start_link(?MODULE, [CallbackModule, Listener, Opts, Sup], []).
 
--spec get_cb_state(ConnPid :: pid()) -> {ok, cb_state()} | {error, any()}.
+-spec get_cb_state(ConnPid :: pid()) -> cb_state() | {error, any()}.
 get_cb_state(ConnPid) ->
     gen_server:call(ConnPid, get_cb_state, infinity).
 

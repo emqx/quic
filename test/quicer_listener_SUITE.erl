@@ -384,6 +384,83 @@ tc_stop_start_listener_with_new_port(Config) ->
     gen_udp:close(Sock1),
     ok = quicer:close_listener(L).
 
+tc_listener_lock(Config) ->
+    process_flag(trap_exit, true),
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 2}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+    %% GIVEN: A QUIC connection between example client and example server
+    {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
+    ClientConnOpts = default_conn_opts_verify(Config, ca),
+    {ok, ClientConnPid} = example_client_connection:start_link(
+        "localhost",
+        Port,
+        {ClientConnOpts, default_stream_opts()}
+    ),
+
+    %% ensure conn successfully established before lock
+    #{is_resumed := false} = snabbkaffe:retry(
+        50,
+        20,
+        fun() ->
+            #{is_resumed := false} = quicer_connection:get_cb_state(ClientConnPid)
+        end
+    ),
+
+    %% WHEN: the listener is locked
+    ok = quicer_listener:lock(QuicApp, infinity),
+
+    %% THEN: 1) new connection should be rejected
+    ?assertMatch(
+        {error, transport_down, #{error := 1, status := Status}} when
+            connection_idle == Status orelse unreachable == Status,
+        quicer:connect(
+            "localhost",
+            Port,
+            default_conn_opts_verify(Config, 'ca'),
+            2000
+        )
+    ),
+
+    %% THEN: 2) existing client connection should be kept, and traffic still works
+    Handle = quicer_connection:get_handle(ClientConnPid),
+    ?assertMatch({ok, {_, Port}}, quicer:peername(Handle)),
+
+    {ok, LocalStream} = quicer:async_csend(
+        Handle,
+        <<"hello_after_lock_listener">>,
+        [{active, true}],
+        %?QUIC_SEND_FLAG_NONE
+        ?QUIC_SEND_FLAG_FIN
+    ),
+    receive
+        {quic, <<"hello_after_lock_listener">>, LocalStream, _} ->
+            ct:pal("Client received hello_after_lock_listener from ~p", [LocalStream]),
+            ok
+    end,
+
+    gen_server:stop(ClientConnPid),
+    quicer_listener:stop_listener(QuicApp),
+    ok.
+
 tc_listener_conf_reload(Config) ->
     process_flag(trap_exit, true),
     DataDir = ?config(data_dir, Config),
@@ -463,7 +540,7 @@ tc_listener_conf_reload(Config) ->
     {ok, _} = quicer:send(Stream2, <<"ping_from_conn_2">>),
 
     receive
-        {quic, new_stream, Stream2Remote, _} ->
+        {quic, new_stream, Stream2Remote, #{is_orphan := true}} ->
             quicer:setopt(Stream2Remote, active, true),
             ok
     end,
@@ -474,7 +551,8 @@ tc_listener_conf_reload(Config) ->
         ct:fail("nothing from conn 2"),
         quicer_test_lib:report_unhandled_messages()
     end,
-    gen_server:stop(ClientConnPid).
+    gen_server:stop(ClientConnPid),
+    quicer_listener:stop_listener(QuicApp).
 
 tc_stop_close_listener(Config) ->
     Port = select_port(),
