@@ -1054,7 +1054,7 @@ addr2eterm(ErlNifEnv *env, QUIC_ADDR *addr)
                            enif_make_int(env, ntohs(ip[5])),
                            enif_make_int(env, ntohs(ip[6])),
                            enif_make_int(env, ntohs(ip[7]))),
-          enif_make_int(env, addr->Ipv6.sin6_port));
+          enif_make_int(env, ntohs(addr->Ipv6.sin6_port)));
     }
   else
     {
