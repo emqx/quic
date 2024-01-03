@@ -229,9 +229,9 @@ ServerLoadConfiguration(ErlNifEnv *env,
     }
 
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN] = { 0 };
+  QUIC_BUFFER *alpn_buffers = NULL;
 
-  if (!load_alpn(env, option, &alpn_buffer_length, alpn_buffers))
+  if (!load_alpn(env, option, &alpn_buffer_length, &alpn_buffers))
     {
       return ATOM_ALPN;
     }
@@ -240,14 +240,15 @@ ServerLoadConfiguration(ErlNifEnv *env,
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
   //
-  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
-                                                     alpn_buffers,
-                                                     alpn_buffer_length,
-                                                     &Settings,
-                                                     sizeof(Settings),
-                                                     CredConfig, // Context
-                                                     Configuration)))
+  QUIC_STATUS Status = MsQuic->ConfigurationOpen(Registration,
+                                                 alpn_buffers,
+                                                 alpn_buffer_length,
+                                                 &Settings,
+                                                 sizeof(Settings),
+                                                 CredConfig, // Context
+                                                 Configuration);
+  free_alpn_buffers(alpn_buffers, alpn_buffer_length);
+  if (QUIC_FAILED(Status))
     {
       return ATOM_STATUS(Status);
     }
@@ -313,9 +314,9 @@ ClientLoadConfiguration(ErlNifEnv *env,
     }
 
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_BUFFER *alpn_buffers = NULL;
 
-  if (!load_alpn(env, options, &alpn_buffer_length, alpn_buffers))
+  if (!load_alpn(env, options, &alpn_buffer_length, &alpn_buffers))
     {
       ret = ATOM_ALPN;
       goto done;
@@ -325,14 +326,15 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // Allocate/initialize the configuration object, with the configured ALPN
   // and settings.
   //
-  QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration,
-                                                     alpn_buffers,
-                                                     alpn_buffer_length,
-                                                     &Settings,
-                                                     sizeof(Settings),
-                                                     NULL,
-                                                     Configuration)))
+  QUIC_STATUS Status = MsQuic->ConfigurationOpen(Registration,
+                                                 alpn_buffers,
+                                                 alpn_buffer_length,
+                                                 &Settings,
+                                                 sizeof(Settings),
+                                                 NULL,
+                                                 Configuration);
+  free_alpn_buffers(alpn_buffers, alpn_buffer_length);
+  if (QUIC_FAILED(Status))
     {
       ret = ATOM_STATUS(Status);
       goto done;
@@ -357,50 +359,83 @@ done:
   return ret;
 }
 
+/*
+** load alpn from eterm options to the alpn_buffers
+** @NOTE 1:caller must call free_alpn_buffers after use
+*/
 bool
 load_alpn(ErlNifEnv *env,
           const ERL_NIF_TERM *options,
           unsigned *alpn_buffer_length,
-          QUIC_BUFFER alpn_buffers[])
+          QUIC_BUFFER **alpn_buffers)
 {
   ERL_NIF_TERM alpn_list;
+  assert(*alpn_buffers == NULL);
   if (!enif_get_map_value(env, *options, ATOM_ALPN, &alpn_list))
     {
       return false;
     }
 
-  if (!enif_get_list_length(env, alpn_list, alpn_buffer_length))
+  if (!enif_get_list_length(env, alpn_list, alpn_buffer_length)
+      || alpn_buffer_length == 0)
     {
       return false;
     }
 
-  ERL_NIF_TERM head, tail;
+  *alpn_buffers = malloc((*alpn_buffer_length) * sizeof(QUIC_BUFFER));
 
-  if (!enif_get_list_cell(env, alpn_list, &head, &tail))
+  if (!*alpn_buffers)
     {
       return false;
     }
 
-  for (int i = 0; i < (int)(*alpn_buffer_length); i++)
+  CxPlatZeroMemory(*alpn_buffers, (*alpn_buffer_length) * sizeof(QUIC_BUFFER));
+
+  ERL_NIF_TERM list, head, tail;
+  unsigned i = 0;
+  list = alpn_list;
+  while (enif_get_list_cell(env, list, &head, &tail))
     {
-      // @todo check if PATH_MAX is the correct length
-      char str[PATH_MAX];
-      if (enif_get_string(env, head, str, PATH_MAX, ERL_NIF_LATIN1) <= 0)
+      unsigned len = 0;
+#if ERL_NIF_MINOR_VERSION > 16
+      if (!enif_get_string_length(env, head, &len, ERL_NIF_LATIN1))
+#else
+      if (!enif_get_list_length(env, head, &len))
+#endif
         {
-          return false;
+          goto exit;
+        }
+      len++; // for '\0'
+      char *str = malloc(len * sizeof(char));
+
+      if (enif_get_string(env, head, str, len, ERL_NIF_LATIN1) <= 0)
+        {
+          free(str);
+          str = NULL;
+          goto exit;
         }
 
-      alpn_buffers[i].Buffer = (uint8_t *)str;
-      alpn_buffers[i].Length = strlen(str);
-
-      if (!enif_get_list_cell(env, tail, &head, &tail)
-          && i + 1 < (int)(*alpn_buffer_length))
-        {
-          return false;
-        }
+      (*alpn_buffers)[i].Buffer = (uint8_t *)str;
+      (*alpn_buffers)[i].Length = len - 1; // msquic doesn't need '\0'
+      i++;
+      list = tail;
     }
-
   return true;
+
+exit:
+  free_alpn_buffers(*alpn_buffers, i);
+  return false;
+}
+
+void
+free_alpn_buffers(QUIC_BUFFER *alpn_buffers, unsigned len)
+{
+  for (unsigned i = 0; i < len; i++)
+    {
+      free(alpn_buffers[i].Buffer);
+    }
+  free(alpn_buffers);
+  alpn_buffers = NULL;
 }
 
 bool

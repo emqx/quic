@@ -30,7 +30,8 @@
     stream_closed/3,
     peer_accepted/3,
     passive/3,
-    handle_call/3
+    handle_call/3,
+    handle_info/2
 ]).
 
 -export([handle_stream_data/4]).
@@ -115,9 +116,6 @@ passive(Stream, undefined, S) ->
     ct:fail("Steam ~p go into passive mode", [Stream]),
     {ok, S}.
 
-handle_call(_Request, _From, S) ->
-    {reply, {error, not_impl}, S}.
-
 stream_closed(
     _Stream,
     #{
@@ -138,3 +136,9 @@ stream_closed(
         is_integer(Code)
 ->
     {stop, normal, S}.
+
+handle_call(_Request, _From, S) ->
+    {reply, {error, not_impl}, S}.
+
+handle_info(_, S) ->
+    {ok, S}.

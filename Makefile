@@ -21,7 +21,8 @@ clean: distclean
 
 
 fmt:
-	rebar3 fmt
+	@clang-format-12 -i c_src/*
+	@rebar3 fmt
 
 
 .PHONY: distclean

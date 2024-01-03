@@ -410,7 +410,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   // Now try to start listener
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_BUFFER *alpn_buffers = NULL;
 
   // Allow insecure, default is false
   ERL_NIF_TERM eisInsecure;
@@ -420,16 +420,18 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       l_ctx->allow_insecure = TRUE;
     }
 
-  if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
+  if (!load_alpn(env, &options, &alpn_buffer_length, &alpn_buffers))
     {
       ret = ERROR_TUPLE_2(ATOM_ALPN);
       goto exit;
     }
 
   // Start Listener
-  if (QUIC_FAILED(
-          Status = MsQuic->ListenerStart(
-              l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
+  Status = MsQuic->ListenerStart(
+      l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address);
+  free_alpn_buffers(alpn_buffers, alpn_buffer_length);
+
+  if (QUIC_FAILED(Status))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       HQUIC Listener = l_ctx->Listener;
@@ -515,10 +517,9 @@ stop_listener1(ErlNifEnv *env,
   return ret;
 }
 
+// For simplicity, we do not support to switch the Registration
 ERL_NIF_TERM
-start_listener3(ErlNifEnv *env,
-                __unused_parm__ int argc,
-                const ERL_NIF_TERM argv[])
+start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM listener_handle = argv[0];
   ERL_NIF_TERM elisten_on = argv[1];
@@ -526,13 +527,15 @@ start_listener3(ErlNifEnv *env,
 
   QuicerListenerCTX *l_ctx;
   unsigned alpn_buffer_length = 0;
-  QUIC_BUFFER alpn_buffers[MAX_ALPN];
+  QUIC_BUFFER *alpn_buffers = NULL;
   QUIC_ADDR Address = {};
   int UdpPort = 0;
 
   // Return value
   ERL_NIF_TERM ret = ATOM_OK;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+
+  CXPLAT_FRE_ASSERT(argc == 3);
 
   if (!enif_get_resource(
           env, listener_handle, ctx_listener_t, (void **)&l_ctx))
@@ -561,31 +564,89 @@ start_listener3(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!load_alpn(env, &options, &alpn_buffer_length, alpn_buffers))
+  QuicerConfigCTX *new_config_ctx = init_config_ctx();
+  if (!new_config_ctx)
     {
-      return ERROR_TUPLE_2(ATOM_ALPN);
+      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
+  QUIC_CREDENTIAL_CONFIG CredConfig = { 0 };
+#if defined(QUICER_USE_TRUSTED_STORE)
+  X509_STORE *trusted_store = NULL;
+  ret = eoptions_to_cred_config(env, options, &CredConfig, &trusted_store);
+#else
+  ret = eoptions_to_cred_config(env, options, &CredConfig, NULL);
+#endif // QUICER_USE_TRUSTED_STORE
+
+  if (!IS_SAME_TERM(ret, ATOM_OK))
+    {
+      return ERROR_TUPLE_2(ret);
+    }
+
+  // ===================================================
+  // Safe to access l_ctx  now
+  // ===================================================
   enif_mutex_lock(l_ctx->lock);
+
   if (!l_ctx->Listener)
     {
       ret = ERROR_TUPLE_2(ATOM_CLOSED);
       goto exit;
     }
 
-  if (QUIC_FAILED(
-          Status = MsQuic->ListenerStart(
-              l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address)))
+  QuicerRegistrationCTX *target_r_ctx = NULL;
+
+  // This is a read, do not need to bump the ref count
+  target_r_ctx = l_ctx->r_ctx ? l_ctx->r_ctx : G_r_ctx;
+
+  ret = ServerLoadConfiguration(env,
+                                &options,
+                                target_r_ctx->Registration,
+                                &new_config_ctx->Configuration,
+                                &CredConfig);
+  free_certificate(&CredConfig);
+
+  if (!IS_SAME_TERM(ret, ATOM_OK))
+    {
+      enif_release_resource(new_config_ctx);
+      ret = ERROR_TUPLE_2(ret);
+      goto exit;
+    }
+
+  QuicerConfigCTX *old_config_ctx = l_ctx->config_resource;
+  l_ctx->config_resource = new_config_ctx;
+
+#if defined(QUICER_USE_TRUSTED_STORE)
+  X509_STORE_free(l_ctx->trusted_store);
+  l_ctx->trusted_store = trusted_store;
+#endif // QUICER_USE_TRUSTED_STORE
+  // Now we swap the config
+
+  if (!load_alpn(env, &options, &alpn_buffer_length, &alpn_buffers))
+    {
+      enif_release_resource(new_config_ctx);
+      ret = ERROR_TUPLE_2(ATOM_ALPN);
+      goto exit;
+    }
+  Status = MsQuic->ListenerStart(
+      l_ctx->Listener, alpn_buffers, alpn_buffer_length, &Address);
+
+  free_alpn_buffers(alpn_buffers, alpn_buffer_length);
+
+  if (QUIC_FAILED(Status))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
+      enif_release_resource(new_config_ctx);
       goto exit;
     }
   l_ctx->is_stopped = FALSE;
 
+  // the ongoing handshake will be completed with the old config
+  enif_release_resource(old_config_ctx);
+
 exit:
   enif_mutex_unlock(l_ctx->lock);
-
   return ret;
 }
 

@@ -77,7 +77,10 @@ ERL_NIF_TERM ClientLoadConfiguration(ErlNifEnv *env,
 bool load_alpn(ErlNifEnv *env,
                const ERL_NIF_TERM *option,
                unsigned *alpn_buffer_length,
-               QUIC_BUFFER alpn_buffers[]);
+               QUIC_BUFFER **alpn_buffers);
+
+void free_alpn_buffers(QUIC_BUFFER *alpn_buffers, unsigned alpn_buffer_length);
+
 bool load_verify(ErlNifEnv *env,
                  const ERL_NIF_TERM *option,
                  const bool default_verify);

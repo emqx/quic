@@ -20,6 +20,8 @@
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
+-include_lib("quicer/include/quicer.hrl").
+
 -compile(export_all).
 -compile(nowarn_export_all).
 
@@ -382,6 +384,176 @@ tc_stop_start_listener_with_new_port(Config) ->
     gen_udp:close(Sock1),
     ok = quicer:close_listener(L).
 
+tc_listener_lock(Config) ->
+    process_flag(trap_exit, true),
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 2}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+    %% GIVEN: A QUIC connection between example client and example server
+    {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
+    ClientConnOpts = default_conn_opts_verify(Config, ca),
+    {ok, ClientConnPid} = example_client_connection:start_link(
+        "localhost",
+        Port,
+        {ClientConnOpts, default_stream_opts()}
+    ),
+
+    %% ensure conn successfully established before lock
+    #{is_resumed := false} = snabbkaffe:retry(
+        50,
+        20,
+        fun() ->
+            #{is_resumed := false} = quicer_connection:get_cb_state(ClientConnPid)
+        end
+    ),
+
+    %% WHEN: the listener is locked
+    ok = quicer_listener:lock(QuicApp, infinity),
+
+    %% THEN: 1) new connection should be rejected
+    ?assertMatch(
+        {error, transport_down, #{error := 1, status := Status}} when
+            connection_idle == Status orelse unreachable == Status,
+        quicer:connect(
+            "localhost",
+            Port,
+            default_conn_opts_verify(Config, 'ca'),
+            2000
+        )
+    ),
+
+    %% THEN: 2) existing client connection should be kept, and traffic still works
+    Handle = quicer_connection:get_handle(ClientConnPid),
+    ?assertMatch({ok, {_, Port}}, quicer:peername(Handle)),
+
+    {ok, LocalStream} = quicer:async_csend(
+        Handle,
+        <<"hello_after_lock_listener">>,
+        [{active, true}],
+        %?QUIC_SEND_FLAG_NONE
+        ?QUIC_SEND_FLAG_FIN
+    ),
+    receive
+        {quic, <<"hello_after_lock_listener">>, LocalStream, _} ->
+            ct:pal("Client received hello_after_lock_listener from ~p", [LocalStream]),
+            ok
+    end,
+
+    gen_server:stop(ClientConnPid),
+    quicer_listener:stop_listener(QuicApp),
+    ok.
+
+tc_listener_conf_reload(Config) ->
+    process_flag(trap_exit, true),
+    DataDir = ?config(data_dir, Config),
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 1}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+    %% Given a QUIC connection between example client and example server
+    {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
+    ClientConnOpts = default_conn_opts_verify(Config, ca),
+    {ok, ClientConnPid} = example_client_connection:start_link(
+        "localhost",
+        Port,
+        {ClientConnOpts, default_stream_opts()}
+    ),
+
+    ct:pal("C1 status : ~p", [sys:get_status(ClientConnPid)]),
+    {ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
+
+    %% WHEN: the listener is reloaded with new listener opts (New cert, key and cacert).
+    ok = quicer_listener:lock(QuicApp, infinity),
+    ok = quicer_listener:unlock(QuicApp, infinity),
+    NewListenerOpts =
+        ListenerOpts ++
+            [
+                {certfile, filename:join(DataDir, "other-server.pem")},
+                {keyfile, filename:join(DataDir, "other-server.key")},
+                {cacertfile, filename:join(DataDir, "other-ca.pem")}
+            ],
+    ok = quicer_listener:reload(QuicApp, NewListenerOpts),
+    %% THEN: the listener handle is unchanged
+    ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
+
+    %% THEN: start new connection with old cacert must fail
+    ?assertMatch(
+        {error, transport_down, #{error := _, status := Status}} when
+            Status =:= bad_certificate;
+            Status =:= cert_untrusted_root;
+            Status =:= handshake_failure,
+        quicer:connect(
+            "localhost",
+            Port,
+            default_conn_opts_verify(Config, 'ca'),
+            5000
+        )
+    ),
+    %% WHEN: start new connection with new cacert
+    {ok, Conn2} = quicer:connect(
+        "localhost",
+        Port,
+        default_conn_opts_verify(Config, 'other-ca'),
+        5000
+    ),
+
+    %% THEN: the new connection shall be established and traffic can be sent and received
+    {ok, Stream2} = quicer:start_stream(
+        Conn2,
+        #{open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+    ),
+    {ok, _} = quicer:send(Stream2, <<"ping_from_conn_2">>),
+
+    receive
+        {quic, new_stream, Stream2Remote, #{is_orphan := true}} ->
+            quicer:setopt(Stream2Remote, active, true),
+            ok
+    end,
+
+    receive
+        {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
+    after 2000 ->
+        ct:fail("nothing from conn 2"),
+        quicer_test_lib:report_unhandled_messages()
+    end,
+    gen_server:stop(ClientConnPid),
+    quicer_listener:stop_listener(QuicApp).
+
 tc_stop_close_listener(Config) ->
     Port = select_port(),
     {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
@@ -629,8 +801,13 @@ default_listener_opts(Config, Verify) ->
         | tl(default_listen_opts(Config))
     ].
 
-%%%_* Emacs ====================================================================
-%%% Local Variables:
-%%% allout-layout: t
-%%% erlang-indent-level: 2
-%%% End:
+default_conn_opts_verify(Config, Ca) ->
+    DataDir = ?config(data_dir, Config),
+    CACertFile = filename:join(DataDir, Ca) ++ ".pem",
+    [
+        {verify, verify_peer},
+        {cacertfile, CACertFile},
+        {alpn, ["sample"]},
+        %% {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
+        {idle_timeout_ms, 5000}
+    ].

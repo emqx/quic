@@ -21,7 +21,11 @@
 -export([
     start_link/3,
     start_listener/3,
-    stop_listener/1
+    stop_listener/1,
+    lock/2,
+    unlock/2,
+    reload/2,
+    get_handle/2
 ]).
 
 %% gen_server callbacks
@@ -35,9 +39,11 @@
 
 -record(state, {
     name :: atom(),
+    listen_on :: quicer:listen_on(),
     listener :: quicer:listener_handle(),
     conn_sup :: pid(),
-    alpn :: [string()]
+    alpn :: [string()],
+    opts :: quicer:listener_opts()
 }).
 
 -export_type([listener_name/0]).
@@ -72,6 +78,26 @@ start_listener(Name, ListenOn, Options) ->
 stop_listener(Name) ->
     quicer_listener_sup:stop_listener(Name).
 
+-spec lock(pid(), timeout()) -> ok | {error, _}.
+lock(Pid, Timeout) ->
+    gen_server:call(Pid, lock, Timeout).
+
+-spec unlock(pid(), timeout()) -> ok | {error, _}.
+unlock(Pid, Timeout) ->
+    gen_server:call(Pid, unlock, Timeout).
+
+%% @doc Reload the listener with new *listener* opts.
+%% @NOTE: the acceptor opts and stream opts are not reloaded.
+%%%       if you want to reload them, you should restart the listener (terminate and spawn).
+%% @end
+-spec reload(pid(), NewConf :: map()) -> ok | {error, _}.
+reload(Pid, NewConf) ->
+    gen_server:call(Pid, {reload, NewConf}, infinity).
+
+-spec get_handle(pid(), timeout()) -> quicer:listener_handle().
+get_handle(Pid, Timeout) ->
+    gen_server:call(Pid, get_handle, Timeout).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -98,8 +124,10 @@ init([Name, ListenOn, {#{conn_acceptors := N, alpn := Alpn} = LOpts, _COpts, _SO
     _ = [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
     {ok, #state{
         name = Name,
+        listen_on = ListenOn,
         listener = L,
         conn_sup = ConnSup,
+        opts = LOpts,
         alpn = Alpn
     }}.
 
@@ -118,8 +146,28 @@ init([Name, ListenOn, {#{conn_acceptors := N, alpn := Alpn} = LOpts, _COpts, _SO
     | {noreply, NewState :: term(), hibernate}
     | {stop, Reason :: term(), Reply :: term(), NewState :: term()}
     | {stop, Reason :: term(), NewState :: term()}.
-handle_call(_Request, _From, State) ->
-    Reply = ok,
+handle_call(get_handle, _From, State) ->
+    {reply, {ok, State#state.listener}, State};
+handle_call(lock, _From, State) ->
+    Res = quicer:stop_listener(State#state.listener),
+    {reply, Res, State};
+handle_call(unlock, _From, State) ->
+    Res = quicer:start_listener(
+        State#state.listener,
+        State#state.listen_on,
+        State#state.opts
+    ),
+    {reply, Res, State};
+handle_call({reload, NewConf}, _From, State) ->
+    _ = quicer:stop_listener(State#state.listener),
+    Res = quicer:start_listener(
+        State#state.listener,
+        State#state.listen_on,
+        NewConf
+    ),
+    {reply, Res, State};
+handle_call(Request, _From, State) ->
+    Reply = {error, {unimpl, Request}},
     {reply, Reply, State}.
 
 %%--------------------------------------------------------------------
