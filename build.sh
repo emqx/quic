@@ -9,15 +9,23 @@ PKGNAME="$(./pkgname.sh)"
 build() {
     # default: 4 concurrent jobs
     JOBS=4
+    # if Ninja is installed, use it
+    if command -v ninja; then
+        GENERATOR=Ninja
+        MakeCmd=ninja
+    else
+        GENERATOR="Unix Makefiles"
+        MakeCmd=make
+    fi
     if [ "$(uname -s)" = 'Darwin' ]; then
         JOBS="$(sysctl -n hw.ncpu)"
     else
         JOBS="$(nproc)"
     fi
     ./get-msquic.sh "$MSQUIC_VERSION"
-    cmake -B c_build
-    make -j "$JOBS" -C c_build
-    make install -C c_build
+    cmake -B c_build -G "${GENERATOR}"
+    $MakeCmd -C c_build -j "$JOBS"
+    $MakeCmd -C c_build install
     ## MacOS
     if [ -f priv/libquicer_nif.dylib ]; then
         # https://developer.apple.com/forums/thread/696460

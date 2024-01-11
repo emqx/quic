@@ -5,6 +5,7 @@
 erl_crash.dump
 .concrete/DEV_MODE
 .DS_Store
+.cache
 
 # rebar 2.x
 .rebar
