@@ -267,7 +267,7 @@ reg_close() ->
 
 %% @doc Start a stopped listener with listener handle with new Options.
 -spec start_listener(listener_handle(), listen_on(), listen_opts()) ->
-    {ok, pid()} | {error, any()}.
+    ok | {error, any()}.
 start_listener(Listener, Port, Options) when is_list(Options) ->
     start_listener(Listener, Port, maps:from_list(Options));
 start_listener(Listener, Port, Options) ->

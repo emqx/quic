@@ -209,7 +209,7 @@ start_listener(_Listener, _ListenOn, _Opts) ->
 close_listener(_Listener) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec stop_listener(listener_handle()) -> ok | {error, closed | badarg}.
+-spec stop_listener(listener_handle()) -> ok | {error, closed | listener_stopped | badarg}.
 stop_listener(_Listener) ->
     erlang:nif_error(nif_library_not_loaded).
 

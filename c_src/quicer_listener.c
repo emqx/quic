@@ -511,8 +511,17 @@ stop_listener1(ErlNifEnv *env,
       ret = ERROR_TUPLE_2(ATOM_CLOSED);
       return ret; // follow otp behaviour?
     }
+  enif_mutex_lock(l_ctx->lock);
+  if (l_ctx->is_stopped)
+    {
+      ret = ERROR_TUPLE_2(ATOM_LISTENER_STOPPED);
+      goto exit;
+    }
   l_ctx->is_stopped = TRUE;
   MsQuic->ListenerStop(l_ctx->Listener);
+
+exit:
+  enif_mutex_unlock(l_ctx->lock);
   put_listener_handle(l_ctx);
   return ret;
 }
