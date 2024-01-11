@@ -21,9 +21,11 @@ do_patch()
 patch_2_2_3()
 {
     local patch_1="https://github.com/microsoft/msquic/commit/73a11d7bdc724432964a2d4bdc4211ed29823380.patch"
+    local patch_2="https://github.com/microsoft/msquic/commit/d7a3658cea2bee4a1873623c772dc193165433a6.patch"
     mkdir -p "$patch_dir"
     echo "Patching Msquic 2.2.3"
     do_patch "$patch_1"
+    do_patch "$patch_2"
 }
 
 
