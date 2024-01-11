@@ -25,6 +25,7 @@
     lock/2,
     unlock/2,
     reload/2,
+    reload/3,
     get_handle/2
 ]).
 
@@ -94,6 +95,14 @@ unlock(Pid, Timeout) ->
 reload(Pid, NewConf) ->
     gen_server:call(Pid, {reload, NewConf}, infinity).
 
+%% @doc Reload the listener with new *listener* opts and new listen_on.
+%% @NOTE: the acceptor opts and stream opts are not reloaded.
+%%%       if you want to reload them, you should restart the listener (terminate and spawn).
+%% @end
+-spec reload(pid(), quicer:listen_on(), NewConf :: map()) -> ok | {error, _}.
+reload(Pid, ListenOn, NewConf) ->
+    gen_server:call(Pid, {reload, ListenOn, NewConf}, infinity).
+
 -spec get_handle(pid(), timeout()) -> quicer:listener_handle().
 get_handle(Pid, Timeout) ->
     gen_server:call(Pid, get_handle, Timeout).
@@ -159,13 +168,11 @@ handle_call(unlock, _From, State) ->
     ),
     {reply, Res, State};
 handle_call({reload, NewConf}, _From, State) ->
-    _ = quicer:stop_listener(State#state.listener),
-    Res = quicer:start_listener(
-        State#state.listener,
-        State#state.listen_on,
-        NewConf
-    ),
-    {reply, Res, State};
+    {Res, NewState} = do_reload(State#state.listen_on, NewConf, State),
+    {reply, Res, NewState};
+handle_call({reload, NewListenOn, NewConf}, _From, State) ->
+    {Res, NewState} = do_reload(NewListenOn, NewConf, State),
+    {reply, Res, NewState};
 handle_call(Request, _From, State) ->
     Reply = {error, {unimpl, Request}},
     {reply, Reply, State}.
@@ -217,3 +224,18 @@ terminate(_Reason, #state{listener = L}) ->
     %% nif listener has no owner process so we need to close it explicitly.
     _ = quicer:close_listener(L),
     ok.
+
+-spec do_reload(quicer:listen_on(), map(), #state{}) -> {ok | {error, any()}, #state{}}.
+do_reload(ListenOn, NewConf, State) ->
+    _ = quicer:stop_listener(State#state.listener),
+    Res = quicer:start_listener(
+        State#state.listener,
+        ListenOn,
+        NewConf
+    ),
+    case Res of
+        ok ->
+            {ok, State#state{listen_on = ListenOn, opts = NewConf}};
+        Error ->
+            {Error, State}
+    end.

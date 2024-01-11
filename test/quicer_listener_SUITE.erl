@@ -369,6 +369,7 @@ tc_stop_start_listener(Config) ->
     LConf = default_listen_opts(Config),
     {ok, L} = quicer:listen(Port, LConf),
     ok = quicer:stop_listener(L),
+    ?assertEqual({error, listener_stopped}, quicer:stop_listener(L)),
     ok = snabbkaffe:retry(100, 10, fun() -> ok = quicer:start_listener(L, Port, LConf) end),
     ok = quicer:close_listener(L).
 
@@ -529,6 +530,88 @@ tc_listener_conf_reload(Config) ->
         "localhost",
         Port,
         default_conn_opts_verify(Config, 'other-ca'),
+        5000
+    ),
+
+    %% THEN: the new connection shall be established and traffic can be sent and received
+    {ok, Stream2} = quicer:start_stream(
+        Conn2,
+        #{open_flag => ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+    ),
+    {ok, _} = quicer:send(Stream2, <<"ping_from_conn_2">>),
+
+    receive
+        {quic, new_stream, Stream2Remote, #{is_orphan := true}} ->
+            quicer:setopt(Stream2Remote, active, true),
+            ok
+    end,
+
+    receive
+        {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
+    after 2000 ->
+        ct:fail("nothing from conn 2"),
+        quicer_test_lib:report_unhandled_messages()
+    end,
+    gen_server:stop(ClientConnPid),
+    quicer_listener:stop_listener(QuicApp).
+
+tc_listener_conf_reload_listen_on(Config) ->
+    process_flag(trap_exit, true),
+    DataDir = ?config(data_dir, Config),
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 1}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+    %% Given a QUIC connection between example client and example server
+    {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
+    ClientConnOpts = default_conn_opts_verify(Config, ca),
+    {ok, ClientConnPid} = example_client_connection:start_link(
+        "localhost",
+        Port,
+        {ClientConnOpts, default_stream_opts()}
+    ),
+
+    ct:pal("C1 status : ~p", [sys:get_status(ClientConnPid)]),
+    {ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
+
+    %% WHEN: the listener is reloaded with ListenOn (new bind address)
+    NewPort = select_port(),
+    ok = quicer_listener:reload(QuicApp, NewPort, ListenerOpts),
+    %% THEN: the listener handle is unchanged
+    ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
+
+    %% THEN: start new connection to old port
+    ?assertMatch(
+        {error, transport_down, #{error := _, status := _}},
+        quicer:connect(
+            "localhost",
+            Port,
+            default_conn_opts_verify(Config, 'ca'),
+            1000
+        )
+    ),
+    %% WHEN: start new connection to new port
+    {ok, Conn2} = quicer:connect(
+        "localhost",
+        NewPort,
+        default_conn_opts_verify(Config, 'ca'),
         5000
     ),
 
