@@ -623,7 +623,6 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   QuicerConfigCTX *old_config_ctx = l_ctx->config_resource;
-  l_ctx->config_resource = new_config_ctx;
 
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_free(l_ctx->trusted_store);
@@ -651,6 +650,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   l_ctx->is_stopped = FALSE;
 
+  l_ctx->config_resource = new_config_ctx;
   // the ongoing handshake will be completed with the old config
   enif_release_resource(old_config_ctx);
 
