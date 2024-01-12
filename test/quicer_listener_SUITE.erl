@@ -551,8 +551,8 @@ tc_listener_conf_reload(Config) ->
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
     after 2000 ->
-        ct:fail("nothing from conn 2"),
-        quicer_test_lib:report_unhandled_messages()
+        quicer_test_lib:report_unhandled_messages(),
+        ct:fail("nothing from conn 2")
     end,
     gen_server:stop(ClientConnPid),
     quicer_listener:stop_listener(QuicApp).
@@ -632,8 +632,8 @@ tc_listener_conf_reload_listen_on(Config) ->
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
     after 2000 ->
-        ct:fail("nothing from conn 2"),
-        quicer_test_lib:report_unhandled_messages()
+        quicer_test_lib:report_unhandled_messages(),
+        ct:fail("nothing from conn 2")
     end,
     gen_server:stop(ClientConnPid),
     quicer_listener:stop_listener(QuicApp).
@@ -714,8 +714,8 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
     after 2000 ->
-        ct:fail("nothing from conn 2"),
-        quicer_test_lib:report_unhandled_messages()
+        quicer_test_lib:report_unhandled_messages(),
+        ct:fail("nothing from conn 2")
     end,
 
     quicer_listener:stop_listener(QuicApp).
