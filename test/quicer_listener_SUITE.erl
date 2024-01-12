@@ -99,6 +99,8 @@ end_per_group(_GroupName, _Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
+init_per_testcase(tc_listener_conf_reload_listen_on_neg, Config) ->
+    {skip, "MacOs is able to listen on port 1"};
 init_per_testcase(_TestCase, Config) ->
     application:ensure_all_started(quicer),
     quicer_test_lib:cleanup_msquic(),
@@ -671,7 +673,7 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
     ct:pal("C1 status : ~p", [sys:get_status(ClientConnPid)]),
     {ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
 
-    %% WHEN: the listener is reloaded with ListenOn (new bind address)
+    %% WHEN: the listener is reloaded with ListenOn (new invalid bind address)
     NewPort = 1,
     %% THEN: We get error
     {error, _, _} = quicer_listener:reload(QuicApp, NewPort, ListenerOpts),
