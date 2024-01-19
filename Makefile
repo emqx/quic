@@ -42,11 +42,12 @@ eunit:
 
 .PHONY: proper
 proper:
-	$(REBAR) proper
+	$(REBAR) proper -n 1000
 
 .PHONY: proper-cover
 proper-cover:
-	QUICER_TEST_COVER=1 QUICER_USE_SNK=1 $(REBAR) as test proper
+	mkdir -p coverage
+	QUICER_TEST_COVER=1 $(REBAR) as test proper -n 1000
 	lcov -c  --directory c_build/CMakeFiles/quicer_nif.dir/c_src/ \
 	--exclude "${PWD}/msquic/src/inc/*" \
 	--output-file ./coverage/proper-lcov.info
@@ -56,7 +57,7 @@ ct:
 	QUICER_USE_SNK=1 $(REBAR) as test ct -v --readable=true
 
 .PHONY: cover
-cover: eunit
+cover: eunit proper-cover
 	mkdir -p coverage
 	QUICER_TEST_COVER=1 QUICER_USE_SNK=1 $(REBAR) as test ct --cover --cover_export_name=ct -v
 	$(REBAR) as test cover -v
@@ -65,7 +66,7 @@ cover: eunit
 	--output-file ./coverage/lcov.info
 
 .PHONY: cover-html
-cover-html: cover proper-cover
+cover-html: cover
 	genhtml -o coverage/ coverage/lcov.info coverage/proper-lcov.info
 
 .PHONY: dialyzer
