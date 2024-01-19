@@ -795,7 +795,7 @@ getopt3(ErlNifEnv *env,
   ERL_NIF_TERM elevel = argv[2];
 
   void *q_ctx;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   if (!enif_is_atom(env, eopt))
     {
@@ -905,7 +905,7 @@ setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM evalue = argv[2];
   ERL_NIF_TERM elevel = argv[3];
 
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   void *q_ctx = NULL;
 
   if (!enif_is_atom(env, eopt))
@@ -1254,7 +1254,7 @@ get_stream_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   uint64_t BuffUint64 = 0;
 
@@ -1337,7 +1337,7 @@ set_stream_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   uint16_t BuffUint16 = 0;
 
@@ -1439,10 +1439,14 @@ get_connection_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   uint32_t Value = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
+      if (!c_ctx->config_resource)
+        {
+          goto Exit;
+        }
       res = get_level_param(env,
                             c_ctx->Connection,
                             c_ctx->config_resource->Configuration,
@@ -1620,13 +1624,17 @@ set_connection_opt(ErlNifEnv *env,
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   uint32_t Value = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   QUIC_ADDR addr;
   uint8_t phrase[512] = { 0 };
   ErlNifBinary ticket;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
+      if (!c_ctx->config_resource)
+        {
+          goto Exit;
+        }
       res = set_level_param(env,
                             c_ctx->Connection,
                             c_ctx->config_resource->Configuration,
@@ -1950,7 +1958,7 @@ get_listener_opt(ErlNifEnv *env,
   uint32_t Param = 0;
   QUIC_ADDR q_addr = { 0 };
   QUIC_LISTENER_STATISTICS stats = { 65535, 65535, 65535 };
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   if (!l_ctx)
     {
@@ -2037,7 +2045,7 @@ set_listener_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   ErlNifBinary bin;
   if (!l_ctx)
     {
@@ -2105,7 +2113,7 @@ get_tls_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   uint8_t alpn[255] = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO))
@@ -2196,7 +2204,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
   uint32_t percent = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   QUIC_SETTINGS Settings = { 0 };
   uint8_t githash[41] = { 0 }; // git hash 40 chars + \0
 
@@ -2314,7 +2322,7 @@ set_global_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   uint32_t percent = 0;
   uint32_t lbmode = 0;
   QUIC_SETTINGS Settings = { 0 };
@@ -2395,7 +2403,7 @@ get_config_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS))
     {
@@ -2435,7 +2443,7 @@ set_config_opt(ErlNifEnv *env,
   void *Buffer = NULL;
   uint32_t BufferLength = 0;
   uint32_t Param = 0;
-  ERL_NIF_TERM res = ATOM_ERROR_NOT_FOUND;
+  ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   QUIC_SETTINGS Settings = { 0 };
 
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS))

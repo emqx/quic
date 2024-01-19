@@ -168,8 +168,10 @@
 %% @TODO expand
 -type acceptor_opts() :: map().
 
+-type active_n() :: boolean() | once | integer().
+
 -type stream_opts() :: #{
-    active := boolean() | once | integer(),
+    active := active_n(),
     open_flag => stream_open_flags(),
     start_flag => stream_start_flags(),
     event_mask => uint32(),
@@ -211,7 +213,21 @@
     | ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE.
 
 %% is sync send or not
--type send_flags() :: non_neg_integer().
+-type send_flags() ::
+    ?QUIC_SEND_FLAG_NONE
+    | ?QUIC_SEND_FLAG_ALLOW_0_RTT
+    | ?QUIC_SEND_FLAG_START
+    | ?QUIC_SEND_FLAG_FIN
+    | ?QUIC_SEND_FLAG_DGRAM_PRIORITY
+    | ?QUIC_SEND_FLAG_DELAY_SEND
+    | ?QUICER_SEND_FLAG_SYNC.
+
+-type stream_start_flag() ::
+    ?QUIC_STREAM_START_FLAG_NONE
+    | ?QUIC_STREAM_START_FLAG_IMMEDIATE
+    | ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
+    | ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
+    | ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT.
 
 -type new_stream_props() :: #{
     is_orphan := boolean(),

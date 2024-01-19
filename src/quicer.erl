@@ -168,7 +168,10 @@
 
     %% Suporting types
     error_code/0,
-    quicer_addr/0
+    quicer_addr/0,
+
+    %% Registraion Profiles
+    registration_profile/0
 ]).
 
 -type connection_opts() :: proplists:proplist() | conn_opts().
