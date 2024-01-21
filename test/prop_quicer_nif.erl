@@ -146,13 +146,30 @@
     | conn_opt_nst()
     | conn_opt_cacertfile()
     | conn_opt_sslkeylogfile()
-    | conn_opt_peer_bidi_stream_count()
-    | conn_opt_peer_unidi_stream_count()
+    | conn_opt_local_bidi_stream_count()
+    | conn_opt_local_unidi_stream_count()
     | conn_opt_handshake_idle_timeout_ms()
     | conn_opt_quic_event_mask()
     | conn_opt_param_conn_disable_1rtt_encryption()
+    | conn_opt_param_conn_quic_version()
+    | conn_opt_param_conn_remote_address()
+    | conn_opt_param_conn_ideal_processor()
+    | conn_opt_param_conn_settings()
+    | conn_opt_param_conn_statistics()
+    | conn_opt_param_conn_statistics_plat()
+    | conn_opt_param_conn_share_udp_binding()
+    %% | conn_opt_param_conn_bidi_stream_count()
+    %% | conn_opt_param_conn_unidi_stream_count()
+    | conn_opt_param_conn_max_stream_ids()
+    | conn_opt_param_conn_close_reason_phrase()
+    | conn_opt_param_conn_stream_scheduling_scheme()
+    | conn_opt_param_conn_datagram_receive_enabled()
+    | conn_opt_param_conn_datagram_send_enabled()
+    | conn_opt_param_conn_resumption_ticket()
+    | conn_opt_param_conn_peer_certificate_valid()
+    | conn_opt_param_conn_local_interface()
     | conn_opt_param_conn_local_address()
-    | conn_opt_additional()
+    %    | conn_opt_additional()
     | quicer_setting().
 
 -type conn_opt_alpn() :: {alpn, [string()]}.
@@ -167,13 +184,88 @@
 -type conn_opt_nst() :: {nst, binary()}.
 -type conn_opt_cacertfile() :: {cacertfile, file:filename()}.
 -type conn_opt_sslkeylogfile() :: {sslkeylogfile, file:filename()}.
--type conn_opt_peer_bidi_stream_count() :: {peer_bidi_stream_count, uint16()}.
--type conn_opt_peer_unidi_stream_count() :: {peer_unidi_stream_count, uint16()}.
+-type conn_opt_local_bidi_stream_count() :: {param_conn_local_bidi_stream_count, uint16()}.
+-type conn_opt_local_unidi_stream_count() :: {param_conn_local_unidi_stream_count, uint16()}.
 -type conn_opt_handshake_idle_timeout_ms() :: {handshake_idle_timeout_ms, non_neg_integer()}.
 -type conn_opt_quic_event_mask() :: {quic_event_mask, uint32()}.
 -type conn_opt_param_conn_disable_1rtt_encryption() ::
     {param_conn_disable_1rtt_encryption, boolean()}.
--type conn_opt_param_conn_local_address() :: {param_conn_local_address, string()}.
+-type conn_opt_param_conn_quic_version() ::
+    {param_conn_quic_version, uint32()}.
+
+-type conn_opt_param_conn_local_address() ::
+    {param_conn_local_address, string()}.
+
+-type conn_opt_param_conn_remote_address() ::
+    {param_conn_remote_address, string()}.
+
+-type conn_opt_param_conn_ideal_processor() ::
+    {param_conn_ideal_processor, uint16()}.
+
+-type conn_opt_param_conn_settings() ::
+    {param_conn_settings, [quicer_setting()]}.
+
+-type conn_opt_param_conn_statistics() ::
+    %% @TODO
+    {param_conn_statistics, any()}.
+
+-type conn_opt_param_conn_statistics_plat() ::
+    %% @TODO
+    {param_conn_statistics_plat, any()}.
+
+-type conn_opt_param_conn_share_udp_binding() ::
+    {param_conn_share_udp_binding, boolean()}.
+
+%% -type conn_opt_param_conn_bidi_stream_count() ::
+%%     {param_conn_bidi_stream_count, uint16()}.
+
+%% -type conn_opt_param_conn_unidi_stream_count() ::
+%%     {param_conn_unidi_stream_count, uint16()}.
+
+-type conn_opt_param_conn_max_stream_ids() ::
+    {param_conn_max_stream_ids, uint64()}.
+
+-type conn_opt_param_conn_close_reason_phrase() ::
+    {param_conn_close_reason_phrase, string()}.
+
+-type conn_opt_param_conn_stream_scheduling_scheme() ::
+    {param_conn_stream_scheduling_scheme, uint16()}.
+
+-type conn_opt_param_conn_datagram_receive_enabled() ::
+    {param_conn_datagram_receive_enabled, boolean()}.
+
+-type conn_opt_param_conn_datagram_send_enabled() ::
+    {param_conn_datagram_send_enabled, boolean()}.
+
+-type conn_opt_param_conn_resumption_ticket() ::
+    {param_conn_resumption_ticket, [uint8()]}.
+
+-type conn_opt_param_conn_peer_certificate_valid() ::
+    {param_conn_peer_certificate_valid, boolean()}.
+
+-type conn_opt_param_conn_local_interface() ::
+    {param_conn_local_interface, uint32()}.
+
+-type conn_opt_param_conn_tls_secrets() ::
+    {param_conn_tls_secrets, binary()}.
+%%{param_conn_tls_secrets, quic_tls_secrets()}.
+
+-type conn_opt_param_conn_version_settings() ::
+    %% @TODO
+    {param_conn_version_settings, any()}.
+%%{param_conn_version_settings, quic_version_settings()}.
+
+-type conn_opt_param_conn_cibir_id() ::
+    {param_conn_cibir_id, [uint8()]}.
+
+-type conn_opt_param_conn_statistics_v2() ::
+    %% @TODO
+    {param_conn_statistics_v2, any()}.
+
+-type conn_opt_param_conn_statistics_v2_plat() ::
+    %% @TODO
+    {param_conn_statistics_v2_plat, any()}.
+
 -type conn_opt_additional() :: {_, _}.
 
 -type quicer_acceptor_opts() :: [acceptor_opt()].
@@ -186,13 +278,21 @@
 -type quicer_stream_opts() :: [stream_opt()].
 -type stream_opt() ::
     stream_opt_active()
+    | stream_opt_id()
+    | stream_opt_priority()
+    | stream_opt_ideal_send_buffer_size()
+    | stream_opt_0rtt_length()
     | stream_opt_open_flag()
     | stream_opt_start_flag()
     | stream_opt_event_mask()
-    | stream_opt_disable_fpbuffer()
-    | stream_opt_additional().
+    | stream_opt_disable_fpbuffer().
+%| stream_opt_additional().
 
 -type stream_opt_active() :: {active, active_n()}.
+-type stream_opt_id() :: {id, uint62()}.
+-type stream_opt_priority() :: {priority, uint16()}.
+-type stream_opt_ideal_send_buffer_size() :: {ideal_send_buffer_size, uint64()}.
+-type stream_opt_0rtt_length() :: {'0rtt_length', uint64()}.
 -type stream_opt_open_flag() :: {open_flag, stream_open_flags()}.
 -type stream_opt_start_flag() :: {start_flag, stream_start_flags()}.
 -type stream_opt_event_mask() :: {event_mask, uint32()}.
@@ -792,6 +892,33 @@ prop_robust_setopt_4_with_valid_handle_AND_param() ->
             Res = quicer_nif:setopt(Handle#prop_handle.handle, Optname, OptLevel, Value),
             (Handle#prop_handle.destructor)(),
             collect(Res, true)
+        end
+    ).
+
+prop_getopt_3_stream_opt() ->
+    ?FORALL(
+        {Handle, {Optname, _Value}},
+        {valid_stream_handle(), stream_opt()},
+        begin
+            Res = quicer_nif:getopt(Handle#prop_handle.handle, Optname, false),
+            (Handle#prop_handle.destructor)(),
+            collect(Res, true)
+        end
+    ).
+
+prop_getopt_3_conn_opt() ->
+    ?FORALL(
+        {Handle, {Optname, _Value}},
+        {valid_connection_handle(), conn_opt()},
+        begin
+            Res = quicer_nif:getopt(Handle#prop_handle.handle, Optname, false),
+            (Handle#prop_handle.destructor)(),
+            case Res of
+                {ok, _} ->
+                    collect(ok, true);
+                _ ->
+                    collect({Optname, Res}, true)
+            end
         end
     ).
 

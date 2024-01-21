@@ -92,7 +92,9 @@
 }.
 
 -type uint64() :: 0..?MASK(64).
+-type uint62() :: 0..?MASK(62).
 -type uint32() :: 0..?MASK(32).
+%-type none_zero_uint32() :: 128..?MASK(32).
 -type uint16() :: 0..?MASK(16).
 -type uint8() :: 0..?MASK(8).
 
@@ -152,13 +154,13 @@
         nst => binary(),
         cacertfile => file:filename(),
         sslkeylogfile => file:filename(),
-        peer_bidi_stream_count => uint16(),
-        peer_unidi_stream_count => uint16(),
         handshake_idle_timeout_ms => non_neg_integer(),
         quic_event_mask => uint32(),
         param_conn_disable_1rtt_encryption => boolean(),
         %% Not working well
         param_conn_local_address => string(),
+        param_conn_local_bidi_stream_count => uint16(),
+        param_conn_local_peer_unidi_stream_count => uint16(),
         %% for Application defined options
         _ => _
     }.
@@ -176,6 +178,10 @@
     start_flag => stream_start_flags(),
     event_mask => uint32(),
     disable_fpbuffer => boolean(),
+    id => uint62(),
+    priority => uint16(),
+    ideal_send_buffer_size => uint64(),
+    '0rtt_length' => uint64(),
     %% for Application defined options
     _ => _
     %% @TODO expand

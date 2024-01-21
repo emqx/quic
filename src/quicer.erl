@@ -990,7 +990,7 @@ setopt(Handle, Opt, Value, Level) ->
 -spec get_stream_id(Stream :: stream_handle()) ->
     {ok, integer()} | {error, any()} | not_found.
 get_stream_id(Stream) ->
-    quicer_nif:getopt(Stream, param_stream_id, false).
+    quicer_nif:getopt(Stream, stream_id, false).
 
 %% @doc get connection state
 %% mimic {@link ssl:getstat/2}

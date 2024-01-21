@@ -613,11 +613,11 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_STREAM.  */                             \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_STREAM_ID, param_stream_id);                           \
-  ATOM(ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH, param_stream_0rtt_length);         \
+  ATOM(ATOM_QUIC_PARAM_STREAM_ID, stream_id);                                 \
+  ATOM(ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH, 0rtt_length);                      \
   ATOM(ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE,                         \
-       param_stream_ideal_send_buffer_size);                                  \
-  ATOM(ATOM_QUIC_PARAM_STREAM_PRIORITY, param_stream_priority);               \
+       ideal_send_buffer_size);                                               \
+  ATOM(ATOM_QUIC_PARAM_STREAM_PRIORITY, priority);                            \
                                                                               \
   /*-----------------------*/                                                 \
   /* msquic params ends     */                                                \

@@ -1090,9 +1090,9 @@ tc_get_stream_0rtt_length(Config) ->
                     ok
             end,
             %% before stream shutdown,
-            {error, invalid_state} = quicer:getopt(Stm, param_stream_0rtt_length),
+            {error, invalid_state} = quicer:getopt(Stm, '0rtt_length'),
             quicer:async_shutdown_stream(Stm),
-            case quicer:getopt(Stm, param_stream_0rtt_length) of
+            case quicer:getopt(Stm, '0rtt_length') of
                 {ok, Val} -> ?assert(is_integer(Val));
                 {error, invalid_state} -> ok;
                 {error, closed} -> ok
@@ -1118,7 +1118,7 @@ tc_get_stream_ideal_sndbuff_size(Config) ->
                     ok
             end,
             %% before stream shutdown,
-            {ok, Val} = quicer:getopt(Stm, param_stream_ideal_send_buffer_size),
+            {ok, Val} = quicer:getopt(Stm, ideal_send_buffer_size),
             ?assert(is_integer(Val)),
             ok = quicer:shutdown_stream(Stm),
             SPid ! done,
@@ -1661,11 +1661,11 @@ tc_setopt_stream_priority(Config) ->
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
             {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-            ok = quicer:setopt(Stm, param_stream_priority, 10),
+            ok = quicer:setopt(Stm, priority, 10),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
             {ok, <<"ping">>} = quicer:recv(Stm, 0),
             % try to set priority out of range
-            {error, param_error} = quicer:setopt(Stm, param_stream_priority, 65536),
+            {error, param_error} = quicer:setopt(Stm, priority, 65536),
             SPid ! done,
             ensure_server_exit_normal(Ref)
     after 5000 ->
@@ -1680,18 +1680,18 @@ tc_setopt_stream_unsupp_opts(Config) ->
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
             {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-            ?assertEqual({error, not_supported}, quicer:setopt(Stm, param_stream_id, 8)),
+            ?assertEqual({error, not_supported}, quicer:setopt(Stm, stream_id, 8)),
             ?assertEqual(
-                {error, not_supported}, quicer:setopt(Stm, param_stream_0rtt_length, 4096)
+                {error, not_supported}, quicer:setopt(Stm, '0rtt_length', 4096)
             ),
             ?assertEqual(
                 {error, not_supported},
-                quicer:setopt(Stm, param_stream_ideal_send_buffer_size, 4096)
+                quicer:setopt(Stm, ideal_send_buffer_size, 4096)
             ),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
             {ok, <<"ping">>} = quicer:recv(Stm, 0),
             % try to set priority out of range
-            {error, param_error} = quicer:setopt(Stm, param_stream_priority, 65536),
+            {error, param_error} = quicer:setopt(Stm, priority, 65536),
             quicer:shutdown_stream(Stm),
             SPid ! done,
             ensure_server_exit_normal(Ref)
