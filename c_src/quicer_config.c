@@ -706,6 +706,7 @@ encode_parm_to_eterm(ErlNifEnv *env,
     }
   else if ((QUICER_PARAM_HANDLE_TYPE_STREAM == Type
             && (QUIC_PARAM_STREAM_ID == Param
+                || QUIC_PARAM_STREAM_PRIORITY == Param
                 || QUIC_PARAM_STREAM_0RTT_LENGTH == Param
                 || QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE == Param))
            || (QUICER_PARAM_HANDLE_TYPE_CONN == Type
@@ -1257,6 +1258,7 @@ get_stream_opt(ErlNifEnv *env,
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
 
   uint64_t BuffUint64 = 0;
+  uint16_t BuffUint16 = 0;
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
@@ -1272,6 +1274,12 @@ get_stream_opt(ErlNifEnv *env,
       Param = QUIC_PARAM_STREAM_ID;
       BufferLength = sizeof(uint64_t);
       Buffer = &BuffUint64;
+    }
+  else if (ATOM_QUIC_PARAM_STREAM_PRIORITY == optname)
+    {
+      Param = QUIC_PARAM_STREAM_PRIORITY;
+      BufferLength = sizeof(uint16_t);
+      Buffer = &BuffUint16;
     }
   else if (ATOM_QUIC_STREAM_OPTS_ACTIVE == optname)
     {
