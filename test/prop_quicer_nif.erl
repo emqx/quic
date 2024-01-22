@@ -922,6 +922,64 @@ prop_getopt_3_conn_opt() ->
         end
     ).
 
+prop_robust_peercert() ->
+    ?FORALL(
+        Handle,
+        any(),
+        begin
+            {error, badarg} == quicer:peercert(Handle)
+        end
+    ).
+
+prop_peercert_with_valid_connection_handle() ->
+    ?FORALL(
+        #prop_handle{type = conn, handle = Handle, destructor = Destroy},
+        valid_connection_handle(),
+        begin
+            Res = quicer_nif:peercert(Handle),
+            Destroy(),
+            collect(Res, true)
+        end
+    ).
+
+prop_peercert_with_valid_stream_handle() ->
+    ?FORALL(
+        #prop_handle{type = stream, handle = Handle, destructor = Destroy},
+        valid_stream_handle(),
+        begin
+            Destroy(),
+            collect(quicer_nif:peercert(Handle), true)
+        end
+    ).
+
+prop_robust_controlling_process() ->
+    ?FORALL(
+        {Handle, Pid},
+        {any(), any()},
+        begin
+            {error, badarg} == quicer_nif:controlling_process(Handle, Pid)
+        end
+    ).
+
+prop_controlling_process_with_valid_opts() ->
+    ?FORALL(
+        {#prop_handle{type = Type, handle = Handle, destructor = Destroy}, Pid},
+        {valid_handle(), pid()},
+        begin
+            Res = quicer_nif:controlling_process(Handle, Pid),
+            case Res of
+                ok when Type == conn ->
+                    {ok, Pid} = quicer_nif:get_conn_owner(Handle);
+                ok when Type == stream ->
+                    {ok, Pid} = quicer_nif:get_stream_owner(Handle);
+                _ ->
+                    skip
+            end,
+            Destroy(),
+            collect({Type, Res}, true)
+        end
+    ).
+
 %%% ============================================================================
 %%%  Generators
 %%% ============================================================================
@@ -932,6 +990,14 @@ valid_handle() ->
         valid_listen_handle(),
         valid_reg_handle()
     ]).
+
+%% @doc pid of process that dies randomly within 0-1000(ms)
+pid() ->
+    ?LET(
+        LiveTimeMs,
+        range(0, 1000),
+        spawn(fun() -> timer:sleep(LiveTimeMs) end)
+    ).
 
 data() ->
     oneof([binary(), list(binary())]).
