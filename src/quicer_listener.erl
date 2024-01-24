@@ -26,7 +26,8 @@
     unlock/2,
     reload/2,
     reload/3,
-    get_handle/2
+    get_handle/2,
+    count_conns/1
 ]).
 
 %% gen_server callbacks
@@ -107,6 +108,11 @@ reload(Pid, ListenOn, NewConf) ->
 get_handle(Pid, Timeout) ->
     gen_server:call(Pid, get_handle, Timeout).
 
+%% @doc count accepted but not yet closed connections
+-spec count_conns(pid()) -> non_neg_integer().
+count_conns(Pid) ->
+    gen_server:call(Pid, count_conns, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -173,6 +179,17 @@ handle_call({reload, NewConf}, _From, State) ->
 handle_call({reload, NewListenOn, NewConf}, _From, State) ->
     {Res, NewState} = do_reload(NewListenOn, NewConf, State),
     {reply, Res, NewState};
+handle_call(
+    count_conns,
+    _From,
+    #state{
+        conn_sup = ConnSup,
+        opts = #{conn_acceptors := NoAcceptors}
+    } =
+        State
+) ->
+    ConnPids = supervisor:which_children(ConnSup),
+    {reply, length(ConnPids) - NoAcceptors, State};
 handle_call(Request, _From, State) ->
     Reply = {error, {unimpl, Request}},
     {reply, Reply, State}.
