@@ -953,6 +953,72 @@ tc_get_listener_owner(Config) ->
     ?assertEqual({ok, self()}, quicer:get_listener_owner(L)),
     quicer:close_listener(L).
 
+tc_count_conns(Config) ->
+    Port0 = select_port(),
+    Port1 = select_port(),
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 2}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+
+    %% GIVEN: Two QUIC listeners
+    {ok, QuicApp} = quicer:spawn_listener(sample, Port0, Options),
+
+    {ok, QuicApp2} = quicer:spawn_listener(sample2, Port1, Options),
+
+    ClientConnOpts = default_conn_opts_verify(Config, ca),
+
+    %% WHEN: a client is connected to the first listener
+    {ok, ClientConnPid} = example_client_connection:start_link(
+        "localhost",
+        Port0,
+        {ClientConnOpts, default_stream_opts()}
+    ),
+    #{is_resumed := false} = snabbkaffe:retry(
+        50,
+        20,
+        fun() ->
+            #{is_resumed := false} = quicer_connection:get_cb_state(ClientConnPid)
+        end
+    ),
+
+    %% Then the first listener has one connection and other has none
+    ?assertEqual({1, 0}, {
+        quicer_listener:count_conns(QuicApp), quicer_listener:count_conns(QuicApp2)
+    }),
+
+    %% WHEN: client is stopped
+    gen_server:stop(ClientConnPid),
+
+    %% THEN: both listeners have no connections
+    {0, 0} = snabbkaffe:retry(
+        10,
+        100,
+        fun() ->
+            {0, 0} =
+                {quicer_listener:count_conns(QuicApp), quicer_listener:count_conns(QuicApp2)}
+        end
+    ),
+
+    quicer:terminate_listener(sample),
+    quicer:terminate_listener(sample2).
+
+%%% Helpers
+
 select_port() ->
     Port = select_free_port(quic),
     timer:sleep(100),
