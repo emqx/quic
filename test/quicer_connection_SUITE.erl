@@ -238,7 +238,7 @@ tc_conn_basic_verify_peer(Config) ->
         5000
     ),
     {ok, {_, _}} = quicer:sockname(Conn),
-    {ok, Info} = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
+    {ok, Info} = quicer:getopt(Conn, handshake_info, quic_tls),
     ct:pal("Handshake Info with Google: ~p", [Info]),
     ok = quicer:close_connection(Conn),
     ok.
@@ -394,7 +394,7 @@ tc_conn_with_localaddr(Config) ->
                 "127.0.0.1",
                 Port,
                 [
-                    {param_conn_local_address, "127.0.0.1:" ++ integer_to_list(PortX)}
+                    {local_address, "127.0.0.1:" ++ integer_to_list(PortX)}
                     | default_conn_opts(Config)
                 ],
                 5000
@@ -759,7 +759,7 @@ tc_conn_opt_ideal_processor(Config) ->
             {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
             {ok, Stm} = quicer:start_stream(Conn, []),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
-            {ok, Processor} = quicer:getopt(Conn, param_conn_ideal_processor),
+            {ok, Processor} = quicer:getopt(Conn, ideal_processor),
             ?assert(is_integer(Processor)),
             ok = quicer:close_connection(Conn),
             SPid ! done
@@ -776,12 +776,12 @@ tc_conn_opt_share_udp_binding(Config) ->
             {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
             {ok, Stm} = quicer:start_stream(Conn, []),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
-            {ok, IsShared} = quicer:getopt(Conn, param_conn_share_udp_binding),
+            {ok, IsShared} = quicer:getopt(Conn, share_udp_binding),
             ?assert(is_boolean(IsShared)),
             {error, invalid_state} = quicer:setopt(
-                Conn, param_conn_share_udp_binding, not IsShared
+                Conn, share_udp_binding, not IsShared
             ),
-            {ok, IsShared} = quicer:getopt(Conn, param_conn_share_udp_binding),
+            {ok, IsShared} = quicer:getopt(Conn, share_udp_binding),
             ok = quicer:close_connection(Conn),
             SPid ! done
     after 5000 ->
@@ -797,10 +797,10 @@ tc_conn_opt_local_bidi_stream_count(Config) ->
             {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
             {ok, Stm} = quicer:start_stream(Conn, []),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
-            {ok, Cnt} = quicer:getopt(Conn, param_conn_local_bidi_stream_count),
+            {ok, Cnt} = quicer:getopt(Conn, local_bidi_stream_count),
             ?assert(is_integer(Cnt)),
             {error, invalid_parameter} = quicer:setopt(
-                Conn, param_conn_local_bidi_stream_count, Cnt + 2
+                Conn, local_bidi_stream_count, Cnt + 2
             ),
             ok = quicer:close_connection(Conn),
             SPid ! done
@@ -817,10 +817,10 @@ tc_conn_opt_local_uni_stream_count(Config) ->
             {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
             {ok, Stm} = quicer:start_stream(Conn, []),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
-            {ok, Cnt} = quicer:getopt(Conn, param_conn_local_unidi_stream_count),
+            {ok, Cnt} = quicer:getopt(Conn, local_unidi_stream_count),
             ?assert(is_integer(Cnt)),
             {error, invalid_parameter} = quicer:setopt(
-                Conn, param_conn_local_unidi_stream_count, Cnt + 2
+                Conn, local_unidi_stream_count, Cnt + 2
             ),
             ok = quicer:close_connection(Conn),
             SPid ! done
@@ -847,7 +847,7 @@ tc_conn_list(Config) ->
     {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(Config), 5000),
     {ok, Stm} = quicer:start_stream(Conn, []),
     {ok, 4} = quicer:send(Stm, <<"ping">>),
-    {ok, Cnt} = quicer:getopt(Conn, param_conn_local_unidi_stream_count),
+    {ok, Cnt} = quicer:getopt(Conn, local_unidi_stream_count),
     ?assert(is_integer(Cnt)),
     Conns =
         case Reg of
@@ -1050,7 +1050,7 @@ echo_server(Owner, Config, Port) ->
                     ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [
                         BidirCount, UniDirCount
                     ]),
-                    quicer:setopt(Conn, param_conn_settings, #{
+                    quicer:setopt(Conn, settings, #{
                         peer_bidi_stream_count => BidirCount,
                         peer_unidi_stream_count => UniDirCount
                     }),
@@ -1121,7 +1121,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
             echo_server_stm_loop(L, Conn, Stms -- [Stm]);
         {set_stm_cnt, N} ->
             ct:pal("echo_server: set max stream count: ~p", [N]),
-            ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => N}),
+            ok = quicer:setopt(Conn, settings, #{peer_bidi_stream_count => N}),
             {ok, NewStm} = quicer:accept_stream(Conn, []),
             echo_server_stm_loop(L, Conn, [NewStm | Stms]);
         {peer_addr, From} ->
@@ -1131,7 +1131,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
             ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [
                 BidirCount, UniDirCount
             ]),
-            quicer:setopt(Conn, param_conn_settings, #{
+            quicer:setopt(Conn, settings, #{
                 peer_bidi_stream_count => BidirCount,
                 peer_unidi_stream_count => UniDirCount
             }),

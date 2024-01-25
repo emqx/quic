@@ -901,7 +901,7 @@ tc_conn_and_stream_shared_owner(Config) ->
     ensure_server_exit_normal(Ref).
 
 %% tc_getopt_raw(Config) ->
-%%   Parm = param_conn_quic_version,
+%%   Parm = quic_version,
 %%   Port = select_port(),
 %%   Owner = self(),
 %%   {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
@@ -922,7 +922,7 @@ tc_conn_and_stream_shared_owner(Config) ->
 %%   end.
 
 tc_getopt(Config) ->
-    Parm = param_conn_statistics,
+    Parm = statistics,
     Port = select_port(),
     Owner = self(),
     {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
@@ -930,33 +930,33 @@ tc_getopt(Config) ->
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
             {ok, Stats} = quicer:getopt(Conn, Parm, false),
-            ?assertEqual({ok, false}, quicer:getopt(Conn, param_conn_datagram_receive_enabled)),
-            ?assertEqual({ok, false}, quicer:getopt(Conn, param_conn_datagram_send_enabled)),
-            ?assertEqual({ok, false}, quicer:getopt(Conn, param_conn_disable_1rtt_encryption)),
-            ?assertEqual({ok, 1}, quicer:getopt(Conn, param_conn_quic_version)),
+            ?assertEqual({ok, false}, quicer:getopt(Conn, datagram_receive_enabled)),
+            ?assertEqual({ok, false}, quicer:getopt(Conn, datagram_send_enabled)),
+            ?assertEqual({ok, false}, quicer:getopt(Conn, disable_1rtt_encryption)),
+            ?assertEqual({ok, 1}, quicer:getopt(Conn, quic_version)),
             %% 0: fifo
             %% 1: round-robin
-            ?assertEqual({ok, 0}, quicer:getopt(Conn, param_conn_stream_scheduling_scheme)),
-            ?assertMatch({ok, {_, _}}, quicer:getopt(Conn, param_conn_local_address)),
-            {ok, MaxIds} = quicer:getopt(Conn, param_conn_max_stream_ids),
+            ?assertEqual({ok, 0}, quicer:getopt(Conn, stream_scheduling_scheme)),
+            ?assertMatch({ok, {_, _}}, quicer:getopt(Conn, local_address)),
+            {ok, MaxIds} = quicer:getopt(Conn, max_stream_ids),
             ct:pal(
                 "MaxStreamIds: client bidi: ~p, server bidi: ~p "
                 "client unidi ~p, server unidi ~p",
                 MaxIds
             ),
             ?assertEqual(
-                {error, invalid_parameter}, quicer:getopt(Conn, param_conn_local_interface)
+                {error, invalid_parameter}, quicer:getopt(Conn, local_interface)
             ),
             ?assertEqual(
-                {error, invalid_parameter}, quicer:getopt(Conn, param_conn_peer_certificate_valid)
+                {error, invalid_parameter}, quicer:getopt(Conn, peer_certificate_valid)
             ),
-            {error, not_supported} = quicer:getopt(Conn, param_conn_resumption_ticket),
+            {error, not_supported} = quicer:getopt(Conn, resumption_ticket),
             0 = proplists:get_value("Recv.DroppedPackets", Stats),
             [
                 true = proplists:is_defined(SKey, Stats)
              || SKey <- ["Send.TotalPackets", "Recv.TotalPackets"]
             ],
-            {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+            {ok, Settings} = quicer:getopt(Conn, settings, false),
             5000 = proplists:get_value(idle_timeout_ms, Settings),
             true = proplists:get_value(send_buffering_enabled, Settings),
             {ok, Stm} = quicer:start_stream(Conn, []),
@@ -966,7 +966,7 @@ tc_getopt(Config) ->
             end,
             ok = quicer:close_connection(Conn),
             %% @todo unsupp in msquic, leave it for now
-            {error, _} = quicer:getopt(Conn, param_conn_close_reason_phrase),
+            {error, _} = quicer:getopt(Conn, close_reason_phrase),
             SPid ! done,
             ensure_server_exit_normal(Ref)
     after 5000 ->
@@ -980,10 +980,10 @@ tc_getopt_settings(Config) ->
     receive
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
-            {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+            {ok, Settings} = quicer:getopt(Conn, settings, false),
             ?assertEqual(
                 {ok, Settings},
-                quicer:getopt(Conn, param_configuration_settings, quic_configuration)
+                quicer:getopt(Conn, settings, quic_configuration)
             ),
             {ok, Stm} = quicer:start_stream(Conn, []),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
@@ -991,12 +991,12 @@ tc_getopt_settings(Config) ->
                 {quic, <<"ping">>, Stm, _} -> ok
             end,
             ?assertEqual(
-                {ok, Settings}, quicer:getopt(Stm, param_configuration_settings, quic_configuration)
+                {ok, Settings}, quicer:getopt(Stm, settings, quic_configuration)
             ),
             ?assertEqual(
-                ok, quicer:setopt(quic_global, param_global_settings, #{idle_timeout_ms => 12000})
+                ok, quicer:setopt(quic_global, settings, #{idle_timeout_ms => 12000})
             ),
-            {ok, NewGSettings} = quicer:getopt(quic_global, param_global_settings),
+            {ok, NewGSettings} = quicer:getopt(quic_global, settings),
             ?assertEqual(12000, proplists:get_value(idle_timeout_ms, NewGSettings)),
             ok = quicer:close_connection(Conn),
             SPid ! done,
@@ -1227,7 +1227,7 @@ tc_alpn(Config) ->
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
             {ok, {_, _}} = quicer:sockname(Conn),
-            {ok, <<"sample">>} = quicer:getopt(Conn, param_tls_negotiated_alpn, quic_tls),
+            {ok, <<"sample">>} = quicer:getopt(Conn, negotiated_alpn, quic_tls),
             {ok, <<"sample">>} = quicer:negotiated_protocol(Conn),
             ok = quicer:close_connection(Conn),
             SPid ! done
@@ -1306,8 +1306,8 @@ tc_setopt_conn_settings(Config) ->
     receive
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
-            {ok, Settings} = quicer:getopt(Conn, param_conn_settings),
-            ok = quicer:setopt(Conn, param_conn_settings, Settings),
+            {ok, Settings} = quicer:getopt(Conn, settings),
+            ok = quicer:setopt(Conn, settings, Settings),
             {ok, Stm0} = quicer:start_stream(Conn, [{active, false}]),
             %% Stream 0
             {ok, 5} = quicer:send(Stm0, <<"ping0">>),
@@ -1364,32 +1364,32 @@ tc_setopt(Config) ->
                 ok
             end,
 
-            {error, not_supported} = quicer:setopt(Conn, param_conn_quic_version, 1),
+            {error, not_supported} = quicer:setopt(Conn, quic_version, 1),
             %% must be set before start
-            {error, invalid_state} = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
+            {error, invalid_state} = quicer:setopt(Conn, remote_address, "8.8.8.8:443"),
 
-            {error, not_supported} = quicer:setopt(Conn, param_conn_ideal_processor, 1),
-            {error, not_supported} = quicer:setopt(Conn, param_conn_max_stream_ids, [1, 2, 3, 4]),
-            ok = quicer:setopt(Conn, param_conn_close_reason_phrase, "You are not welcome!"),
-            ok = quicer:setopt(Conn, param_conn_stream_scheduling_scheme, 1),
-            {ok, 1} = quicer:getopt(Conn, param_conn_stream_scheduling_scheme),
+            {error, not_supported} = quicer:setopt(Conn, ideal_processor, 1),
+            {error, not_supported} = quicer:setopt(Conn, max_stream_ids, [1, 2, 3, 4]),
+            ok = quicer:setopt(Conn, close_reason_phrase, "You are not welcome!"),
+            ok = quicer:setopt(Conn, stream_scheduling_scheme, 1),
+            {ok, 1} = quicer:getopt(Conn, stream_scheduling_scheme),
             %% get-only
             {error, invalid_parameter} = quicer:setopt(
-                Conn, param_conn_datagram_send_enabled, false
+                Conn, datagram_send_enabled, false
             ),
             %% Must set before start
             {error, invalid_state} = quicer:setopt(
-                Conn, param_conn_datagram_receive_enabled, false
+                Conn, datagram_receive_enabled, false
             ),
-            {error, invalid_state} = quicer:setopt(Conn, param_conn_datagram_receive_enabled, true),
+            {error, invalid_state} = quicer:setopt(Conn, datagram_receive_enabled, true),
             {error, invalid_state} = quicer:setopt(
-                Conn, param_conn_datagram_receive_enabled, false
+                Conn, datagram_receive_enabled, false
             ),
-            ok = quicer:setopt(Conn, param_conn_peer_certificate_valid, true),
-            ok = quicer:setopt(Conn, param_conn_peer_certificate_valid, false),
-            {error, invalid_state} = quicer:setopt(Conn, param_conn_local_interface, 1),
+            ok = quicer:setopt(Conn, peer_certificate_valid, true),
+            ok = quicer:setopt(Conn, peer_certificate_valid, false),
+            {error, invalid_state} = quicer:setopt(Conn, local_interface, 1),
             %% test invalid
-            {error, invalid_parameter} = quicer:setopt(Conn, param_conn_resumption_ticket, <<>>),
+            {error, invalid_parameter} = quicer:setopt(Conn, resumption_ticket, <<>>),
             %% unblock Stream 1
             SPid ! {set_stm_cnt, 3},
 
@@ -1407,8 +1407,8 @@ tc_setopt(Config) ->
 
 tc_setopt_remote_addr(_Config) ->
     {ok, Conn} = quicer:open_connection(),
-    ok = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
-    ?assertEqual({ok, {{8, 8, 8, 8}, 443}}, quicer:getopt(Conn, param_conn_remote_address)),
+    ok = quicer:setopt(Conn, remote_address, "8.8.8.8:443"),
+    ?assertEqual({ok, {{8, 8, 8, 8}, 443}}, quicer:getopt(Conn, remote_address)),
     quicer:shutdown_connection(Conn).
 
 tc_setopt_bad_opt(_Config) ->
@@ -1443,17 +1443,17 @@ tc_setopt_config_settings(Config) ->
     receive
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
-            {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+            {ok, Settings} = quicer:getopt(Conn, settings, false),
             ?assertEqual(
                 ok,
                 quicer:setopt(
                     Conn,
-                    param_configuration_settings,
+                    settings,
                     #{idle_timeout_ms => 60000},
                     quic_configuration
                 )
             ),
-            {ok, Settings} = quicer:getopt(Conn, param_conn_settings, false),
+            {ok, Settings} = quicer:getopt(Conn, settings, false),
             {ok, Stm} = quicer:start_stream(Conn, []),
             {ok, 4} = quicer:send(Stm, <<"ping">>),
             receive
@@ -1464,11 +1464,11 @@ tc_setopt_config_settings(Config) ->
             %% config resources are not really exposed
             ?assertEqual(
                 {ok, Settings1},
-                quicer:getopt(Conn, param_configuration_settings, quic_configuration)
+                quicer:getopt(Conn, settings, quic_configuration)
             ),
             ?assertEqual(
                 {ok, Settings1},
-                quicer:getopt(Stm, param_configuration_settings, quic_configuration)
+                quicer:getopt(Stm, settings, quic_configuration)
             ),
             ok = quicer:close_connection(Conn),
             SPid ! done,
@@ -1479,8 +1479,8 @@ tc_setopt_config_settings(Config) ->
 
 tc_setopt_conn_remote_addr(_Config) ->
     {ok, Conn} = quicer:open_connection(),
-    ok = quicer:setopt(Conn, param_conn_remote_address, "8.8.8.8:443"),
-    ok = quicer:setopt(Conn, param_conn_datagram_receive_enabled, false),
+    ok = quicer:setopt(Conn, remote_address, "8.8.8.8:443"),
+    ok = quicer:setopt(Conn, datagram_receive_enabled, false),
     Res = quicer:connect(
         "google.com",
         443,
@@ -1504,32 +1504,32 @@ tc_setopt_conn_remote_addr(_Config) ->
     end.
 
 tc_setopt_global_retry_mem_percent(_Config) ->
-    ?assertEqual(ok, quicer:setopt(quic_global, param_global_retry_memory_percent, 30, false)).
+    ?assertEqual(ok, quicer:setopt(quic_global, retry_memory_percent, 30, false)).
 
 tc_getopt_global_retry_mem_percent(_Config) ->
-    {ok, Val} = quicer:getopt(quic_global, param_global_retry_memory_percent),
+    {ok, Val} = quicer:getopt(quic_global, retry_memory_percent),
     ?assert(is_integer(Val)).
 
 tc_getopt_global_lb_mode(_Config) ->
     ?assertEqual(
         {ok, 0},
-        quicer:getopt(quic_global, param_global_load_balacing_mode)
+        quicer:getopt(quic_global, load_balacing_mode)
     ).
 
 tc_getopt_global_lib_git_hash(_Config) ->
-    {ok, HashBin} = quicer:getopt(quic_global, param_global_library_git_hash),
+    {ok, HashBin} = quicer:getopt(quic_global, library_git_hash),
     ct:pal("msquic git hash ~s", [HashBin]),
     ?assert(is_binary(HashBin)).
 
 tc_setopt_global_lb_mode(_Config) ->
     ?assertEqual(
         {error, badarg},
-        quicer:setopt(quic_global, param_global_load_balacing_mode, 4)
+        quicer:setopt(quic_global, load_balacing_mode, 4)
     ),
     %% v1 api
     ?assertEqual(
         {error, invalid_parameter},
-        quicer:setopt(quic_global, param_global_load_balacing_mode, 1)
+        quicer:setopt(quic_global, load_balacing_mode, 1)
     ).
 
 tc_setopt_conn_local_addr(Config) ->
@@ -1555,13 +1555,13 @@ tc_setopt_conn_local_addr(Config) ->
     end,
     {ok, OldAddr} = quicer:sockname(Conn),
     %% change local addr with a new random port (0)
-    ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
+    ?assertEqual(ok, quicer:setopt(Conn, local_address, "127.0.0.1:0")),
     {ok, NewAddr} = quicer:sockname(Conn),
     ?assertNotEqual(OldAddr, NewAddr),
     ?assertNotEqual({ok, {{127, 0, 0, 1}, 50600}}, NewAddr),
     ?assertNotEqual({ok, {{127, 0, 0, 1}, 50600}}, OldAddr),
     %% change local addr with a new port 5060
-    ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")),
+    ?assertEqual(ok, quicer:setopt(Conn, local_address, "127.0.0.1:50600")),
     receive
         {quic, peer_address_changed, Conn, NewPeerAddr} ->
             ct:pal("new peer addr: ~p", [NewPeerAddr])
@@ -1618,7 +1618,7 @@ tc_setopt_conn_local_addr_in_use(Config) ->
     end,
     {ok, OldAddr} = quicer:sockname(Conn),
     %% change local addr with a new random port (0)
-    ?assertEqual(ok, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:0")),
+    ?assertEqual(ok, quicer:setopt(Conn, local_address, "127.0.0.1:0")),
     %% sleep is needed to finish migration at protocol level
     timer:sleep(50),
     {ok, NewAddr} = quicer:sockname(Conn),
@@ -1630,7 +1630,7 @@ tc_setopt_conn_local_addr_in_use(Config) ->
     {ok, ESocket} = gen_udp:open(50600, [{ip, element(1, NewAddr)}]),
     %% change local addr with a new port 5060
     ?assertEqual(
-        {error, address_in_use}, quicer:setopt(Conn, param_conn_local_address, "127.0.0.1:50600")
+        {error, address_in_use}, quicer:setopt(Conn, local_address, "127.0.0.1:50600")
     ),
 
     gen_udp:close(ESocket),
@@ -2112,7 +2112,7 @@ tc_stream_start_flag_shutdown_on_fail(Config) ->
         100,
         10,
         fun() ->
-            {error, closed} = quicer:getopt(Stm, param_configuration_settings, quic_configuration)
+            {error, closed} = quicer:getopt(Stm, settings, quic_configuration)
         end
     ),
     ?assert(is_integer(Rid)).
@@ -2418,7 +2418,7 @@ tc_insecure_traffic(Config) ->
         "localhost",
         Port,
         [
-            {param_conn_disable_1rtt_encryption, true}
+            {disable_1rtt_encryption, true}
             | default_conn_opts()
         ],
         5000
@@ -2427,7 +2427,7 @@ tc_insecure_traffic(Config) ->
     {ok, 5} = quicer:async_send(Stm, <<"ping1">>),
     receive
         {quic, <<"ping1">>, Stm, _} ->
-            {ok, true} = quicer:getopt(Conn, param_conn_disable_1rtt_encryption, false),
+            {ok, true} = quicer:getopt(Conn, disable_1rtt_encryption, false),
             ok
     end,
     quicer:close_connection(Conn),
@@ -2460,7 +2460,7 @@ tc_event_start_compl_client(Config) ->
         "localhost",
         Port,
         [
-            {param_conn_disable_1rtt_encryption, true}
+            {disable_1rtt_encryption, true}
             | default_conn_opts()
         ],
         5000
@@ -2523,7 +2523,7 @@ tc_event_start_compl_server(Config) ->
         "localhost",
         Port,
         [
-            {param_conn_disable_1rtt_encryption, true}
+            {disable_1rtt_encryption, true}
             | default_conn_opts()
         ],
         5000
@@ -2587,7 +2587,7 @@ tc_direct_send_over_conn(Config) ->
         "localhost",
         Port,
         [
-            {param_conn_disable_1rtt_encryption, true}
+            {disable_1rtt_encryption, true}
             | default_conn_opts()
         ]
     ),
@@ -2672,7 +2672,7 @@ tc_direct_send_over_conn_block(Config) ->
         "localhost",
         Port,
         [
-            {param_conn_disable_1rtt_encryption, true}
+            {disable_1rtt_encryption, true}
             | default_conn_opts()
         ]
     ),
@@ -2750,7 +2750,7 @@ tc_direct_send_over_conn_fail(Config) ->
         "localhost",
         Port,
         [
-            {param_conn_disable_1rtt_encryption, true}
+            {disable_1rtt_encryption, true}
             | default_conn_opts()
         ]
     ),
@@ -2820,10 +2820,10 @@ tc_getopt_tls_handshake_info(Config) ->
                     key_exchange_strength := 0,
                     tls_protocol_version := tlsv1_3
                 } = HSInfo} =
-                quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
+                quicer:getopt(Conn, handshake_info, quic_tls),
             ?assertEqual(
                 {error, not_supported},
-                quicer:setopt(Conn, param_tls_handshake_info, HSInfo, quic_tls)
+                quicer:setopt(Conn, handshake_info, HSInfo, quic_tls)
             ),
             ok = quicer:close_connection(Conn),
             SPid ! done
@@ -3069,7 +3069,7 @@ echo_server(Owner, Config, Port) ->
                     ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [
                         BidirCount, UniDirCount
                     ]),
-                    quicer:setopt(Conn, param_conn_settings, #{
+                    quicer:setopt(Conn, settings, #{
                         peer_bidi_stream_count => BidirCount,
                         peer_unidi_stream_count => UniDirCount
                     }),
@@ -3139,7 +3139,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
             echo_server_stm_loop(L, Conn, Stms -- [Stm]);
         {set_stm_cnt, N} ->
             ct:pal("echo_server: set max stream count: ~p", [N]),
-            ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => N}),
+            ok = quicer:setopt(Conn, settings, #{peer_bidi_stream_count => N}),
             {ok, NewStm} = quicer:accept_stream(Conn, []),
             echo_server_stm_loop(L, Conn, [NewStm | Stms]);
         {peer_addr, From} ->
@@ -3149,7 +3149,7 @@ echo_server_stm_loop(L, Conn, Stms) ->
             ct:pal("echo server stream flow control to bidirectional: ~p : ~p", [
                 BidirCount, UniDirCount
             ]),
-            quicer:setopt(Conn, param_conn_settings, #{
+            quicer:setopt(Conn, settings, #{
                 peer_bidi_stream_count => BidirCount,
                 peer_unidi_stream_count => UniDirCount
             }),

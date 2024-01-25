@@ -959,7 +959,7 @@ getopt(Handle, Opt) ->
 -spec getopt(handle(), optname(), optlevel()) ->
     %% `optname' not found, or wrong `optlevel' must be a bug.
     not_found
-    %% when optname = param_conn_settings
+    %% when optname = settings
     | {ok, [any()]}
     | {error, badarg | param_error | internal_error | not_enough_mem}
     | {error, atom_reason()}.
@@ -972,8 +972,8 @@ getopt(Handle, Opt, Optlevel) ->
     ok
     | {error, badarg | param_error | internal_error | not_enough_mem}
     | {error, atom_reason()}.
-setopt(Handle, param_conn_settings, Value) when is_list(Value) ->
-    setopt(Handle, param_conn_settings, maps:from_list(Value));
+setopt(Handle, settings, Value) when is_list(Value) ->
+    setopt(Handle, settings, maps:from_list(Value));
 setopt({_Conn, Stream}, active, Value) ->
     setopt(Stream, active, Value);
 setopt(Handle, Opt, Value) ->
@@ -997,7 +997,7 @@ get_stream_id(Stream) ->
 -spec getstat(connection_handle(), [inet:stat_option()]) ->
     {ok, list()} | {error, any()}.
 getstat(Conn, Cnts) ->
-    case quicer_nif:getopt(Conn, param_conn_statistics, false) of
+    case quicer_nif:getopt(Conn, statistics, false) of
         {error, _} = E ->
             E;
         {ok, Res} ->
@@ -1016,14 +1016,14 @@ getstat(Conn, Cnts) ->
 -spec negotiated_protocol(Conn :: connection_handle()) ->
     {ok, Protocol :: binary()} | {error, Reason :: any()}.
 negotiated_protocol(Conn) ->
-    quicer:getopt(Conn, param_tls_negotiated_alpn, quic_tls).
+    quicer:getopt(Conn, negotiated_alpn, quic_tls).
 
 %% @doc Peer name
 %% mimic {@link ssl:peername/1}
 -spec peername(connection_handle() | stream_handle()) ->
     {ok, {inet:ip_address(), inet:port_number()}} | {error, any()}.
 peername(Handle) ->
-    quicer_nif:getopt(Handle, param_conn_remote_address, false).
+    quicer_nif:getopt(Handle, remote_address, false).
 
 %% @doc Peer Cert in DER-encoded binary
 %% mimic {@link ssl:peername/1}
@@ -1203,7 +1203,7 @@ perf_counters() ->
     case
         quicer_nif:getopt(
             quic_global,
-            param_global_perf_counters,
+            perf_counters,
             false
         )
     of
