@@ -33,271 +33,117 @@
     ))
 ).
 
--type quicer_listen_opts() :: [quicer_listen_opt()].
--type quicer_listen_opt() ::
-    listen_opt_alpn()
-    | listen_opt_cert()
-    | listen_opt_certfile()
-    %listen_opt_key() |
-    | listen_opt_keyfile()
-    | listen_opt_verify()
-    | listen_opt_cacertfile()
-    | listen_opt_password()
-    | listen_opt_sslkeylogfile()
-    | listen_opt_allow_insecure()
-    %listen_opt_quic_registration() |
-    | listen_opt_conn_acceptors()
-    | quicer_setting().
+-type quicer_listen_opts() :: [listen_opt()].
+
+-type listen_opt() ::
+    {alpn, [alpn()]}
+    | {cert, file:filename()}
+    | {certfile, file:filename()}
+    %-| {key, file:filename()}. %% @FIXME reflect in types
+    | {keyfile, file:filename()}
+    | {verify, none | peer | verify_peer | verify_none}
+    | {cacertfile, file:filename()}
+    | {password, string()}
+    | {sslkeylogfile, file:filename()}
+    | {allow_insecure, boolean()}
+    %-| {quic_registration, reg_handle()}
+    | {conn_acceptors, non_neg_integer()}
+    | {settings, [quicer_setting()]}.
 
 -type quicer_setting() ::
-    quic_setting_max_bytes_per_key()
-    | quic_setting_handshake_idle_timeout_ms()
-    | quic_setting_idle_timeout_ms()
-    | quic_setting_tls_client_max_send_buffer()
-    | quic_setting_tls_server_max_send_buffer()
-    | quic_setting_stream_recv_window_default()
-    | quic_setting_stream_recv_buffer_default()
-    | quic_setting_conn_flow_control_window()
-    | quic_setting_max_stateless_operations()
-    | quic_setting_initial_window_packets()
-    | quic_setting_send_idle_timeout_ms()
-    | quic_setting_initial_rtt_ms()
-    | quic_setting_max_ack_delay_ms()
-    | quic_setting_disconnect_timeout_ms()
-    | quic_setting_keep_alive_interval_ms()
-    | quic_setting_peer_bidi_stream_count()
-    | quic_setting_peer_unidi_stream_count()
-    | quic_setting_retry_memory_limit()
-    | quic_setting_load_balancing_mode()
-    | quic_setting_max_operations_per_drain()
-    | quic_setting_send_buffering_enabled()
-    | quic_setting_pacing_enabled()
-    | quic_setting_migration_enabled()
-    | quic_setting_datagram_receive_enabled()
-    | quic_setting_server_resumption_level()
-    | quic_setting_minimum_mtu()
-    | quic_setting_maximum_mtu()
-    | quic_setting_mtu_discovery_search_complete_timeout_us()
-    | quic_setting_mtu_discovery_missing_probe_count()
-    | quic_setting_max_binding_stateless_operations()
-    | quic_setting_stateless_operation_expiration_ms().
-
--type listen_opt_alpn() :: {alpn, [alpn()]}.
--type listen_opt_cert() :: {cert, file:filename()}.
--type listen_opt_certfile() :: {certfile, file:filename()}.
-%-type listen_opt_key() :: {key, file:filename()}. %% @FIXME reflect in types
--type listen_opt_keyfile() :: {keyfile, file:filename()}.
--type listen_opt_verify() :: {verify, none | peer | verify_peer | verify_none}.
--type listen_opt_cacertfile() :: {cacertfile, file:filename()}.
--type listen_opt_password() :: {password, string()}.
--type listen_opt_sslkeylogfile() :: {sslkeylogfile, file:filename()}.
--type listen_opt_allow_insecure() :: {allow_insecure, boolean()}.
--type listen_opt_quic_registration() :: {quic_registration, reg_handle()}.
--type listen_opt_conn_acceptors() :: {conn_acceptors, non_neg_integer()}.
-
--type quic_setting_max_bytes_per_key() :: {max_bytes_per_key, uint64()}.
--type quic_setting_handshake_idle_timeout_ms() :: {handshake_idle_timeout_ms, uint64()}.
--type quic_setting_idle_timeout_ms() :: {idle_timeout_ms, uint64()}.
--type quic_setting_tls_client_max_send_buffer() :: {tls_client_max_send_buffer, uint32()}.
--type quic_setting_tls_server_max_send_buffer() :: {tls_server_max_send_buffer, uint32()}.
--type quic_setting_stream_recv_window_default() :: {stream_recv_window_default, uint32()}.
--type quic_setting_stream_recv_buffer_default() :: {stream_recv_buffer_default, uint32()}.
--type quic_setting_conn_flow_control_window() :: {conn_flow_control_window, uint32()}.
--type quic_setting_max_stateless_operations() :: {max_stateless_operations, uint32()}.
--type quic_setting_initial_window_packets() :: {initial_window_packets, uint32()}.
--type quic_setting_send_idle_timeout_ms() :: {send_idle_timeout_ms, uint32()}.
--type quic_setting_initial_rtt_ms() :: {initial_rtt_ms, uint32()}.
--type quic_setting_max_ack_delay_ms() :: {max_ack_delay_ms, uint32()}.
--type quic_setting_disconnect_timeout_ms() :: {disconnect_timeout_ms, uint32()}.
--type quic_setting_keep_alive_interval_ms() :: {keep_alive_interval_ms, uint32()}.
--type quic_setting_peer_bidi_stream_count() :: {peer_bidi_stream_count, uint16()}.
--type quic_setting_peer_unidi_stream_count() :: {peer_unidi_stream_count, uint16()}.
--type quic_setting_retry_memory_limit() :: {retry_memory_limit, uint16()}.
--type quic_setting_load_balancing_mode() :: {load_balancing_mode, uint16()}.
--type quic_setting_max_operations_per_drain() :: {max_operations_per_drain, uint8()}.
--type quic_setting_send_buffering_enabled() :: {send_buffering_enabled, uint8()}.
--type quic_setting_pacing_enabled() :: {pacing_enabled, uint8()}.
--type quic_setting_migration_enabled() :: {migration_enabled, uint8()}.
--type quic_setting_datagram_receive_enabled() :: {datagram_receive_enabled, uint8()}.
-%% @FIXME reflect in types
--type quic_setting_server_resumption_level() :: {server_resumption_level, 0 | 1 | 2}.
--type quic_setting_minimum_mtu() :: {minimum_mtu, uint16()}.
--type quic_setting_maximum_mtu() :: {maximum_mtu, uint16()}.
--type quic_setting_mtu_discovery_search_complete_timeout_us() ::
-    {mtu_discovery_search_complete_timeout_us, uint64()}.
--type quic_setting_mtu_discovery_missing_probe_count() ::
-    {mtu_discovery_missing_probe_count, uint8()}.
--type quic_setting_max_binding_stateless_operations() ::
-    {max_binding_stateless_operations, uint16()}.
--type quic_setting_stateless_operation_expiration_ms() ::
-    {stateless_operation_expiration_ms, uint16()}.
+    {max_bytes_per_key, uint64()}
+    | {handshake_idle_timeout_ms, uint64()}
+    | {idle_timeout_ms, uint64()}
+    | {tls_client_max_send_buffer, uint32()}
+    | {tls_server_max_send_buffer, uint32()}
+    | {stream_recv_window_default, uint32()}
+    | {stream_recv_buffer_default, uint32()}
+    | {conn_flow_control_window, uint32()}
+    | {max_stateless_operations, uint32()}
+    | {initial_window_packets, uint32()}
+    | {send_idle_timeout_ms, uint32()}
+    | {initial_rtt_ms, uint32()}
+    | {max_ack_delay_ms, uint32()}
+    | {disconnect_timeout_ms, uint32()}
+    | {keep_alive_interval_ms, uint32()}
+    | {peer_bidi_stream_count, uint16()}
+    | {peer_unidi_stream_count, uint16()}
+    | {retry_memory_limit, uint16()}
+    | {load_balancing_mode, uint16()}
+    | {max_operations_per_drain, uint8()}
+    | {send_buffering_enabled, uint8()}
+    | {pacing_enabled, uint8()}
+    | {migration_enabled, uint8()}
+    | {datagram_receive_enabled, uint8()}
+    | {server_resumption_level, 0 | 1 | 2}
+    | {minimum_mtu, uint16()}
+    | {maximum_mtu, uint16()}
+    | {mtu_discovery_search_complete_timeout_us, uint64()}
+    | {mtu_discovery_missing_probe_count, uint8()}
+    | {max_binding_stateless_operations, uint16()}
+    | {stateless_operation_expiration_ms, uint16()}.
 
 -type quicer_conn_opts() :: [conn_opt()].
 -type conn_opt() ::
-    conn_opt_alpn()
-    %conn_opt_conn_callback() |
-    | conn_opt_cert()
-    | conn_opt_certfile()
-    | conn_opt_key()
-    | conn_opt_keyfile()
-    | conn_opt_password()
-    | conn_opt_verify()
-    %conn_opt_handle() |
-    | conn_opt_nst()
-    | conn_opt_cacertfile()
-    | conn_opt_sslkeylogfile()
-    | conn_opt_local_bidi_stream_count()
-    | conn_opt_local_unidi_stream_count()
-    | conn_opt_handshake_idle_timeout_ms()
-    | conn_opt_quic_event_mask()
-    | conn_opt_param_conn_disable_1rtt_encryption()
-    | conn_opt_param_conn_quic_version()
-    | conn_opt_param_conn_remote_address()
-    | conn_opt_param_conn_ideal_processor()
-    | conn_opt_param_conn_settings()
-    | conn_opt_param_conn_statistics()
-    | conn_opt_param_conn_statistics_plat()
-    | conn_opt_param_conn_share_udp_binding()
-    %% | conn_opt_param_conn_bidi_stream_count()
-    %% | conn_opt_param_conn_unidi_stream_count()
-    | conn_opt_param_conn_max_stream_ids()
-    | conn_opt_param_conn_close_reason_phrase()
-    | conn_opt_param_conn_stream_scheduling_scheme()
-    | conn_opt_param_conn_datagram_receive_enabled()
-    | conn_opt_param_conn_datagram_send_enabled()
-    | conn_opt_param_conn_resumption_ticket()
-    | conn_opt_param_conn_peer_certificate_valid()
-    | conn_opt_param_conn_local_interface()
-    | conn_opt_param_conn_local_address()
-    %    | conn_opt_additional()
-    | quicer_setting().
-
--type conn_opt_alpn() :: {alpn, [string()]}.
-%% -type conn_opt_conn_callback() :: {conn_callback, module()}. %% @FIXME
--type conn_opt_cert() :: {cert, file:filename()}.
--type conn_opt_certfile() :: {certfile, file:filename()}.
--type conn_opt_key() :: {key, file:filename()}.
--type conn_opt_keyfile() :: {keyfile, file:filename()}.
--type conn_opt_password() :: {password, string()}.
--type conn_opt_verify() :: {verify, none | peer}.
-%-type conn_opt_handle() :: {handle, valid_connection_handle()}. %% @FIXME reflect in types
--type conn_opt_nst() :: {nst, binary()}.
--type conn_opt_cacertfile() :: {cacertfile, file:filename()}.
--type conn_opt_sslkeylogfile() :: {sslkeylogfile, file:filename()}.
--type conn_opt_local_bidi_stream_count() :: {param_conn_local_bidi_stream_count, uint16()}.
--type conn_opt_local_unidi_stream_count() :: {param_conn_local_unidi_stream_count, uint16()}.
--type conn_opt_handshake_idle_timeout_ms() :: {handshake_idle_timeout_ms, non_neg_integer()}.
--type conn_opt_quic_event_mask() :: {quic_event_mask, uint32()}.
--type conn_opt_param_conn_disable_1rtt_encryption() ::
-    {param_conn_disable_1rtt_encryption, boolean()}.
--type conn_opt_param_conn_quic_version() ::
-    {param_conn_quic_version, uint32()}.
-
--type conn_opt_param_conn_local_address() ::
-    {param_conn_local_address, string()}.
-
--type conn_opt_param_conn_remote_address() ::
-    {param_conn_remote_address, string()}.
-
--type conn_opt_param_conn_ideal_processor() ::
-    {param_conn_ideal_processor, uint16()}.
-
--type conn_opt_param_conn_settings() ::
-    {param_conn_settings, [quicer_setting()]}.
-
--type conn_opt_param_conn_statistics() ::
-    %% @TODO
-    {param_conn_statistics, any()}.
-
--type conn_opt_param_conn_statistics_plat() ::
-    %% @TODO
-    {param_conn_statistics_plat, any()}.
-
--type conn_opt_param_conn_share_udp_binding() ::
-    {param_conn_share_udp_binding, boolean()}.
-
-%% -type conn_opt_param_conn_bidi_stream_count() ::
-%%     {param_conn_bidi_stream_count, uint16()}.
-
-%% -type conn_opt_param_conn_unidi_stream_count() ::
-%%     {param_conn_unidi_stream_count, uint16()}.
-
--type conn_opt_param_conn_max_stream_ids() ::
-    {param_conn_max_stream_ids, uint64()}.
-
--type conn_opt_param_conn_close_reason_phrase() ::
-    {param_conn_close_reason_phrase, string()}.
-
--type conn_opt_param_conn_stream_scheduling_scheme() ::
-    {param_conn_stream_scheduling_scheme, uint16()}.
-
--type conn_opt_param_conn_datagram_receive_enabled() ::
-    {param_conn_datagram_receive_enabled, boolean()}.
-
--type conn_opt_param_conn_datagram_send_enabled() ::
-    {param_conn_datagram_send_enabled, boolean()}.
-
--type conn_opt_param_conn_resumption_ticket() ::
-    {param_conn_resumption_ticket, [uint8()]}.
-
--type conn_opt_param_conn_peer_certificate_valid() ::
-    {param_conn_peer_certificate_valid, boolean()}.
-
--type conn_opt_param_conn_local_interface() ::
-    {param_conn_local_interface, uint32()}.
-
--type conn_opt_param_conn_tls_secrets() ::
-    {param_conn_tls_secrets, binary()}.
-%%{param_conn_tls_secrets, quic_tls_secrets()}.
-
--type conn_opt_param_conn_version_settings() ::
-    %% @TODO
-    {param_conn_version_settings, any()}.
-%%{param_conn_version_settings, quic_version_settings()}.
-
--type conn_opt_param_conn_cibir_id() ::
-    {param_conn_cibir_id, [uint8()]}.
-
--type conn_opt_param_conn_statistics_v2() ::
-    %% @TODO
-    {param_conn_statistics_v2, any()}.
-
--type conn_opt_param_conn_statistics_v2_plat() ::
-    %% @TODO
-    {param_conn_statistics_v2_plat, any()}.
-
--type conn_opt_additional() :: {_, _}.
+    {alpn, [string()]}
+    | {cert, file:filename()}
+    | {certfile, file:filename()}
+    | {key, file:filename()}
+    | {keyfile, file:filename()}
+    | {password, string()}
+    | {verify, none | peer}
+    | {nst, binary()}
+    | {cacertfile, file:filename()}
+    | {sslkeylogfile, file:filename()}
+    | {local_bidi_stream_count, uint16()}
+    | {local_unidi_stream_count, uint16()}
+    | {handshake_idle_timeout_ms, non_neg_integer()}
+    | {quic_event_mask, uint32()}
+    | {disable_1rtt_encryption, boolean()}
+    | {quic_version, uint32()}
+    | {local_address, string()}
+    | {remote_address, string()}
+    | {ideal_processor, uint16()}
+    | {settings, [quicer_setting()]}
+    % @TODO
+    | {statistics, any()}
+    % @TODO
+    | {statistics_plat, any()}
+    | {share_udp_binding, boolean()}
+    | {max_stream_ids, uint64()}
+    | {close_reason_phrase, string()}
+    | {stream_scheduling_scheme, uint16()}
+    | {datagram_receive_enabled, boolean()}
+    | {datagram_send_enabled, boolean()}
+    | {resumption_ticket, [uint8()]}
+    | {peer_certificate_valid, boolean()}
+    | {local_interface, uint32()}
+    % @TODO
+    | {tls_secrets, binary()}
+    % @TODO
+    | {version_settings, any()}
+    | {cibir_id, [uint8()]}
+    % @TODO
+    | {statistics_v2, any()}
+    % @TODO
+    | {statistics_v2_plat, any()}.
 
 -type quicer_acceptor_opts() :: [acceptor_opt()].
 -type acceptor_opt() ::
-    acceptor_opt_active()
+    {active, active_n()}
     | quicer_setting().
-
--type acceptor_opt_active() :: {active, boolean() | non_neg_integer()}.
 
 -type quicer_stream_opts() :: [stream_opt()].
 -type stream_opt() ::
-    stream_opt_active()
-    | stream_opt_id()
-    | stream_opt_priority()
-    | stream_opt_ideal_send_buffer_size()
-    | stream_opt_0rtt_length()
-    | stream_opt_open_flag()
-    | stream_opt_start_flag()
-    | stream_opt_event_mask()
-    | stream_opt_disable_fpbuffer().
-%| stream_opt_additional().
-
--type stream_opt_active() :: {active, active_n()}.
--type stream_opt_id() :: {id, uint62()}.
--type stream_opt_priority() :: {priority, uint16()}.
--type stream_opt_ideal_send_buffer_size() :: {ideal_send_buffer_size, uint64()}.
--type stream_opt_0rtt_length() :: {'0rtt_length', uint64()}.
--type stream_opt_open_flag() :: {open_flag, stream_open_flags()}.
--type stream_opt_start_flag() :: {start_flag, stream_start_flags()}.
--type stream_opt_event_mask() :: {event_mask, uint32()}.
--type stream_opt_disable_fpbuffer() :: {disable_fpbuffer, boolean()}.
--type stream_opt_additional() :: {_, _}.
+    {active, active_n()}
+    | {stream_id, uint62()}
+    | {priority, uint16()}
+    | {ideal_send_buffer_size, uint64()}
+    | {'0rtt_length', uint64()}
+    | {open_flag, stream_open_flags()}
+    | {start_flag, stream_start_flags()}
+    | {event_mask, uint32()}
+    | {disable_fpbuffer, boolean()}.
 
 prop_robust_new_registration_2() ->
     ?FORALL(
@@ -852,7 +698,16 @@ prop_getopt_3_with_valid_handle() ->
 prop_getopt_3_with_valid_handle_AND_param() ->
     ?FORALL(
         {Handle, Opt0, OptLevel},
-        {valid_handle(), oneof([quicer_setting()]), optlevel()},
+        {
+            valid_handle(),
+            oneof([
+                listen_opt(),
+                conn_opt(),
+                acceptor_opt(),
+                stream_opt()
+            ]),
+            optlevel()
+        },
         begin
             Opt =
                 case Opt0 of
@@ -880,7 +735,7 @@ prop_robust_setopt_4_with_valid_handle_AND_param() ->
         {
             valid_handle(),
             oneof([
-                quicer_listen_opt(),
+                listen_opt(),
                 conn_opt(),
                 acceptor_opt(),
                 stream_opt(),
@@ -988,7 +843,8 @@ valid_handle() ->
         valid_connection_handle(),
         valid_stream_handle(),
         valid_listen_handle(),
-        valid_reg_handle()
+        valid_reg_handle(),
+        valid_global_handle()
     ]).
 
 %% @doc pid of process that dies randomly within 0-1000(ms)
@@ -1052,6 +908,13 @@ reg_name() ->
             "foo" ++ integer_to_list(Rand)
         end
     ).
+
+valid_global_handle() ->
+    ?LET(_H, integer(), #prop_handle{
+        type = global,
+        handle = quic_global,
+        destructor = fun() -> ok end
+    }).
 
 valid_listen_handle() ->
     ?SUCHTHAT(
