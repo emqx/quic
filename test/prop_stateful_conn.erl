@@ -74,6 +74,7 @@ command(#{handle := Handle}) ->
         {50, {call, quicer, peercert, [Handle]}},
         {10, {call, quicer, negotiated_protocol, [Handle]}},
         {10, {call, quicer, get_connections, []}},
+        {10, {call, quicer, get_conn_owner, [Handle]}},
         {1, {call, quicer, controlling_process, [Handle, ?LET(Pid, quicer_prop_gen:pid(), Pid)]}},
         {100,
             {call, quicer, async_csend, [
@@ -168,6 +169,8 @@ postcondition(_State, {call, quicer, peercert, [_]}, {error, no_peercert}) ->
     true;
 postcondition(_State, {call, quicer, controlling_process, [_, _]}, ok) ->
     true;
+postcondition(_State, {call, quicer, get_conn_owner, _}, {ok, Pid}) when is_pid(Pid) ->
+    true;
 postcondition(
     #{owner := Owner, state := connected},
     {call, quicer, controlling_process, [_, _]},
@@ -215,12 +218,12 @@ listener_start_link(ListenerName) ->
     LPort = 14568,
     ListenerOpts = default_listen_opts(),
     ConnectionOpts = [
-        {conn_callback, quicer_server_conn_callback},
+        {conn_callback, example_server_connection},
         {stream_acceptors, 32}
         | default_conn_opts()
     ],
     StreamOpts = [
-        {stream_callback, quicer_echo_server_stream_callback}
+        {stream_callback, example_server_stream}
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     quicer:spawn_listener(ListenerName, LPort, Options).

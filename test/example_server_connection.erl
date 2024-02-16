@@ -72,7 +72,7 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
                 streams => [{Pid, undefined}]
             }};
         {error, _} = Error ->
-            Error
+            {stop, Error, S#{conn => Conn}}
     end.
 
 connected(_Conn, _Flags, S) ->
@@ -105,6 +105,8 @@ new_stream(
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
                     {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
+                {error, closed} ->
+                    {stop, {shutdown, closed}, CBState};
                 false ->
                     {error, handoff_fail}
             end;

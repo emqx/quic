@@ -117,8 +117,12 @@ handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     %% for bidir stream, we just echo in place.
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => bidir}),
     ct:pal("Server recv: ~p from ~p", [Bin, Stream]),
-    {ok, _} = quicer:send(Stream, Bin),
-    {ok, State};
+    case quicer:send(Stream, Bin) of
+        {ok, _} ->
+            {ok, State};
+        {error, closed} ->
+            {stop, {shutdown, closed}, State}
+    end;
 handle_stream_data(
     Stream, Bin, _Flags, #{is_unidir := true, peer_stream := PeerStream, conn := Conn} = State
 ) ->
