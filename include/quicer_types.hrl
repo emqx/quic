@@ -220,13 +220,15 @@
 
 %% is sync send or not
 -type send_flags() ::
+    csend_flags() | ?QUICER_SEND_FLAG_SYNC.
+
+-type csend_flags() ::
     ?QUIC_SEND_FLAG_NONE
     | ?QUIC_SEND_FLAG_ALLOW_0_RTT
     | ?QUIC_SEND_FLAG_START
     | ?QUIC_SEND_FLAG_FIN
     | ?QUIC_SEND_FLAG_DGRAM_PRIORITY
-    | ?QUIC_SEND_FLAG_DELAY_SEND
-    | ?QUICER_SEND_FLAG_SYNC.
+    | ?QUIC_SEND_FLAG_DELAY_SEND.
 
 -type stream_start_flag() ::
     ?QUIC_STREAM_START_FLAG_NONE

@@ -475,7 +475,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
       if (!enif_get_uint(env, eopen_flag, &open_flag))
         {
-          // if set must be valid.
+          // if set, must be valid.
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
     }
