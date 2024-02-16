@@ -760,6 +760,10 @@ encode_parm_to_eterm(ErlNifEnv *env,
                && QUICER_PARAM_HANDLE_TYPE_CONN == Type))
     {
       ERL_NIF_TERM ebin;
+      if (QUIC_PARAM_CONN_CLOSE_REASON_PHRASE == Param && BufferLength > 1)
+        {
+          BufferLength -= 1; // remove \0
+        }
       unsigned char *bin_data = enif_make_new_binary(env, BufferLength, &ebin);
       if (!bin_data)
         {

@@ -965,8 +965,9 @@ tc_getopt(Config) ->
                 {quic, <<"ping">>, Stm, _} -> ok
             end,
             ok = quicer:close_connection(Conn),
-            %% @todo unsupp in msquic, leave it for now
-            {error, _} = quicer:getopt(Conn, close_reason_phrase),
+            %% @NOTE: msquic returns not_found when it is unset.
+            {error, Reason} = quicer:getopt(Conn, close_reason_phrase),
+            ?assert(Reason == not_found orelse Reason == closed),
             SPid ! done,
             ensure_server_exit_normal(Ref)
     after 5000 ->
@@ -1370,7 +1371,8 @@ tc_setopt(Config) ->
 
             {error, not_supported} = quicer:setopt(Conn, ideal_processor, 1),
             {error, not_supported} = quicer:setopt(Conn, max_stream_ids, [1, 2, 3, 4]),
-            ok = quicer:setopt(Conn, close_reason_phrase, "You are not welcome!"),
+            ok = quicer:setopt(Conn, close_reason_phrase, "You are not welcomed!"),
+            {ok, <<"You are not welcomed!">>} = quicer:getopt(Conn, close_reason_phrase),
             ok = quicer:setopt(Conn, stream_scheduling_scheme, 1),
             {ok, 1} = quicer:getopt(Conn, stream_scheduling_scheme),
             %% get-only
