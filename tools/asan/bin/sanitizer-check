@@ -51,6 +51,9 @@ if [ $# -eq 1 ]; then
                 escript "$REBAR3" do ct --suite=test/quicer_SUITE --case="$tc";
             done
             ;;
+        proper)
+            escript "$REBAR3" as test proper
+            ;;
     esac
 else
     escript "$REBAR3" do ct $@
