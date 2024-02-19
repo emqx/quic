@@ -209,7 +209,7 @@ next_state(#{state := connected} = State, _Res, {call, quicer, close_connection,
 next_state(#{state := connected} = State, _Res, {call, quicer, shutdown_connection, _Args}) ->
     State#{state := closed};
 next_state(
-    #{state := connected, handle := H} = State, ok, {call, quicer, controlling_process, [_, Owner]}
+    #{state := connected} = State, ok, {call, quicer, controlling_process, [_, Owner]}
 ) ->
     State#{owner := Owner};
 next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->

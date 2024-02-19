@@ -94,7 +94,6 @@
 -type uint64() :: 0..?MASK(64).
 -type uint62() :: 0..?MASK(62).
 -type uint32() :: 0..?MASK(32).
-%-type none_zero_uint32() :: 128..?MASK(32).
 -type uint16() :: 0..?MASK(16).
 -type uint8() :: 0..?MASK(8).
 

@@ -36,7 +36,7 @@
 -export([handle_stream_data/4]).
 
 %% @doc handle handoff from other stream owner.
-init_handoff(Stream, StreamOpts, Conn, #{is_orphan := true, flags := Flags}) ->
+init_handoff(Stream, _StreamOpts, Conn, #{is_orphan := true, flags := Flags}) ->
     InitState = #{
         stream => Stream,
         conn => Conn,

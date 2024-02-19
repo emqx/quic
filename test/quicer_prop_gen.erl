@@ -34,7 +34,8 @@
     valid_csend_stream_opts/0,
     pid/0,
     data/0,
-    quicer_send_flags/0
+    quicer_send_flags/0,
+    latin1_string/0
 ]).
 
 -include_lib("proper/include/proper.hrl").

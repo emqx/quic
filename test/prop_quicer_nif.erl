@@ -115,7 +115,7 @@ prop_listen_robust() ->
 %% precondition: with valid listener handle
 prop_start_listener_with_valid_handle() ->
     ?FORALL(
-        {#prop_handle{type = listener, handle = Handle, destructor = Destroy} = H, On, Opts},
+        {#prop_handle{type = listener, handle = Handle, destructor = Destroy}, On, Opts},
         {valid_listen_handle(), listen_on(), quicer_listen_opts()},
         begin
             case quicer_nif:start_listener(Handle, On, maps:from_list(Opts)) of
@@ -373,7 +373,7 @@ prop_csend_with_valid_opts() ->
         begin
             SOpts = maps:from_list(Opts),
             case quicer_nif:csend(ConnHandle, Data, SOpts, Flags) of
-                {ok, StreamHandle} ->
+                {ok, _StreamHandle} ->
                     Destroy(),
                     collect(ok, true);
                 {error, closed} ->

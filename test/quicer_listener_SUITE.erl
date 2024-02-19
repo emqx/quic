@@ -100,7 +100,10 @@ end_per_group(_GroupName, _Config) ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_testcase(tc_listener_conf_reload_listen_on_neg, Config) ->
-    {skip, "MacOs is able to listen on port 1"};
+    case os:type() of
+        {unix, darwin} -> {skip, "Not runnable on MacOS"};
+        _ -> Config
+    end;
 init_per_testcase(_TestCase, Config) ->
     application:ensure_all_started(quicer),
     quicer_test_lib:cleanup_msquic(),
@@ -542,11 +545,12 @@ tc_listener_conf_reload(Config) ->
     ),
     {ok, _} = quicer:send(Stream2, <<"ping_from_conn_2">>),
 
-    receive
-        {quic, new_stream, Stream2Remote, #{is_orphan := true}} ->
-            quicer:setopt(Stream2Remote, active, true),
-            ok
-    end,
+    Stream2Remote =
+        receive
+            {quic, new_stream, Stream2R, #{is_orphan := true}} ->
+                quicer:setopt(Stream2R, active, true),
+                Stream2R
+        end,
 
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
@@ -623,12 +627,12 @@ tc_listener_conf_reload_listen_on(Config) ->
     ),
     {ok, _} = quicer:send(Stream2, <<"ping_from_conn_2">>),
 
-    receive
-        {quic, new_stream, Stream2Remote, #{is_orphan := true}} ->
-            quicer:setopt(Stream2Remote, active, true),
-            ok
-    end,
-
+    Stream2Remote =
+        receive
+            {quic, new_stream, Stream2R, #{is_orphan := true}} ->
+                quicer:setopt(Stream2R, active, true),
+                Stream2R
+        end,
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
     after 2000 ->
@@ -662,7 +666,7 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
 
     %% Given a QUIC connection between example client and example server
-    {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
+    {ok, QuicApp} = quicer:spawn_listener(?FUNCTION_NAME, Port, Options),
     ClientConnOpts = default_conn_opts_verify(Config, ca),
     {ok, ClientConnPid} = example_client_connection:start_link(
         "localhost",
@@ -705,11 +709,12 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
     ),
     {ok, _} = quicer:send(Stream2, <<"ping_from_conn_2">>),
 
-    receive
-        {quic, new_stream, Stream2Remote, #{is_orphan := true}} ->
-            quicer:setopt(Stream2Remote, active, true),
-            ok
-    end,
+    Stream2Remote =
+        receive
+            {quic, new_stream, Stream2R, #{is_orphan := true}} ->
+                quicer:setopt(Stream2R, active, true),
+                Stream2R
+        end,
 
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
