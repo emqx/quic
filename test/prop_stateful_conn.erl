@@ -156,10 +156,17 @@ postcondition(_State, {call, quicer, close_connection, _Args}, ok) ->
     true;
 postcondition(_State, {call, quicer, shutdown_connection, _Args}, ok) ->
     true;
-%% @FIXME: Fix it in server side callback module, more robust to closed connection
-postcondition(_State, {call, quicer, shutdown_connection, _Args}, {error, timeout}) ->
+postcondition(
+    #{me := Me, owner := Owner, state := State},
+    {call, quicer, shutdown_connection, _Args},
+    {error, timeout}
+) when Me =/= Owner orelse State == closed ->
     true;
-postcondition(_State, {call, quicer, close_connection, [_]}, {error, timeout}) ->
+postcondition(
+    #{me := Me, owner := Owner, state := State},
+    {call, quicer, close_connection, [_]},
+    {error, timeout}
+) when Me =/= Owner orelse State == closed ->
     true;
 postcondition(_State, {call, quicer, negotiated_protocol, [_]}, {ok, <<"prop">>}) ->
     true;

@@ -47,7 +47,7 @@ init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
         is_local => false,
         is_unidir => quicer:is_unidirectional(Flags)
     },
-    ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
+    % ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->

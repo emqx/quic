@@ -45,7 +45,7 @@ init_handoff(Stream, StreamOpts, Conn, #{is_orphan := true, flags := Flags}) ->
         echo_stream => undefined,
         sent_bytes => 0
     },
-    ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
+    %ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
