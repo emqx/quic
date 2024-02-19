@@ -524,64 +524,56 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_GLOBAL. */                              \
   ATOM(ATOM_QUIC_GLOBAL, quic_global);                                        \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT,                           \
-       param_global_retry_memory_percent);                                    \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS,                             \
-       param_global_supported_versions);                                      \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE,                             \
-       param_global_load_balacing_mode);                                      \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, param_global_perf_counters);     \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, param_global_settings);               \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, param_global_version);                 \
-  ATOM(ATOM_QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH,                               \
-       param_global_library_git_hash);                                        \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_RETRY_MEMORY_PERCENT, retry_memory_percent);    \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_SUPPORTED_VERSIONS, supported_versions);        \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE, load_balacing_mode);        \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_PERF_COUNTERS, perf_counters);                  \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_SETTINGS, settings);                            \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_VERSION, version);                              \
+  ATOM(ATOM_QUIC_PARAM_GLOBAL_LIBRARY_GIT_HASH, library_git_hash);            \
                                                                               \
   /*Parameters for QUIC_PARAM_LEVEL_REGISTRATION.*/                           \
   ATOM(ATOM_QUIC_REGISTRATION, quic_registration);                            \
-  ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX,                               \
-       param_registration_cid_prefix);                                        \
+  ATOM(ATOM_QUIC_PARAM_REGISTRATION_CID_PREFIX, cid_prefix);                  \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_CONFIGURATION. */                        \
   ATOM(ATOM_QUIC_CONFIGURATION, quic_configuration);                          \
-  ATOM(ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS, param_configuration_settings); \
+  ATOM(ATOM_QUIC_PARAM_CONFIGURATION_SETTINGS, settings);                     \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_LISTENER. */                             \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS, param_listener_local_address); \
-  ATOM(ATOM_QUIC_PARAM_LISTENER_STATS, param_listener_stats);                 \
-  ATOM(ATOM_QUIC_PARAM_LISTENER_CIBIR_ID, param_listener_cibir_id);           \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS, local_address);                \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_STATS, stats);                                \
+  ATOM(ATOM_QUIC_PARAM_LISTENER_CIBIR_ID, cibir_id);                          \
                                                                               \
   /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */                           \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_CONN_QUIC_VERSION, param_conn_quic_version);           \
-  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, param_conn_local_address);         \
-  ATOM(ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS, param_conn_remote_address);       \
-  ATOM(ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR, param_conn_ideal_processor);     \
-  ATOM(ATOM_QUIC_PARAM_CONN_SETTINGS, param_conn_settings);                   \
-  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS, param_conn_statistics);               \
-  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT, param_conn_statistics_plat);     \
-  ATOM(ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING, param_conn_share_udp_binding); \
+  ATOM(ATOM_QUIC_PARAM_CONN_QUIC_VERSION, quic_version);                      \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_ADDRESS, local_address);                    \
+  ATOM(ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS, remote_address);                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR, ideal_processor);                \
+  ATOM(ATOM_QUIC_PARAM_CONN_SETTINGS, settings);                              \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS, statistics);                          \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT, statistics_plat);                \
+  ATOM(ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING, share_udp_binding);            \
   ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT,                          \
-       param_conn_local_bidi_stream_count);                                   \
+       local_bidi_stream_count);                                              \
   ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT,                         \
-       param_conn_local_unidi_stream_count);                                  \
-  ATOM(ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS, param_conn_max_stream_ids);       \
-  ATOM(ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE,                              \
-       param_conn_close_reason_phrase);                                       \
+       local_unidi_stream_count);                                             \
+  ATOM(ATOM_QUIC_PARAM_CONN_MAX_STREAM_IDS, max_stream_ids);                  \
+  ATOM(ATOM_QUIC_PARAM_CONN_CLOSE_REASON_PHRASE, close_reason_phrase);        \
   ATOM(ATOM_QUIC_PARAM_CONN_STREAM_SCHEDULING_SCHEME,                         \
-       param_conn_stream_scheduling_scheme);                                  \
+       stream_scheduling_scheme);                                             \
   ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_RECEIVE_ENABLED,                         \
-       param_conn_datagram_receive_enabled);                                  \
-  ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED,                            \
-       param_conn_datagram_send_enabled);                                     \
+       datagram_receive_enabled);                                             \
+  ATOM(ATOM_QUIC_PARAM_CONN_DATAGRAM_SEND_ENABLED, datagram_send_enabled);    \
                                                                               \
   ATOM(ATOM_QUIC_PARAM_CONN_DISABLE_1RTT_ENCRYPTION,                          \
-       param_conn_disable_1rtt_encryption);                                   \
+       disable_1rtt_encryption);                                              \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, param_conn_resumption_ticket); \
-  ATOM(ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID,                           \
-       param_conn_peer_certificate_valid);                                    \
-  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE, param_conn_local_interface);     \
+  ATOM(ATOM_QUIC_PARAM_CONN_RESUMPTION_TICKET, resumption_ticket);            \
+  ATOM(ATOM_QUIC_PARAM_CONN_PEER_CERTIFICATE_VALID, peer_certificate_valid);  \
+  ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_INTERFACE, local_interface);                \
   /* Parameters for QUIC_PARAM_LEVEL_TLS. */                                  \
   ATOM(ATOM_QUIC_TLS, quic_tls);                                              \
   ATOM(ATOM_TLS_PROTOCOL_VERSION, tls_protocol_version);                      \
@@ -605,19 +597,19 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_AES_256_GCM_SHA384, aes_256_gcm_sha384);                          \
   ATOM(ATOM_CHACHA20_POLY1305_SHA256, chacha20_poly1305_sha256);              \
   ATOM(ATOM_QUIC_PARAM_TLS_SCHANNEL_CONTEXT_ATTRIBUTE_W,                      \
-       param_tls_schannel_context_attribute_w);                               \
+       schannel_context_attribute_w);                                         \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO, param_tls_handshake_info);         \
+  ATOM(ATOM_QUIC_PARAM_TLS_HANDSHAKE_INFO, handshake_info);                   \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN, param_tls_negotiated_alpn);       \
+  ATOM(ATOM_QUIC_PARAM_TLS_NEGOTIATED_ALPN, negotiated_alpn);                 \
                                                                               \
   /*  Parameters for QUIC_PARAM_LEVEL_STREAM.  */                             \
                                                                               \
-  ATOM(ATOM_QUIC_PARAM_STREAM_ID, param_stream_id);                           \
-  ATOM(ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH, param_stream_0rtt_length);         \
+  ATOM(ATOM_QUIC_PARAM_STREAM_ID, stream_id);                                 \
+  ATOM(ATOM_QUIC_PARAM_STREAM_0RTT_LENGTH, 0rtt_length);                      \
   ATOM(ATOM_QUIC_PARAM_STREAM_IDEAL_SEND_BUFFER_SIZE,                         \
-       param_stream_ideal_send_buffer_size);                                  \
-  ATOM(ATOM_QUIC_PARAM_STREAM_PRIORITY, param_stream_priority);               \
+       ideal_send_buffer_size);                                               \
+  ATOM(ATOM_QUIC_PARAM_STREAM_PRIORITY, priority);                            \
                                                                               \
   /*-----------------------*/                                                 \
   /* msquic params ends     */                                                \
@@ -1391,16 +1383,26 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
+      if (!get_stream_handle(s_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_CLOSED);
+        }
+
       enif_mutex_lock(s_ctx->lock);
       res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
       enif_mutex_unlock(s_ctx->lock);
+      put_stream_handle(s_ctx);
     }
   else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
-
+      if (!get_conn_handle(c_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_CLOSED);
+        }
       enif_mutex_lock(c_ctx->lock);
       res = connection_controlling_process(env, c_ctx, &caller, &new_owner);
       enif_mutex_unlock(c_ctx->lock);
+      put_conn_handle(c_ctx);
     }
   else
     {

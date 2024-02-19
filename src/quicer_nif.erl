@@ -78,7 +78,9 @@
     get_registration_name/0,
     get_listeners/0,
     get_connections/0,
-    get_owner/0
+    get_owner/0,
+
+    reg_handle/0
 ]).
 
 %% NIF fuction return types
@@ -302,12 +304,12 @@ sockname(_Conn) ->
 -spec getopt(handle(), optname(), optlevel()) ->
     %% `optname' not found, or wrong `optlevel' must be a bug.
     not_found
-    %% when optname = param_conn_settings
+    %% when optname = settings
     | {ok, any()}
     | {error, badarg | param_error | internal_error | not_enough_mem}
     | {error, atom_reason()}.
 
-getopt(_Handle, _Optname, _IsRaw) ->
+getopt(_Handle, _Optname, _Level) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec setopt(handle(), optname(), any(), optlevel()) ->

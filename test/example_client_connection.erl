@@ -135,12 +135,12 @@ streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
     {hibernate, S}.
 
 peer_needs_streams(C, unidi_streams, S) ->
-    {ok, Current} = quicer:getopt(C, param_conn_local_unidi_stream_count),
-    ok = quicer:setopt(C, param_conn_settings, #{peer_unidi_stream_count => Current + 1}),
+    {ok, Current} = quicer:getopt(C, local_unidi_stream_count),
+    ok = quicer:setopt(C, settings, #{peer_unidi_stream_count => Current + 1}),
     {ok, S};
 peer_needs_streams(C, bidi_streams, S) ->
-    {ok, Current} = quicer:getopt(C, param_conn_local_bidi_stream_count),
-    ok = quicer:setopt(C, param_conn_settings, #{peer_bidi_stream_count => Current + 1}),
+    {ok, Current} = quicer:getopt(C, local_bidi_stream_count),
+    ok = quicer:setopt(C, settings, #{peer_bidi_stream_count => Current + 1}),
     {ok, S}.
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->

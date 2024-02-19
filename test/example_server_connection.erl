@@ -72,7 +72,7 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
                 streams => [{Pid, undefined}]
             }};
         {error, _} = Error ->
-            Error
+            {stop, Error, S#{conn => Conn}}
     end.
 
 connected(_Conn, _Flags, S) ->
@@ -105,6 +105,8 @@ new_stream(
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
                     {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
+                {error, closed} ->
+                    {stop, {shutdown, closed}, CBState};
                 false ->
                     {error, handoff_fail}
             end;
@@ -128,8 +130,8 @@ streams_available(_C, {_BidirCnt, _UnidirCnt}, S) ->
     {ok, S}.
 
 peer_needs_streams(C, unidi_streams, S) ->
-    {ok, Current} = quicer:getopt(C, param_conn_local_unidi_stream_count),
-    ok = quicer:setopt(C, param_conn_settings, #{peer_unidi_stream_count => Current + 1}),
+    {ok, Current} = quicer:getopt(C, local_unidi_stream_count),
+    ok = quicer:setopt(C, settings, #{peer_unidi_stream_count => Current + 1}),
     {ok, S};
 peer_needs_streams(_C, bidi_streams, S) ->
     %% leave it for test case to unblock it, see tc_multi_streams_example_server_3

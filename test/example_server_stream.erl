@@ -39,7 +39,7 @@
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
-init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
+init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
     InitState = #{
         stream => Stream,
         conn => Conn,
@@ -47,7 +47,7 @@ init_handoff(Stream, StreamOpts, Conn, #{flags := Flags}) ->
         is_local => false,
         is_unidir => quicer:is_unidirectional(Flags)
     },
-    ct:pal("init_handoff ~p", [{InitState, StreamOpts}]),
+    % ct:pal("init_handoff ~p", [{InitState, _StreamOpts}]),
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
@@ -111,14 +111,18 @@ handle_stream_data(
     Stream, <<"flow_control.enable_bidi">> = Bin, _Flags, #{is_unidir := true, conn := Conn} = State
 ) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
-    ok = quicer:setopt(Conn, param_conn_settings, #{peer_bidi_stream_count => 2}),
+    ok = quicer:setopt(Conn, settings, #{peer_bidi_stream_count => 2}),
     {ok, State};
 handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     %% for bidir stream, we just echo in place.
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => bidir}),
     ct:pal("Server recv: ~p from ~p", [Bin, Stream]),
-    {ok, _} = quicer:send(Stream, Bin),
-    {ok, State};
+    case quicer:send(Stream, Bin) of
+        {ok, _} ->
+            {ok, State};
+        {error, closed} ->
+            {stop, {shutdown, closed}, State}
+    end;
 handle_stream_data(
     Stream, Bin, _Flags, #{is_unidir := true, peer_stream := PeerStream, conn := Conn} = State
 ) ->

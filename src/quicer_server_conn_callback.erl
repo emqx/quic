@@ -94,7 +94,7 @@ new_stream(
                 ok ->
                     {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
                 {error, _} = E ->
-                    E
+                    {stop, {shutdown, {handoff, E}, CBState}}
             end;
         Other ->
             Other

@@ -92,6 +92,7 @@
 }.
 
 -type uint64() :: 0..?MASK(64).
+-type uint62() :: 0..?MASK(62).
 -type uint32() :: 0..?MASK(32).
 -type uint16() :: 0..?MASK(16).
 -type uint8() :: 0..?MASK(8).
@@ -152,13 +153,13 @@
         nst => binary(),
         cacertfile => file:filename(),
         sslkeylogfile => file:filename(),
-        peer_bidi_stream_count => uint16(),
-        peer_unidi_stream_count => uint16(),
         handshake_idle_timeout_ms => non_neg_integer(),
         quic_event_mask => uint32(),
-        param_conn_disable_1rtt_encryption => boolean(),
+        disable_1rtt_encryption => boolean(),
         %% Not working well
-        param_conn_local_address => string(),
+        local_address => string(),
+        local_bidi_stream_count => uint16(),
+        local_peer_unidi_stream_count => uint16(),
         %% for Application defined options
         _ => _
     }.
@@ -168,12 +169,18 @@
 %% @TODO expand
 -type acceptor_opts() :: map().
 
+-type active_n() :: boolean() | once | integer().
+
 -type stream_opts() :: #{
-    active := boolean() | once | integer(),
+    active := active_n(),
     open_flag => stream_open_flags(),
     start_flag => stream_start_flags(),
     event_mask => uint32(),
     disable_fpbuffer => boolean(),
+    stream_id => uint62(),
+    priority => uint16(),
+    ideal_send_buffer_size => uint64(),
+    '0rtt_length' => uint64(),
     %% for Application defined options
     _ => _
     %% @TODO expand
@@ -211,7 +218,23 @@
     | ?QUIC_STREAM_SHUTDOWN_FLAG_IMMEDIATE.
 
 %% is sync send or not
--type send_flags() :: non_neg_integer().
+-type send_flags() ::
+    csend_flags() | ?QUICER_SEND_FLAG_SYNC.
+
+-type csend_flags() ::
+    ?QUIC_SEND_FLAG_NONE
+    | ?QUIC_SEND_FLAG_ALLOW_0_RTT
+    | ?QUIC_SEND_FLAG_START
+    | ?QUIC_SEND_FLAG_FIN
+    | ?QUIC_SEND_FLAG_DGRAM_PRIORITY
+    | ?QUIC_SEND_FLAG_DELAY_SEND.
+
+-type stream_start_flag() ::
+    ?QUIC_STREAM_START_FLAG_NONE
+    | ?QUIC_STREAM_START_FLAG_IMMEDIATE
+    | ?QUIC_STREAM_START_FLAG_FAIL_BLOCKED
+    | ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL
+    | ?QUIC_STREAM_START_FLAG_INDICATE_PEER_ACCEPT.
 
 -type new_stream_props() :: #{
     is_orphan := boolean(),
@@ -250,52 +273,52 @@
 -type optname_conn() ::
     %% /* Parameters for QUIC_PARAM_LEVEL_CONNECTION. */|
     %% |  X  |    |
-    param_conn_quic_version
+    quic_version
     %% |  X  |    |
-    | param_conn_local_address
+    | local_address
     %% |  X  |  X | @TODO SET
-    | param_conn_remote_address
+    | remote_address
     %% |  X  |    |
-    | param_conn_ideal_processor
+    | ideal_processor
     %% |  X  |  X |
-    | param_conn_settings
+    | settings
     %% |  X  |    |
-    | param_conn_statistics
+    | statistics
     %% |  X  |    | @TODO
-    | param_conn_statistics_plat
+    | statistics_plat
     %% |  X  |  X |
-    | param_conn_share_udp_binding
+    | share_udp_binding
     %% |  X  |    |
-    | param_conn_local_bidi_stream_count
+    | local_bidi_stream_count
     %% |  X  |    |
-    | param_conn_local_unidi_stream_count
+    | local_unidi_stream_count
     %% |  X  |    |
-    | param_conn_max_stream_ids
+    | max_stream_ids
     %% |  X  |  X |
-    | param_conn_close_reason_phrase
+    | close_reason_phrase
     %% |  X  |  X |
-    | param_conn_stream_scheduling_scheme
+    | stream_scheduling_scheme
     %% |  X  |  X |
-    | param_conn_datagram_receive_enabled
+    | datagram_receive_enabled
     %% |  X  |    |
-    | param_conn_datagram_send_enabled
+    | datagram_send_enabled
     %% |  X  |  X |
-    | param_conn_disable_1rtt_encryption
+    | disable_1rtt_encryption
     %% |     |  X |
-    | param_conn_resumption_ticket
+    | resumption_ticket
     %% |     |  X |
-    | param_conn_peer_certificate_valid
+    | peer_certificate_valid
     %% |     |  X |
-    | param_conn_local_interface.
+    | local_interface.
 
 %% with connection_handle()
 -type optname_tls() ::
     %% |  X  |    |
-    param_tls_schannel_context_attribute_w
+    schannel_context_attribute_w
     %% |  X  |    |
-    | param_tls_handshake_info
+    | handshake_info
     %% |  X  |    |
-    | param_tls_negotiated_alpn.
+    | negotiated_alpn.
 
 -type optname_stream() ::
     %% |  X  |  X |
@@ -303,47 +326,47 @@
     %% |     |  X |
     | controlling_process
     %% |     |  X |
-    | param_stream_id
+    | stream_id
     %% |  X  |    |
-    | param_stream_0rtt_length
+    | '0rtt_length'
     %% |  X  |    |
-    | param_stream_ideal_send_buffer_size
+    | ideal_send_buffer_size
     %% |     |    |
-    | param_stream_priority.
+    | priority.
 
 %% with `undefined' handle
 -type optname_global() ::
     %% |  X  | X  |
-    param_global_retry_memory_percent
+    retry_memory_percent
     %% |  X  |    | @TODO
-    | param_global_supported_versions
+    | supported_versions
     %% |  X  | X  |
-    | param_global_load_balacing_mode
+    | load_balacing_mode
     %% |  X  |    |
-    | param_global_perf_counters
+    | perf_counters
     %% |  X  | X  |
-    | param_global_settings
+    | global_settings
     %% |  X  |    | @TODO
-    | param_global_version.
+    | global_version.
 
 %% |  X  | X  | @TODO
--type optname_reg() :: param_registration_cid_prefix.
+-type optname_reg() :: cid_prefix.
 
 %% with config_handle()
 -type optname_configuration() ::
     %% |  X  | X  |
-    param_configuration_settings
+    settings
     %% |     | X  | @TODO
-    | param_configuration_ticket_keys.
+    | ticket_keys.
 
 %% with listener_handle
 -type optname_listener() ::
     %% |  X  |    |
-    param_listener_local_address
+    local_address
     %% |  X  |    |
-    | param_listener_stats
+    | stats
     %% |     | X  |
-    | param_listener_cibir_id.
+    | cibir_id.
 
 -type conn_settings() :: [{conn_settings_key(), non_neg_integer()}].
 -type conn_settings_key() ::

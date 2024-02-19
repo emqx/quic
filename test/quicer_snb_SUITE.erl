@@ -1783,7 +1783,7 @@ tc_conn_resume_nst(Config) ->
                 [{quic_event_mask, ?QUICER_CONNECTION_EVENT_MASK_NST} | default_conn_opts()],
                 5000
             ),
-            {ok, HandshakeInfo} = quicer:getopt(Conn, param_tls_handshake_info, quic_tls),
+            {ok, HandshakeInfo} = quicer:getopt(Conn, handshake_info, quic_tls),
             {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
             {ok, 4} = quicer:async_send(Stm, <<"ping">>),
             {ok, <<"ping">>} = quicer:recv(Stm, 4),
@@ -1801,7 +1801,7 @@ tc_conn_resume_nst(Config) ->
             ),
             {ok, Stm2} = quicer:start_stream(ConnResumed, [{active, false}]),
             {ok, HandshakeInfo0RTT} = quicer:getopt(
-                ConnResumed, param_tls_handshake_info, quic_tls
+                ConnResumed, handshake_info, quic_tls
             ),
             ct:pal("handshake info:~n1RTT: ~p~n0RTT: ~p~n", [HandshakeInfo, HandshakeInfo0RTT]),
             ?assertEqual(HandshakeInfo, HandshakeInfo0RTT),
@@ -2100,7 +2100,7 @@ tc_conn_resume_nst_async_2(Config) ->
                 end,
             quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
             {ok, NewConn} = quicer:open_connection(),
-            ok = quicer:setopt(NewConn, param_conn_resumption_ticket, NST),
+            ok = quicer:setopt(NewConn, resumption_ticket, NST),
             {ok, ConnResumed} = quicer:async_connect("localhost", Port, [
                 {handle, NewConn} | default_conn_opts()
             ]),
@@ -2196,8 +2196,8 @@ tc_conn_resume_nst_with_data(Config) ->
                 end,
             quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 111),
             {ok, NewConn} = quicer_nif:open_connection(),
-            ok = quicer:setopt(NewConn, param_conn_share_udp_binding, false),
-            ?assertEqual({ok, false}, quicer:getopt(NewConn, param_conn_share_udp_binding)),
+            ok = quicer:setopt(NewConn, share_udp_binding, false),
+            ?assertEqual({ok, false}, quicer:getopt(NewConn, share_udp_binding)),
 
             %% Send data over new stream in the resumed connection
             {ok, Stm2} = quicer:async_csend(

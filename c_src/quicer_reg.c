@@ -113,7 +113,7 @@ deregistration(__unused_parm__ ErlNifEnv *env,
 ERL_NIF_TERM
 new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-
+  CXPLAT_FRE_ASSERT(argc >= 1);
   ERL_NIF_TERM ename = argv[0];
   ERL_NIF_TERM eprofile = argv[1];
   QUIC_REGISTRATION_CONFIG RegConfig
@@ -134,8 +134,9 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   if (argc == 2
-      && 0 >= enif_get_string(
-             env, ename, r_ctx->name, UINT8_MAX + 1, ERL_NIF_LATIN1))
+      && (0 >= enif_get_string(
+              env, ename, r_ctx->name, UINT8_MAX + 1, ERL_NIF_LATIN1)
+          || strlen(r_ctx->name) == 0))
     {
       res = ERROR_TUPLE_2(ATOM_BADARG);
       goto exit;
