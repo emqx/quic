@@ -36,12 +36,12 @@ parse_cert_options(ErlNifEnv *env,
   if (!(certfile
         = str_from_map(env, ATOM_CERTFILE, &options, NULL, PATH_MAX + 1)))
     {
-      return FALSE;
+      goto error;
     }
   if (!(keyfile
         = str_from_map(env, ATOM_KEYFILE, &options, NULL, PATH_MAX + 1)))
     {
-      return FALSE;
+      goto error;
     }
 
   // Get password for Server CertFile
@@ -49,7 +49,7 @@ parse_cert_options(ErlNifEnv *env,
     {
       if (!(password = str_from_map(env, ATOM_PASSWORD, &options, NULL, 256)))
         {
-          return FALSE;
+          goto error;
         }
 
       QUIC_CERTIFICATE_FILE_PROTECTED *CertFile
@@ -59,7 +59,7 @@ parse_cert_options(ErlNifEnv *env,
 
       if (!CertFile)
         {
-          return FALSE;
+          goto error;
         }
       CertFile->CertificateFile = certfile;
       CertFile->PrivateKeyFile = keyfile;
@@ -74,7 +74,7 @@ parse_cert_options(ErlNifEnv *env,
               sizeof(QUIC_CERTIFICATE_FILE), QUICER_CERTIFICATE_FILE);
       if (!CertFile)
         {
-          return FALSE;
+          goto error;
         }
       CertFile->CertificateFile = certfile;
       CertFile->PrivateKeyFile = keyfile;
@@ -83,6 +83,11 @@ parse_cert_options(ErlNifEnv *env,
     }
 
   return TRUE;
+error:
+  free(certfile);
+  free(keyfile);
+  free(password);
+  return FALSE;
 }
 
 /*
@@ -330,7 +335,8 @@ eoptions_to_cred_config(ErlNifEnv *env,
   // Handle the certificate, key, password options
   if (!parse_cert_options(env, eoptions, CredConfig))
     {
-      return ATOM_QUIC_TLS;
+      ret = ATOM_QUIC_TLS;
+      goto exit;
     }
 
   // Handle the `verify` options

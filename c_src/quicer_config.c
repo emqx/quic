@@ -310,7 +310,8 @@ ClientLoadConfiguration(ErlNifEnv *env,
   // If Verify Peer...
   if (!parse_verify_options(env, *options, &CredConfig, FALSE, NULL))
     {
-      return ERROR_TUPLE_2(ATOM_VERIFY);
+      ret = ATOM_VERIFY;
+      goto done;
     }
 
   unsigned alpn_buffer_length = 0;

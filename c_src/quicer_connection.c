@@ -772,7 +772,11 @@ async_connect3(ErlNifEnv *env,
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(estatus);
-      goto Error;
+      if (!is_reuse_handle)
+        {
+          enif_release_resource(c_ctx);
+        }
+      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
     }
 
   if (!is_reuse_handle)

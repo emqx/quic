@@ -589,6 +589,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (!IS_SAME_TERM(ret, ATOM_OK))
     {
+      enif_release_resource(new_config_ctx);
       return ERROR_TUPLE_2(ret);
     }
 
@@ -600,6 +601,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!l_ctx->Listener)
     {
       ret = ERROR_TUPLE_2(ATOM_CLOSED);
+      enif_release_resource(new_config_ctx);
       goto exit;
     }
 
