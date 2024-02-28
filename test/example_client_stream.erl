@@ -76,7 +76,12 @@ peer_send_aborted(Stream, ErrorCode, #{is_unidir := true, is_local := false} = S
     {ok, S}.
 
 peer_send_shutdown(Stream, _Flags, S) ->
-    ok = quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0),
+    case quicer:async_shutdown_stream(Stream, ?QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0) of
+        ok ->
+            ok;
+        {error, closed} ->
+            ok
+    end,
     {ok, S}.
 
 send_complete(_Stream, false, S) ->
@@ -110,6 +115,20 @@ handle_stream_data(
 ) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => remote_unidir}),
     ct:pal("Client recv: ~p from ~p", [Bin, Stream]),
+    {ok, State};
+handle_stream_data(
+    _Stream,
+    _,
+    #{
+        absolute_offset :=
+            0
+    },
+    #{
+        is_local := false,
+        is_unidir := false
+    } = State
+) ->
+    %% for proper test
     {ok, State}.
 
 passive(Stream, undefined, S) ->

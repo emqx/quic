@@ -111,8 +111,8 @@ listener(Name) when is_atom(Name) ->
 init([]) ->
     SupFlags = #{
         strategy => one_for_one,
-        intensity => 60,
-        period => 30
+        intensity => 10000,
+        period => 1
     },
     {ok, {SupFlags, []}}.
 

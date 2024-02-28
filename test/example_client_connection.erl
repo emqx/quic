@@ -54,6 +54,7 @@ init(ConnOpts) when is_list(ConnOpts) ->
 init(#{stream_opts := SOpts} = S) when is_list(SOpts) ->
     init(S#{stream_opts := maps:from_list(SOpts)});
 init(#{conn := Conn, stream_opts := SOpts} = ConnOpts) when is_map(ConnOpts) ->
+    process_flag(trap_exit, true),
     %% for accepting
     {ok, Stream2} = quicer_remote_stream:start(example_client_stream, Conn, SOpts, [
         {spawn_opt, [link]}
@@ -69,7 +70,7 @@ init(#{conn := Conn, stream_opts := SOpts} = ConnOpts) when is_map(ConnOpts) ->
     {ok, _} = quicer_stream:send(
         Stream1, <<"ping_from_example">>, ?QUICER_SEND_FLAG_SYNC bor ?QUIC_SEND_FLAG_FIN
     ),
-    {ok, ConnOpts#{master_stream_pair => {Stream1, Stream2}}}.
+    {ok, ConnOpts#{streams => [], master_stream_pair => {Stream1, Stream2}}}.
 
 closed(_Conn, #{is_peer_acked := true}, S) ->
     {stop, normal, S};
@@ -107,7 +108,7 @@ new_stream(
     %% Spawn new stream
     case quicer_remote_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
-            quicer_connection:handoff_stream(Stream, StreamOwner),
+            quicer:handoff_stream(Stream, StreamOwner),
             {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
         Other ->
             Other

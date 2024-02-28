@@ -13,7 +13,7 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
--module(prop_stateful_conn).
+-module(prop_stateful_client_conn).
 -compile([export_all]).
 -include_lib("proper/include/proper.hrl").
 -include_lib("quicer/include/quicer_types.hrl").
@@ -167,6 +167,10 @@ postcondition(
     {call, quicer, close_connection, [_]},
     {error, timeout}
 ) when Me =/= Owner orelse State == closed ->
+    true;
+postcondition(
+    #{state := closed}, {call, quicer, negotiated_protocol, [_]}, {error, invalid_parameter}
+) ->
     true;
 postcondition(_State, {call, quicer, negotiated_protocol, [_]}, {ok, <<"prop">>}) ->
     true;
