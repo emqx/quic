@@ -38,6 +38,7 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         flag-name: run-c-lcov
+        files: coverage/proper-lcov.info coverage/lcov.info
         parallel: true
         git-branch: ${{ github.ref_name }}
         git-commit: ${{ github.sha }}
@@ -53,6 +54,7 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         flag-name: run-c-lcov-feature
+        files: coverage/proper-lcov.info coverage/lcov.info
         parallel: true
         git-branch: ${{ github.ref_name }}
         git-commit: ${{ github.sha }}
