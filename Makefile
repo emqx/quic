@@ -21,7 +21,7 @@ clean: distclean
 
 
 fmt:
-	@clang-format-12 -i c_src/*
+	@clang-format-14 -i c_src/*
 	@rebar3 fmt
 
 
@@ -81,7 +81,7 @@ check: clang-format
 
 .PHONY: clang-format
 clang-format:
-	clang-format-11 --Werror --dry-run c_src/*
+	clang-format-14 --Werror --dry-run c_src/*
 
 .PHONY: ci
 ci: test dialyzer
