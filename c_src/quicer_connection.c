@@ -91,6 +91,8 @@ static QUIC_STATUS handle_connection_event_resumption_ticket_received(
 static QUIC_STATUS handle_connection_event_peer_certificate_received(
     QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event);
 
+static void put_conn_handles(ErlNifEnv *env, ERL_NIF_TERM conn_handles);
+
 BOOLEAN
 parse_registration(ErlNifEnv *env,
                    ERL_NIF_TERM options,
@@ -1124,18 +1126,13 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 }
 
 ERL_NIF_TERM
-async_handshake_1(ErlNifEnv *env,
-                  __unused_parm__ int argc,
-                  const ERL_NIF_TERM argv[])
+async_handshake_1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 {
   QuicerConnCTX *c_ctx;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_OK;
-  if (1 != argc)
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
+  CXPLAT_FRE_ASSERT(argc == 1);
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
@@ -1766,11 +1763,15 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       if (get_conn_handle(c_ctx))
         {
           res = enif_make_list_cell(env, enif_make_resource(env, c_ctx), res);
-          put_conn_handle(c_ctx);
         }
       Entry = Entry->Flink;
     }
   enif_mutex_unlock(r_ctx->lock);
+
+  // We must deref c_ctx without locking the r_ctx
+  // becasue deref c_ctx may cause connection close and then trigger callback
+  // that destroy c_ctx which locks r_ctx in another thread, causing dead lock
+  put_conn_handles(env, res);
 
   if (argc == 0) // use global registration
     {
@@ -1800,6 +1801,26 @@ get_conn_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 exit:
   enif_mutex_unlock(c_ctx->lock);
   return res;
+}
+
+/*
+** Helper function.
+** put a list of connection handles
+*/
+void
+put_conn_handles(ErlNifEnv *env, ERL_NIF_TERM conn_handles)
+{
+  ERL_NIF_TERM head;
+  ERL_NIF_TERM tail;
+  QuicerConnCTX *c_ctx = NULL;
+  while (enif_get_list_cell(env, conn_handles, &head, &tail))
+    {
+      if (enif_get_resource(env, head, ctx_connection_t, (void **)&c_ctx))
+        {
+          put_conn_handle(c_ctx);
+        }
+      conn_handles = tail;
+    }
 }
 
 ///_* Emacs

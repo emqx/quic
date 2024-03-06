@@ -60,7 +60,9 @@ initial_state() ->
         state => connected,
         handle => H,
         owner => self(),
-        me => self()
+        me => self(),
+        % cnt calls
+        calls => 0
     }.
 
 %% @doc List of possible commands to run against the system
@@ -208,17 +210,21 @@ postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
 
 %% @doc Assuming the postcondition for a call was true, update the model
 %% accordingly for the test to proceed.
-next_state(#{state := connected} = State, _Res, {call, quicer, close_connection, _Args}) ->
+next_state(State, Res, Call) ->
+    step_calls(do_next_state(State, Res, Call)).
+do_next_state(#{state := connected} = State, _Res, {call, quicer, close_connection, _Args}) ->
     State#{state := closed};
-next_state(#{state := connected} = State, _Res, {call, quicer, shutdown_connection, _Args}) ->
+do_next_state(#{state := connected} = State, _Res, {call, quicer, shutdown_connection, _Args}) ->
     State#{state := closed};
-next_state(
+do_next_state(
     #{state := connected} = State, ok, {call, quicer, controlling_process, [_, Owner]}
 ) ->
     State#{owner := Owner};
-next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->
+do_next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->
     State.
 
+step_calls(#{calls := Calls} = S) ->
+    S#{calls := Calls + 1}.
 %%% Generators
 
 %%%%%%%%%%%%%%%%%%%%%%%
