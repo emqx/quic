@@ -1125,17 +1125,14 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
 
 ERL_NIF_TERM
 async_handshake_1(ErlNifEnv *env,
-                  __unused_parm__ int argc,
+                  int argc,
                   const ERL_NIF_TERM argv[])
 
 {
   QuicerConnCTX *c_ctx;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_OK;
-  if (1 != argc)
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
+  CXPLAT_FRE_ASSERT(argc == 1);
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
