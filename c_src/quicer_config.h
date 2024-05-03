@@ -122,4 +122,6 @@ ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
                                 ERL_NIF_TERM optval,
                                 ERL_NIF_TERM elevel);
 
+const char *QuicStatusToString(_In_ QUIC_STATUS Status);
+
 #endif // __QUICER_CONFIG_H_

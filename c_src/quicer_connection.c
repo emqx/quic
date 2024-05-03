@@ -31,8 +31,6 @@ extern inline void
 EncodeHexBuffer(uint8_t *Buffer, uint8_t BufferLen, char *HexString);
 #endif
 
-extern inline const char *QuicStatusToString(QUIC_STATUS Status);
-
 static QUIC_STATUS
 handle_connection_event_connected(QuicerConnCTX *c_ctx,
                                   QUIC_CONNECTION_EVENT *Event);
