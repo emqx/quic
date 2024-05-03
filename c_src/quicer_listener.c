@@ -39,10 +39,17 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
   QuicerConnCTX *c_ctx = NULL;
   BOOLEAN is_destroy = FALSE;
 
+  BOOLEAN is_worker = (enif_thread_type() == ERL_NIF_THR_UNDEFINED);
+
+  if (is_worker)
+    {
+      enif_mutex_lock(l_ctx->lock);
+    }
+
   switch (Event->Type)
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
-      enif_mutex_lock(l_ctx->lock);
+
       //
       // Note, c_ctx is newly init here, don't grab lock.
       //
@@ -219,9 +226,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       break;
 
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
-      // **Note**, the callback in msquic for this event is called in the
-      // MsQuicListenerClose or MsQuicListenerStop. we assume caller should
-      // ensure the thread safty thus we don't hold lock
+      // **Note**, this callback event in msquic can be triggered by either
+      // MsQuicListenerClose or MsQuicListenerStop.
       env = l_ctx->env;
       enif_send(NULL,
                 &(l_ctx->listenerPid),
@@ -238,15 +244,21 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           assert(!l_ctx->is_stopped);
           is_destroy = TRUE;
         }
+      else
+        {
+          l_ctx->is_stopped = TRUE;
+        }
       enif_clear_env(env);
-      goto Exit2;
+      break;
     default:
       break;
     }
 
 Error:
-  enif_mutex_unlock(l_ctx->lock);
-Exit2:
+  if (is_worker)
+    {
+      enif_mutex_unlock(l_ctx->lock);
+    }
   if (is_destroy)
     {
       destroy_l_ctx(l_ctx);

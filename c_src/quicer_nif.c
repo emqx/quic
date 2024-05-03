@@ -804,7 +804,7 @@ resource_listener_down_callback(__unused_parm__ ErlNifEnv *env,
       // b. Some pid could still close the stopped listener with nif
       // handle.
       // c. We close it in resource_listener_dealloc_callback anyway when
-      // Listener term get GC.
+      // Listener term get GCed.
       */
       MsQuic->ListenerStop(l_ctx->Listener);
       put_listener_handle(l_ctx);
