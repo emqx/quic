@@ -1115,13 +1115,10 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
     }
 
   // Apply connection owners' option overrides
-  if (QUIC_FAILED(Status = MsQuic->SetParam(c_ctx->Connection,
-                                            QUIC_PARAM_CONN_SETTINGS,
-                                            sizeof(QUIC_SETTINGS),
-                                            &c_ctx->owner->Settings)))
-    {
-      return Status;
-    }
+  Status = MsQuic->SetParam(c_ctx->Connection,
+                            QUIC_PARAM_CONN_SETTINGS,
+                            sizeof(QUIC_SETTINGS),
+                            &c_ctx->owner->Settings);
   return Status;
 }
 
@@ -1141,10 +1138,17 @@ async_handshake_1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   TP_NIF_3(start, (uintptr_t)c_ctx->Connection, 0);
 
+  if (!get_conn_handle(c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
   if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
     {
       res = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
+
+  put_conn_handle(c_ctx);
   return res;
 }
 
