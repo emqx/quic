@@ -87,11 +87,12 @@ jobs:
         otp:
           - 25.3.2
           - 26.1.2
+          - OTP-27.0-rc3
         openssl:
           - openssl3
           - openssl
         rebar3:
-          - 3.20.0
+          - 3.23.0
         build_type:
           - RelWithDebInfo
           - Debug
