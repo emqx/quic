@@ -56,5 +56,5 @@ if [ $# -eq 1 ]; then
             ;;
     esac
 else
-    escript "$REBAR3"  $@
+    escript "$REBAR3" $@
 fi
