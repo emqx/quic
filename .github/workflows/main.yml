@@ -87,6 +87,7 @@ jobs:
         otp:
           - 25.3.2
           - 26.1.2
+          - OTP-27.0-rc3
         openssl:
           - openssl3
           - openssl
