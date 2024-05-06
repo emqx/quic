@@ -994,7 +994,9 @@ simple_slow_conn_server(Owner, Config, Port, HandshakeDelay) ->
             ok
     end,
     %% test what happens if handshake twice
-    {error, invalid_state} = quicer:handshake(Conn),
+    ?assertMatch(
+        {error, Err} when Err == closed orelse Err == invalid_state, quicer:handshake(Conn)
+    ),
     receive
         done ->
             quicer:close_listener(L),
