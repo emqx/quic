@@ -166,8 +166,8 @@
 -type conn_shutdown_flag() ::
     ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE
     | ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
-%% @TODO expand
--type acceptor_opts() :: map().
+
+-type acceptor_opts() :: quic_settings() | #{active => boolean()}.
 
 -type active_n() :: boolean() | once | integer().
 

@@ -145,4 +145,12 @@ peer_needs_streams(C, bidi_streams, S) ->
     {ok, S}.
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->
-    {ok, State}.
+    {ok, State};
+handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
+    %% @FIXME, not desired behavior.
+    %% Casued by inflight quic Msg during stream handoff
+    Sig == peer_send_shutdown orelse Sig == stream_closed
+->
+    {OwnerPid, Stream} = lists:keyfind(Stream, 2, Streams),
+    OwnerPid ! Msg,
+    {ok, S}.
