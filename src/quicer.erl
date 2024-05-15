@@ -1150,13 +1150,20 @@ handoff_stream(Stream, NewOwner, HandoffData) ->
     case quicer:getopt(Stream, active) of
         {ok, ActiveN} ->
             ActiveN =/= false andalso quicer:setopt(Stream, active, false),
+            ok = quicer_nif:lock_stream(Stream),
             Res =
                 case forward_stream_msgs(Stream, NewOwner) of
                     ok ->
-                        _ = quicer:controlling_process(Stream, NewOwner),
+                        case quicer_nif:controlling_process(Stream, NewOwner, unlock) of
+                            {error, _} ->
+                                quicer_nif:unlock_stream(Stream);
+                            ok ->
+                                ok
+                        end,
                         NewOwner ! {handoff_done, Stream, HandoffData},
                         ok;
                     {error, _} = Other ->
+                        quicer_nif:unlock_stream(Stream),
                         Other
                 end,
             ActiveN =/= false andalso quicer:setopt(Stream, active, ActiveN),

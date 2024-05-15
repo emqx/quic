@@ -1268,6 +1268,35 @@ exit:
   return res;
 }
 
+ERL_NIF_TERM
+lock_stream(ErlNifEnv *env,
+            __unused_parm__ int args,
+            const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+  enif_mutex_lock(s_ctx->lock);
+  return ATOM_OK;
+}
+
+ERL_NIF_TERM
+unlock_stream(ErlNifEnv *env,
+              __unused_parm__ int args,
+              const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx;
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_unlock(s_ctx->lock);
+  return ATOM_OK;
+}
+
 ///_* Emacs
 ///====================================================================
 /// Local Variables:

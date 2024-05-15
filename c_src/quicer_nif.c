@@ -1364,9 +1364,10 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ErlNifPid target, caller;
   ERL_NIF_TERM new_owner = argv[1];
   ERL_NIF_TERM res = ATOM_OK;
-  if (argc != 2)
+  BOOLEAN is_locked = FALSE;
+  if (argc == 3)
     {
-      return ATOM_BADARG;
+      is_locked = TRUE;
     }
 
   // precheck
@@ -1388,7 +1389,10 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           return ERROR_TUPLE_2(ATOM_CLOSED);
         }
 
-      enif_mutex_lock(s_ctx->lock);
+      if (!is_locked)
+        {
+          enif_mutex_lock(s_ctx->lock);
+        }
       res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
       enif_mutex_unlock(s_ctx->lock);
       put_stream_handle(s_ctx);
@@ -1561,6 +1565,7 @@ static ErlNifFunc nif_funcs[] = {
   { "getopt", 3, getopt3, 0},
   { "setopt", 4, setopt4, 0},
   { "controlling_process", 2, controlling_process, 0},
+  { "controlling_process", 3, controlling_process, 0},
   { "peercert", 1, peercert1, 0},
   /* for DEBUG */
   { "get_conn_rid", 1, get_conn_rid1, 1},
@@ -1571,7 +1576,9 @@ static ErlNifFunc nif_funcs[] = {
   { "get_connections", 1, get_connectionsX, 0},
   { "get_conn_owner", 1, get_conn_owner1, 0},
   { "get_stream_owner", 1, get_stream_owner1, 0},
-  { "get_listener_owner", 1, get_listener_owner1, 0}
+  { "get_listener_owner", 1, get_listener_owner1, 0},
+  { "lock_stream", 1, lock_stream, 0},
+  { "unlock_stream", 1, unlock_stream, 0}
   // clang-format on
 };
 

@@ -44,7 +44,10 @@
     getopt/3,
     setopt/4,
     controlling_process/2,
-    peercert/1
+    controlling_process/3,
+    peercert/1,
+    lock_stream/1,
+    unlock_stream/1
 ]).
 
 -export([
@@ -337,9 +340,23 @@ get_stream_rid(_Handle) ->
 controlling_process(_H, _P) ->
     erlang:nif_error(nif_library_not_loaded).
 
+-spec controlling_process(connection_handle() | stream_handle(), pid(), unlock) ->
+    ok
+    | {error, closed | badarg | owner_dead | not_owner}.
+controlling_process(_H, _P, unlock) ->
+    erlang:nif_error(nif_library_not_loaded).
+
 -spec peercert(connection_handle() | stream_handle()) ->
     {ok, CertDerEncoded :: binary()} | {error, any()}.
 peercert(_Handle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec lock_stream(stream_handle()) -> ok | {error, badarg}.
+lock_stream(_Handle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec unlock_stream(stream_handle()) -> ok | {error, badarg}.
+unlock_stream(_Handle) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec get_conn_owner(connection_handle()) -> get_owner().

@@ -66,3 +66,9 @@ get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
 get_stream_owner1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
+lock_stream(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
+
+ERL_NIF_TERM
+unlock_stream(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
