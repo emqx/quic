@@ -1360,7 +1360,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
 
   if (!acc)
     {
-      // If we don't have available process
+      // If we don't have available acceptor waiting,
       // fallback to the connection owner
       TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
       is_orphan = TRUE;
@@ -1386,7 +1386,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   acc_pid = &(acc->Pid);
 
   s_ctx->owner = acc;
-  s_ctx->is_closed = FALSE;
+
   cache_stream_id(s_ctx);
 
   ERL_NIF_TERM props_name[] = { ATOM_FLAGS, ATOM_IS_ORPHAN };
@@ -1394,18 +1394,15 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
       = { enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags),
           ATOM_BOOLEAN(is_orphan) };
 
-  ERL_NIF_TERM report = make_event_with_props(env,
-                                              ATOM_NEW_STREAM,
-                                              enif_make_resource(env, s_ctx),
-                                              props_name,
-                                              props_value,
-                                              2);
+  ERL_NIF_TERM report = make_event_with_props(
+      env, ATOM_NEW_STREAM, s_ctx->eHandle, props_name, props_value, 2);
   if (!enif_send(NULL, acc_pid, NULL, report))
     {
       if (is_orphan)
         {
           // Connection acceptor is dead
           // we don't need to destroy acceptor, we don't have the ownwership
+          destroy_s_ctx(s_ctx);
           return QUIC_STATUS_UNREACHABLE;
         }
       else
@@ -1426,17 +1423,18 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
 
           report = make_event_with_props(env,
                                          ATOM_NEW_STREAM,
-                                         enif_make_resource(env, s_ctx),
+                                         s_ctx->eHandle,
                                          props_name,
                                          props_value,
                                          2);
           if (!enif_send(NULL, acc_pid, NULL, report))
             {
-              // Sad...
+              destroy_s_ctx(s_ctx);
               return QUIC_STATUS_UNREACHABLE;
             }
         }
     }
+  s_ctx->is_closed = FALSE;
   MsQuic->SetCallbackHandler(
       Event->PEER_STREAM_STARTED.Stream, stream_callback, s_ctx);
   return QUIC_STATUS_SUCCESS;

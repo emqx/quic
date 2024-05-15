@@ -57,7 +57,7 @@ prop_stateful_client_stream_test() ->
     ).
 
 prop_stateful_server_stream_test(opts) ->
-    [{numtests, 2000}].
+    [{numtests, 10000}].
 prop_stateful_server_stream_test() ->
     Port = 14570,
     process_flag(trap_exit, true),
