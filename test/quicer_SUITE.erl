@@ -59,6 +59,7 @@
     tc_stream_passive_receive_large_buffer_1/1,
     tc_stream_passive_receive_large_buffer_2/1,
     tc_stream_send_after_conn_close/1,
+    tc_stream_send_after_stream_shutdown/1,
     tc_stream_send_after_async_conn_close/1,
     tc_stream_sendrecv_large_data_passive/1,
     %% @deprecated
@@ -736,6 +737,34 @@ tc_stream_send_after_conn_close(Config) ->
     after 1000 ->
         ct:fail("timeout")
     end.
+
+tc_stream_send_after_stream_shutdown(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> simple_stream_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    end,
+
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    {ok, {_, _}} = quicer:sockname(Conn),
+
+    ok = quicer:async_shutdown_stream(Stm),
+    case quicer:send(Stm, <<"ping2">>) of
+        {error, closed} ->
+            ok;
+        {error, stm_send_error, aborted} ->
+            ok;
+        {error, stm_send_error, invalid_state} ->
+            ok;
+        {error, cancelled} ->
+            ok
+    end,
+    ok = quicer:close_connection(Conn),
+    SPid ! done,
+    ok = ensure_server_exit_normal(Ref).
 
 tc_stream_send_after_async_conn_close(Config) ->
     Port = select_port(),
