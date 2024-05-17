@@ -2836,7 +2836,11 @@ tc_multi_streams_example_server_1(Config) ->
             receive
                 {quic, Data, Stm3In, DFlag} ->
                     ct:pal("~p is received from ~p with flag: ~p", [Data, Stm3In, DFlag]),
-                    ?assertEqual(Data, <<"ping3">>)
+                    ?assertEqual(Data, <<"ping3">>),
+                    %% Assert that send over a remote unidirectional stream get `invalid_state`
+                    ?assertEqual(
+                        {error, stm_send_error, invalid_state}, quicer:send(Stm3In, <<"foo">>)
+                    )
             after 1000 ->
                 ct:fail("no incoming data")
             end,

@@ -35,6 +35,7 @@
 -export([handle_stream_data/4]).
 
 -export([handle_call/3]).
+-export([handle_info/2]).
 
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
@@ -51,8 +52,12 @@ init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
-    ok = quicer:setopt(Stream, active, true),
-    {ok, State}.
+    case quicer:setopt(Stream, active, true) of
+        ok ->
+            {ok, State};
+        {error, closed} ->
+            {stop, closed, State}
+    end.
 
 new_stream(Stream, #{flags := Flags}, Conn) ->
     InitState = #{
@@ -131,13 +136,21 @@ handle_stream_data(
 
     case PeerStream of
         undefined ->
-            {ok, StreamProc} = quicer_local_stream:start_link(
-                ?MODULE,
-                Conn,
-                [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]
-            ),
-            {ok, _} = quicer_stream:send(StreamProc, Bin),
-            {ok, State#{peer_stream := StreamProc}};
+            case
+                quicer_local_stream:start_link(
+                    ?MODULE,
+                    Conn,
+                    [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]
+                )
+            of
+                {ok, StreamProc} ->
+                    catch quicer_stream:send(StreamProc, Bin),
+                    {ok, State#{peer_stream := StreamProc}};
+                {error, {_, _}} ->
+                    {ok, State};
+                {error, closed} ->
+                    {ok, State}
+            end;
         StreamProc when is_pid(StreamProc) ->
             {ok, _} = quicer_stream:send(StreamProc, Bin),
             {ok, State}
@@ -170,3 +183,6 @@ stream_closed(
 
 handle_call(_Request, _From, S) ->
     {reply, {error, not_impl}, S}.
+
+handle_info(Info, S) ->
+    {ok, S}.

@@ -105,8 +105,12 @@ new_stream(
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
                     {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
-                {error, closed} ->
+                {error, closed} when Streams == [] ->
+                    %% Shutdown the connection when fails to handle the first stream
                     {stop, {shutdown, closed}, CBState};
+                {error, closed} ->
+                    %% For proper test, handle random failures from the streams
+                    {ok, CBState};
                 false ->
                     {error, handoff_fail}
             end;
@@ -149,5 +153,10 @@ dgram_recv(C, Bin, _Flag, S) ->
     end,
     {ok, S}.
 
+handle_info({quic, stream_closed, _}, State) ->
+    %% Stream close before/in the middle of handoff
+    {ok, State};
 handle_info({'EXIT', _Pid, _Reason}, State) ->
+    {ok, State};
+handle_info(_, State) ->
     {ok, State}.

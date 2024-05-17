@@ -153,3 +153,5 @@
     | {start_flag, stream_start_flags()}
     | {event_mask, uint32()}
     | {disable_fpbuffer, boolean()}.
+
+-type stream_accept_opts() :: [{active, boolean()}].
