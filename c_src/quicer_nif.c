@@ -1365,8 +1365,9 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM new_owner = argv[1];
   ERL_NIF_TERM res = ATOM_OK;
   BOOLEAN is_locked = FALSE;
-  if (argc == 3)
+  if (argc == 3 || IS_SAME_TERM(argv[2], ATOM_TRUE))
     {
+      // give hint to this call that stream mutex is locked.
       is_locked = TRUE;
     }
 

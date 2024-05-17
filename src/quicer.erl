@@ -1154,7 +1154,7 @@ handoff_stream(Stream, NewOwner, HandoffData) ->
             Res =
                 case forward_stream_msgs(Stream, NewOwner) of
                     ok ->
-                        case quicer_nif:controlling_process(Stream, NewOwner, unlock) of
+                        case quicer_nif:controlling_process(Stream, NewOwner, true) of
                             {error, _} ->
                                 quicer_nif:unlock_stream(Stream);
                             ok ->
