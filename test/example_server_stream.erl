@@ -185,5 +185,4 @@ handle_call(_Request, _From, S) ->
     {reply, {error, not_impl}, S}.
 
 handle_info(Info, S) ->
-    %    ct:pal("~p:~p:~p ", [?MODULE, ?FUNCTION_NAME, Info]),
     {ok, S}.

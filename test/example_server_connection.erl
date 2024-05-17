@@ -154,7 +154,7 @@ dgram_recv(C, Bin, _Flag, S) ->
     {ok, S}.
 
 handle_info({quic, stream_closed, _}, State) ->
-    %% Stream close in the before/in the middle of handoff
+    %% Stream close before/in the middle of handoff
     {ok, State};
 handle_info({'EXIT', _Pid, _Reason}, State) ->
     {ok, State};
