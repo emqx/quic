@@ -340,10 +340,10 @@ get_stream_rid(_Handle) ->
 controlling_process(_H, _P) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec controlling_process(connection_handle() | stream_handle(), pid(), unlock) ->
+-spec controlling_process(connection_handle() | stream_handle(), pid(), boolean()) ->
     ok
     | {error, closed | badarg | owner_dead | not_owner}.
-controlling_process(_H, _P, unlock) ->
+controlling_process(_H, _P, IsLocked) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec peercert(connection_handle() | stream_handle()) ->
