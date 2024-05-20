@@ -112,6 +112,8 @@ set(SOURCES
   c_src/quicer_config.h
   c_src/quicer_queue.c
   c_src/quicer_queue.h
+  c_src/quicer_owner_queue.c
+  c_src/quicer_owner_queue.h
   c_src/quicer_ctx.c
   c_src/quicer_ctx.h
   c_src/quicer_listener.c

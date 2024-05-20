@@ -59,6 +59,9 @@ handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
 
 static void reset_stream_recv(QuicerStreamCTX *s_ctx);
 
+static int
+signal_or_buffer(QuicerStreamCTX *s_ctx, ErlNifPid *owner, ERL_NIF_TERM sig);
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
@@ -1212,7 +1215,8 @@ handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
                       ATOM_SEND_SHUTDOWN_COMPLETE,
                       enif_make_copy(env, s_ctx->eHandle),
                       ATOM_BOOLEAN(is_graceful));
-  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+
+  signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1265,6 +1269,136 @@ get_stream_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   res = SUCCESS(enif_make_pid(env, &(s_ctx->owner->Pid)));
 exit:
   enif_mutex_unlock(s_ctx->lock);
+  return res;
+}
+
+// s_ctx MUST be locked
+int
+signal_or_buffer(QuicerStreamCTX *s_ctx,
+                 ErlNifPid *owner_pid,
+                 ERL_NIF_TERM msg)
+{
+  if (s_ctx->sig_queue != NULL)
+    { // Ongoing handoff... buffering
+      CXPLAT_FRE_ASSERT(ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active);
+      ErlNifEnv *q_env = s_ctx->sig_queue->env;
+      OWNER_SIGNAL *sig = OwnerSignalAlloc();
+      sig->msg = enif_make_copy(q_env, msg);
+      sig->orig_owner = enif_make_pid(q_env, owner_pid);
+      OwnerSignalEnqueue(s_ctx->sig_queue, sig);
+      return TRUE;
+    }
+  else
+    {
+      return enif_send(NULL, owner_pid, NULL, msg);
+    }
+}
+
+// s_ctx MUST be locked
+int
+flush_sig_buffer(__unused_parm__ ErlNifEnv *env, QuicerStreamCTX *s_ctx)
+{
+  OWNER_SIGNAL *sig = NULL;
+  if (!s_ctx->sig_queue)
+    {
+      return FALSE;
+    }
+
+  while ((sig = OwnerSignalDequeue(s_ctx->sig_queue)))
+    {
+      // if send failed, msg will be cleared in `OwnerSignalQueueDestroy`
+      enif_send(NULL, &(s_ctx->owner->Pid), NULL, sig->msg);
+
+      OwnerSignalFree(sig);
+    }
+  OwnerSignalQueueDestroy(s_ctx->sig_queue);
+  s_ctx->sig_queue = NULL;
+  return TRUE;
+}
+
+ERL_NIF_TERM
+buffer_sig(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx;
+  ErlNifPid orig_pid;
+  ERL_NIF_TERM res = ATOM_OK;
+
+  CXPLAT_FRE_ASSERT(argc == 3);
+
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_local_pid(env, argv[1], &orig_pid))
+    {
+      return ERROR_TUPLE_2(ATOM_BAD_PID);
+    }
+
+  enif_mutex_lock(s_ctx->lock);
+  if (!s_ctx->sig_queue)
+    {
+      res = ERROR_TUPLE_2(ATOM_NONE);
+      goto Exit;
+    }
+
+  if (!signal_or_buffer(s_ctx, &orig_pid, argv[2]))
+    {
+      res = ERROR_TUPLE_2(ATOM_FALSE);
+    }
+Exit:
+  enif_mutex_unlock(s_ctx->lock);
+  return res;
+}
+
+ERL_NIF_TERM
+flush_stream_buffered_sigs(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx = NULL;
+  ERL_NIF_TERM res = ATOM_OK;
+
+  CXPLAT_FRE_ASSERT(argc == 1);
+
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+  enif_mutex_lock(s_ctx->lock);
+  if (!flush_sig_buffer(env, s_ctx))
+    {
+      res = ERROR_TUPLE_2(ATOM_NONE);
+    }
+  enif_mutex_unlock(s_ctx->lock);
+  return res;
+}
+
+/*
+** Enable signal buffering.
+** Signals are buffered instead of being sent to the owner.
+** call `flush_stream_buffered_sigs` to flush the buffer.
+*/
+ERL_NIF_TERM
+enable_sig_buffer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *s_ctx = NULL;
+  ERL_NIF_TERM res = ATOM_OK;
+
+  CXPLAT_FRE_ASSERT(argc == 1);
+
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  enif_mutex_lock(s_ctx->lock);
+  if (!s_ctx->sig_queue)
+    {
+      s_ctx->owner->active = ACCEPTOR_RECV_MODE_PASSIVE;
+      s_ctx->sig_queue = OwnerSignalQueueNew();
+      OwnerSignalQueueInit(s_ctx->sig_queue);
+    }
+  enif_mutex_unlock(s_ctx->lock);
+
   return res;
 }
 

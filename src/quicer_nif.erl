@@ -62,7 +62,11 @@
     get_connections/1,
     get_conn_owner/1,
     get_stream_owner/1,
-    get_listener_owner/1
+    get_listener_owner/1,
+    buffer_sig/3,
+    %% @TODO move to API
+    flush_stream_buffered_sigs/1,
+    enable_sig_buffer/1
 ]).
 
 -export([abi_version/0]).
@@ -371,6 +375,19 @@ get_connections() ->
 
 -spec get_connections(reg_handle()) -> [connection_handle()] | {error, badarg}.
 get_connections(_RegHandle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec enable_sig_buffer(stream_handle()) -> ok.
+enable_sig_buffer(_H) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec buffer_sig(stream_handle(), OrigOwner :: pid(), term()) ->
+    ok | {error, false | none | bad_pid | bad_arg}.
+buffer_sig(_StreamHandle, _OrigOwner, _Msg) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec flush_stream_buffered_sigs(stream_handle()) -> ok | {error, badarg | none}.
+flush_stream_buffered_sigs(_H) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% Internals

@@ -1584,7 +1584,11 @@ static ErlNifFunc nif_funcs[] = {
   { "get_connections", 1, get_connectionsX, 0},
   { "get_conn_owner", 1, get_conn_owner1, 0},
   { "get_stream_owner", 1, get_stream_owner1, 0},
-  { "get_listener_owner", 1, get_listener_owner1, 0}
+  { "get_listener_owner", 1, get_listener_owner1, 0},
+  /* for testing */
+  {"buffer_sig", 3, buffer_sig, 0},
+  {"enable_sig_buffer", 1, enable_sig_buffer, 0},
+  {"flush_stream_buffered_sigs", 1, flush_stream_buffered_sigs, 0}
   // clang-format on
 };
 
