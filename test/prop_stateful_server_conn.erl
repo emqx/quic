@@ -36,25 +36,27 @@
 prop_server_state_test(opts) ->
     [{numtests, 2000}].
 prop_server_state_test() ->
-    %% dbg:tracer(process, {fun dbg:dhandler/2,group_leader()}),
-    %% dbg:p(self(), c),
-    %% dbg:tp(quicer, cx),
     process_flag(trap_exit, true),
-    {ok, L} = quicer:listen(?PORT, default_listen_opts()),
-    put(listener, L),
-    ?FORALL(
-        Cmds,
-        commands(?MODULE),
-        begin
-            {History, State, Result} = run_commands(?MODULE, Cmds),
-            ?WHENFAIL(
-                io:format(
-                    "History: ~p\nState: ~p\nResult: ~p\n",
-                    [History, State, Result]
-                ),
-                aggregate(command_names(Cmds), Result =:= ok)
-            )
-        end
+    ?SETUP(
+        fun() ->
+            {ok, L} = quicer:listen(?PORT, default_listen_opts()),
+            put(listener, L),
+            fun() -> quicer:close_listener(L) end
+        end,
+        ?FORALL(
+            Cmds,
+            commands(?MODULE),
+            begin
+                {History, State, Result} = run_commands(?MODULE, Cmds),
+                ?WHENFAIL(
+                    io:format(
+                        "History: ~p\nState: ~p\nResult: ~p\n",
+                        [History, State, Result]
+                    ),
+                    aggregate(command_names(Cmds), Result =:= ok)
+                )
+            end
+        )
     ).
 
 %%%%%%%%%%%%%
@@ -63,7 +65,7 @@ prop_server_state_test() ->
 %% @doc Initial model value at system start. Should be deterministic.
 initial_state() ->
     process_flag(trap_exit, true),
-    {ok, L} = quicer:async_accept(get(listener), #{active => false}),
+    {ok, _L} = quicer:async_accept(get(listener), #{active => false}),
 
     %%% We don't care about the client thus no linking.
     spawn(fun() ->
@@ -265,7 +267,7 @@ postcondition(
     is_pid(NewOwner);
 %% postcondition(#{owner := Owner, state := closed} = State, {call, quicer, controlling_process, [_, _]}, {error, not_owner}) ->
 %%     true;
-postcondition(#{handle := H, state := S}, {call, quicer, get_connections, _}, Conns) when
+postcondition(#{handle := _H, state := _S}, {call, quicer, get_connections, _}, Conns) when
     is_list(Conns)
 ->
     %% @TODO check why handle is not member
