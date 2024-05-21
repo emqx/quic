@@ -62,6 +62,8 @@ static void reset_stream_recv(QuicerStreamCTX *s_ctx);
 static int
 signal_or_buffer(QuicerStreamCTX *s_ctx, ErlNifPid *owner, ERL_NIF_TERM sig);
 
+static int flush_sig_buffer(ErlNifEnv *env, QuicerStreamCTX *s_ctx);
+
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
@@ -132,6 +134,7 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
   if (is_destroy)
     {
+      flush_sig_buffer(NULL, s_ctx);
       s_ctx->is_closed = TRUE;
     }
 
@@ -232,6 +235,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       s_ctx->is_closed = TRUE;
+      flush_sig_buffer(NULL, s_ctx);
       MsQuic->SetCallbackHandler(Stream, NULL, NULL);
     }
 
@@ -1296,7 +1300,7 @@ signal_or_buffer(QuicerStreamCTX *s_ctx,
 
 // s_ctx MUST be locked
 int
-flush_sig_buffer(__unused_parm__ ErlNifEnv *env, QuicerStreamCTX *s_ctx)
+flush_sig_buffer(ErlNifEnv *env, QuicerStreamCTX *s_ctx)
 {
   OWNER_SIGNAL *sig = NULL;
   if (!s_ctx->sig_queue)
@@ -1307,7 +1311,7 @@ flush_sig_buffer(__unused_parm__ ErlNifEnv *env, QuicerStreamCTX *s_ctx)
   while ((sig = OwnerSignalDequeue(s_ctx->sig_queue)))
     {
       // if send failed, msg will be cleared in `OwnerSignalQueueDestroy`
-      enif_send(NULL, &(s_ctx->owner->Pid), NULL, sig->msg);
+      enif_send(env, &(s_ctx->owner->Pid), NULL, sig->msg);
 
       OwnerSignalFree(sig);
     }

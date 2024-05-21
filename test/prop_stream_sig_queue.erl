@@ -8,10 +8,11 @@
 %%%%%%%%%%%%%%%%%%
 prop_buffer_sig_err_none() ->
     ?FORALL(
-        {#prop_handle{handle = S}, Pid, Term},
+        {#prop_handle{handle = S, destructor = Destructor}, Pid, Term},
         {valid_stream(), pid(), term()},
         begin
             Res = quicer_nif:buffer_sig(S, Pid, Term),
+            Destructor(),
             Res == {error, none}
         end
     ).
@@ -97,7 +98,7 @@ receive_n(N, Ref, Acc) ->
             receive_n(N - 1, Ref, [X | Acc]);
         {quic, _, _, _} = _Drop ->
             receive_n(N, Ref, Acc)
-    after 1000 ->
+    after 500 ->
         {timeout, N}
     end.
 

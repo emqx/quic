@@ -17,10 +17,12 @@ limitations under the License.
 #define QUICER_OWNER_QUEUE_H_
 
 #include <erl_nif.h>
+
+// clang-format off
 #include <quicer_internal.h>
 #include <msquic.h>
 #include <quic_platform.h>
-
+// clang-format on
 
 #define QUICER_OWNER_SIGNAL 'E0rQ' // 'Er0d'  QUICER_OWNER_SIGNAL
 
