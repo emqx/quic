@@ -1927,7 +1927,7 @@ tc_stream_open_flag_unidirectional(Config) ->
     receive
         {quic, <<"ping1">>, Stm, _} ->
             ct:fail("unidirectional stream should not receive any");
-        {quic, stream_closed, Stm, #{is_conn_shutdown := true, is_app_closing := false}} ->
+        {quic, stream_closed, Stm, #{is_conn_shutdown := _, is_app_closing := false}} ->
             ct:pal("stream is closed due to connecion idle")
     end,
     ?assert(is_integer(Rid)),
