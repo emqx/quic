@@ -191,11 +191,11 @@ postcondition(
 ) ->
     Owner =/= self();
 postcondition(
-    #{owner := Owner, state := connected},
-    {call, quicer, controlling_process, [_, _]},
+    #{owner := _, state := connected},
+    {call, quicer, controlling_process, [_, NewOwner]},
     {error, owner_dead}
 ) ->
-    Owner =/= self();
+    NewOwner =/= self();
 %% postcondition(#{owner := Owner, state := closed} = State, {call, quicer, controlling_process, [_, _]}, {error, not_owner}) ->
 %%     true;
 postcondition(#{handle := H, state := connected}, {call, quicer, get_connections, _}, Conns) ->

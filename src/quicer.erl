@@ -1285,7 +1285,7 @@ stats_map(_) ->
     undefined.
 
 default_stream_opts() ->
-    #{active => true}.
+    #{active => true, start_flag => ?QUIC_STREAM_START_FLAG_SHUTDOWN_ON_FAIL}.
 
 default_conn_opts() ->
     #{

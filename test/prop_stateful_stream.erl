@@ -42,7 +42,7 @@ prop_stateful_client_stream_test() ->
             commands(?MODULE),
             begin
                 flush_quic_msgs(),
-                {ok, H} = quicer:connect("localhost", 14569, default_conn_opts(), 10000),
+                {ok, H} = quicer:connect("localhost", 14571, default_conn_opts(), 10000),
                 {History, State, Result} = run_commands(?MODULE, Cmds, [{conn_handle, H}]),
                 quicer:async_shutdown_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
                 ?WHENFAIL(
@@ -272,7 +272,7 @@ flush_quic_msgs() ->
 %%%%%%%%%%%%%%%%%%%%%%%
 listener_start_link(ListenerName) ->
     application:ensure_all_started(quicer),
-    LPort = 14569,
+    LPort = 14571,
     ListenerOpts = default_listen_opts(),
     ConnectionOpts = [
         {conn_callback, example_server_connection},
