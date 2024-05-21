@@ -108,8 +108,13 @@ new_stream(
     %% Spawn new stream
     case quicer_remote_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
-            quicer:handoff_stream(Stream, StreamOwner),
-            {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
+            case quicer:handoff_stream(Stream, StreamOwner) of
+                ok ->
+                    {ok, CBState#{streams := [{StreamOwner, Stream} | Streams]}};
+                {error, E} ->
+                    %% record bad stream
+                    {ok, CBState#{streams := [{E, Stream} | Streams]}}
+            end;
         Other ->
             Other
     end.
@@ -152,5 +157,12 @@ handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
     Sig == peer_send_shutdown orelse Sig == stream_closed
 ->
     {OwnerPid, Stream} = lists:keyfind(Stream, 2, Streams),
-    OwnerPid ! Msg,
+    NewS =
+        case OwnerPid == owner_down orelse OwnerPid == closed of
+            true ->
+                quicer:async_shutdown_stream(Stream),
+                S#{streams := lists:keydelete(Stream, 2, Streams)};
+            false ->
+                error(fixme)
+        end,
     {ok, S}.

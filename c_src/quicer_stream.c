@@ -62,8 +62,6 @@ static void reset_stream_recv(QuicerStreamCTX *s_ctx);
 static int
 signal_or_buffer(QuicerStreamCTX *s_ctx, ErlNifPid *owner, ERL_NIF_TERM sig);
 
-static int flush_sig_buffer(ErlNifEnv *env, QuicerStreamCTX *s_ctx);
-
 QUIC_STATUS
 ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 {
@@ -1061,7 +1059,7 @@ handle_stream_event_start_complete(QuicerStreamCTX *s_ctx,
                                      props_name,
                                      props_value,
                                      3);
-      enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+      signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
     }
   return QUIC_STATUS_SUCCESS;
 }
@@ -1080,7 +1078,7 @@ handle_stream_event_peer_send_shutdown(
                       enif_make_copy(env, s_ctx->eHandle),
                       ATOM_UNDEFINED);
 
-  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+  signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1101,7 +1099,7 @@ handle_stream_event_peer_send_aborted(QuicerStreamCTX *s_ctx,
                    enif_make_copy(env, s_ctx->eHandle),
                    enif_make_uint64(env, Event->PEER_SEND_ABORTED.ErrorCode));
 
-  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+  signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1121,7 +1119,7 @@ handle_stream_event_peer_receive_aborted(QuicerStreamCTX *s_ctx,
       ATOM_PEER_RECEIVE_ABORTED,
       enif_make_copy(env, s_ctx->eHandle),
       enif_make_uint64(env, Event->PEER_RECEIVE_ABORTED.ErrorCode));
-  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+  signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1154,7 +1152,7 @@ handle_stream_event_shutdown_complete(QuicerStreamCTX *s_ctx,
                                  props_name,
                                  props_value,
                                  6);
-  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+  signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1171,7 +1169,7 @@ handle_stream_event_peer_accepted(QuicerStreamCTX *s_ctx,
                       ATOM_PEER_ACCEPTED,
                       enif_make_copy(env, s_ctx->eHandle),
                       ATOM_UNDEFINED);
-  enif_send(NULL, &(s_ctx->owner->Pid), NULL, report);
+  signal_or_buffer(s_ctx, &(s_ctx->owner->Pid), report);
   return QUIC_STATUS_SUCCESS;
 }
 
@@ -1282,9 +1280,8 @@ signal_or_buffer(QuicerStreamCTX *s_ctx,
                  ErlNifPid *owner_pid,
                  ERL_NIF_TERM msg)
 {
-  if (s_ctx->sig_queue != NULL)
-    { // Ongoing handoff... buffering
-      CXPLAT_FRE_ASSERT(ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active);
+  if (s_ctx && s_ctx->sig_queue != NULL)
+    {
       ErlNifEnv *q_env = s_ctx->sig_queue->env;
       OWNER_SIGNAL *sig = OwnerSignalAlloc();
       sig->msg = enif_make_copy(q_env, msg);
@@ -1299,7 +1296,7 @@ signal_or_buffer(QuicerStreamCTX *s_ctx,
 }
 
 // s_ctx MUST be locked
-int
+BOOLEAN
 flush_sig_buffer(ErlNifEnv *env, QuicerStreamCTX *s_ctx)
 {
   OWNER_SIGNAL *sig = NULL;
@@ -1321,7 +1318,7 @@ flush_sig_buffer(ErlNifEnv *env, QuicerStreamCTX *s_ctx)
 }
 
 ERL_NIF_TERM
-buffer_sig(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+mock_buffer_sig(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerStreamCTX *s_ctx;
   ErlNifPid orig_pid;

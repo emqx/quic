@@ -11,7 +11,7 @@ prop_buffer_sig_err_none() ->
         {#prop_handle{handle = S, destructor = Destructor}, Pid, Term},
         {valid_stream(), pid(), term()},
         begin
-            Res = quicer_nif:buffer_sig(S, Pid, Term),
+            Res = quicer_nif:mock_buffer_sig(S, Pid, Term),
             Destructor(),
             Res == {error, none}
         end
@@ -36,7 +36,7 @@ prop_buffer_sig_success() ->
         {valid_stream(), pid(), term()},
         begin
             ok = quicer_nif:enable_sig_buffer(S),
-            Res = quicer_nif:buffer_sig(S, Pid, Term),
+            Res = quicer_nif:mock_buffer_sig(S, Pid, Term),
             Destructor(),
             Res == ok
         end
@@ -51,7 +51,7 @@ prop_flush_buffered_sig_no_owner_change() ->
             Ref = erlang:make_ref(),
             lists:foreach(
                 fun(Term) ->
-                    quicer_nif:buffer_sig(S, Pid, {Ref, Term})
+                    quicer_nif:mock_buffer_sig(S, Pid, {Ref, Term})
                 end,
                 TermList
             ),
@@ -71,7 +71,7 @@ prop_flush_buffered_sig_success() ->
             Ref = erlang:make_ref(),
             lists:foreach(
                 fun(Term) ->
-                    ok = quicer_nif:buffer_sig(S, Pid, {Ref, Term})
+                    ok = quicer_nif:mock_buffer_sig(S, Pid, {Ref, Term})
                 end,
                 TermList
             ),

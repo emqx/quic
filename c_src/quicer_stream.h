@@ -18,10 +18,13 @@ limitations under the License.
 #define __QUICER_STREAM_H_
 
 #include "quicer_config.h"
+#include "quicer_ctx.h"
 #include "quicer_internal.h"
 #include "quicer_nif.h"
 
 #define UNSET_STREAMID 0xFFFFFFFFFFFFFFF
+
+struct QuicerStreamCTX;
 
 typedef enum QUICER_SEND_FLAGS
 {
@@ -68,7 +71,7 @@ ERL_NIF_TERM
 get_stream_owner1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
-buffer_sig(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+mock_buffer_sig(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
 flush_stream_buffered_sigs(ErlNifEnv *env,
@@ -77,3 +80,7 @@ flush_stream_buffered_sigs(ErlNifEnv *env,
 
 ERL_NIF_TERM
 enable_sig_buffer(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
+typedef struct QuicerStreamCTX QuicerStreamCTX;
+BOOLEAN
+flush_sig_buffer(ErlNifEnv *env, QuicerStreamCTX *s_ctx);

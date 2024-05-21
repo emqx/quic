@@ -44,7 +44,9 @@
     getopt/3,
     setopt/4,
     controlling_process/2,
-    peercert/1
+    peercert/1,
+    enable_sig_buffer/1,
+    flush_stream_buffered_sigs/1
 ]).
 
 -export([
@@ -63,10 +65,7 @@
     get_conn_owner/1,
     get_stream_owner/1,
     get_listener_owner/1,
-    buffer_sig/3,
-    %% @TODO move to API
-    flush_stream_buffered_sigs/1,
-    enable_sig_buffer/1
+    mock_buffer_sig/3
 ]).
 
 -export([abi_version/0]).
@@ -377,17 +376,26 @@ get_connections() ->
 get_connections(_RegHandle) ->
     erlang:nif_error(nif_library_not_loaded).
 
+%% @doc enable signal buffering, used in stream handoff.
+%% * not exposed API.
 -spec enable_sig_buffer(stream_handle()) -> ok.
 enable_sig_buffer(_H) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec buffer_sig(stream_handle(), OrigOwner :: pid(), term()) ->
-    ok | {error, false | none | bad_pid | bad_arg}.
-buffer_sig(_StreamHandle, _OrigOwner, _Msg) ->
-    erlang:nif_error(nif_library_not_loaded).
-
+%% @doc flush buffered stream signals to the current owner
+%% * not exposed API.
+%% also @see quicer:controlling_process/2
+%% @end
 -spec flush_stream_buffered_sigs(stream_handle()) -> ok | {error, badarg | none}.
 flush_stream_buffered_sigs(_H) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+%% @doc mock buffer a signal in sig_buffer.
+%%      for testing sig_buffer
+%% @end
+-spec mock_buffer_sig(stream_handle(), OrigOwner :: pid(), term()) ->
+    ok | {error, false | none | bad_pid | bad_arg}.
+mock_buffer_sig(_StreamHandle, _OrigOwner, _Msg) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% Internals

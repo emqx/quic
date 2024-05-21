@@ -42,7 +42,6 @@ OWNER_SIGNAL *
 OwnerSignalAlloc()
 {
   OWNER_SIGNAL *sig = CxPlatAlloc(sizeof(OWNER_SIGNAL), QUICER_OWNER_SIGNAL);
-  sig->Link.Flink = NULL;
   return sig;
 }
 
