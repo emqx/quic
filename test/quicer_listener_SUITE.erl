@@ -558,7 +558,7 @@ tc_listener_conf_reload(Config) ->
         quicer_test_lib:report_unhandled_messages(),
         ct:fail("nothing from conn 2")
     end,
-    gen_server:stop(ClientConnPid),
+    catch gen_server:stop(ClientConnPid),
     quicer_listener:stop_listener(QuicApp).
 
 tc_listener_conf_reload_listen_on(Config) ->
