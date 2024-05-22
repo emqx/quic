@@ -1179,6 +1179,8 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   TP_NIF_3(success, 0, 2);
 
   res = SUCCESS(ATOM_TRUE);
+  uint16_t lb_mode = 1;
+  MsQuic->SetParam(NULL, QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE, sizeof(uint16_t), &lb_mode);
 
   if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
     {
