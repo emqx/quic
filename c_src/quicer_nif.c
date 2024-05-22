@@ -1148,14 +1148,14 @@ on_unload(__unused_parm__ ErlNifEnv *env, __unused_parm__ void *priv_data)
 }
 
 static ERL_NIF_TERM
-openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+openLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-  assert(1 == argc);
+  CXPLAT_FRE_ASSERT(argc == 1);
   TP_NIF_3(enter, 0, 1);
   QUIC_STATUS status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_FALSE;
-  ERL_NIF_TERM lttngLib = argv[0];
   char lttngPath[PATH_MAX] = { 0 };
+  unsigned int lb_mode = 0;
 
   pthread_mutex_lock(&MsQuicLock);
   if (MsQuic)
@@ -1179,10 +1179,21 @@ openLib(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   TP_NIF_3(success, 0, 2);
 
   res = SUCCESS(ATOM_TRUE);
-  uint16_t lb_mode = 1;
-  MsQuic->SetParam(NULL, QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE, sizeof(uint16_t), &lb_mode);
 
-  if (enif_get_string(env, lttngLib, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
+  ERL_NIF_TERM eterm = ATOM_UNDEFINED;
+
+  if (enif_get_map_value(
+          env, argv[0], ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE, &eterm)
+      && enif_get_uint(env, eterm, &lb_mode))
+    {
+      MsQuic->SetParam(NULL,
+                       QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE,
+                       sizeof(uint16_t),
+                       (uint16_t *)&lb_mode);
+    }
+
+  if (enif_get_map_value(env, argv[0], ATOM_TRACE, &eterm)
+      && enif_get_string(env, eterm, lttngPath, PATH_MAX, ERL_NIF_LATIN1))
     {
       // loading lttng lib is optional, ok to fail
       if (dlopen(lttngPath, (unsigned)RTLD_NOW | (unsigned)RTLD_GLOBAL))

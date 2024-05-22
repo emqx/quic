@@ -7,7 +7,7 @@
         stdlib
     ]},
     {mod, {quicer_app, []}},
-    {env, []},
+    {env, [{lb_mode, 0}]},
     {modules, [
         quicer,
         quicer_app,
