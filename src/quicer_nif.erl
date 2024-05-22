@@ -153,7 +153,10 @@ open_lib() ->
             {error, _} ->
                 priv_dir()
         end,
-    open_lib(LibFile).
+    open_lib(#{
+        load_balacing_mode => application:get_env(quicer, lb_mode, 0),
+        trace => LibFile
+    }).
 
 open_lib(_LttngLib) ->
     erlang:nif_error(nif_library_not_loaded).
