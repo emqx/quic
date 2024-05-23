@@ -1101,7 +1101,9 @@ get_listener_owner(Listener) ->
     quicer_nif:get_listener_owner(Listener).
 
 %% @doc set controlling process for Connection/Stream.
+%% For Stream, also flush the sig buffer to old owner if failed or new owner if succeeded.
 %% mimic {@link ssl:controlling_process/2}
+%% @see handoff_stream/2
 %% @see wait_for_handoff/2
 %% @end
 -spec controlling_process(connection_handle() | stream_handle(), pid()) ->
@@ -1129,15 +1131,17 @@ handoff_stream(Stream, NewOwner) ->
     handoff_stream(Stream, NewOwner, undefined).
 
 %% @doc Used by Old stream owner to handoff to the new stream owner.
-%%      1. The Stream will be put into passive mode.
-%%      2. Stream messages in the current owners process messages queue will
+%%      1. The Stream will be put into passive mode so the data is paused.
+%%      2. The Stream signal buffer will be enabled, so the signal is paused.
+%%      3. Stream messages (for both data and sig )in the current owners process messages queue will
 %%         be forwarded to the New Owner's mailbox in the same recv order.
-%%      3. Set the control process of the stream to the new owner.
-%%      4. A signal msg `{handoff_done, Stream, PostHandoff}' will be sent to the new owner.
+%%      4. Set the control process of the stream to the new owner, signal buffer will be flushed to new owner if succeed, otherwise to the old owner
+%%      5. A signal msg `{handoff_done, Stream, PostHandoff}' will be sent to the new owner.
 %%         The new owner should block for this message before handle any stream data to
 %%         ensure the ordering.
-%%      5. Revert stream active mode whatever handoff fail or success.
+%%      6. Revert stream active mode whatever handoff fail or success.
 %% also @see wait_for_handoff/2
+%% also @see controlling_process/2
 %% @end
 -spec handoff_stream(stream_handle(), pid(), term()) -> ok | {error, any()}.
 handoff_stream(Stream, NewOwner, HandoffData) when NewOwner == self() ->
@@ -1150,6 +1154,7 @@ handoff_stream(Stream, NewOwner, HandoffData) ->
     case quicer:getopt(Stream, active) of
         {ok, ActiveN} ->
             ActiveN =/= false andalso quicer:setopt(Stream, active, false),
+            ok = quicer_nif:enable_sig_buffer(Stream),
             Res =
                 case forward_stream_msgs(Stream, NewOwner) of
                     ok ->
@@ -1157,6 +1162,7 @@ handoff_stream(Stream, NewOwner, HandoffData) ->
                         NewOwner ! {handoff_done, Stream, HandoffData},
                         ok;
                     {error, _} = Other ->
+                        _ = quicer_nif:flush_stream_buffered_sigs(Stream),
                         Other
                 end,
             ActiveN =/= false andalso quicer:setopt(Stream, active, ActiveN),

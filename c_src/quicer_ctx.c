@@ -270,6 +270,7 @@ init_s_ctx()
   s_ctx->is_recv_pending = FALSE;
   s_ctx->is_closed = TRUE; // init
   s_ctx->event_mask = 0;
+  s_ctx->sig_queue = NULL;
   return s_ctx;
 }
 

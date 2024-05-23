@@ -18,6 +18,7 @@ limitations under the License.
 #define __QUICER_CTX_H_
 
 #include "quicer_nif.h"
+#include "quicer_owner_queue.h"
 #include "quicer_queue.h"
 #include <msquichelper.h>
 #include <openssl/x509.h>
@@ -137,6 +138,8 @@ typedef struct QuicerStreamCTX
   // Track lifetime of Stream handle
   CXPLAT_REF_COUNT ref_count;
   uint32_t event_mask;
+  // for ownership handoff
+  OWNER_SIGNAL_QUEUE *sig_queue;
   void *reserved1;
   void *reserved2;
   void *reserved3;

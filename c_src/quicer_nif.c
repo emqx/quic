@@ -1486,10 +1486,11 @@ stream_controlling_process(ErlNifEnv *env,
     {
       // rollback, must success
       enif_self(env, &s_ctx->owner->Pid);
+      flush_sig_buffer(env, s_ctx);
       enif_monitor_process(env, s_ctx, caller, &s_ctx->owner_mon);
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
-
+  flush_sig_buffer(env, s_ctx);
   TP_NIF_3(exit, (uintptr_t)s_ctx->Stream, (uintptr_t)&s_ctx->owner->Pid);
   return ATOM_OK;
 }
@@ -1575,6 +1576,8 @@ static ErlNifFunc nif_funcs[] = {
   { "setopt", 4, setopt4, 0},
   { "controlling_process", 2, controlling_process, 0},
   { "peercert", 1, peercert1, 0},
+  { "enable_sig_buffer", 1, enable_sig_buffer, 0},
+  { "flush_stream_buffered_sigs", 1, flush_stream_buffered_sigs, 0},
   /* for DEBUG */
   { "get_conn_rid", 1, get_conn_rid1, 1},
   { "get_stream_rid", 1, get_stream_rid1, 1},
@@ -1584,7 +1587,9 @@ static ErlNifFunc nif_funcs[] = {
   { "get_connections", 1, get_connectionsX, 0},
   { "get_conn_owner", 1, get_conn_owner1, 0},
   { "get_stream_owner", 1, get_stream_owner1, 0},
-  { "get_listener_owner", 1, get_listener_owner1, 0}
+  { "get_listener_owner", 1, get_listener_owner1, 0},
+  /* for testing */
+  { "mock_buffer_sig", 3, mock_buffer_sig, 0}
   // clang-format on
 };
 
