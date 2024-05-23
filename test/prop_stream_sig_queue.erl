@@ -78,7 +78,8 @@ prop_flush_buffered_sig_success() ->
             ok = quicer:controlling_process(S, self()),
             {ok, NewOwner} = quicer:get_stream_owner(S),
             NewOwner = self(),
-            ok = quicer_nif:flush_stream_buffered_sigs(S),
+            %% assert already flushed by quicer:controlling_process/2
+            {error, none} = quicer_nif:flush_stream_buffered_sigs(S),
             Res = receive_n(length(TermList), Ref),
             Destructor(),
             Res == TermList
