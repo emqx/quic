@@ -1,67 +1,32 @@
-# quicer
+# Quicer
 
-QUIC protocol erlang library.
+QUIC (Next-generation transport protocol) erlang library.
 
 [msquic](https://github.com/microsoft/msquic) NIF binding.
 
-Project Status: WIP (actively), POC quality
-
-API: is not stable, might be changed in the future.
+Project Status: Preview
 
 ![Erlang](https://img.shields.io/badge/Erlang-white.svg?style=plastic&logo=erlang&logoColor=a90533)
 ![CI](https://github.com/emqx/quic/workflows/ci/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Coverage Status](https://coveralls.io/repos/emqx/quic/badge.png?branch=main)](https://coveralls.io/r/emqx/quic?branch=main)
 
-# OS Support
-| OS      | Status    |
-|---------|-----------|
-| Linux   | Supported |
-| macOS   | Supported |
-| Windows | TBD       |
+## OS Support
 
-# BUILD
+| OS      | Status      |
+|---------|-------------|
+| Linux   | Supported   |
+| macOS   | Supported   |
+| Windows | Help Needed |
 
-## Dependencies
+# Add to your project 
 
-1. OTP22+
-1. rebar3
-1. cmake3.16+
-1. [CLOG](https://github.com/microsoft/CLOG) (required for debug logging only)
-1. LTTNG2.12 (required for debug build only)
+## rebar.config
 
-## With DEBUG
-
-Debug build dependency: [CLOG](https://github.com/microsoft/CLOG) 
-
-``` sh
-$ rebar3 compile 
-# OR
-$ make
-```
-
-note, 
-
-To enable logging and release build:
-
-``` sh
-export CMAKE_BUILD_TYPE=Debug
-export QUIC_ENABLE_LOGGING=ON
-export QUICER_USE_LTTNG=1
-make
-```
-
-## BUILD with logging to stdout
-
-``` sh
-QUIC_LOGGING_TYPE=stdout make
-```
-
-## Without DEBUG
-
-``` sh
-export CMAKE_BUILD_TYPE=Release
-make
+``` erlang
+{deps, [
+    {quicer, {git, "https://github.com/qzhuyan/quic.git", {tag, "0.1.0"}}},
+    ...
 ```
 
 # Examples
@@ -99,23 +64,82 @@ receive {quic, <<"pong">>, Stm, _Props} -> ok end,
 ok = quicer:close_connection(Conn).
 ```
 
+## Try connect to Google with QUIC transport
 
-# TEST
-
-``` sh
-$ make test
+``` erlang
+%% Connect to google and disconnect, 
+%% You could also tweak the parameters to see how it goes
+{ok, Conn} = quicer:connect("google.com", 443, [{alpn, ["h3"]}, 
+                            {verify, verify_peer}, 
+                            {peer_unidi_stream_count, 3}], 5000),
+quicer:shutdown_connection(Conn).
 ```
+
+## More examples in test dir
+
+refer to [test](./test) dir.
 
 # Documentation
 
+## Get Started
+
+1. Understand the `handles` and the `ownership` in [Terminology](docs/Terminology.md)
+
+1. Then check how to receives the data and signals:  [Messages](docs/messages_to_owner.md)
+
+1. Read more in [msquic doc](https://github.com/microsoft/msquic/tree/main/docs)
+
+## Offline hex doc
+
 ``` sh
 $ make doc
+$ firefox doc/index.html
 ```
 
-Then check the doc in browser: 
+# Dependencies
+
+1. OTP25+
+1. rebar3
+1. cmake3.16+
+
+# Build and test
+
+## Dev mode
+``` sh
+$ make ci
+```
+
+# Troubleshooting 
+
+### Log to `stdout`
+
+Debug log could be enabled to print to `stdout` with the envvar `QUIC_LOGGING_TYPE=stdout` 
 
 ``` sh
-$ firefox doc/index.html
+QUIC_LOGGING_TYPE=stdout make
+```
+
+``` sh
+%% Debug one testcase
+QUIC_LOGGING_TYPE=stdout rebar3 ct --suite test/quicer_connection_SUITE.erl --case tc_conn_basic_verify_peer
+```
+
+### Decrypt traffic with Wireshark
+
+Client could specify the connect param `sslkeylogfile` to record tls secrets for wireshark to decrypt.
+
+``` erlang
+    {ok, Conn} = quicer:connect(
+        "google.com",
+        443,
+        [
+            {verify, verify_peer},
+            {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
+            {peer_unidi_stream_count, 3},
+            {alpn, ["h3"]}
+        ],
+        5000
+    )
 ```
 
 # License
