@@ -6,14 +6,14 @@ jobs:
     name: Formatting Check
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
     - name: Run clang-format style check for C/C++/Protobuf programs.
-      uses: jidicula/clang-format-action@v4.11.0
+      uses: jidicula/clang-format-action@c74383674bf5f7c69f60ce562019c1c94bc1421a # v4.13.0
       with:
         clang-format-version: '13'
         check-path: 'c_src'
     - name: Prepare OTP and rebar3
-      uses: erlef/setup-beam@v1
+      uses: erlef/setup-beam@2f0cc07b4b9bea248ae098aba9e1a8a1de5ec24c # v1.17.5
       with:
         otp-version: 26
         rebar3-version: 3.20.0
@@ -28,18 +28,18 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-12
+          - macos-14
         otp:
           - 25
           - 26
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
         with:
           submodules: recursive
       - name: Configure Homebrew cache
-        uses: actions/cache@v3
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
           path: |
             ~/Library/Caches/Homebrew/
@@ -49,10 +49,11 @@ jobs:
         run: |
           export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
           brew install erlang@${{ matrix.otp }}
+          echo "$(brew --prefix erlang@${{ matrix.otp }})/bin" >> $GITHUB_PATH
       - name: release build
         run: |
-          wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-          export PATH="$PWD:/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
+          wget https://s3.amazonaws.com/rebar3/rebar3
+          sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
           # run sudo for getting coredump
@@ -69,7 +70,7 @@ jobs:
           fi
 
       - name: Archive CT Logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: failure()
         with:
           name: mac-ct-logs
@@ -79,14 +80,14 @@ jobs:
 
   linux:
     needs: formatting-check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         otp:
           - 25.3.2
-          - 26.1.2
+          - 26.2.1
           - OTP-27.0-rc3
         openssl:
           - openssl3
@@ -103,10 +104,10 @@ jobs:
           - x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
         with:
           submodules: recursive
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@2f0cc07b4b9bea248ae098aba9e1a8a1de5ec24c # v1.17.5
         with:
           otp-version: ${{ matrix.otp }}
           rebar3-version: ${{ matrix.rebar3 }}
@@ -159,7 +160,7 @@ jobs:
           fi
 
       - name: Archive CT Logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: failure()
         with:
           name: linux-ct-logs
