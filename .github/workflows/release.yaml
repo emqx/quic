@@ -24,6 +24,8 @@ jobs:
           - openssl3
           - openssl
         os:
+          - macos-14
+          - macos-13
           - macos-12
           - macos-12-arm64
     runs-on: ${{ matrix.os }}
@@ -69,8 +71,8 @@ jobs:
       fail-fast: false
       matrix:
         builder:
-          - 5.2-7:1.15.7-25.3.2-2
-          - 5.2-7:1.15.7-26.1.2-1
+          - 5.3-5:1.15.7-25.3.2-2
+          - 5.3-5:1.15.7-26.2.1-2
         openssl:
           - openssl3
           - openssl
@@ -78,6 +80,7 @@ jobs:
           - amd64
           - arm64
         os:
+          - ubuntu24.04
           - ubuntu22.04
           - ubuntu20.04
           - ubuntu18.04
@@ -85,6 +88,7 @@ jobs:
           - debian11
           - debian10
           - amzn2023
+          - amzn2
           - el9
           - el8
           - el7

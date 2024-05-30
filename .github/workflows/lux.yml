@@ -3,12 +3,12 @@ on: [push, pull_request]
 
 jobs:
   run-lux-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         otp:
-          - 24.3.4
           - 25.3.2
+          - 26.2.1
     steps:
       - name: Checkout
         uses: actions/checkout@v3

@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-12
+          - macos-14
         otp:
           - 25
           - 26
@@ -79,14 +79,14 @@ jobs:
 
   linux:
     needs: formatting-check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         otp:
           - 25.3.2
-          - 26.1.2
+          - 26.2.1
           - OTP-27.0-rc3
         openssl:
           - openssl3

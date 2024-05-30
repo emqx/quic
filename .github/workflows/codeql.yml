@@ -34,7 +34,7 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: 24.3.4
+          otp-version: 25.3.2
 
       - name: Build cpp
         run: make build-nif
