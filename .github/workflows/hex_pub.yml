@@ -8,9 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v3
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
       - name: Publish to Hex.pm
-        uses: erlangpack/github-action@v3
+        uses: erlangpack/github-action@09d8fc9cc3563f04a128311d627c60dfadc75493 # v3
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}

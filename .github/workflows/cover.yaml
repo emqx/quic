@@ -21,9 +21,9 @@ jobs:
           - x86_64
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
-    - uses: erlef/setup-beam@v1
+    - uses: erlef/setup-beam@2f0cc07b4b9bea248ae098aba9e1a8a1de5ec24c # v1.17.5
       with:
         otp-version: ${{ matrix.otp }}
         rebar3-version: ${{ matrix.rebar3 }}
@@ -34,7 +34,7 @@ jobs:
         make cover
 
     - name: Coveralls C
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         flag-name: run-c-lcov
@@ -50,7 +50,7 @@ jobs:
         make cover
 
     - name: Coveralls C
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         flag-name: run-c-lcov-feature
@@ -65,7 +65,7 @@ jobs:
       run: rebar3 as test coveralls send
 
     - name: Coveralls Finished
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         parallel-finished: true

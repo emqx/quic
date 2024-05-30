@@ -24,22 +24,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@7e187e1c529d80bac7b87a16e7a792427f65cf02 # v2.15.5
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@2f0cc07b4b9bea248ae098aba9e1a8a1de5ec24c # v1.17.5
         with:
-          otp-version: 25.3.2
+          otp-version: 24.3.4
 
       - name: Build cpp
         run: make build-nif
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@7e187e1c529d80bac7b87a16e7a792427f65cf02 # v2.15.5
         with:
           category: "/language:${{ matrix.language }}"
