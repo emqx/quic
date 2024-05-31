@@ -42,6 +42,7 @@ jobs:
         run: |
           export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
           brew install erlang@${{ matrix.otp }}
+          echo "$(brew --prefix erlang@${{ matrix.otp }})/bin" >> $GITHUB_PATH
       - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
         with:
           fetch-depth: 0
@@ -53,7 +54,7 @@ jobs:
           QUIC_TLS: ${{ matrix.openssl }}
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-          export PATH="$PWD:/usr/local/opt/erlang@${{ matrix.otp }}/bin:$PATH"
+          sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           export QUIC_TLS
           BUILD_RELEASE=1 make
