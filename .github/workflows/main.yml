@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: failure()
         with:
-          name: mac-ct-logs
+          name: mac-ct-logs-${{ matrix.os }}-${{ matrix.otp }}
           path: _build/test/logs
           retention-days: 1
 
@@ -163,7 +163,7 @@ jobs:
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: failure()
         with:
-          name: linux-ct-logs
+          name: linux-ct-logs-${{ matrix.otp }}-${{ matrix.openssl }}-${{ matrix.build_type }}-${{ matrix.logging }}-${{ matrix.arch }}
           path: _build/test/
           retention-days: 1
 
