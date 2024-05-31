@@ -6,20 +6,10 @@
 
 Feature todo list, priority descending
 
-** Stream behavior should able to handle multiple streams
-One process could become the owner of multiple streams in the scenario
-that these streams are correlated.
-
 ** Impl ConfigurationLoadCredential
 Load QUIC_CREDENTIAL_CONFIG to configuration
 
 ** Check shutdown connection wait for peer to close or not
-
-** Get/Set Context
-with lock protection set/get the callback context.
-
-** New API: open_send(connection_handle(), Data, Flags)
-Open stream over this connection and send without starting the stream
 
 ** Unintentional Transport Migration
 
@@ -40,24 +30,7 @@ Open stream over this connection and send without starting the stream
 - Use imm handle
   Maybe very less performance gain but still worth to change it.
 
-- 0-RTT NST
-
-  stateful and stateless.
-
 - make sending NST configurable
 
 - check types.
 
-- Level of APIs
-
-  Current API are designd to easily migrate from TCP.
-
-  QUIC can provide more detailed error info that a simple {error, Info} cannot hold.
-
-  QUIC can provide more flags while doing any calls
-
-  So we may need different levels of APIs.
-  Level 1: Simple and for ease of migration from TCP/TLS
-  Level 2: Expose details but with some common generic behaviors
-  Level 3: Pure NIF calls, application caller manages everything but also means
-           Quicer must be more transparent

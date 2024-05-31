@@ -863,7 +863,7 @@ shutdown_stream(Stream, Timeout) ->
 %%
 %% Flags could be used to control the behavior like half-close.
 %% @end
-%% @see async_shutdown_stream/4
+%% @see async_shutdown_stream/3
 -spec shutdown_stream(
     stream_handle(),
     stream_shutdown_flags(),
@@ -1131,14 +1131,20 @@ handoff_stream(Stream, NewOwner) ->
     handoff_stream(Stream, NewOwner, undefined).
 
 %% @doc Used by Old stream owner to handoff to the new stream owner.
+%%
 %%      1. The Stream will be put into passive mode so the data is paused.
+%%
 %%      2. The Stream signal buffer will be enabled, so the signal is paused.
+%%
 %%      3. Stream messages (for both data and sig )in the current owners process messages queue will
 %%         be forwarded to the New Owner's mailbox in the same recv order.
+%%
 %%      4. Set the control process of the stream to the new owner, signal buffer will be flushed to new owner if succeed, otherwise to the old owner
+%%
 %%      5. A signal msg `{handoff_done, Stream, PostHandoff}' will be sent to the new owner.
 %%         The new owner should block for this message before handle any stream data to
 %%         ensure the ordering.
+%%
 %%      6. Revert stream active mode whatever handoff fail or success.
 %% also @see wait_for_handoff/2
 %% also @see controlling_process/2

@@ -338,7 +338,7 @@ Connection is resumed with binary session data or with 'false' means empty sessi
 
 ### New Session Ticket
 
-**Client Only** The client received the `NST`` (new session ticket) from the server if `QUICER_CONNECTION_EVENT_MASK_NST` had been 
+**Client Only** The client received the `NST` (new session ticket) from the server if `QUICER_CONNECTION_EVENT_MASK_NST` had been 
 set in connection opt `quic_event_mask` when client starts the connection.
 
 ``` erlang
