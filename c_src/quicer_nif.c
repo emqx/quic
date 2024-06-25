@@ -1186,10 +1186,29 @@ openLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           env, argv[0], ATOM_QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE, &eterm)
       && enif_get_uint(env, eterm, &lb_mode))
     {
-      MsQuic->SetParam(NULL,
-                       QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE,
-                       sizeof(uint16_t),
-                       (uint16_t *)&lb_mode);
+
+      if (lb_mode > QUIC_LOAD_BALANCING_COUNT)
+        {
+          // quicer specific load balancing settings
+          // use FixedServerID
+          QUIC_GLOBAL_SETTINGS global_settings;
+          global_settings.IsSet.LoadBalancingMode = TRUE;
+          global_settings.IsSet.FixedServerID = TRUE;
+          global_settings.LoadBalancingMode
+              = QUIC_LOAD_BALANCING_SERVER_ID_FIXED;
+          global_settings.FixedServerID = lb_mode;
+          MsQuic->SetParam(NULL,
+                           QUIC_PARAM_GLOBAL_GLOBAL_SETTINGS,
+                           sizeof(global_settings),
+                           &global_settings);
+        }
+      else
+        {
+          MsQuic->SetParam(NULL,
+                           QUIC_PARAM_GLOBAL_LOAD_BALACING_MODE,
+                           sizeof(uint16_t),
+                           (uint16_t *)&lb_mode);
+        }
     }
 
   if (enif_get_map_value(env, argv[0], ATOM_TRACE, &eterm)
