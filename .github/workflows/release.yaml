@@ -26,8 +26,6 @@ jobs:
         os:
           - macos-14
           - macos-13
-          - macos-12
-          - macos-12-arm64
     runs-on: ${{ matrix.os }}
     steps:
 
@@ -92,7 +90,6 @@ jobs:
           - amzn2
           - el9
           - el8
-          - el7
     runs-on: ubuntu-latest
 
     steps:
