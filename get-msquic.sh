@@ -28,6 +28,14 @@ patch_2_2_3()
     do_patch "$patch_2"
 }
 
+patch_2_3_5()
+{
+    local patch_1="https://github.com/microsoft/msquic/commit/12edf3725475d4a99e5598df3289bace47b8f56e.patch"
+    mkdir -p "$patch_dir"
+    echo "Patching Msquic 2.3.5"
+    do_patch "$patch_1"
+}
+
 
 if [ ! -d msquic ]; then
     git clone https://github.com/microsoft/msquic.git -b "$VERSION" --recursive --depth 1 --shallow-submodules msquic
@@ -50,4 +58,8 @@ fi
 case $VERSION in
     v2.2.3)
         patch_2_2_3
+        ;;
+    v2.3.5)
+        patch_2_3_5
+        ;;
 esac
