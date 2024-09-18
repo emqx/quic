@@ -92,8 +92,8 @@ refer to [test](./test) dir.
 ## Offline hex doc
 
 ``` sh
-$ make doc
-$ firefox doc/index.html
+make doc
+firefox doc/index.html
 ```
 
 # Dependencies
@@ -106,7 +106,7 @@ $ firefox doc/index.html
 
 ## Dev mode
 ``` sh
-$ make ci
+make ci
 ```
 
 # Troubleshooting 
