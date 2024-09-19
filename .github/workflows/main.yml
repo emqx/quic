@@ -85,10 +85,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt
         otp:
-          - 25.3.2
-          - 26.2.1
-          - OTP-27.0-rc3
+          - 25.3.2.9
+          - 26.2.5.3
+          - 27.1
         openssl:
           - openssl3
           - openssl

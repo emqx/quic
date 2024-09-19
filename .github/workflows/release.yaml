@@ -71,7 +71,7 @@ jobs:
       matrix:
         otp:
           - 25.3.2-2
-          - 26.2.1-2
+          - 26.2.5.2-1
         openssl:
           - openssl3
           - openssl
