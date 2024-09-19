@@ -3097,7 +3097,7 @@ tc_setopt_global_lb_mode_ifip(_Config) ->
     quicer:close_lib(),
     {ok, _} = quicer:open_lib(),
     ?assertEqual(
-        {ok, 2},
+        {ok, ?QUIC_LOAD_BALANCING_SERVER_ID_FIXED},
         quicer:getopt(quic_global, load_balacing_mode)
     ).
 
