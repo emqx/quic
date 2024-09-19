@@ -44,6 +44,7 @@
     tc_lib_registration_1/1,
     tc_lib_re_registration/1,
     tc_lib_registration_neg/1,
+    tc_setopt_global_lb_mode_ifip/1,
     tc_open_listener_inval_reg/1,
 
     tc_stream_client_init/1,
@@ -3080,6 +3081,25 @@ tc_stream_get_owner_remote(Config) ->
     end,
     SPid ! done,
     ensure_server_exit_normal(Ref).
+
+tc_setopt_global_lb_mode_ifip(_Config) ->
+    {ok, _} = application:ensure_all_started(quicer),
+    true = code:soft_purge(quicer_nif),
+    true = code:delete(quicer_nif),
+    %% If test fail ensure we have this netdev
+    NetDevName =
+        case os:type() of
+            {unix, darwin} -> "lo0";
+            _ -> "lo"
+        end,
+    application:set_env(quicer, lb_mode, NetDevName),
+    quicer:reg_close(),
+    quicer:close_lib(),
+    {ok, _} = quicer:open_lib(),
+    ?assertEqual(
+        {ok, 2},
+        quicer:getopt(quic_global, load_balacing_mode)
+    ).
 
 %%% ====================
 %%% Internal helpers

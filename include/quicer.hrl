@@ -140,4 +140,10 @@
     bin :: binary()
 }).
 
+-define(QUIC_LOAD_BALANCING_DISABLED, 0).
+-define(QUIC_LOAD_BALANCING_SERVER_ID_IP, 1).
+-define(QUIC_LOAD_BALANCING_SERVER_ID_FIXED, 2).
+-define(QUIC_LOAD_BALANCING_COUNT, 3).
+-define(QUICER_LOAD_BALANCING_IFIP_AS_SERVER_ID, 100). %% User Network Interface IP as Server ID
+
 -endif. %% QUICER_HRL

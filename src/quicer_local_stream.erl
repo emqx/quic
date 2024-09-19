@@ -25,6 +25,10 @@
 
 -include("quicer_types.hrl").
 
+-type local_stream_opts() :: stream_opts() | proplists:proplist().
+-type cb_ret() :: quicer_stream:cb_ret().
+-type cb_state() :: quicer_stream:cb_state().
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Local Stream Callbacks
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -78,10 +82,6 @@
     handle_info/2,
     handle_continue/2
 ]).
-
--type local_stream_opts() :: stream_opts() | proplists:proplist().
--type cb_ret() :: quicer_stream:cb_ret().
--type cb_state() :: quicer_stream:cb_state().
 
 -spec start_link(module(), connection_handle(), local_stream_opts()) -> gen_server:start_ret().
 start_link(CallbackModule, Connection, Opts) ->

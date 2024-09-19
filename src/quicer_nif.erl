@@ -156,8 +156,15 @@ open_lib() ->
             {error, _} ->
                 priv_dir()
         end,
+    LBMode =
+        case application:get_env(quicer, lb_mode, 0) of
+            X when is_integer(X) ->
+                X;
+            DevName when is_list(DevName) ->
+                lb_server_id(ipv4, DevName)
+        end,
     open_lib(#{
-        load_balacing_mode => application:get_env(quicer, lb_mode, 0),
+        load_balacing_mode => LBMode,
         trace => LibFile
     }).
 
@@ -423,4 +430,21 @@ priv_dir() ->
             "priv";
         Dir ->
             Dir
+    end.
+
+%% @doc Get the load balancing server id from the given device name. ipv4 only.
+-spec lb_server_id(ipv4, string()) -> non_neg_integer().
+lb_server_id(ipv4, DevName) ->
+    try
+        {ok, IfList} = inet:getifaddrs(),
+        %% @NOTE Be aware of the order of the bytes in the address
+        lists:foldr(
+            fun(I, V) -> V bsl 8 bor I end,
+            0,
+            tuple_to_list(proplists:get_value(addr, proplists:get_value(DevName, IfList)))
+        )
+    catch
+        _:E ->
+            logger:error("Failed to set lb mode from ~s, fallback to disabled: ~p", [DevName, E]),
+            ?QUIC_LOAD_BALANCING_DISABLED
     end.
