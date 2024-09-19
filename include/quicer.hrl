@@ -17,8 +17,6 @@
 -ifndef(QUICER_HRL).
 -define(QUICER_HRL, true).
 
--define(DEFAULT_LB_DEV, "eth0").
-
 %%% ========================================
 %%% mirror macro from NIF code
 %%% ========================================

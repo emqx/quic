@@ -158,10 +158,10 @@ open_lib() ->
         end,
     LBMode =
         case application:get_env(quicer, lb_mode, 0) of
-            ?QUICER_LOAD_BALANCING_IFIP_AS_SERVER_ID ->
-                lb_server_id(ipv4, application:get_env(quicer, lb_dev, ?DEFAULT_LB_DEV));
-            X ->
-                X
+            X when is_integer(X) ->
+                X;
+            DevName when is_list(DevName) ->
+                lb_server_id(ipv4, DevName)
         end,
     open_lib(#{
         load_balacing_mode => LBMode,
