@@ -75,7 +75,10 @@ release() {
     fi
     mkdir -p _packages
     TARGET_PKG="_packages/${PKGNAME}"
-    tar czvf "$TARGET_PKG" -C $(dirname "$TARGET_SO") --exclude include --exclude share --exclude .gitignore .
+    tar czvf "$TARGET_PKG" -C $(dirname "$TARGET_SO") \
+        --exclude include --exclude share --exclude .gitignore \
+        --exclude lib \
+        .
     # use openssl but not sha256sum command because in some macos env it does not exist
     if command -v openssl; then
         openssl dgst -sha256 "${TARGET_PKG}" | cut -d ' ' -f 2  > "${TARGET_PKG}.sha256"
