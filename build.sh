@@ -68,6 +68,17 @@ download() {
     return $res
 }
 
+# rebar3 deref softlinks while packaging
+# so we dref at here to keep one dynlib file to avoid dup files in EMQX package
+# - priv/libquicer_nif.so
+# - priv/libquicer_nif.so.1
+# - priv/libquicer_nif.so.504
+remove_dups() {
+    cp -L $TARGET_SO ${TARGET_SO}tmp
+    rm ${TARGET_SO}.*
+    mv ${TARGET_SO}tmp $TARGET_SO
+}
+
 release() {
     if [ -z "$PKGNAME" ]; then
         echo "unable_to_resolve_release_package_name"
@@ -97,6 +108,7 @@ else
             build
         else
             echo "QUICER: NOTE! nif library is downloaded from prebuilt releases, not compiled from source!"
+            remove_dups
         fi
     else
         build
