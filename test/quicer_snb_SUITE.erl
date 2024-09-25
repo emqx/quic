@@ -3312,7 +3312,7 @@ default_stream_opts() ->
 default_conn_opts() ->
     [
         {alpn, ["sample"]},
-        %% , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+        %% {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
         {verify, none},
         {idle_timeout_ms, 5000}
     ].

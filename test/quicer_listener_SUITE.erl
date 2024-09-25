@@ -338,6 +338,12 @@ tc_get_listener_opt_addr(Config) ->
     {ok, {{0, 0, 0, 0}, Port}} = quicer:getopt(L, local_address),
     quicer:close_listener(L).
 
+tc_get_listener_opt_addr_specified(Config) ->
+    Port = select_port(),
+    {ok, L} = quicer:listen("127.0.0.1:" ++ integer_to_list(Port), default_listen_opts(Config)),
+    ?assertEqual({ok, {{127, 0, 0, 1}, Port}}, quicer:getopt(L, local_address)),
+    quicer:close_listener(L).
+
 tc_get_listener_opt_stats(Config) ->
     Port = select_port(),
     {ok, L} = quicer:listen(Port, default_listen_opts(Config)),

@@ -230,7 +230,7 @@ tc_conn_basic_verify_peer(Config) ->
         443,
         [
             {verify, verify_peer},
-            %, {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+            % {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
             {peer_unidi_stream_count, 3},
             {alpn, ["h3"]}
             | Config
