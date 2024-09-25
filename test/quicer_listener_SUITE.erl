@@ -520,6 +520,7 @@ tc_listener_conf_reload(Config) ->
     %% THEN: start new connection with old cacert must fail
     ?assertMatch(
         {error, transport_down, #{error := _, status := Status}} when
+            Status =:= unknown_certificate;
             Status =:= bad_certificate;
             Status =:= cert_untrusted_root;
             Status =:= handshake_failure,
