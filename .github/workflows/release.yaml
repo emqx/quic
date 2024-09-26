@@ -49,12 +49,12 @@ jobs:
       - name: build release
         if: startsWith(github.ref, 'refs/tags/')
         env:
-          QUIC_TLS: ${{ matrix.openssl }}
+          QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
           sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
-          export QUIC_TLS
+          export QUICER_TLS_VER
           BUILD_RELEASE=1 make
 
       - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
@@ -65,7 +65,7 @@ jobs:
             _packages/*.gz
             _packages/*.gz.sha256
 
-  linux:
+  emqx-linux:
     strategy:
       fail-fast: false
       matrix:
@@ -75,6 +75,7 @@ jobs:
         openssl:
           - openssl3
           - openssl
+          - sys
         arch:
           - amd64
           - arm64
@@ -90,6 +91,9 @@ jobs:
           - amzn2
           - el9
           - el8
+        exclude:
+          - os: el9
+            openssl: sys
     runs-on: ubuntu-latest
 
     steps:
@@ -113,7 +117,7 @@ jobs:
         run: |
           IMAGE=ghcr.io/emqx/emqx-builder/5.3-13:1.15.7-${{ matrix.otp }}-${{ matrix.os }}
           docker run -i --rm -v $(pwd):/wd --workdir /wd --platform=linux/${{ matrix.arch }} \
-          -e BUILD_RELEASE=1 -e QUIC_TLS=${{ matrix.openssl }} \
+          -e BUILD_RELEASE=1 -e QUICER_TLS_VER=${{ matrix.openssl }} \
           $IMAGE bash -euc 'git config --global --add safe.directory /wd; make'
 
       - uses: actions/upload-artifact@v4
@@ -128,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - mac
-      - linux
+      - emqx-linux
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v4
