@@ -36,9 +36,16 @@ patch_2_3_5()
     do_patch "$patch_1"
 }
 
-
 if [ ! -d msquic ]; then
-    git clone https://github.com/microsoft/msquic.git -b "$VERSION" --recursive --depth 1 --shallow-submodules msquic
+    if [ -f submodules/msquic/.git ]; then
+        pushd submodules/msquic
+        git checkout "$VERSION"
+        popd
+        rm -f msquic
+        ln -s submodules/msquic msquic
+    else
+        git clone https://github.com/microsoft/msquic.git -b "$VERSION" --recursive --depth 1 --shallow-submodules msquic
+    fi
 fi
 
 cd msquic
