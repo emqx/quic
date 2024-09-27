@@ -58,11 +58,15 @@ else()
   set(QUIC_ENABLE_LOGGING "OFF")
 endif()
 
+set(LIBNAME_SUFFIX "")
 if (DEFINED ENV{QUIC_LOGGING_TYPE})
   set(QUIC_ENABLE_LOGGING "ON")
   set(QUIC_LOGGING_TYPE $ENV{QUIC_LOGGING_TYPE})
   if (${QUIC_LOGGING_TYPE} STREQUAL "stdout")
       add_compile_options(-DQUICER_LOGGING_STDOUT)
+  endif()
+  if (DEFINED ENV{BUILD_RELEASE})
+    set(LIBNAME_SUFFIX "-log${QUIC_LOGGING_TYPE}")
   endif()
 endif()
 
@@ -184,7 +188,7 @@ add_dependencies(quicer_static msquic)
 
 set_target_properties(quicer_nif
     PROPERTIES
-        LIBRARY_OUTPUT_NAME quicer_nif
+        LIBRARY_OUTPUT_NAME quicer_nif${LIBNAME_SUFFIX}
         VERSION ${QUICER_VERSION}
         SOVERSION ${QUICER_ABI_VERSION}
 )

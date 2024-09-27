@@ -76,20 +76,24 @@ download() {
 remove_dups() {
     cp -L $TARGET_SO ${TARGET_SO}tmp
     rm ${TARGET_SO}.*
+    rm ${TARGET_SO}-.*
     mv ${TARGET_SO}tmp $TARGET_SO
 }
 
 release() {
+    local variant=${1:-""}
     if [ -z "$PKGNAME" ]; then
         echo "unable_to_resolve_release_package_name"
         exit 1
     fi
     mkdir -p _packages
+    PKGNAME="$(basename $PKGNAME .gz)${variant}.gz"
     TARGET_PKG="_packages/${PKGNAME}"
     tar czvf "$TARGET_PKG" -C $(dirname "$TARGET_SO") \
         --exclude include --exclude share --exclude .gitignore \
         --exclude lib \
         .
+        #$(basename $TARGET_SO).*
     # use openssl but not sha256sum command because in some macos env it does not exist
     if command -v openssl; then
         openssl dgst -sha256 "${TARGET_PKG}" | cut -d ' ' -f 2  > "${TARGET_PKG}.sha256"
@@ -101,6 +105,9 @@ release() {
 if [ "${BUILD_RELEASE:-}" = 1 ]; then
     build
     release
+    ## build logging type variant
+    QUIC_LOGGING_TYPE=stdout build
+    release "logstdout"
 else
     if [ "${QUICER_DOWNLOAD_FROM_RELEASE:-0}" = 1 ]; then
         if ! download; then
