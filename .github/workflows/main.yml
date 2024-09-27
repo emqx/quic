@@ -93,6 +93,7 @@ jobs:
         openssl:
           - openssl3
           - openssl
+          - sys
         rebar3:
           - 3.23.0
         build_type:
@@ -115,7 +116,7 @@ jobs:
       - name: release build with debug log off
         env:
           CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
-          QUIC_TLS: ${{ matrix.openssl }}
+          QUICER_TLS_VER: ${{ matrix.openssl }}
           QUIC_ENABLE_LOGGING: ${{ matrix.logging }}
         run: |
           echo "github ref: ${{ github.event.ref }}"
@@ -123,7 +124,7 @@ jobs:
           sudo sysctl -w kernel.core_pattern=core
           ulimit -c unlimited
           export CMAKE_BUILD_TYPE
-          export QUIC_TLS
+          export QUICER_TLS_VER
           export QUIC_ENABLE_LOGGING
           if [ "${QUIC_ENABLE_LOGGING}" == "ON" ] ; then
             export QUIC_LOGGING_TYPE=lttng

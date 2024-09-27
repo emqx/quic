@@ -29,7 +29,7 @@ esac
 ARCH="$(uname -m)"
 VSN="$(git describe --tags --exact-match | head -1)"
 
-OPENSSL=${QUIC_TLS:-openssl}
+OPENSSL=${QUICER_TLS_VER:-openssl}
 
 if [ -z "$VSN" ]; then
     exit 0

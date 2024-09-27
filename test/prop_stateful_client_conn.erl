@@ -271,7 +271,7 @@ default_listen_opts() ->
 default_conn_opts() ->
     [
         {alpn, ["prop"]},
-        %% , {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+        %%{sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
         {verify, none},
         {idle_timeout_ms, 0},
         {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},

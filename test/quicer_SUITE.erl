@@ -2424,7 +2424,7 @@ tc_conn_opt_sslkeylogfile(Config) ->
     ),
     quicer:close_connection(Conn),
     timer:sleep(100),
-    {ok, #file_info{type = regular}} = file:read_file_info("SSLKEYLOGFILE").
+    {ok, #file_info{type = regular}} = file:read_file_info(TargetFName).
 
 tc_insecure_traffic(Config) ->
     Port = select_port(),

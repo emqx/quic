@@ -230,7 +230,7 @@ tc_conn_basic_verify_peer(Config) ->
         443,
         [
             {verify, verify_peer},
-            %, {sslkeylogfile, "/tmp/SSLKEYLOGFILE"}
+            % {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
             {peer_unidi_stream_count, 3},
             {alpn, ["h3"]}
             | Config
@@ -473,9 +473,10 @@ run_tc_conn_custom_ca_other(Config) ->
             error := _ErrorCode,
             status := Status
         }} when
-            Status == handshake_failure;
-            Status == bad_certificate;
-            Status == cert_untrusted_root,
+            Status =:= unknown_certificate;
+            Status =:= handshake_failure;
+            Status =:= bad_certificate;
+            Status =:= cert_untrusted_root,
         Res
     ),
     SPid ! done,
@@ -656,9 +657,10 @@ run_tc_conn_client_bad_cert(Config) ->
                         {quic, transport_shutdown, _Ref, #{
                             error := _ErrorCode, status := Status
                         }} when
-                            Status == handshake_failure;
-                            Status == bad_certificate;
-                            Status == cert_untrusted_root
+                            Status =:= unknown_certificate;
+                            Status =:= handshake_failure;
+                            Status =:= bad_certificate;
+                            Status =:= cert_untrusted_root
                         ->
                             _ = flush([])
                     after 2000 ->
