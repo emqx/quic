@@ -4,6 +4,7 @@ on:
       - '*'
 
 jobs:
+  if: false
   publish:
     runs-on: ubuntu-latest
     steps:
