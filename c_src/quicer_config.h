@@ -124,4 +124,10 @@ ERL_NIF_TERM set_connection_opt(ErlNifEnv *env,
 
 const char *QuicStatusToString(_In_ QUIC_STATUS Status);
 
+#define STAT_TUPLE_U64(ATOM, FIELD)                                           \
+  enif_make_tuple2(env, ATOM, enif_make_uint64(env, statics->FIELD))
+
+#define STAT_TUPLE_U32(ATOM, FIELD)                                           \
+  enif_make_tuple2(env, ATOM, enif_make_uint(env, statics->FIELD))
+
 #endif // __QUICER_CONFIG_H_
