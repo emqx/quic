@@ -77,6 +77,7 @@
 
     % , tc_getopt_raw/1
     tc_getopt/1,
+    tc_getopt_statistics_v2/1,
     tc_setopt_conn_settings/1,
     tc_setopt_bad_opt/1,
     tc_setopt_bad_nst/1,
@@ -1003,6 +1004,66 @@ tc_getopt(Config) ->
     after 5000 ->
         ct:fail("listener_timeout")
     end.
+
+tc_getopt_statistics_v2(Config) ->
+    Parm = statistics_v2,
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready ->
+            ok
+    after 5000 ->
+        ct:fail("listener_timeout")
+    end,
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stats} = quicer:getopt(Conn, Parm, false),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    ?assertMatch(
+        [
+            {correlation_id, _},
+            {version_negotiation, _},
+            {stateless_retry, _},
+            {resumption_attempted, _},
+            {resumption_succeeded, _},
+            {grease_bit_negotiated, _},
+            {ecn_capable, _},
+            {encryption_offloaded, _},
+            {reserved, _},
+            {rtt, _},
+            {min_rtt, _},
+            {max_rtt, _},
+            {timing_start, _},
+            {timing_initial_flight_end, _},
+            {timing_handshake_flight_end, _},
+            {handshake_client_flight_1_bytes, _},
+            {handshake_server_flight_1_bytes, _},
+            {handshake_client_flight_2_bytes, _},
+            {send_path_mtu, _},
+            {send_total_packets, _},
+            {send_retransmittable_packets, _},
+            {send_suspected_lost_packets, _},
+            {send_spurious_lost_packets, _},
+            {send_total_bytes, _},
+            {send_total_stream_bytes, _},
+            {send_congestion_count, _},
+            {send_persistent_congestion_count, _},
+            {recv_total_packets, _},
+            {recv_reordered_packets, _},
+            {recv_dropped_packets, _},
+            {recv_duplicate_packets, _},
+            {recv_total_bytes, _},
+            {recv_total_stream_bytes, _},
+            {recv_decryption_failures, _},
+            {recv_valid_ack_frames, _},
+            {key_update_count, _}
+        ],
+        Stats
+    ),
+    SPid ! done,
+    ensure_server_exit_normal(Ref),
+    ok.
 
 tc_getopt_settings(Config) ->
     Port = select_port(),

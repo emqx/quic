@@ -198,6 +198,7 @@ ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_REMOTE_ADDRESS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_SETTINGS;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS;
+ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS_V2;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING;
 ERL_NIF_TERM ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT;
@@ -414,6 +415,53 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED;
 ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS;
 ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
 
+ERL_NIF_TERM ATOM_QUIC_CORRELATION_ID;
+ERL_NIF_TERM ATOM_QUIC_VERSION_NEGOTIATION;
+ERL_NIF_TERM ATOM_QUIC_STATELESS_RETRY;
+ERL_NIF_TERM ATOM_QUIC_RESUMPTION_ATTEMPTED;
+ERL_NIF_TERM ATOM_QUIC_RESUMPTION_SUCCEEDED;
+ERL_NIF_TERM ATOM_QUIC_GREASE_BIT_NEGOTIATED;
+ERL_NIF_TERM ATOM_QUIC_ECN_CAPABLE;
+ERL_NIF_TERM ATOM_QUIC_ENCRYPTION_OFFLOADED;
+ERL_NIF_TERM ATOM_QUIC_RESERVED;
+ERL_NIF_TERM ATOM_QUIC_RTT;
+ERL_NIF_TERM ATOM_QUIC_MIN_RTT;
+ERL_NIF_TERM ATOM_QUIC_MAX_RTT;
+
+ERL_NIF_TERM ATOM_QUIC_TIMING_START;
+ERL_NIF_TERM ATOM_QUIC_TIMING_INITIAL_FLIGHT_END;
+ERL_NIF_TERM ATOM_QUIC_TIMING_HANDSHAKE_FLIGHT_END;
+
+ERL_NIF_TERM ATOM_QUIC_HANDSHAKE_CLIENT_FLIGHT_1_BYTES;
+ERL_NIF_TERM ATOM_QUIC_HANDSHAKE_SERVER_FLIGHT_1_BYTES;
+ERL_NIF_TERM ATOM_QUIC_HANDSHAKE_CLIENT_FLIGHT_2_BYTES;
+
+ERL_NIF_TERM ATOM_QUIC_SEND_PATH_MTU;
+ERL_NIF_TERM ATOM_QUIC_SEND_TOTAL_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_SEND_RETRANSMITABLE_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_SEND_SUSPECTED_LOST_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_SEND_SPURIOUS_LOST_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_SEND_TOTAL_BYTES;
+ERL_NIF_TERM ATOM_QUIC_SEND_TOTAL_STREAM_BYTES;
+ERL_NIF_TERM ATOM_QUIC_SEND_CONGESTION_COUNT;
+ERL_NIF_TERM ATOM_QUIC_SEND_PERSISTENT_CONGESTION_COUNT;
+
+ERL_NIF_TERM ATOM_QUIC_RECV_TOTAL_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_RECV_REORDERED_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_RECV_DROPPED_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_RECV_DUPLICATE_PACKETS;
+ERL_NIF_TERM ATOM_QUIC_RECV_TOTAL_BYTES;
+ERL_NIF_TERM ATOM_QUIC_RECV_TOTAL_STREAM_BYTES;
+ERL_NIF_TERM ATOM_QUIC_RECV_DECRYPTION_FAILURES;
+ERL_NIF_TERM ATOM_QUIC_RECV_VALID_ACK_FRAMES;
+
+ERL_NIF_TERM ATOM_QUIC_KEY_UPDATE_COUNT;
+
+ERL_NIF_TERM ATOM_QUIC_SEND_CONGESTION_WINDOW;
+
+ERL_NIF_TERM ATOM_QUIC_DEST_CID_UPDATE_COUNT;
+ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
+
 // Mirror 'status' in msquic_linux.h
 
 /*
@@ -556,6 +604,7 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_QUIC_PARAM_CONN_IDEAL_PROCESSOR, ideal_processor);                \
   ATOM(ATOM_QUIC_PARAM_CONN_SETTINGS, settings);                              \
   ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS, statistics);                          \
+  ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS_V2, statistics_v2);                    \
   ATOM(ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT, statistics_plat);                \
   ATOM(ATOM_QUIC_PARAM_CONN_SHARE_UDP_BINDING, share_udp_binding);            \
   ATOM(ATOM_QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT,                          \
@@ -766,6 +815,49 @@ ERL_NIF_TERM ATOM_QUIC_DATAGRAM_SEND_CANCELED;
   ATOM(ATOM_QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS,                         \
        dgram_send_acknowledged_spurious);                                     \
   ATOM(ATOM_QUIC_DATAGRAM_SEND_CANCELED, dgram_send_canceled);                \
+  ATOM(ATOM_QUIC_CORRELATION_ID, correlation_id);                             \
+  ATOM(ATOM_QUIC_VERSION_NEGOTIATION, version_negotiation);                   \
+  ATOM(ATOM_QUIC_STATELESS_RETRY, stateless_retry);                           \
+  ATOM(ATOM_QUIC_RESUMPTION_ATTEMPTED, resumption_attempted);                 \
+  ATOM(ATOM_QUIC_RESUMPTION_SUCCEEDED, resumption_succeeded);                 \
+  ATOM(ATOM_QUIC_GREASE_BIT_NEGOTIATED, grease_bit_negotiated);               \
+  ATOM(ATOM_QUIC_ECN_CAPABLE, ecn_capable);                                   \
+  ATOM(ATOM_QUIC_ENCRYPTION_OFFLOADED, encryption_offloaded);                 \
+  ATOM(ATOM_QUIC_RESERVED, reserved);                                         \
+  ATOM(ATOM_QUIC_RTT, rtt);                                                   \
+  ATOM(ATOM_QUIC_MIN_RTT, min_rtt);                                           \
+  ATOM(ATOM_QUIC_MAX_RTT, max_rtt);                                           \
+  ATOM(ATOM_QUIC_TIMING_START, timing_start);                                 \
+  ATOM(ATOM_QUIC_TIMING_INITIAL_FLIGHT_END, timing_initial_flight_end);       \
+  ATOM(ATOM_QUIC_TIMING_HANDSHAKE_FLIGHT_END, timing_handshake_flight_end);   \
+  ATOM(ATOM_QUIC_HANDSHAKE_CLIENT_FLIGHT_1_BYTES,                             \
+       handshake_client_flight_1_bytes);                                      \
+  ATOM(ATOM_QUIC_HANDSHAKE_SERVER_FLIGHT_1_BYTES,                             \
+       handshake_server_flight_1_bytes);                                      \
+  ATOM(ATOM_QUIC_HANDSHAKE_CLIENT_FLIGHT_2_BYTES,                             \
+       handshake_client_flight_2_bytes);                                      \
+  ATOM(ATOM_QUIC_SEND_PATH_MTU, send_path_mtu);                               \
+  ATOM(ATOM_QUIC_SEND_TOTAL_PACKETS, send_total_packets);                     \
+  ATOM(ATOM_QUIC_SEND_RETRANSMITABLE_PACKETS, send_retransmittable_packets);  \
+  ATOM(ATOM_QUIC_SEND_SUSPECTED_LOST_PACKETS, send_suspected_lost_packets);   \
+  ATOM(ATOM_QUIC_SEND_SPURIOUS_LOST_PACKETS, send_spurious_lost_packets);     \
+  ATOM(ATOM_QUIC_SEND_TOTAL_BYTES, send_total_bytes);                         \
+  ATOM(ATOM_QUIC_SEND_TOTAL_STREAM_BYTES, send_total_stream_bytes);           \
+  ATOM(ATOM_QUIC_SEND_CONGESTION_COUNT, send_congestion_count);               \
+  ATOM(ATOM_QUIC_SEND_PERSISTENT_CONGESTION_COUNT,                            \
+       send_persistent_congestion_count);                                     \
+  ATOM(ATOM_QUIC_RECV_TOTAL_PACKETS, recv_total_packets);                     \
+  ATOM(ATOM_QUIC_RECV_REORDERED_PACKETS, recv_reordered_packets);             \
+  ATOM(ATOM_QUIC_RECV_DROPPED_PACKETS, recv_dropped_packets);                 \
+  ATOM(ATOM_QUIC_RECV_DUPLICATE_PACKETS, recv_duplicate_packets);             \
+  ATOM(ATOM_QUIC_RECV_TOTAL_BYTES, recv_total_bytes);                         \
+  ATOM(ATOM_QUIC_RECV_TOTAL_STREAM_BYTES, recv_total_stream_bytes);           \
+  ATOM(ATOM_QUIC_RECV_DECRYPTION_FAILURES, recv_decryption_failures);         \
+  ATOM(ATOM_QUIC_RECV_VALID_ACK_FRAMES, recv_valid_ack_frames);               \
+  ATOM(ATOM_QUIC_KEY_UPDATE_COUNT, key_update_count);                         \
+  ATOM(ATOM_QUIC_SEND_CONGESTION_WINDOW, send_congestion_window);             \
+  ATOM(ATOM_QUIC_DEST_CID_UPDATE_COUNT, dest_cid_update_count);               \
+  ATOM(ATOM_QUIC_SEND_ECN_CONGESTION_COUNT, send_ecn_congestion_count);       \
   ATOM(ATOM_UNDEFINED, undefined);
 
 extern QuicerRegistrationCTX *G_r_ctx;

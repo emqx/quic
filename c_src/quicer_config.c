@@ -571,8 +571,73 @@ encode_parm_to_eterm(ErlNifEnv *env,
 {
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_NOT_FOUND);
   if (QUICER_PARAM_HANDLE_TYPE_CONN == Type
-      && QUIC_PARAM_CONN_STATISTICS == Param
-      && sizeof(QUIC_STATISTICS) == BufferLength)
+      && QUIC_PARAM_CONN_STATISTICS_V2 == Param
+      && sizeof(QUIC_STATISTICS_V2) == BufferLength)
+    {
+      QUIC_STATISTICS_V2 *statics = (QUIC_STATISTICS_V2 *)Buffer;
+      ERL_NIF_TERM term = enif_make_list(
+          env,
+          36,
+          STAT_TUPLE_U64(ATOM_QUIC_CORRELATION_ID, CorrelationId),
+          STAT_TUPLE_U32(ATOM_QUIC_VERSION_NEGOTIATION, VersionNegotiation),
+          STAT_TUPLE_U32(ATOM_QUIC_STATELESS_RETRY, StatelessRetry),
+          STAT_TUPLE_U32(ATOM_QUIC_RESUMPTION_ATTEMPTED, ResumptionAttempted),
+          STAT_TUPLE_U32(ATOM_QUIC_RESUMPTION_SUCCEEDED, ResumptionSucceeded),
+          STAT_TUPLE_U32(ATOM_QUIC_GREASE_BIT_NEGOTIATED, GreaseBitNegotiated),
+          STAT_TUPLE_U32(ATOM_QUIC_ECN_CAPABLE, EcnCapable),
+          STAT_TUPLE_U32(ATOM_QUIC_ENCRYPTION_OFFLOADED, EncryptionOffloaded),
+          STAT_TUPLE_U32(ATOM_QUIC_RESERVED, RESERVED),
+          STAT_TUPLE_U32(ATOM_QUIC_RTT, Rtt),
+          STAT_TUPLE_U32(ATOM_QUIC_MIN_RTT, MinRtt),
+          STAT_TUPLE_U32(ATOM_QUIC_MAX_RTT, MaxRtt),
+          STAT_TUPLE_U64(ATOM_QUIC_TIMING_START, TimingStart),
+          STAT_TUPLE_U64(ATOM_QUIC_TIMING_INITIAL_FLIGHT_END,
+                         TimingInitialFlightEnd),
+          STAT_TUPLE_U64(ATOM_QUIC_TIMING_HANDSHAKE_FLIGHT_END,
+                         TimingHandshakeFlightEnd),
+          STAT_TUPLE_U32(ATOM_QUIC_HANDSHAKE_CLIENT_FLIGHT_1_BYTES,
+                         HandshakeClientFlight1Bytes),
+          STAT_TUPLE_U32(ATOM_QUIC_HANDSHAKE_SERVER_FLIGHT_1_BYTES,
+                         HandshakeServerFlight1Bytes),
+          STAT_TUPLE_U32(ATOM_QUIC_HANDSHAKE_CLIENT_FLIGHT_2_BYTES,
+                         HandshakeClientFlight2Bytes),
+          STAT_TUPLE_U32(ATOM_QUIC_SEND_PATH_MTU, SendPathMtu),
+          STAT_TUPLE_U64(ATOM_QUIC_SEND_TOTAL_PACKETS, SendTotalPackets),
+          STAT_TUPLE_U64(ATOM_QUIC_SEND_RETRANSMITABLE_PACKETS,
+                         SendRetransmittablePackets),
+          STAT_TUPLE_U64(ATOM_QUIC_SEND_SUSPECTED_LOST_PACKETS,
+                         SendSuspectedLostPackets),
+          STAT_TUPLE_U64(ATOM_QUIC_SEND_SPURIOUS_LOST_PACKETS,
+                         SendSpuriousLostPackets),
+          STAT_TUPLE_U64(ATOM_QUIC_SEND_TOTAL_BYTES, SendTotalBytes),
+          STAT_TUPLE_U64(ATOM_QUIC_SEND_TOTAL_STREAM_BYTES,
+                         SendTotalStreamBytes),
+          STAT_TUPLE_U32(ATOM_QUIC_SEND_CONGESTION_COUNT, SendCongestionCount),
+          STAT_TUPLE_U32(ATOM_QUIC_SEND_PERSISTENT_CONGESTION_COUNT,
+                         SendPersistentCongestionCount),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_TOTAL_PACKETS, RecvTotalPackets),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_REORDERED_PACKETS,
+                         RecvReorderedPackets),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_DROPPED_PACKETS, RecvDroppedPackets),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_DUPLICATE_PACKETS,
+                         RecvDuplicatePackets),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_TOTAL_BYTES, RecvTotalBytes),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_TOTAL_STREAM_BYTES,
+                         RecvTotalStreamBytes),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_DECRYPTION_FAILURES,
+                         RecvDecryptionFailures),
+          STAT_TUPLE_U64(ATOM_QUIC_RECV_VALID_ACK_FRAMES, RecvValidAckFrames),
+          STAT_TUPLE_U32(ATOM_QUIC_KEY_UPDATE_COUNT, KeyUpdateCount),
+          STAT_TUPLE_U32(ATOM_QUIC_SEND_CONGESTION_WINDOW,
+                         SendCongestionWindow),
+          STAT_TUPLE_U32(ATOM_QUIC_DEST_CID_UPDATE_COUNT, DestCidUpdateCount),
+          STAT_TUPLE_U32(ATOM_QUIC_SEND_ECN_CONGESTION_COUNT,
+                         SendEcnCongestionCount));
+      res = SUCCESS(term);
+    }
+  else if (QUICER_PARAM_HANDLE_TYPE_CONN == Type
+           && QUIC_PARAM_CONN_STATISTICS == Param
+           && sizeof(QUIC_STATISTICS) == BufferLength)
     {
       QUIC_STATISTICS *statics = (QUIC_STATISTICS *)Buffer;
       res = SUCCESS(enif_make_list(
@@ -1497,6 +1562,11 @@ get_connection_opt(ErlNifEnv *env,
     {
       Param = QUIC_PARAM_CONN_STATISTICS;
       BufferLength = sizeof(QUIC_STATISTICS);
+    }
+  else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS_V2))
+    {
+      Param = QUIC_PARAM_CONN_STATISTICS_V2;
+      BufferLength = sizeof(QUIC_STATISTICS_V2);
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_STATISTICS_PLAT))
     {
