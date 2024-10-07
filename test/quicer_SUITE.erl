@@ -91,6 +91,7 @@
     tc_setopt/1,
     tc_setopt_remote_addr/1,
     tc_getopt_settings/1,
+    tc_setopt_congestion_control_algorithm/1,
 
     %% @TODO following two tcs are failing due to:
     %  https://github.com/microsoft/msquic/issues/2033
@@ -3161,6 +3162,42 @@ tc_setopt_global_lb_mode_ifip(_Config) ->
         {ok, ?QUIC_LOAD_BALANCING_SERVER_ID_FIXED},
         quicer:getopt(quic_global, load_balacing_mode)
     ).
+
+tc_setopt_congestion_control_algorithm(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, _Ref} = spawn_monitor(
+        fun() ->
+            echo_server(Owner, Config, Port)
+        end
+    ),
+    receive
+        listener_ready ->
+            ok
+    after 5000 ->
+        ct:fail("listener_timeout")
+    end,
+    {ok, Conn} = quicer:connect(
+        "localhost",
+        Port,
+        [
+            {congestion_control_algorithm, ?QUIC_CONGESTION_CONTROL_ALGORITHM_BBR}
+            | default_conn_opts()
+        ],
+        5000
+    ),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+
+    {ok, Settings} = quicer:getopt(Conn, settings),
+    ?assertMatch(
+        ?QUIC_CONGESTION_CONTROL_ALGORITHM_BBR,
+        proplists:get_value(congestion_control_algorithm, Settings)
+    ),
+
+    quicer:shutdown_connection(Conn),
+    SPid ! done,
+    ok.
 
 %%% ====================
 %%% Internal helpers
