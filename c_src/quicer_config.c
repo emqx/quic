@@ -753,6 +753,8 @@ encode_parm_to_eterm(ErlNifEnv *env,
                            Settings->DisconnectTimeoutMs),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_KeepAliveIntervalMs,
                            Settings->KeepAliveIntervalMs),
+          PropTupleAtomInt(ATOM_QUIC_SETTINGS_CongestionControlAlgorithm,
+                           Settings->CongestionControlAlgorithm),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerBidiStreamCount,
                            Settings->PeerBidiStreamCount),
           PropTupleAtomInt(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount,
@@ -1160,6 +1162,14 @@ create_settings(ErlNifEnv *env,
     {
       Settings->IsSet.KeepAliveIntervalMs = TRUE;
     }
+  if (get_uint16_from_map(env,
+                          *emap,
+                          ATOM_QUIC_SETTINGS_CongestionControlAlgorithm,
+                          &Settings->CongestionControlAlgorithm))
+    {
+      Settings->IsSet.CongestionControlAlgorithm = TRUE;
+    }
+
   if (get_uint16_from_map(env,
                           *emap,
                           ATOM_QUIC_SETTINGS_PeerBidiStreamCount,

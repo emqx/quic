@@ -116,6 +116,7 @@
     max_ack_delay_ms => uint32(),
     disconnect_timeout_ms => uint32(),
     keep_alive_interval_ms => uint32(),
+    congestion_control_algorithm => uint16(),
     peer_bidi_stream_count => uint16(),
     peer_unidi_stream_count => uint16(),
     retry_memory_limit => uint16(),

@@ -278,6 +278,7 @@ ERL_NIF_TERM ATOM_QUIC_SETTINGS_InitialRttMs;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxAckDelayMs;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_DisconnectTimeoutMs;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_KeepAliveIntervalMs;
+ERL_NIF_TERM ATOM_QUIC_SETTINGS_CongestionControlAlgorithm;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerBidiStreamCount;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerUnidiStreamCount;
 ERL_NIF_TERM ATOM_QUIC_SETTINGS_RetryMemoryLimit;
@@ -687,6 +688,8 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
   ATOM(ATOM_QUIC_SETTINGS_MaxAckDelayMs, max_ack_delay_ms);                   \
   ATOM(ATOM_QUIC_SETTINGS_DisconnectTimeoutMs, disconnect_timeout_ms);        \
   ATOM(ATOM_QUIC_SETTINGS_KeepAliveIntervalMs, keep_alive_interval_ms);       \
+  ATOM(ATOM_QUIC_SETTINGS_CongestionControlAlgorithm,                         \
+       congestion_control_algorithm);                                         \
   ATOM(ATOM_QUIC_SETTINGS_PeerBidiStreamCount, peer_bidi_stream_count);       \
   ATOM(ATOM_QUIC_SETTINGS_PeerUnidiStreamCount, peer_unidi_stream_count);     \
   ATOM(ATOM_QUIC_SETTINGS_RetryMemoryLimit, retry_memory_limit);              \

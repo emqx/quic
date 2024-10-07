@@ -254,6 +254,7 @@ extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_InitialRttMs;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_MaxAckDelayMs;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_DisconnectTimeoutMs;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_KeepAliveIntervalMs;
+extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_CongestionControlAlgorithm;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerBidiStreamCount;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_PeerUnidiStreamCount;
 extern ERL_NIF_TERM ATOM_QUIC_SETTINGS_RetryMemoryLimit;
