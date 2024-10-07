@@ -2553,10 +2553,7 @@ tc_event_start_compl_client(Config) ->
     {ok, Conn} = quicer:connect(
         "localhost",
         Port,
-        [
-            {disable_1rtt_encryption, true}
-            | default_conn_opts()
-        ],
+        default_conn_opts(),
         5000
     ),
     %% Stream 1 enabled
@@ -2616,10 +2613,7 @@ tc_event_start_compl_server(Config) ->
     {ok, Conn} = quicer:connect(
         "localhost",
         Port,
-        [
-            {disable_1rtt_encryption, true}
-            | default_conn_opts()
-        ],
+        default_conn_opts(),
         5000
     ),
     %% Stream 1 enabled
