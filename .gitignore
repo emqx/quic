@@ -6,6 +6,7 @@ erl_crash.dump
 .concrete/DEV_MODE
 .DS_Store
 .cache
+build
 
 # rebar 2.x
 .rebar
@@ -23,6 +24,7 @@ rebar.lock
 priv/*.so
 priv/*lttng.*
 priv/*.dylib
+priv/**
 
 # language server caches
 .ccls-cache/
@@ -36,3 +38,6 @@ compile_commands.json
 # downloaded code
 msquic/
 _packages/
+
+# test logs
+asan_logs/

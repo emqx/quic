@@ -277,6 +277,7 @@ init_s_ctx()
 void
 deinit_s_ctx(QuicerStreamCTX *s_ctx)
 {
+  cleanup_owner_signals(s_ctx);
   enif_mutex_destroy(s_ctx->lock);
   enif_free_env(s_ctx->env);
 }
@@ -408,4 +409,22 @@ cache_stream_id(QuicerStreamCTX *s_ctx)
     {
       s_ctx->StreamID = UNSET_STREAMID;
     }
+}
+
+void
+cleanup_owner_signals(QuicerStreamCTX *s_ctx)
+{
+  OWNER_SIGNAL *sig;
+
+  if (!s_ctx->sig_queue)
+    {
+      return;
+    }
+  while ((sig = OwnerSignalDequeue(s_ctx->sig_queue)))
+    {
+      CxPlatFree(sig, QUICER_OWNER_SIGNAL);
+    }
+
+  OwnerSignalQueueDestroy(s_ctx->sig_queue);
+  s_ctx->sig_queue = NULL;
 }

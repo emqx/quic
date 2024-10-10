@@ -197,4 +197,6 @@ BOOLEAN get_reg_handle(QuicerRegistrationCTX *r_ctx);
 
 void cache_stream_id(QuicerStreamCTX *s_ctx);
 
+void cleanup_owner_signals(QuicerStreamCTX *s_ctx);
+
 #endif // __QUICER_CTX_H_
