@@ -75,8 +75,8 @@ download() {
 # - priv/libquicer_nif.so.504
 remove_dups() {
     cp -L $TARGET_SO ${TARGET_SO}tmp
-    rm ${TARGET_SO}.*
-    rm ${TARGET_SO}-.*
+    rm -f ${TARGET_SO}.*
+    rm -f ${TARGET_SO}-.*
     mv ${TARGET_SO}tmp $TARGET_SO
 }
 
