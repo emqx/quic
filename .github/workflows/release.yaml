@@ -92,8 +92,6 @@ jobs:
           - el9
           - el8
         exclude:
-          - os: el9
-            openssl: sys
           - os: amzn2
             openssl: openssl3
     runs-on: ubuntu-latest
@@ -120,7 +118,7 @@ jobs:
           IMAGE=ghcr.io/emqx/emqx-builder/5.3-13:1.15.7-${{ matrix.otp }}-${{ matrix.os }}
           docker run -i --rm -v $(pwd):/wd --workdir /wd --platform=linux/${{ matrix.arch }} \
           -e BUILD_RELEASE=1 -e QUICER_TLS_VER=${{ matrix.openssl }} \
-          $IMAGE bash -euc 'git config --global --add safe.directory /wd; [[ "${QUICER_TLS_VER}" == "openssl3" ]] && which yum && yum install -y perl-IPC-Cmd; make'
+          $IMAGE bash -euc 'git config --global --add safe.directory /wd; which yum && yum install -y perl-IPC-Cmd; make'
 
       - uses: actions/upload-artifact@v4
         if: startsWith(github.ref, 'refs/tags/')
