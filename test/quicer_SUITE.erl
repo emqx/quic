@@ -75,6 +75,7 @@
 
     tc_dgram_client_send/1,
     tc_dgram_client_send_iolist/1,
+    tc_dgram_client_send_fail/1,
 
     % , tc_getopt_raw/1
     tc_getopt/1,
@@ -859,7 +860,7 @@ tc_stream_controlling_process_demon(Config) ->
             ok = quicer:setopt(Stm, active, true),
             {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
             receive
-                {quic, <<"owner_changed">>, Stm, _} ->
+                {quic, <<"owner_changed">>, _Stm, _} ->
                     ok
             end,
             %% Set controlling_process again
@@ -882,6 +883,15 @@ tc_stream_controlling_process_demon(Config) ->
     after 6000 ->
         ct:fail("timeout")
     end.
+
+tc_dgram_client_send_fail(_) ->
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:async_connect("localhost", 65535, Opts),
+    ?assertEqual(
+        {error, dgram_send_error, dgram_send_canceled},
+        quicer:send_dgram(Conn, <<"ping">>)
+    ),
+    ok.
 
 tc_dgram_client_send(Config) ->
     Port = select_port(),
