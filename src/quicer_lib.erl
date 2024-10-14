@@ -41,7 +41,10 @@
 
 -type action() :: hibernate | timeout() | {continue, Continue :: term()}.
 
--export([default_cb_ret/2]).
+-export([
+    default_cb_ret/2,
+    handle_dgram_send_states/1
+]).
 
 -spec default_cb_ret(cb_ret(), State :: term()) ->
     {reply, NewState :: term()}
@@ -69,3 +72,43 @@ default_cb_ret({reply, Reply, NewCBState, Action}, State) ->
     {reply, Reply, State#{callback_state := NewCBState}, Action};
 default_cb_ret({reply, Reply, NewCBState}, State) ->
     {reply, Reply, State#{callback_state := NewCBState}}.
+
+-spec handle_dgram_send_states(connection_handle()) ->
+    ok
+    | {error,
+        dgram_send_canceled
+        | dgram_send_unknown
+        | dgram_send_lost_discarded}.
+handle_dgram_send_states(Conn) ->
+    handle_dgram_send_states(init, Conn).
+handle_dgram_send_states(init, Conn) ->
+    receive
+        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_SENT}} ->
+            handle_dgram_send_states(sent, Conn);
+        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
+            %% @TODO unsure if it will hit here
+            ok;
+        {quic, dgram_send_state, Conn, #{state := E}} ->
+            {error, E}
+    end;
+handle_dgram_send_states(sent, Conn) ->
+    receive
+        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
+            %% Happy Track
+            ok;
+        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_LOST_SUSPECT}} ->
+            %% Lost suspected
+            receive
+                {quic, dgram_send_state, Conn, #{
+                    state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED_SPURIOUS
+                }} ->
+                    %% Lost recovered
+                    ok;
+                {quic, dgram_send_state, Conn, #{state := EState}} ->
+                    %% Unrecoverable Errors.
+                    {error, EState}
+            end;
+        {quic, dgram_send_state, Conn, #{state := EState}} ->
+            %% Unrecoverable Errors.
+            {error, EState}
+    end.

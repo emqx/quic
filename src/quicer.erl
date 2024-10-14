@@ -68,6 +68,7 @@
     async_send/2,
     async_send/3,
     recv/2,
+    async_send_dgram/2,
     send_dgram/2,
     shutdown_stream/1,
     shutdown_stream/2,
@@ -809,33 +810,39 @@ do_recv(Stream, Count, Buff) ->
             E
     end.
 
-%% @doc Sending Unreliable Datagram
+%% @doc Sending Unreliable Datagram.
+%% Caller should handle the async signals for the send results
 %%
-%% ref: [https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram]
-%% @see send/2
+%% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
+%% @see send/2 send_dgram/2
+-spec async_send_dgram(connection_handle(), binary()) ->
+    {ok, non_neg_integer()}
+    | {error, badarg | not_enough_mem | closed}
+    | {error, dgram_send_error, atom_reason()}.
+async_send_dgram(Conn, Data) ->
+    quicer_nif:send_dgram(Conn, Data, _IsSyncRel = 1).
+
+%% @doc Sending Unreliable Datagram, returns the end state.
+%%
+%% %% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
+%% @see send/2, async_send_dgram
 -spec send_dgram(connection_handle(), binary()) ->
-    {ok, BytesSent :: pos_integer()}
+    {ok, BytesSent :: non_neg_integer()}
     | {error, badarg | not_enough_mem | closed}
     | {error, dgram_send_error, atom_reason()}.
 send_dgram(Conn, Data) ->
     case quicer_nif:send_dgram(Conn, Data, _IsSync = 1) of
-        %% @todo we need find tuned event mask
         {ok, _Len} = OK ->
-            receive
-                {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_SENT}} ->
-                    receive
-                        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
-                            OK;
-                        {quic, dgram_send_state, Conn, #{state := Other}} ->
-                            {error, dgram_send_error, Other}
-                    end;
-                {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
+            case quicer_lib:handle_dgram_send_states(Conn) of
+                ok ->
                     OK;
-                {quic, dgram_send_state, Conn, #{state := Other}} ->
-                    {error, dgram_send_error, Other}
+                {error, E} ->
+                    {error, dgram_send_error, E}
             end;
-        E ->
-            E
+        {error, _, _} = E ->
+            E;
+        {error, E} ->
+            {error, dgram_send_error, E}
     end.
 
 %% @doc Shutdown stream gracefully, with infinity timeout
