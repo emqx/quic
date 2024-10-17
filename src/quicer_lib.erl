@@ -111,13 +111,11 @@ handle_dgram_send_states(init, Conn, {Fun, CallbackState}, Timeout) ->
         {quic, dgram_send_state, Conn, #{state := Final}} ->
             Fun(Conn, Final, CallbackState)
     after 5000 ->
+        %% @TODO proper test caught this, may fire a bug report to msquic
         Fun(Conn, timeout, CallbackState)
     end;
 handle_dgram_send_states(sent, Conn, {Fun, CallbackState}, Timeout) ->
     receive
-        %% {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
-        %%     %% Happy Track
-        %%     Fun(Conn, ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED, CallbackState);
         {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_LOST_SUSPECT}} ->
             %% Lost suspected, call the callback for the return hits.
             %% however, we still need to wait for the final state.
@@ -126,12 +124,13 @@ handle_dgram_send_states(sent, Conn, {Fun, CallbackState}, Timeout) ->
                 {quic, dgram_send_state, Conn, #{state := EState}} ->
                     Fun(Conn, EState, NewCBState)
             after Timeout ->
+                %% @TODO proper test caught this, may fire a bug report to msquic
                 Fun(Conn, timeout, CallbackState)
             end;
         {quic, dgram_send_state, Conn, #{state := Final}} ->
-            %% Unrecoverable Errors.
             Fun(Conn, Final, CallbackState)
     after Timeout ->
+        %% @TODO proper test caught this, may fire a bug report to msquic
         Fun(Conn, timeout, CallbackState)
     end.
 
