@@ -58,6 +58,7 @@
     close_connection/4,
     async_close_connection/1,
     async_close_connection/3,
+    probe/2,
     accept_stream/2,
     accept_stream/3,
     async_accept_stream/2,
@@ -172,7 +173,10 @@
     quicer_addr/0,
 
     %% Registraion Profiles
-    registration_profile/0
+    registration_profile/0,
+
+    %% probes
+    probe_res/0
 ]).
 
 -type connection_opts() :: proplists:proplist() | conn_opts().
@@ -822,10 +826,13 @@ do_recv(Stream, Count, Buff) ->
 async_send_dgram(Conn, Data) ->
     quicer_nif:send_dgram(Conn, Data, _IsSyncRel = 1).
 
-%% @doc Sending Unreliable Datagram, returns the end state.
+%% @doc Sending Unreliable Datagram
+%%  return error only if sending could not be scheduled such as
+%%  not_enough_mem, connection is already closed or wrong args.
+%%  otherwise, it is fire and forget.
 %%
 %% %% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
-%% @see send/2, async_send_dgram
+%% @see send/2, async_send_dgram/2
 -spec send_dgram(connection_handle(), binary()) ->
     {ok, BytesSent :: non_neg_integer()}
     | {error, badarg | not_enough_mem | closed}
@@ -839,11 +846,16 @@ send_dgram(Conn, Data) ->
                 {error, E} ->
                     {error, dgram_send_error, E}
             end;
-        {error, _, _} = E ->
-            E;
         {error, E} ->
-            {error, dgram_send_error, E}
+            {error, E};
+        E ->
+            E
     end.
+
+%% @doc Probe conn state with 0 len dgram.
+-spec probe(connection_handle(), timeout()) -> probe_res().
+probe(Conn, Timeout) ->
+    quicer_lib:probe(Conn, Timeout).
 
 %% @doc Shutdown stream gracefully, with infinity timeout
 %%

@@ -506,5 +506,11 @@
     dgram_max_len := uint64()
 }.
 
+-type probe_state() :: #probe_state{}.
+-type probe_res() ::
+    #probe_state{}
+    | {error, dgram_send_error, atom()}
+    | {error, atom()}.
+
 %% QUICER_TYPES_HRL
 -endif.
