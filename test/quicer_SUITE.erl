@@ -888,7 +888,8 @@ tc_dgram_client_send_fail(_) ->
     Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
     {ok, Conn} = quicer:async_connect("localhost", 65535, Opts),
     ?assertEqual(
-        {error, dgram_send_error, dgram_send_canceled},
+        %% fire and forget
+        {ok, 4},
         quicer:send_dgram(Conn, <<"ping">>)
     ),
     ok.

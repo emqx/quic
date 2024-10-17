@@ -101,6 +101,8 @@ command(#{handle := Handle}) ->
             {call, quicer, async_accept_stream, [Handle, ?LET(Opts, quicer_acceptor_opts(), Opts)]}},
         {100, {call, quicer, peername, [Handle]}},
         {50, {call, quicer, peercert, [Handle]}},
+        {50, {call, quicer, probe, [Handle, 5000]}},
+        {50, {call, quicer, send_dgram, [Handle, binary()]}},
         {10, {call, quicer, negotiated_protocol, [Handle]}},
         {10, {call, quicer, get_connections, []}},
         {10, {call, quicer, get_conn_owner, [Handle]}},
@@ -295,6 +297,36 @@ postcondition(#{state := closed}, {call, _Mod, _Fun, _Args}, {error, closed}) ->
 postcondition(#{state := accepted}, {call, _Mod, _Fun, _Args}, {error, closed}) ->
     %% handshake didnt take place on time
     true;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, probe, [_, _]},
+    {error, dgram_send_error, _}
+) ->
+    ConnState =/= connected;
+postcondition(
+    #{state := _ConnState},
+    {call, quicer, probe, [_, _]},
+    #probe_state{final = FinalState, final_at = FinalTs}
+) ->
+    FinalState =/= undefined andalso FinalTs =/= undefined;
+postcondition(
+    #{state := _ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {ok, _}
+) ->
+    true;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {error, _, _}
+) ->
+    ConnState =/= connected;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {error, _}
+) ->
+    ConnState =/= connected;
 postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
     false.
 
@@ -321,6 +353,10 @@ do_next_state(
     #{state := _} = State, ok, {call, quicer, controlling_process, [_, Owner]}
 ) ->
     State#{owner := Owner};
+do_next_state(
+    #{state := _} = State, {error, closed}, {call, _M, _F, _A}
+) ->
+    State#{state := closed};
 do_next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->
     State.
 
