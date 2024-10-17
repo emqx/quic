@@ -821,7 +821,7 @@ do_recv(Stream, Count, Buff) ->
 %% @see send/2 send_dgram/2
 -spec async_send_dgram(connection_handle(), binary()) ->
     {ok, non_neg_integer()}
-    | {error, badarg | not_enough_mem | closed}
+    | {error, badarg | not_enough_mem | invalid_parameter | closed}
     | {error, dgram_send_error, atom_reason()}.
 async_send_dgram(Conn, Data) ->
     quicer_nif:send_dgram(Conn, Data, _IsSyncRel = 1).
@@ -835,7 +835,7 @@ async_send_dgram(Conn, Data) ->
 %% @see send/2, async_send_dgram/2
 -spec send_dgram(connection_handle(), binary()) ->
     {ok, BytesSent :: non_neg_integer()}
-    | {error, badarg | not_enough_mem | closed}
+    | {error, badarg | not_enough_mem | invalid_parameter | closed}
     | {error, dgram_send_error, atom_reason()}.
 send_dgram(Conn, Data) ->
     case quicer_nif:send_dgram(Conn, Data, _IsSync = 1) of

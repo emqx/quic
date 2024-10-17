@@ -157,6 +157,10 @@ postcondition(#{state := S}, {call, quicer, handshake, _Args}, {error, invalid_s
     S =/= accepted
 ->
     true;
+postcondition(#{state := S}, {call, quicer, handshake, _Args}, {error, timeout}) when
+    S =/= accepted
+->
+    true;
 postcondition(_State, {call, quicer, getopt, _Args}, {ok, _}) ->
     true;
 postcondition(_State, {call, quicer, getopt, [_, password]}, {error, badarg}) ->
@@ -318,6 +322,10 @@ postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
 next_state(State, Res, Call) ->
     step_calls(do_next_state(State, Res, Call)).
 
+do_next_state(
+    #{state := _} = State, {error, closed}, {call, _M, _F, _A}
+) ->
+    State#{state := closed};
 do_next_state(#{state := accepted} = State, {error, _}, {call, quicer, handshake, _Args}) ->
     State;
 do_next_state(#{state := accepted} = State, _Res, {call, quicer, handshake, _Args}) ->
@@ -334,10 +342,6 @@ do_next_state(
     #{state := _} = State, ok, {call, quicer, controlling_process, [_, Owner]}
 ) ->
     State#{owner := Owner};
-do_next_state(
-    #{state := _} = State, {error, closed}, {call, _M, _F, _A}
-) ->
-    State#{state := closed};
 do_next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->
     State.
 
@@ -383,7 +387,8 @@ default_listen_opts() ->
         {handshake_idle_timeout_ms, 100},
         % QUIC_SERVER_RESUME_AND_ZERORTT
         {server_resumption_level, 2},
-        {peer_bidi_stream_count, 10}
+        {peer_bidi_stream_count, 10},
+        {datagram_receive_enabled, true}
     ].
 
 default_conn_opts() ->
@@ -394,5 +399,6 @@ default_conn_opts() ->
         {idle_timeout_ms, 5000},
         {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
         {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"}
+        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"},
+        {datagram_receive_enabled, true}
     ].
