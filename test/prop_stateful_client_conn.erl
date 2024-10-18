@@ -55,6 +55,7 @@ prop_client_state_test() ->
 %%%%%%%%%%%%%
 %% @doc Initial model value at system start. Should be deterministic.
 initial_state() ->
+    net_kernel:start([?MODULE, shortnames]),
     {ok, H} = quicer:connect("localhost", 14568, default_conn_opts(), 10000),
     #{
         state => connected,
@@ -74,6 +75,8 @@ command(#{handle := Handle}) ->
             {call, quicer, async_accept_stream, [Handle, ?LET(Opts, quicer_acceptor_opts(), Opts)]}},
         {100, {call, quicer, peername, [Handle]}},
         {50, {call, quicer, peercert, [Handle]}},
+        {50, {call, quicer, probe, [Handle, 5000]}},
+        {50, {call, quicer, send_dgram, [Handle, binary()]}},
         {10, {call, quicer, negotiated_protocol, [Handle]}},
         {10, {call, quicer, get_connections, []}},
         {10, {call, quicer, get_conn_owner, [Handle]}},
@@ -191,6 +194,36 @@ postcondition(
 ) ->
     Owner =/= self();
 postcondition(
+    #{state := ConnState},
+    {call, quicer, probe, [_, _]},
+    {error, dgram_send_error, _}
+) ->
+    ConnState =/= connected;
+postcondition(
+    #{state := _ConnState},
+    {call, quicer, probe, [_, _]},
+    #probe_state{final = FinalState, final_at = FinalTs}
+) ->
+    FinalState =/= undefined andalso FinalTs =/= undefined;
+postcondition(
+    #{state := _ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {ok, _}
+) ->
+    true;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {error, _, _}
+) ->
+    ConnState =/= connected;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {error, _}
+) ->
+    ConnState =/= connected;
+postcondition(
     #{owner := _, state := connected},
     {call, quicer, controlling_process, [_, NewOwner]},
     {error, owner_dead}
@@ -265,7 +298,8 @@ default_listen_opts() ->
         {handshake_idle_timeout_ms, 10000},
         % QUIC_SERVER_RESUME_AND_ZERORTT
         {server_resumption_level, 2},
-        {peer_bidi_stream_count, 10}
+        {peer_bidi_stream_count, 10},
+        {datagram_receive_enabled, 1}
     ].
 
 default_conn_opts() ->
@@ -276,5 +310,6 @@ default_conn_opts() ->
         {idle_timeout_ms, 0},
         {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
         {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"}
+        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"},
+        {datagram_receive_enabled, 1}
     ].

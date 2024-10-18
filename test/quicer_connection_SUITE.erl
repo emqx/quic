@@ -897,6 +897,16 @@ tc_get_conn_owner_server(Config) ->
             ct:fail({client_fail, Reason})
     end.
 
+tc_conn_probe(_) ->
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:async_connect("localhost", 65535, Opts),
+    ?assertMatch(
+        #probe_state{final_at = TS, final = ?QUIC_DATAGRAM_SEND_CANCELED} when
+            TS =/= undefined,
+        quicer:probe(Conn, 5000)
+    ),
+    ok.
+
 %%%
 %%% Helpers
 %%%

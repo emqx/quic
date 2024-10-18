@@ -149,4 +149,11 @@
 -define(QUIC_CONGESTION_CONTROL_ALGORITHM_CUBIC, 0).
 -define(QUIC_CONGESTION_CONTROL_ALGORITHM_BBR, 1).
 
+-record(probe_state, {
+    final :: term() | undefined,
+    sent_at :: integer() | undefined,
+    suspect_lost_at :: integer() | undefined,
+    final_at :: integer() | undefined
+}).
+
 -endif. %% QUICER_HRL
