@@ -841,7 +841,14 @@ async_connect3(ErlNifEnv *env,
 
   // Monitor owner before start, so we don't need to race with callbacks
   // after start the connection
-  enif_monitor_process(NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon);
+  //
+  if (!c_ctx->is_monitored
+      && 0
+             == enif_monitor_process(
+                 NULL, c_ctx, &c_ctx->owner->Pid, &c_ctx->owner_mon))
+    {
+      c_ctx->is_monitored = TRUE;
+    }
 
   // c_ctx->lock should be taken to prevent parallel access from callback as
   // work trigged by starting of the connection.
@@ -1168,7 +1175,11 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
   // A monitor is automatically removed when it triggers or when the
   // resource is deallocated.
   enif_mutex_lock(c_ctx->lock);
-  enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon);
+  if ((!c_ctx->is_monitored)
+      && 0 == enif_monitor_process(NULL, c_ctx, acc_pid, &c_ctx->owner_mon))
+    {
+      c_ctx->is_monitored = TRUE;
+    }
   enif_mutex_unlock(c_ctx->lock);
 
   ERL_NIF_TERM ConnHandle = enif_make_resource(c_ctx->env, c_ctx);
@@ -1392,8 +1403,13 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
       = { enif_make_uint(env, Event->PEER_STREAM_STARTED.Flags),
           ATOM_BOOLEAN(is_orphan) };
 
-  ERL_NIF_TERM report = make_event_with_props(
-      env, ATOM_NEW_STREAM, s_ctx->eHandle, props_name, props_value, 2);
+  ERL_NIF_TERM report
+      = make_event_with_props(env,
+                              ATOM_NEW_STREAM,
+                              enif_make_copy(env, s_ctx->eHandle),
+                              props_name,
+                              props_value,
+                              2);
   if (!enif_send(NULL, acc_pid, NULL, report))
     {
       if (is_orphan)
@@ -1421,7 +1437,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
 
           report = make_event_with_props(env,
                                          ATOM_NEW_STREAM,
-                                         s_ctx->eHandle,
+                                         enif_make_copy(env, s_ctx->eHandle),
                                          props_name,
                                          props_value,
                                          2);

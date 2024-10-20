@@ -129,7 +129,11 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
       l_ctx->r_ctx = NULL;
     }
   l_ctx->config_resource = NULL;
-  enif_demonitor_process(l_ctx->env, l_ctx, &l_ctx->owner_mon);
+  if (l_ctx->is_monitored)
+    {
+      enif_demonitor_process(l_ctx->env, l_ctx, &l_ctx->owner_mon);
+      l_ctx->is_monitored = FALSE;
+    }
   enif_release_resource(l_ctx);
 }
 
@@ -212,7 +216,12 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
   CxPlatListEntryRemove(&c_ctx->RegistrationLink);
   enif_mutex_unlock(r_ctx->lock);
 
-  enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
+  if (c_ctx->is_monitored)
+    {
+      enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
+      c_ctx->is_monitored = FALSE;
+    }
+
   enif_release_resource(c_ctx);
 }
 

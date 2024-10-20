@@ -395,6 +395,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
+  l_ctx->is_monitored = TRUE;
   // Now open listener
   if (QUIC_FAILED(Status = MsQuic->ListenerOpen(
                       // Listener registration
