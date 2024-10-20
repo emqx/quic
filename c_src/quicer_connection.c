@@ -870,6 +870,7 @@ async_connect3(ErlNifEnv *env,
       if (c_ctx->config_resource)
         {
           destroy_config_ctx(c_ctx->config_resource);
+          c_ctx->config_resource = NULL;
         }
 
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
