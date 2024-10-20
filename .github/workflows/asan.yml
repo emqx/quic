@@ -25,7 +25,7 @@ jobs:
       - name: run sanitizer-check
         run: |
           . /home/runner/OTP/default/activate
-          tools/asan/bin/sanitizer-check all
+          tools/run/bin/sanitizer-check all
       - name: Archive asan logs
         uses: actions/upload-artifact@v3
         with:

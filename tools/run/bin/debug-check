@@ -2,13 +2,13 @@
 #
 # Usage:
 # # run all test cases
-# sanitizer-check
+# debug-check
 #
 # # run one testcase at a time
-# sanitizer-check one_by_one
+# debug-check one_by_one
 #
 # # run with ct options
-# sanitizer-check --case=Case0 --repeat 100
+# debug-check --case=Case0 --repeat 100
 #
 #
 lib_dir=$(dirname "$(realpath "$0")")
@@ -17,7 +17,7 @@ lib_dir=$(dirname "$(realpath "$0")")
 #export QUICER_USE_SANITIZERS=1
 
 # for using asan emulator
-export ESCRIPT_EMULATOR="${lib_dir}/erl-valgrind"
+export ESCRIPT_EMULATOR="${lib_dir}/erl-debug"
 
 # Since cerl returns different code:root_dir(), we need to override it here
 # Erlang_OTP_ROOT_DIR will be picked up by CMakeLists.txt
@@ -27,13 +27,6 @@ export Erlang_OTP_ROOT_DIR=$(dirname $(dirname $(which erl)))
 export ERL_TOP=$(cerl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt)
 
 #export QUICER_USE_SNK=1
-
-# For log output
-if [ -z "${VALGRIND_LOG_DIR}" ]; then
-    export VALGRIND_LOG_DIR=${PWD}/valgrind_logs
-fi
-
-mkdir -p "${VALGRIND_LOG_DIR}"
 
 REBAR3=$(command -v rebar3)
 
