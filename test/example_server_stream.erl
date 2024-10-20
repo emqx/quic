@@ -137,10 +137,11 @@ handle_stream_data(
     case PeerStream of
         undefined ->
             case
-                quicer_local_stream:start_link(
+                quicer_local_stream:start(
                     ?MODULE,
                     Conn,
-                    [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]
+                    [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}],
+                    []
                 )
             of
                 {ok, StreamProc} ->

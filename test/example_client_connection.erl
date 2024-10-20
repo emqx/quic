@@ -165,4 +165,4 @@ handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
             false ->
                 error(fixme)
         end,
-    {ok, S}.
+    {ok, NewS}.
