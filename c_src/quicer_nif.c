@@ -1140,6 +1140,9 @@ on_load(ErlNifEnv *env,
   int ret_val = 0;
   unsigned load_vsn = 0;
 
+  init_atoms(env);
+
+  // TP must run after init_atoms as atoms are used in TP
   TP_NIF_3(start, &MsQuic, 0);
   if (!enif_get_uint(env, loadinfo, &load_vsn))
     {
@@ -1154,7 +1157,6 @@ on_load(ErlNifEnv *env,
       return 1; // any value except 0 is error
     }
 
-  init_atoms(env);
   open_resources(env);
 
   TP_NIF_3(end, &MsQuic, 0);

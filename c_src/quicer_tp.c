@@ -4,6 +4,9 @@
 
 extern uint64_t CxPlatTimeUs64(void);
 
+// help macro to copy atom to env for debug emulator assertions
+#define ATOM_IN_ENV(X) enif_make_copy(env, ATOM_##X)
+
 void
 tp_snk(ErlNifEnv *env,
        const char *ctx,
@@ -17,11 +20,13 @@ tp_snk(ErlNifEnv *env,
     {
       ERL_NIF_TERM snk_event;
       ERL_NIF_TERM snk_event_key_array[7]
-          = { ATOM_SNK_KIND,    ATOM_CONTEXT, ATOM_FUNCTION, ATOM_TAG,
-              ATOM_RESOURCE_ID, ATOM_MARK,    ATOM_SNK_META };
+          = { ATOM_IN_ENV(SNK_KIND),    ATOM_IN_ENV(CONTEXT),
+              ATOM_IN_ENV(FUNCTION),    ATOM_IN_ENV(TAG),
+              ATOM_IN_ENV(RESOURCE_ID), ATOM_IN_ENV(MARK),
+              ATOM_IN_ENV(SNK_META) };
 
       ERL_NIF_TERM snk_evt_meta;
-      ERL_NIF_TERM snk_evt_meta_key_array[1] = { ATOM_TIME };
+      ERL_NIF_TERM snk_evt_meta_key_array[1] = { ATOM_IN_ENV(TIME) };
       ERL_NIF_TERM snk_evt_meta_val_array[1]
           = { enif_make_uint64(env, CxPlatTimeUs64()) };
 
@@ -33,7 +38,7 @@ tp_snk(ErlNifEnv *env,
                                 &snk_evt_meta);
 
       ERL_NIF_TERM snk_event_val_array[7] = {
-        ATOM_DEBUG,                                 // snk_kind
+        ATOM_IN_ENV(DEBUG),                         // snk_kind
         enif_make_string(env, ctx, ERL_NIF_LATIN1), // context
         enif_make_string(env, fun, ERL_NIF_LATIN1), // fun
         enif_make_string(env, tag, ERL_NIF_LATIN1), // tag
@@ -46,7 +51,9 @@ tp_snk(ErlNifEnv *env,
           env, snk_event_key_array, snk_event_val_array, 7, &snk_event);
 
       ERL_NIF_TERM report = enif_make_tuple2(
-          env, ATOM_GEN_CAST, enif_make_tuple2(env, ATOM_TRACE, snk_event));
+          env,
+          ATOM_IN_ENV(GEN_CAST),
+          enif_make_tuple2(env, ATOM_IN_ENV(TRACE), snk_event));
       enif_send(NULL, &pid, NULL, report);
     }
 }
