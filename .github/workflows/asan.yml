@@ -1,0 +1,34 @@
+name: asan check
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        required: false
+
+jobs:
+  asan:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: true
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: asan build
+        run: |
+          otp_prebuilds=otp-26.2.5.3-ubuntu-22.04.tar.gz
+          wget https://github.com/qzhuyan/kerl/releases/download/testing/${otp_prebuilds}
+          tar zxvf ${otp_prebuilds} -C /
+          ln -s /home/runner/OTP/otp-26.2.5.3/ /home/runner/OTP/default
+          echo ". /home/runner/OTP/default/activate" >> ~/.bashrc
+      - name: run sanitizer-check
+        run: |
+          . /home/runner/OTP/default/activate
+          tools/asan/bin/sanitizer-check all
+      - name: Archive asan logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: asan_logs
+          path: asan_logs
+          retention-days: 7
