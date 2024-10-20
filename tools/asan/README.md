@@ -2,7 +2,7 @@
 
 ## Prepare
 
-Build otp with debug type: asan
+Build otp with emu type: asan
 
 ## Run
 
