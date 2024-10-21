@@ -1,0 +1,10 @@
+#!/bin/bash
+
+core=$(find . -type f -name "core.*" -printf '%T+ %p\n' | sort -r | head -n 1 | cut -d ' ' -f 2)
+
+if [ -z "$core" ]; then
+    echo "No core file found"
+    exit 1
+fi
+
+cerl -debug -rcore $core

@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# Usage:
+# # run all test cases
+# valgrind-check
+#
+# # run one testcase at a time
+# valgrind-check one_by_one
+#
+# # run with ct options
+# valgrind-check --case=Case0 --repeat 100
+#
+#
+lib_dir=$(dirname "$(realpath "$0")")
+
+# for compiler flag
+export QUICER_USE_SANITIZERS=1
+
+# for using asan emulator
+export ESCRIPT_EMULATOR="${lib_dir}/erl-valgrind"
+
+# Since cerl returns different code:root_dir(), we need to override it here
+# Erlang_OTP_ROOT_DIR will be picked up by CMakeLists.txt
+export Erlang_OTP_ROOT_DIR=$(dirname $(dirname $(which erl)))
+
+# Set ERL_TOP for Suppressions list
+export ERL_TOP=$(cerl -noshell -eval "io:format(\"~s\", [code:root_dir()])" -s erlang halt)
+
+#export QUICER_USE_SNK=1
+
+# For log output
+if [ -z "${VALGRIND_LOG_DIR}" ]; then
+    export VALGRIND_LOG_DIR=${PWD}/valgrind_logs
+fi
+
+mkdir -p "${VALGRIND_LOG_DIR}"
+
+REBAR3=$(command -v rebar3)
+
+if [ $# -eq 1 ]; then
+    case $1 in
+        all)
+            escript "$REBAR3" ct
+            ;;
+        one_by_one)
+            AllTCs=$(erl -pa _build/test/lib/quicer/test/  -noshell \
+                -eval 'io:format("~p", [lists:flatten( string:join(lists:map(fun erlang:atom_to_list/1, quicer_SUITE:all()), " ") )]), halt()')
+            for tc in ${AllTCs};
+            do
+                echo "running tc $tc";
+                escript "$REBAR3" do ct --suite=test/quicer_SUITE --case="$tc";
+            done
+            ;;
+        proper)
+            escript "$REBAR3" as test proper
+            ;;
+    esac
+else
+    escript "$REBAR3" $@
+fi

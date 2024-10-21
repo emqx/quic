@@ -39,9 +39,16 @@
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
-init_handoff(_Stream, _StreamOpts, _Conn, _Flags) ->
-    %% stream owner already set while starts.
-    {stop, not_impl, #{}}.
+init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
+    InitState = #{
+        stream => Stream,
+        conn => Conn,
+        peer_stream => undefined,
+        is_local => false,
+        is_unidir => quicer:is_unidirectional(Flags)
+    },
+    ct:pal("init_handoff ~p", [{InitState, _StreamOpts}]),
+    {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
     ok = quicer:setopt(Stream, active, true),

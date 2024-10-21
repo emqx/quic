@@ -48,7 +48,7 @@ init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
         is_local => false,
         is_unidir => quicer:is_unidirectional(Flags)
     },
-    % ct:pal("init_handoff ~p", [{InitState, _StreamOpts}]),
+    ct:pal("init_handoff ~p", [{InitState, _StreamOpts}]),
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
@@ -137,10 +137,11 @@ handle_stream_data(
     case PeerStream of
         undefined ->
             case
-                quicer_local_stream:start_link(
+                quicer_local_stream:start(
                     ?MODULE,
                     Conn,
-                    [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}]
+                    [{open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}],
+                    []
                 )
             of
                 {ok, StreamProc} ->

@@ -293,7 +293,7 @@ tc_conn_timeout(Config) ->
     TOut = 10,
     {SPid, Ref} = spawn_monitor(
         fun() ->
-            simple_slow_conn_server(Owner, Config, Port, TOut * 2)
+            simple_slow_conn_server(Owner, Config, Port, TOut * 5)
         end
     ),
     receive

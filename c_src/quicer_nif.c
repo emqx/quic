@@ -1140,6 +1140,9 @@ on_load(ErlNifEnv *env,
   int ret_val = 0;
   unsigned load_vsn = 0;
 
+  init_atoms(env);
+
+  // TP must run after init_atoms as atoms are used in TP
   TP_NIF_3(start, &MsQuic, 0);
   if (!enif_get_uint(env, loadinfo, &load_vsn))
     {
@@ -1154,7 +1157,6 @@ on_load(ErlNifEnv *env,
       return 1; // any value except 0 is error
     }
 
-  init_atoms(env);
   open_resources(env);
 
   TP_NIF_3(end, &MsQuic, 0);
@@ -1575,7 +1577,11 @@ connection_controlling_process(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_demonitor_process(env, c_ctx, &c_ctx->owner_mon);
+  if (c_ctx->is_monitored)
+    {
+      enif_demonitor_process(env, c_ctx, &c_ctx->owner_mon);
+      c_ctx->is_monitored = FALSE;
+    }
 
   if (0
       != enif_monitor_process(
@@ -1583,10 +1589,12 @@ connection_controlling_process(ErlNifEnv *env,
     {
       // rollback, must success
       enif_self(env, &c_ctx->owner->Pid);
-      enif_monitor_process(env, c_ctx, caller, &c_ctx->owner_mon);
+      CXPLAT_FRE_ASSERT(
+          0 == enif_monitor_process(env, c_ctx, caller, &c_ctx->owner_mon));
+      c_ctx->is_monitored = TRUE;
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
-
+  c_ctx->is_monitored = TRUE;
   TP_NIF_3(exit, (uintptr_t)c_ctx->Connection, (uintptr_t)&c_ctx);
   return ATOM_OK;
 }
@@ -1610,7 +1618,11 @@ stream_controlling_process(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  enif_demonitor_process(env, s_ctx, &s_ctx->owner_mon);
+  if (s_ctx->is_monitored)
+    {
+      enif_demonitor_process(env, s_ctx, &s_ctx->owner_mon);
+      s_ctx->is_monitored = FALSE;
+    }
 
   if (0
       != enif_monitor_process(
@@ -1619,9 +1631,14 @@ stream_controlling_process(ErlNifEnv *env,
       // rollback, must success
       enif_self(env, &s_ctx->owner->Pid);
       flush_sig_buffer(env, s_ctx);
-      enif_monitor_process(env, s_ctx, caller, &s_ctx->owner_mon);
+
+      CXPLAT_FRE_ASSERT(
+          0 == enif_monitor_process(env, s_ctx, caller, &s_ctx->owner_mon));
+      s_ctx->is_monitored = TRUE;
+
       return ERROR_TUPLE_2(ATOM_OWNER_DEAD);
     }
+  s_ctx->is_monitored = TRUE;
   flush_sig_buffer(env, s_ctx);
   TP_NIF_3(exit, (uintptr_t)s_ctx->Stream, (uintptr_t)&s_ctx->owner->Pid);
   return ATOM_OK;

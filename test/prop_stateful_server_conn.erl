@@ -288,6 +288,8 @@ next_state(State, Res, Call) ->
 
 do_next_state(#{state := accepted} = State, {error, _}, {call, quicer, handshake, _Args}) ->
     State;
+do_next_state(#{state := _} = State, {error, closed}, {call, quicer, _, _Args}) ->
+    State#{state := closed};
 do_next_state(#{state := accepted} = State, _Res, {call, quicer, handshake, _Args}) ->
     State#{state := connected};
 do_next_state(#{state := accepted} = State, _Res, {call, quicer, close_connection, _Args}) ->

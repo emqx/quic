@@ -63,6 +63,7 @@ typedef struct QuicerListenerCTX
   CXPLAT_REF_COUNT ref_count;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ErlNifPid listenerPid;
+  BOOLEAN is_monitored;
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
@@ -92,6 +93,7 @@ typedef struct QuicerConnCTX
   HQUIC Connection;
   QUICER_ACCEPTOR_QUEUE *acceptor_queue;
   ACCEPTOR *owner;
+  BOOLEAN is_monitored;
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   ErlNifMutex *lock;
@@ -119,6 +121,7 @@ typedef struct QuicerStreamCTX
   HQUIC Stream;
   uint64_t StreamID;
   ACCEPTOR *owner;
+  BOOLEAN is_monitored;
   ErlNifMonitor owner_mon;
   ErlNifEnv *env;
   // Immutable env,
