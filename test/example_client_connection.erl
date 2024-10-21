@@ -106,7 +106,7 @@ new_stream(
     } = CBState
 ) ->
     %% Spawn new stream
-    case quicer_remote_stream:start_link(example_server_stream, Stream, Conn, SOpts, Flags) of
+    case quicer_remote_stream:start_link(example_client_stream, Stream, Conn, SOpts, Flags) of
         {ok, StreamOwner} ->
             case quicer:handoff_stream(Stream, StreamOwner) of
                 ok ->
@@ -116,7 +116,8 @@ new_stream(
                     {ok, CBState#{streams := [{E, Stream} | Streams]}}
             end;
         Other ->
-            Other
+            ct:pal("Start accepting remote stream error ~p", [Other]),
+            {ok, CBState#{streams := [{start_error, Stream} | Streams]}}
     end.
 
 dgram_state_changed(_Conn, _Flags, S) ->
@@ -152,17 +153,19 @@ peer_needs_streams(C, bidi_streams, S) ->
 handle_info({'EXIT', _Pid, _Reason}, State) ->
     {ok, State};
 handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
-    %% @FIXME, not desired behavior.
-    %% Casued by inflight quic Msg during stream handoff
     Sig == peer_send_shutdown orelse Sig == stream_closed
 ->
-    {OwnerPid, Stream} = lists:keyfind(Stream, 2, Streams),
-    NewS =
-        case OwnerPid == owner_down orelse OwnerPid == closed of
-            true ->
-                quicer:async_shutdown_stream(Stream),
-                S#{streams := lists:keydelete(Stream, 2, Streams)};
-            false ->
-                error(fixme)
-        end,
-    {ok, NewS}.
+    case lists:keyfind(Stream, 2, Streams) of
+        {Reason, Stream} when
+            Reason =:= owner_down orelse
+                Reason =:= closed orelse
+                Reason =:= start_error
+        ->
+            _ = quicer:async_shutdown_stream(Stream),
+            {ok, S#{streams := lists:keydelete(Stream, 2, Streams)}};
+        {OwnerPid, Stream} when is_pid(OwnerPid) ->
+            {error, {fixme, bug_handoff_fail}};
+        false ->
+            %% garbage signals from already dead stream (such like crashed owner)
+            {ok, S}
+    end.
