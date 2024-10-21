@@ -2,22 +2,40 @@
 
 ## Prepare
 
-Build otp with emu type: asan
+Build otp with different emu types.
 
 ## Run
 
+Supported runs are
+
+- sanitizer-check
+- debug-check
+- valgrind-check
+
 ### Run all tests
 
+Just take `sanitizer-check` as examples 
+
 ``` sh
-tools/asan/bin/sanitizer-check all
+tools/run/bin/sanitizer-check all
 ```
 
 ### Run one test in the suite
 ``` sh
-tools/asan/bin/sanitizer-check --suite=SUITE --case=CASE
+tools/run/bin/sanitizer-check --suite=SUITE --case=CASE
 ```
 
 ### Run CT test cases one by one
 ``` sh
-tools/asan/bin/sanitizer-check one_by_one
+tools/run/bin/sanitizer-check one_by_one
 ```
+
+## Check coredumps
+
+Debug emu generates coredump when it isn't happy,
+to check the latest core file with gdb use following
+
+``` sh
+tools/run/bin/debug-gdb-core 
+```
+
