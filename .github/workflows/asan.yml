@@ -18,12 +18,19 @@ jobs:
       - name: asan build
         run: |
           otp_prebuilds=otp-26.2.5.3-ubuntu-22.04.tar.gz
-          wget https://github.com/qzhuyan/kerl/releases/download/testing/${otp_prebuilds}
+          wget https://github.com/qzhuyan/kerl/releases/download/test2/${otp_prebuilds}
           tar zxvf ${otp_prebuilds} -C /
           ln -s /home/runner/OTP/otp-26.2.5.3/ /home/runner/OTP/default
           echo ". /home/runner/OTP/default/activate" >> ~/.bashrc
+      - name: download rebar3
+        run: |
+          wget https://s3.amazonaws.com/rebar3/rebar3
+          chmod a+x rebar3
+          mkdir -p $HOME/bin/
+          mv rebar3 $HOME/bin/
       - name: run sanitizer-check
         run: |
+          export PATH=$PATH:$HOME/bin/
           . /home/runner/OTP/default/activate
           tools/run/bin/sanitizer-check all
       - name: Archive asan logs
