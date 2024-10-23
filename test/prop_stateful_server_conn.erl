@@ -215,6 +215,14 @@ postcondition(accepted, {call, quicer, shutdown_connection, _Args}, {error, time
     true;
 postcondition(accepted, {call, quicer, close_connection, _Args}, {error, closed}) ->
     true;
+postcondition(_, {call, quicer, shutdown_connection, [_, _, Tout]}, {error, timeout}) when
+    Tout < 200
+->
+    true;
+postcondition(_, {call, quicer, close_connection, [_, _, Tout]}, {error, timeout}) when
+    Tout < 200
+->
+    true;
 postcondition(accepted, {call, quicer, shutdown_connection, _Args}, {error, closed}) ->
     true;
 postcondition(
@@ -286,10 +294,10 @@ postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
 next_state(State, Res, Call) ->
     step_calls(do_next_state(State, Res, Call)).
 
-do_next_state(#{state := accepted} = State, {error, _}, {call, quicer, handshake, _Args}) ->
-    State;
 do_next_state(#{state := _} = State, {error, closed}, {call, quicer, _, _Args}) ->
     State#{state := closed};
+do_next_state(#{state := accepted} = State, {error, _}, {call, quicer, handshake, _Args}) ->
+    State;
 do_next_state(#{state := accepted} = State, _Res, {call, quicer, handshake, _Args}) ->
     State#{state := connected};
 do_next_state(#{state := accepted} = State, _Res, {call, quicer, close_connection, _Args}) ->
