@@ -297,7 +297,7 @@ recv(_Stream, _Len) ->
 
 -spec send_dgram(connection_handle(), iodata(), send_flags()) ->
     {ok, BytesSent :: pos_integer()}
-    | {error, badarg | not_enough_memory | closed}
+    | {error, badarg | not_enough_memory | invalid_parameter | closed}
     | {error, dgram_send_error, atom_reason()}.
 send_dgram(_Conn, _Data, _Flags) ->
     erlang:nif_error(nif_library_not_loaded).
