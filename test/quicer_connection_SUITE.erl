@@ -897,6 +897,26 @@ tc_get_conn_owner_server(Config) ->
             ct:fail({client_fail, Reason})
     end.
 
+tc_shutdown_conn_before_handshake(Config) ->
+    Port = select_port(),
+    {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+    {ok, L} = quicer:async_accept(L, #{}),
+    CPid = spawn(fun() ->
+        _ = quicer:connect("localhost", Port, default_conn_opts(), 1000),
+        receive
+            done -> ok
+        end
+    end),
+    receive
+        {quic, new_conn, Conn, _} ->
+            Res = quicer:shutdown_connection(Conn),
+            CPid ! done,
+            ?assertEqual(ok, Res)
+    after 1000 ->
+        ct:fail("conn from client timeout")
+    end,
+    quicer:close_listener(L).
+
 %%%
 %%% Helpers
 %%%
