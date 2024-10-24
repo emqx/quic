@@ -41,3 +41,5 @@ _packages/
 
 # test logs
 asan_logs/
+valgrind_logs/
+coverage/

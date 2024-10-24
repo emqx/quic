@@ -1415,10 +1415,10 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
     {
       if (is_orphan)
         {
-          // Connection acceptor is dead
-          // we don't need to destroy acceptor, we don't have the ownwership
-          destroy_s_ctx(s_ctx);
-          return QUIC_STATUS_UNREACHABLE;
+          // Connection owner is dead
+          // we should not destroy the acceptor, because it is owned by the
+          // c_ctx.
+          goto owner_unreachable;
         }
       else
         {
@@ -1444,15 +1444,40 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
                                          2);
           if (!enif_send(NULL, acc_pid, NULL, report))
             {
-              destroy_s_ctx(s_ctx);
-              return QUIC_STATUS_UNREACHABLE;
+              goto owner_unreachable;
             }
         }
     }
+
+  int mon_res = enif_monitor_process(env, s_ctx, acc_pid, &(s_ctx->owner_mon));
+  CXPLAT_FRE_ASSERTMSG(mon_res >= 0, "stream down callback must be defined!");
+  if (mon_res == 0)
+    {
+      s_ctx->is_monitored = TRUE;
+    }
+  else // mon_res > 0
+    {
+      // unlikely
+      // owner pid is dead, but message is sent
+      goto owner_dead;
+    }
+
   s_ctx->is_closed = FALSE;
+  CXPLAT_FRE_ASSERTMSG(s_ctx, "s_ctx must be validate");
   MsQuic->SetCallbackHandler(
       Event->PEER_STREAM_STARTED.Stream, stream_callback, s_ctx);
   return QUIC_STATUS_SUCCESS;
+
+owner_unreachable:
+  //
+  // s_ctx ownership transfer failed
+  //
+  s_ctx->is_closed = TRUE;
+  // so we must release ctx twice, here and in `destroy_s_ctx`.
+  enif_release_resource(s_ctx);
+owner_dead:
+  destroy_s_ctx(s_ctx);
+  return QUIC_STATUS_UNREACHABLE;
 }
 
 static QUIC_STATUS
