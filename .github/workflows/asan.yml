@@ -9,7 +9,15 @@ jobs:
   asan:
     runs-on: ubuntu-22.04
     strategy:
-      fail-fast: true
+      fail-fast: false
+      matrix:
+        check:
+          - valgrind-check
+          - debug-check
+          - sanitizer-check
+        scope:
+          - all
+          - proper
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -32,10 +40,10 @@ jobs:
         run: |
           export PATH=$PATH:$HOME/bin/
           . /home/runner/OTP/default/activate
-          tools/run/bin/sanitizer-check all
-      - name: Archive asan logs
+          tools/run/bin/${{ matrix.check }} ${{ matrix.scope }}
+      - name: Archive logs
         uses: actions/upload-artifact@v3
         with:
-          name: asan_logs
-          path: asan_logs
-          retention-days: 7
+          name: logs
+          path: *_logs
+          retention-days: 3
