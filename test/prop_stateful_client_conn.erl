@@ -28,6 +28,10 @@
     postcondition/3
 ]).
 
+%% Helpers
+-export([
+    spawn_stream_acceptor/3
+]).
 %%%%%%%%%%%%%%%%%%
 %%% PROPERTIES %%%
 %%%%%%%%%%%%%%%%%%
@@ -72,6 +76,10 @@ command(#{handle := Handle}) ->
         {100, {call, quicer, getopt, [Handle, ?LET({Opt, _}, conn_opt(), Opt)]}},
         {100,
             {call, quicer, async_accept_stream, [Handle, ?LET(Opts, quicer_acceptor_opts(), Opts)]}},
+        {100,
+            {call, ?MODULE, spawn_stream_acceptor, [
+                Handle, ?LET(Opts, quicer_acceptor_opts(), Opts), range(0, 200)
+            ]}},
         {100, {call, quicer, peername, [Handle]}},
         {50, {call, quicer, peercert, [Handle]}},
         {10, {call, quicer, negotiated_protocol, [Handle]}},
@@ -205,6 +213,8 @@ postcondition(#{handle := _H, state := closed}, {call, quicer, get_connections, 
     true;
 postcondition(#{state := closed}, {call, _Mod, _Fun, _Args}, {error, closed}) ->
     true;
+postcondition(_State, {call, ?MODULE, spawn_stream_acceptor, _Args}, ok) ->
+    true;
 postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
     false.
 
@@ -278,3 +288,21 @@ default_conn_opts() ->
         {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
         {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"}
     ].
+
+%% Test helpers
+spawn_stream_acceptor(ConnHandle, Opts, DieAfter) ->
+    spawn(
+        fun() ->
+            do_accept_stream(ConnHandle, Opts, DieAfter)
+        end
+    ),
+    ok.
+
+do_accept_stream(Conn, Opts, DieAfter) ->
+    {ok, Conn} = quicer:async_accept_stream(Conn, Opts),
+    receive
+        {quicer, new_stream, _Stream, _Flags} ->
+            timer:sleep(DieAfter)
+    after DieAfter ->
+        ok
+    end.

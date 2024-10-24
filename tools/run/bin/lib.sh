@@ -29,7 +29,7 @@ do_run() {
             done
             ;;
         proper)
-            escript "$REBAR3" as test proper
+            escript "$REBAR3" as test proper --noshrink
             ;;
         *)
             escript "$REBAR3" $@

@@ -84,5 +84,4 @@ tp_snk(ErlNifEnv *env,
                          enif_make_tuple2(env, ATOM_IN_ENV(TRACE), snk_event));
   enif_send(NULL, pid, env, report);
   enif_free_env(env);
-
 }
