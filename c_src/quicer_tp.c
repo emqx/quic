@@ -47,6 +47,8 @@ tp_snk(ErlNifEnv *env,
 {
   ErlNifPid *pid = &GLOBAL_SNAB_KC_PID;
 
+  env = enif_alloc_env();
+
   ERL_NIF_TERM snk_event;
   ERL_NIF_TERM snk_event_key_array[7]
       = { ATOM_IN_ENV(SNK_KIND),    ATOM_IN_ENV(CONTEXT),
@@ -80,5 +82,7 @@ tp_snk(ErlNifEnv *env,
       = enif_make_tuple2(env,
                          ATOM_IN_ENV(GEN_CAST),
                          enif_make_tuple2(env, ATOM_IN_ENV(TRACE), snk_event));
-  enif_send(NULL, pid, NULL, report);
+  enif_send(NULL, pid, env, report);
+  enif_free_env(env);
+
 }
