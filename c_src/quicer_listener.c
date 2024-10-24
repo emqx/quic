@@ -53,15 +53,14 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
       //
       // Note, c_ctx is newly init here, don't grab lock.
       //
-      c_ctx = init_c_ctx();
-      c_ctx->r_ctx = l_ctx->r_ctx;
-      ErlNifEnv *env = c_ctx->env;
-
-      if (!c_ctx)
+      if (!(c_ctx = init_c_ctx()))
         {
           Status = QUIC_STATUS_OUT_OF_MEMORY;
           goto Error;
         }
+
+      c_ctx->r_ctx = l_ctx->r_ctx;
+      ErlNifEnv *env = c_ctx->env;
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
       CxPlatRefInitialize(&(c_ctx->ref_count));
