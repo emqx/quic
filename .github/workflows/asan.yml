@@ -45,5 +45,5 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: logs
-          path: *_logs
+          path: .*_logs
           retention-days: 3
