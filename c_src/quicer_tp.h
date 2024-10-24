@@ -54,6 +54,7 @@ TRACEPOINT_EVENT(
 /* END of ifdef QUICER_USE_LTTNG */
 
 #elif defined(QUICER_USE_SNK)
+extern ErlNifPid GLOBAL_SNAB_KC_PID;
 
 #define TP_NIF_3(TAG, RID, ARG)                                               \
   tp_snk(env, "nif", __func__, #TAG, (uint64_t)RID, ARG)
@@ -66,6 +67,11 @@ void tp_snk(ErlNifEnv *env,
             const char *tag,
             uint64_t rid,
             uint64_t mark);
+
+ERL_NIF_TERM
+set_snab_kc_pid(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+ERL_NIF_TERM
+get_snab_kc_pid(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 /* END of ifdef QUICER_USE_SNK */
 #else /* NO TP is defined */
 

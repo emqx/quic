@@ -66,6 +66,17 @@
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer.hrl").
 
+-define(my_check_trace(BUCKET, RUN, CHECK),
+    ?check_trace(
+        BUCKET,
+        begin
+            quicer_nif:set_snab_kc_pid(whereis(snabbkaffe_collector)),
+            RUN
+        end,
+        CHECK
+    )
+).
+
 %%--------------------------------------------------------------------
 %% @spec suite() -> Info
 %% Info = [tuple()]
@@ -247,7 +258,7 @@ tc_app_echo_server(Config) ->
     {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
     {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
     {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 5000},
         begin
             {ok, 4} = quicer:async_send(Stm, <<"ping">>),
@@ -312,7 +323,7 @@ tc_slow_conn(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 1000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -367,7 +378,7 @@ tc_stream_owner_down(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -501,7 +512,7 @@ tc_stream_acceptor_down(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -601,7 +612,7 @@ tc_conn_owner_down(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -795,7 +806,7 @@ tc_conn_close_flag_1(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 1000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -878,7 +889,7 @@ tc_conn_close_flag_2(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -927,7 +938,7 @@ tc_stream_close_errno(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -1046,7 +1057,7 @@ tc_stream_shutdown_abort(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -1203,7 +1214,7 @@ tc_conn_idle_close(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -1318,7 +1329,7 @@ tc_conn_gc(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 100000},
         begin
             %% Spawn a process that will die without handle cleanups
@@ -1490,7 +1501,7 @@ tc_conn_no_gc(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             %% Spawn a client process that will close the connection explicitly before die.
@@ -1622,7 +1633,7 @@ tc_conn_no_gc_2(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 20000},
         begin
             %% Spawn a client process that will close the connection explicitly before die.
@@ -1773,7 +1784,7 @@ tc_conn_resume_nst(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -1878,7 +1889,7 @@ tc_conn_resume_nst_with_stream(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -1979,7 +1990,7 @@ tc_conn_resume_nst_async(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -2078,7 +2089,7 @@ tc_conn_resume_nst_async_2(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -2177,7 +2188,7 @@ tc_conn_resume_nst_with_data(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -2316,7 +2327,7 @@ tc_listener_no_acceptor(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
@@ -2351,7 +2362,7 @@ tc_listener_no_acceptor(Config) ->
 %% @doc this triggers listener start fail
 tc_listener_inval_local_addr(Config) ->
     BadListenOn = "8.8.8.8:443",
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             Res = quicer:listen(BadListenOn, default_listen_opts(Config)),
@@ -2391,7 +2402,7 @@ tc_listener_inval_local_addr(Config) ->
 tc_conn_start_inval_port(_Config) ->
     application:ensure_all_started(quicer),
     BadPort = 65536,
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             Res = quicer:connect("localhost", BadPort, default_conn_opts(), infinity),
@@ -2449,7 +2460,7 @@ tc_conn_stop_notify_acceptor(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             Parent = self(),
@@ -2521,7 +2532,7 @@ tc_accept_stream_active_once(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -2610,7 +2621,7 @@ tc_accept_stream_active_N(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -2721,7 +2732,7 @@ tc_multi_streams(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -2793,7 +2804,7 @@ tc_multi_streams_example_server_1(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -2914,7 +2925,7 @@ tc_multi_streams_example_server_2(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -2996,7 +3007,7 @@ tc_multi_streams_example_server_3(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
@@ -3241,7 +3252,7 @@ tc_passive_recv_1(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
     ct:pal("Listener Options: ~p", [Options]),
-    ?check_trace(
+    ?my_check_trace(
         #{timetrap => 10000},
         begin
             {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),

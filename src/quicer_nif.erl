@@ -65,7 +65,9 @@
     get_conn_owner/1,
     get_stream_owner/1,
     get_listener_owner/1,
-    mock_buffer_sig/3
+    mock_buffer_sig/3,
+    set_snab_kc_pid/1,
+    get_snab_kc_pid/0
 ]).
 
 -export([abi_version/0]).
@@ -403,6 +405,14 @@ flush_stream_buffered_sigs(_H) ->
 -spec mock_buffer_sig(stream_handle(), OrigOwner :: pid(), term()) ->
     ok | {error, false | none | bad_pid | bad_arg}.
 mock_buffer_sig(_StreamHandle, _OrigOwner, _Msg) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec set_snab_kc_pid(pid()) -> ok | {error, badarg}.
+set_snab_kc_pid(_Pid) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec get_snab_kc_pid() -> pid().
+get_snab_kc_pid() ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% Internals

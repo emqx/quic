@@ -1142,6 +1142,10 @@ on_load(ErlNifEnv *env,
 
   init_atoms(env);
 
+#if defined(QUICER_USE_SNK)
+  enif_set_pid_undefined(&GLOBAL_SNAB_KC_PID);
+#endif
+
   // TP must run after init_atoms as atoms are used in TP
   TP_NIF_3(start, &MsQuic, 0);
   if (!enif_get_uint(env, loadinfo, &load_vsn))
@@ -1738,7 +1742,11 @@ static ErlNifFunc nif_funcs[] = {
   { "get_stream_owner", 1, get_stream_owner1, 0},
   { "get_listener_owner", 1, get_listener_owner1, 0},
   /* for testing */
-  { "mock_buffer_sig", 3, mock_buffer_sig, 0}
+  { "mock_buffer_sig", 3, mock_buffer_sig, 0},
+  #ifdef QUICER_USE_SNK
+  { "set_snab_kc_pid", 1, set_snab_kc_pid, 0},
+  { "get_snab_kc_pid", 0, get_snab_kc_pid, 0},
+  #endif
   // clang-format on
 };
 
