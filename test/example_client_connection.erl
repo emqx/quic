@@ -164,6 +164,7 @@ handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
             _ = quicer:async_shutdown_stream(Stream),
             {ok, S#{streams := lists:keydelete(Stream, 2, Streams)}};
         {OwnerPid, Stream} when is_pid(OwnerPid) ->
+            %%% you should not hit here in testing, if so, fire one issue report
             {error, {fixme, bug_handoff_fail}};
         false ->
             %% garbage signals from already dead stream (such like crashed owner)

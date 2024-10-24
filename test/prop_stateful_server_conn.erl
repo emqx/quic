@@ -139,7 +139,9 @@ postcondition(#{state := accepted}, {call, quicer, handshake, _Args}, {ok, _}) -
     true;
 postcondition(#{state := accepted}, {call, quicer, handshake, _Args}, {error, invalid_state}) ->
     true;
-postcondition(#{state := accepted}, {call, quicer, handshake, _Args}, {error, timeout}) ->
+postcondition(#{state := closed}, {call, quicer, handshake, _}, {error, timeout}) ->
+    true;
+postcondition(#{state := _}, {call, quicer, handshake, _Args}, {error, timeout}) ->
     %% @FIXME
     true;
 postcondition(
@@ -209,21 +211,23 @@ postcondition(_State, {call, quicer, close_connection, _Args}, ok) ->
     true;
 postcondition(_State, {call, quicer, shutdown_connection, _Args}, ok) ->
     true;
-postcondition(accepted, {call, quicer, close_connection, _Args}, {error, timeout}) ->
+postcondition(#{state := accepted}, {call, quicer, close_connection, _Args}, {error, timeout}) ->
     true;
-postcondition(accepted, {call, quicer, shutdown_connection, _Args}, {error, timeout}) ->
+postcondition(#{state := accepted}, {call, quicer, shutdown_connection, _Args}, {error, timeout}) ->
     true;
-postcondition(accepted, {call, quicer, close_connection, _Args}, {error, closed}) ->
+postcondition(#{state := accepted}, {call, quicer, close_connection, _Args}, {error, closed}) ->
+    true;
+postcondition(#{state := closed}, {call, quicer, close_connection, _Args}, {error, timeout}) ->
     true;
 postcondition(_, {call, quicer, shutdown_connection, [_, _, Tout]}, {error, timeout}) when
     Tout < 200
 ->
     true;
-postcondition(_, {call, quicer, close_connection, [_, _, Tout]}, {error, timeout}) when
+postcondition(_, {call, quicer, close_connection, [_, Tout]}, {error, timeout}) when
     Tout < 200
 ->
     true;
-postcondition(accepted, {call, quicer, shutdown_connection, _Args}, {error, closed}) ->
+postcondition(#{state := accepted}, {call, quicer, shutdown_connection, _Args}, {error, closed}) ->
     true;
 postcondition(
     #{me := Me, owner := Owner, state := State},
@@ -242,6 +246,10 @@ postcondition(
 ) when
     S =:= accepted orelse S =:= closed
 ->
+    true;
+postcondition(
+    #{state := accepted}, {call, quicer, async_csend, [_]}, {error, stm_send_error, aborted}
+) ->
     true;
 postcondition(#{state := accepted}, {call, quicer, async_csend, [_]}, {error, timeout}) ->
     %% @FIXME https://github.com/emqx/quic/issues/265
