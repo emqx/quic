@@ -1413,9 +1413,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
     {
       if (is_orphan)
         {
-          // Connection owner is dead
-          // we should not destroy the acceptor, because it is owned by the
-          return selected_owner_unreachable(s_ctx); // cheat
+          return selected_owner_unreachable(s_ctx);
         }
       else
         {
@@ -1426,6 +1424,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
           AcceptorDestroy(acc);
           // Set is_orphan to true, connection owner takeover
           props_value[1] = ATOM_TRUE;
+
           acc = AcceptorAlloc();
           CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
           s_ctx->owner = acc;
@@ -1852,9 +1851,7 @@ selected_owner_unreachable(QuicerStreamCTX *s_ctx)
 {
   //
   // s_ctx ownership transfer failed
-  // We must release ctx twice, here and in `destroy_s_ctx`.
-  // AND
-  // no callback from msquic
+  // There is no shared ownership, we must destroy the s_ctx here
   //
   s_ctx->is_closed = TRUE;
   enif_clear_env(s_ctx->env);

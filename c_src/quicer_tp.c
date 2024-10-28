@@ -47,6 +47,8 @@ tp_snk(ErlNifEnv *env,
 {
   ErlNifPid *pid = &GLOBAL_SNAB_KC_PID;
 
+  // avoid polluting the context env,
+  // use tmp env for message passing,
   env = enif_alloc_env();
 
   ERL_NIF_TERM snk_event;
