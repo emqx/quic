@@ -958,15 +958,13 @@ handle_stream_event_recv(HQUIC Stream,
         { // Owner is waiting for data
           // notify owner to trigger async recv
           //
-          if (!enif_send(
-                  NULL,
-                  &(s_ctx->owner->Pid),
-                  NULL,
-                  make_event(env,
-                             ATOM_QUIC_STATUS_CONTINUE,
-                             // @TODO eHandle is in env, no need to copy?
-                             enif_make_copy(env, s_ctx->eHandle),
-                             ATOM_UNDEFINED)))
+          if (!enif_send(NULL,
+                         &(s_ctx->owner->Pid),
+                         NULL,
+                         make_event(env,
+                                    ATOM_QUIC_STATUS_CONTINUE,
+                                    enif_make_copy(env, s_ctx->eHandle),
+                                    ATOM_UNDEFINED)))
             {
               // App down, shutdown stream
               MsQuic->StreamShutdown(Stream,
