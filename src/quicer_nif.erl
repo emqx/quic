@@ -54,6 +54,9 @@
     get_stream_rid/1
 ]).
 
+%% tools
+-export([malloc_trim/0]).
+
 %% For tests only
 -export([
     open_connection/0,
@@ -345,6 +348,10 @@ get_conn_rid(_Handle) ->
     {ok, non_neg_integer()}
     | {error, badarg | internal_error}.
 get_stream_rid(_Handle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec malloc_trim() -> ok.
+malloc_trim() ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec controlling_process(connection_handle() | stream_handle(), pid()) ->
