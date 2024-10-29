@@ -202,4 +202,7 @@ void cache_stream_id(QuicerStreamCTX *s_ctx);
 
 void cleanup_owner_signals(QuicerStreamCTX *s_ctx);
 
+ERL_NIF_TERM
+copy_stream_handle(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 #endif // __QUICER_CTX_H_

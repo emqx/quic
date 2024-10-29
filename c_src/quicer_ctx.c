@@ -437,3 +437,18 @@ cleanup_owner_signals(QuicerStreamCTX *s_ctx)
   OwnerSignalQueueDestroy(s_ctx->sig_queue);
   s_ctx->sig_queue = NULL;
 }
+
+ERL_NIF_TERM
+copy_stream_handle(ErlNifEnv *env,
+                   __unused_parm__ int argc,
+                   const ERL_NIF_TERM argv[])
+{
+  QuicerStreamCTX *ctx = NULL;
+  if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&ctx))
+    {
+      return enif_make_badarg(env);
+    }
+  assert(ctx != NULL);
+  enif_make_copy(ctx->env, ctx->eHandle);
+  return ATOM_OK;
+}
