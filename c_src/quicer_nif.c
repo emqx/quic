@@ -21,7 +21,10 @@ limitations under the License.
 #include "quicer_listener.h"
 #include "quicer_vsn.h"
 
+#if defined(__linux__)
 #include <malloc.h>
+#endif
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
@@ -1703,6 +1706,16 @@ do_malloc_trim(__unused_parm__ ErlNifEnv *env,
   return ATOM_OK;
 }
 
+ERL_NIF_TERM
+do_malloc_stats(__unused_parm__ ErlNifEnv *env,
+                __unused_parm__ int argc,
+                __unused_parm__ const ERL_NIF_TERM argv[])
+{
+  CXPLAT_FRE_ASSERT(argc == 0);
+  malloc_stats();
+  return ATOM_OK;
+}
+
 static ErlNifFunc nif_funcs[] = {
   /* |  name  | arity| funptr | flags|
    *
@@ -1755,7 +1768,10 @@ static ErlNifFunc nif_funcs[] = {
   { "copy_stream_handle", 1, copy_stream_handle, 0},
   /* for testing */
   { "mock_buffer_sig", 3, mock_buffer_sig, 0},
+#if defined(__linux__)
   { "malloc_trim", 0, do_malloc_trim, 0},
+  { "malloc_stats", 0, do_malloc_stats, 0},
+#endif
   #ifdef QUICER_USE_SNK
   { "set_snab_kc_pid", 1, set_snab_kc_pid, 0},
   { "get_snab_kc_pid", 0, get_snab_kc_pid, 0},
