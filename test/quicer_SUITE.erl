@@ -157,6 +157,7 @@
 
     %% Toolings
     tc_malloc_trim/1,
+    tc_malloc_stats/1,
 
     %% Versions test
     tc_abi_version/1
@@ -229,6 +230,14 @@ end_per_group(_Groupname, _Config) ->
 %%%===================================================================
 %%% Testcase specific setup/teardown
 %%%===================================================================
+init_per_testcase(TC, Config) when
+    TC =:= tc_malloc_trim orelse
+        TC =:= tc_malloc_stats
+->
+    case os:type() of
+        {unix, darwin} -> {skip, "Not runnable on MacOS"};
+        _ -> Config
+    end;
 init_per_testcase(_TestCase, Config) ->
     quicer_test_lib:cleanup_msquic(),
     [{timetrap, 5000} | Config].
@@ -3198,6 +3207,9 @@ tc_setopt_congestion_control_algorithm(Config) ->
 
 tc_malloc_trim(_) ->
     quicer_nif:malloc_trim().
+
+tc_malloc_stats(_) ->
+    quicer_nif:malloc_stats().
 
 %%% ====================
 %%% Internal helpers

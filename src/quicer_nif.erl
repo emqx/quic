@@ -55,7 +55,10 @@
 ]).
 
 %% tools
--export([malloc_trim/0]).
+-export([
+    malloc_trim/0,
+    malloc_stats/0
+]).
 
 %% For tests only
 -export([
@@ -352,6 +355,10 @@ get_stream_rid(_Handle) ->
 
 -spec malloc_trim() -> ok.
 malloc_trim() ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec malloc_stats() -> ok.
+malloc_stats() ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec controlling_process(connection_handle() | stream_handle(), pid()) ->
