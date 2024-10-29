@@ -155,6 +155,9 @@
     tc_peercert_server/1,
     tc_peercert_server_nocert/1,
 
+    %% Toolings
+    tc_malloc_trim/1,
+
     %% Versions test
     tc_abi_version/1
     %% testcase to verify env works
@@ -838,10 +841,10 @@ tc_stream_controlling_process_demon(Config) ->
                 end
             ),
             receive
-                {'DOWN', MonRef, process, NewOwner, {Res, Stm}} ->
+                {'DOWN', MonRef, process, OldOwner, {Res, Stm}} ->
                     ct:pal("Set controlling_process res: ~p", [Res])
             end,
-            ?assertEqual({error, owner_dead}, quicer:controlling_process(Stm, NewOwner)),
+            ?assertEqual({error, owner_dead}, quicer:controlling_process(Stm, OldOwner)),
             ok = quicer:setopt(Stm, active, true),
             {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
             receive
@@ -3192,6 +3195,9 @@ tc_setopt_congestion_control_algorithm(Config) ->
     quicer:shutdown_connection(Conn),
     SPid ! done,
     ok.
+
+tc_malloc_trim(_) ->
+    quicer_nif:malloc_trim().
 
 %%% ====================
 %%% Internal helpers
