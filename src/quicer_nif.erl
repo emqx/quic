@@ -65,6 +65,7 @@
     get_conn_owner/1,
     get_stream_owner/1,
     get_listener_owner/1,
+    copy_stream_handle/1,
     mock_buffer_sig/3,
     set_snab_kc_pid/1,
     get_snab_kc_pid/0
@@ -383,6 +384,10 @@ get_connections() ->
 
 -spec get_connections(reg_handle()) -> [connection_handle()] | {error, badarg}.
 get_connections(_RegHandle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec copy_stream_handle(stream_handle()) -> {ok, stream_handle()} | {error, badarg}.
+copy_stream_handle(_H) ->
     erlang:nif_error(nif_library_not_loaded).
 
 %% @doc enable signal buffering, used in stream handoff.

@@ -1741,6 +1741,7 @@ static ErlNifFunc nif_funcs[] = {
   { "get_conn_owner", 1, get_conn_owner1, 0},
   { "get_stream_owner", 1, get_stream_owner1, 0},
   { "get_listener_owner", 1, get_listener_owner1, 0},
+  { "copy_stream_handle", 1, copy_stream_handle, 0},
   /* for testing */
   { "mock_buffer_sig", 3, mock_buffer_sig, 0},
   #ifdef QUICER_USE_SNK
