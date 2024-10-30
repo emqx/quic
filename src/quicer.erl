@@ -165,6 +165,7 @@
     new_conn_props/0,
     streams_available_props/0,
     new_stream_props/0,
+    dgram_state/0,
 
     %% Suporting types
     error_code/0,
@@ -371,9 +372,8 @@ close_listener(Listener, Timeout) ->
     timeout()
 ) ->
     {ok, connection_handle()}
-    | {error, conn_open_error | config_error | conn_start_error}
-    | {error, timeout}
-    | {error, nst_not_found}.
+    | {error, conn_open_error | config_error | conn_start_error | timeout | nst_not_found}
+    | {error, transport_down, transport_shutdown_props()}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
     connect(Host, Port, maps:from_list(Opts), Timeout);
 connect(Host, Port, Opts, Timeout) when is_tuple(Host) ->
@@ -391,21 +391,12 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
             receive
                 {quic, connected, H, _} ->
                     {ok, H};
-                {quic, transport_shutdown, H, Reason} when
-                    Reason == connection_timeout orelse
-                        Reason == connection_idle
-                ->
-                    flush(closed, H),
-                    {error, timeout};
                 {quic, transport_shutdown, H, Reason} ->
                     flush(closed, H),
                     {error, transport_down, Reason}
             end;
         {error, _} = Err ->
-            Err;
-        {error, not_found, _} ->
-            %% nst error
-            {error, nst_not_found}
+            Err
     end.
 
 %% @doc
