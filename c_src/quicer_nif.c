@@ -1696,6 +1696,7 @@ make_event(ErlNifEnv *env,
                           prop);      // 4th element, event props :: any()) //
 }
 
+#if defined(__linux__)
 ERL_NIF_TERM
 do_malloc_trim(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ int argc,
@@ -1715,6 +1716,7 @@ do_malloc_stats(__unused_parm__ ErlNifEnv *env,
   malloc_stats();
   return ATOM_OK;
 }
+#endif
 
 static ErlNifFunc nif_funcs[] = {
   /* |  name  | arity| funptr | flags|
