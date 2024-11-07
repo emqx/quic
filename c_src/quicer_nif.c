@@ -1757,6 +1757,8 @@ static ErlNifFunc nif_funcs[] = {
   { "peercert", 1, peercert1, 0},
   { "enable_sig_buffer", 1, enable_sig_buffer, 0},
   { "flush_stream_buffered_sigs", 1, flush_stream_buffered_sigs, 0},
+  { "count_reg_conns", 0, count_reg_connsX, 0},
+  { "count_reg_conns", 1, count_reg_connsX, 0},
   /* for DEBUG */
   { "get_conn_rid", 1, get_conn_rid1, 1},
   { "get_stream_rid", 1, get_stream_rid1, 1},

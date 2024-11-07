@@ -46,7 +46,9 @@
     controlling_process/2,
     peercert/1,
     enable_sig_buffer/1,
-    flush_stream_buffered_sigs/1
+    flush_stream_buffered_sigs/1,
+    count_reg_conns/0,
+    count_reg_conns/1
 ]).
 
 -export([
@@ -398,6 +400,13 @@ get_connections() ->
 
 -spec get_connections(reg_handle()) -> [connection_handle()] | {error, badarg}.
 get_connections(_RegHandle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec count_reg_conns() -> non_neg_integer().
+count_reg_conns() ->
+    erlang:nif_error(nif_library_not_loaded).
+-spec count_reg_conns(reg_handle()) -> non_neg_integer() | {error, badarg}.
+count_reg_conns(_RegHandle) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec copy_stream_handle(stream_handle()) -> {ok, stream_handle()} | {error, badarg}.

@@ -1804,6 +1804,54 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 ERL_NIF_TERM
+count_reg_connsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  ERL_NIF_TERM res = ATOM_UNDEFINED;
+  uint32_t count = 0;
+  if (argc == 0) // use global registration
+    {
+      pthread_mutex_lock(&GRegLock);
+      if (!G_r_ctx)
+        {
+          pthread_mutex_unlock(&GRegLock);
+          return res;
+        }
+      r_ctx = G_r_ctx;
+    }
+  else
+    {
+      if (!enif_get_resource(env, argv[0], ctx_reg_t, (void **)&r_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_BADARG);
+        }
+    }
+  if (!get_reg_handle(r_ctx))
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      goto exit;
+    }
+  enif_mutex_lock(r_ctx->lock);
+  CXPLAT_LIST_ENTRY *Entry = r_ctx->Connections.Flink;
+  while (Entry != &r_ctx->Connections)
+    {
+      Entry = Entry->Flink;
+      count++;
+    }
+  enif_mutex_unlock(r_ctx->lock);
+
+  res = enif_make_uint(env, count);
+  put_reg_handle(r_ctx);
+
+exit:
+  if (argc == 0) // use global registration
+    {
+      pthread_mutex_unlock(&GRegLock);
+    }
+  return res;
+}
+
+ERL_NIF_TERM
 get_conn_owner1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx = NULL;

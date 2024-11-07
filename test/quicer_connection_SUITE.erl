@@ -917,6 +917,68 @@ tc_shutdown_conn_before_handshake(Config) ->
     end,
     quicer:close_listener(L).
 
+tc_conn_count_default(_Config) ->
+    ?assertEqual(0, quicer:count_reg_conns(global)).
+
+tc_conn_count_for_registered_listeners(Config) ->
+    Port = select_port(),
+    %% GIVEN: registrations are created for server listener and clients
+    {ok, RegL} = quicer:new_registration(
+        "listener", quic_execution_profile_max_throughput
+    ),
+    {ok, RegC} = quicer:new_registration(
+        "clients", quic_execution_profile_max_throughput
+    ),
+    %% WHEN: When there is no connections from clients.
+    {ok, L} = quicer:listen(Port, default_listen_opts(Config ++ [{quic_registration, RegL}])),
+    {ok, {_, _Port}} = quicer:sockname(L),
+    %% THEN: The Listener registration has 0 connection
+    ?assertEqual(0, length(quicer:get_connections(RegL))),
+    %% WHEN: N clients are connected
+    NClients = 10,
+    CPids = lists:map(
+        fun(_) ->
+            {ok, L} = quicer:async_accept(L, #{}),
+            spawn(fun() ->
+                {ok, CConn} = quicer:connect(
+                    "localhost",
+                    Port,
+                    [{quic_registration, RegC} | default_conn_opts()],
+                    1000
+                ),
+                receive
+                    done ->
+                        quicer:close_connection(CConn)
+                end
+            end)
+        end,
+        lists:seq(1, NClients)
+    ),
+    lists:foreach(
+        fun(_) ->
+            receive
+                {quic, new_conn, Conn, _} ->
+                    quicer:handshake(Conn)
+            after 1000 ->
+                ct:fail("conn from client timeout")
+            end
+        end,
+        lists:seq(1, NClients)
+    ),
+    %% THEN: The Listener registration has N connections
+    ?assertEqual(NClients, quicer:count_reg_conns(RegL)),
+    %% THEN: The Client registration has N connections
+    ?assertEqual(NClients, quicer:count_reg_conns(RegC)),
+    %% THEN: The default global registration has 0 connections
+    ?assertEqual(0, quicer:count_reg_conns(global)),
+
+    lists:foreach(fun(Pid) -> Pid ! done end, CPids),
+    quicer:stop_listener(L),
+
+    ok = quicer:shutdown_registration(RegL),
+    ok = quicer:close_registration(RegC),
+    ok.
+
 %%%
 %%% Helpers
 %%%

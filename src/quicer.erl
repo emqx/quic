@@ -94,7 +94,8 @@
     wait_for_handoff/2,
     handoff_stream/2,
     handoff_stream/3,
-    perf_counters/0
+    perf_counters/0,
+    count_reg_conns/1
 ]).
 
 %% helpers
@@ -1078,6 +1079,12 @@ get_connections(global) ->
     quicer_nif:get_connections();
 get_connections(Reg) ->
     quicer_nif:get_connections(Reg).
+
+-spec count_reg_conns(reg_handle() | global) -> non_neg_integer().
+count_reg_conns(global) ->
+    quicer_nif:count_reg_conns();
+count_reg_conns(Reg) ->
+    quicer_nif:count_reg_conns(Reg).
 
 -spec get_conn_owner(connection_handle()) -> quicer_nif:get_owner().
 get_conn_owner(Conn) ->
