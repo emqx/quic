@@ -974,8 +974,9 @@ tc_conn_count_for_registered_listeners(Config) ->
 
     lists:foreach(fun(Pid) -> Pid ! done end, CPids),
     quicer:stop_listener(L),
-
+    quicer:close_listener(L),
     ok = quicer:shutdown_registration(RegL),
+    ok = quicer:close_registration(RegL),
     ok = quicer:close_registration(RegC),
     ok.
 
