@@ -160,7 +160,7 @@ typedef struct QuicerStreamSendCTX
 
 typedef struct QuicerStreamSendCTX QuicerDgramSendCTX;
 
-QuicerRegistrationCTX *init_r_ctx();
+QuicerRegistrationCTX *init_r_ctx(QuicerRegistrationCTX *r_ctx);
 void deinit_r_ctx(QuicerRegistrationCTX *r_ctx);
 void destroy_r_ctx(QuicerRegistrationCTX *r_ctx);
 

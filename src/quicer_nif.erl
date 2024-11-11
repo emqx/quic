@@ -230,8 +230,12 @@ listen(_ListenOn, _Options) ->
     ok | {error, closed | badarg}.
 start_listener(_Listener, _ListenOn, _Opts) ->
     erlang:nif_error(nif_library_not_loaded).
-
--spec close_listener(listener_handle()) -> ok | {error, closed | badarg}.
+%% @doc close the listener
+%% return closed if the listener is closed.
+%% return ok if the listener is stopped then closed, and caller should expect listener_stopped signal.
+%%
+%% @end
+-spec close_listener(listener_handle()) -> ok | closed | {error, closed | badarg}.
 close_listener(_Listener) ->
     erlang:nif_error(nif_library_not_loaded).
 

@@ -23,7 +23,7 @@ limitations under the License.
 #include <openssl/x509.h>
 #include <unistd.h>
 
-extern QuicerRegistrationCTX *G_r_ctx;
+extern QuicerRegistrationCTX G_r_ctx;
 extern pthread_mutex_t GRegLock;
 
 #if defined(DEBUG) && !defined(QUICER_LOGGING_STDOUT)
@@ -541,16 +541,12 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   // If r_ctx is unset, default to use global registration
-  if (!r_ctx && !G_r_ctx)
+  if (!r_ctx)
     {
-      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
-    }
-  else
-    {
-      r_ctx = G_r_ctx;
+      r_ctx = &G_r_ctx;
     }
 
-  if (!get_reg_handle(r_ctx))
+  if(!get_reg_handle(r_ctx))
     {
       return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
     }
@@ -576,10 +572,13 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   // It is safe to use r_ctx here since
-  // a) it is passed as argument which beam still has reference to
-  // b) G_r_ctx is only destroyed when code is unloaded.
+  // it is passed as argument which beam still has reference to
 
-  enif_keep_resource(r_ctx);
+  if (r_ctx != &G_r_ctx)
+  {
+    enif_keep_resource(r_ctx);
+  }
+
   c_ctx->r_ctx = r_ctx;
   enif_mutex_lock(r_ctx->lock);
 
@@ -673,10 +672,11 @@ async_connect3(ErlNifEnv *env,
           // r_ctx is already kept in open_connectionX
           r_ctx = c_ctx->r_ctx;
           is_reuse_handle = TRUE;
-          if (!get_reg_handle(r_ctx))
-            {
-              return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
-            }
+          /* // @FIXME: I don't think it is necessary. */
+          /* if (!get_reg_handle(r_ctx)) */
+          /*   { */
+          /*     return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION); */
+          /*   } */
         }
       else
         {
@@ -699,7 +699,21 @@ async_connect3(ErlNifEnv *env,
           return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
         }
 
-      r_ctx = c_ctx->r_ctx ? c_ctx->r_ctx : G_r_ctx;
+      // Fallback to G_r_ctx
+      if (!c_ctx->r_ctx)
+      {
+        c_ctx->r_ctx = &G_r_ctx;
+      }
+
+      CXPLAT_DBG_ASSERT(c_ctx->r_ctx);
+      r_ctx = c_ctx->r_ctx;
+
+      if (!get_reg_handle(r_ctx))
+        {
+          c_ctx->r_ctx = NULL;
+          enif_release_resource(c_ctx);
+          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+        }
 
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
         {
@@ -713,13 +727,6 @@ async_connect3(ErlNifEnv *env,
           enif_release_resource(c_ctx);
           return ERROR_TUPLE_2(ATOM_BAD_PID);
         }
-
-      if (!get_reg_handle(r_ctx))
-        {
-          enif_release_resource(c_ctx);
-          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
-        }
-      enif_keep_resource(r_ctx);
     }
 
   assert(r_ctx);
@@ -778,6 +785,7 @@ async_connect3(ErlNifEnv *env,
         {
           enif_release_resource(c_ctx);
         }
+      // @FIXME: why not return?
       return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
     }
 
@@ -805,7 +813,7 @@ async_connect3(ErlNifEnv *env,
         }
     }
   c_ctx->is_closed = FALSE; // connection opened.
-                            //
+
   if (!is_reuse_handle && r_ctx)
     {
       enif_mutex_lock(r_ctx->lock);
@@ -886,7 +894,11 @@ async_connect3(ErlNifEnv *env,
   return SUCCESS(eHandle);
 
 Error:
-  put_reg_handle(r_ctx);
+  if (r_ctx)
+  {
+    put_reg_handle(r_ctx);
+    c_ctx->r_ctx = NULL;
+  }
   HQUIC Connection = c_ctx->Connection;
   if (Connection)
     {
@@ -901,7 +913,7 @@ Error:
     }
 
   // Error exit, it must be closed or Handle is NULL
-  assert(c_ctx->is_closed || NULL == c_ctx->Connection);
+  CXPLAT_FRE_ASSERT(c_ctx->is_closed || NULL == c_ctx->Connection);
   enif_mutex_unlock(c_ctx->lock);
 
   if (Connection)
@@ -1762,13 +1774,7 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM res = enif_make_list(env, 0);
   if (argc == 0) // use global registration
     {
-      pthread_mutex_lock(&GRegLock);
-      if (!G_r_ctx)
-        {
-          pthread_mutex_unlock(&GRegLock);
-          return res;
-        }
-      r_ctx = G_r_ctx;
+      r_ctx = &G_r_ctx;
     }
   else
     {
@@ -1776,6 +1782,11 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         {
           return ERROR_TUPLE_2(ATOM_BADARG);
         }
+    }
+
+  if (!get_reg_handle(r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
     }
   enif_mutex_lock(r_ctx->lock);
   CXPLAT_LIST_ENTRY *Entry = r_ctx->Connections.Flink;
@@ -1795,6 +1806,7 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // becasue deref c_ctx may cause connection close and then trigger callback
   // that destroy c_ctx which locks r_ctx in another thread, causing dead lock
   put_conn_handles(env, res);
+  put_reg_handle(r_ctx); //get_connectionsX
 
   if (argc == 0) // use global registration
     {
@@ -1811,13 +1823,7 @@ count_reg_connsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   uint32_t count = 0;
   if (argc == 0) // use global registration
     {
-      pthread_mutex_lock(&GRegLock);
-      if (!G_r_ctx)
-        {
-          pthread_mutex_unlock(&GRegLock);
-          return res;
-        }
-      r_ctx = G_r_ctx;
+      r_ctx = &G_r_ctx;
     }
   else
     {
@@ -1828,7 +1834,7 @@ count_reg_connsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   if (!get_reg_handle(r_ctx))
     {
-      res = ERROR_TUPLE_2(ATOM_CLOSED);
+      res = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
       goto exit;
     }
   enif_mutex_lock(r_ctx->lock);
@@ -1841,7 +1847,7 @@ count_reg_connsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   enif_mutex_unlock(r_ctx->lock);
 
   res = enif_make_uint(env, count);
-  put_reg_handle(r_ctx);
+  put_reg_handle(r_ctx); // conn count
 
 exit:
   if (argc == 0) // use global registration

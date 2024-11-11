@@ -17,13 +17,15 @@ limitations under the License.
 #include "quicer_ctx.h"
 
 // alloc/dealloc ctx should be done in the callbacks.
-extern QuicerRegistrationCTX *G_r_ctx;
+extern QuicerRegistrationCTX G_r_ctx;
 
 QuicerRegistrationCTX *
-init_r_ctx()
+init_r_ctx(QuicerRegistrationCTX *r_ctx)
 {
-  QuicerRegistrationCTX *r_ctx
-      = enif_alloc_resource(ctx_reg_t, sizeof(QuicerRegistrationCTX));
+  if (!r_ctx)
+  {
+    r_ctx= enif_alloc_resource(ctx_reg_t, sizeof(QuicerRegistrationCTX));
+  }
   if (!r_ctx)
     {
       return NULL;
@@ -35,12 +37,14 @@ init_r_ctx()
   r_ctx->lock = enif_mutex_create("quicer:r_ctx");
   CxPlatListInitializeHead(&r_ctx->Listeners);
   CxPlatListInitializeHead(&r_ctx->Connections);
+  CxPlatRefInitialize(&r_ctx->ref_count);
   return r_ctx;
 }
 
 void
 deinit_r_ctx(QuicerRegistrationCTX *r_ctx)
 {
+  r_ctx->is_released = TRUE;
   enif_free_env(r_ctx->env);
   enif_mutex_destroy(r_ctx->lock);
 }
@@ -48,8 +52,14 @@ deinit_r_ctx(QuicerRegistrationCTX *r_ctx)
 void
 destroy_r_ctx(QuicerRegistrationCTX *r_ctx)
 {
-  r_ctx->is_released = TRUE;
-  enif_release_resource(r_ctx);
+  if (r_ctx == &G_r_ctx)
+  {
+    deinit_r_ctx(r_ctx);
+  }
+  else
+  {
+    enif_release_resource(r_ctx);
+  }
 }
 
 QuicerListenerCTX *
@@ -71,7 +81,6 @@ init_l_ctx()
 #endif
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
-  l_ctx->r_ctx = NULL;
   CxPlatListInitializeHead(&l_ctx->RegistrationLink);
   return l_ctx;
 }
@@ -90,7 +99,7 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
     {
       destroy_config_ctx(l_ctx->config_resource);
     }
-  if (l_ctx->r_ctx && l_ctx->r_ctx != G_r_ctx)
+  if (l_ctx->r_ctx)
     {
       enif_release_resource(l_ctx->r_ctx);
     }
@@ -101,33 +110,20 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
 void
 destroy_l_ctx(QuicerListenerCTX *l_ctx)
 {
-  QuicerRegistrationCTX *r_ctx;
-  if (l_ctx->r_ctx)
-    {
-      r_ctx = l_ctx->r_ctx;
-    }
-  else
-    {
-      r_ctx = G_r_ctx;
-    }
-
+  QuicerRegistrationCTX *r_ctx = l_ctx->r_ctx;
   if (r_ctx)
-    {
-      put_reg_handle(r_ctx);
-      enif_mutex_lock(r_ctx->lock);
-      CxPlatListEntryRemove(&l_ctx->RegistrationLink);
-      enif_mutex_unlock(r_ctx->lock);
-    }
+  {
+    CXPLAT_DBG_ASSERT(r_ctx->ref_count > 0);
+    enif_mutex_lock(r_ctx->lock);
+    CxPlatListEntryRemove(&l_ctx->RegistrationLink);
+    enif_mutex_unlock(r_ctx->lock);
+  }
 
   // @note, Destroy config asap as it holds rundown
   // ref count in registration
+
   destroy_config_ctx(l_ctx->config_resource);
 
-  if (l_ctx->r_ctx)
-    {
-      enif_release_resource(l_ctx->r_ctx);
-      l_ctx->r_ctx = NULL;
-    }
   l_ctx->config_resource = NULL;
   if (l_ctx->is_monitored)
     {
@@ -135,6 +131,13 @@ destroy_l_ctx(QuicerListenerCTX *l_ctx)
       l_ctx->is_monitored = FALSE;
     }
   enif_release_resource(l_ctx);
+
+  // NOTE: do it last otherwise deadlock
+  if (r_ctx)
+  {
+    // for config_resource
+    put_reg_handle(r_ctx);
+  }
 }
 
 QuicerConnCTX *
@@ -187,6 +190,12 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
     {
       X509_free(c_ctx->peer_cert);
     }
+
+  if (c_ctx->r_ctx)
+    {
+      put_reg_handle(c_ctx->r_ctx);
+      c_ctx->r_ctx = NULL;
+    }
   enif_mutex_destroy(c_ctx->lock);
 }
 
@@ -202,26 +211,21 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
       c_ctx->trusted = NULL;
     }
 #endif // QUICER_USE_TRUSTED_STORE
-  QuicerRegistrationCTX *r_ctx;
-  if (c_ctx->r_ctx)
-    {
-      r_ctx = c_ctx->r_ctx;
-    }
-  else
-    {
-      r_ctx = G_r_ctx;
-    }
+  QuicerRegistrationCTX *r_ctx = c_ctx->r_ctx;
 
-  enif_mutex_lock(r_ctx->lock);
-  CxPlatListEntryRemove(&c_ctx->RegistrationLink);
-  enif_mutex_unlock(r_ctx->lock);
-
+  if (r_ctx)
+  {
+    enif_mutex_lock(r_ctx->lock);
+    CxPlatListEntryRemove(&c_ctx->RegistrationLink);
+    enif_mutex_unlock(r_ctx->lock);
+  }
   if (c_ctx->is_monitored)
     {
       enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
       c_ctx->is_monitored = FALSE;
     }
 
+  // maybe we should move it to put_conn_handle
   enif_release_resource(c_ctx);
 }
 
@@ -251,6 +255,8 @@ destroy_config_ctx(QuicerConfigCTX *config_ctx)
 {
   if (config_ctx)
     {
+      MsQuic->ConfigurationClose(config_ctx->Configuration);
+      config_ctx->Configuration = NULL;
       enif_release_resource(config_ctx);
     }
 }
@@ -385,22 +391,37 @@ put_listener_handle(QuicerListenerCTX *l_ctx)
 {
   if (CxPlatRefDecrement(&l_ctx->ref_count) && l_ctx->Listener)
     {
+      printf("closing listener...\n");
       HQUIC Listener = l_ctx->Listener;
       l_ctx->Listener = NULL;
+      l_ctx->is_closed = TRUE;
       MsQuic->ListenerClose(Listener);
     }
+  else {
+    printf("listener refcnt--> %ld\n", l_ctx->ref_count);
+  }
 }
 
 inline BOOLEAN
 get_listener_handle(QuicerListenerCTX *l_ctx)
 {
+  printf("*** get listener refcnt--> %ld\n", l_ctx->ref_count+1);
+  //l_ctx->ref_count+1 == 2? abort(): 0;
   return CxPlatRefIncrementNonZero(&l_ctx->ref_count, 1);
 }
 
 inline void
 put_reg_handle(QuicerRegistrationCTX *r_ctx)
 {
-  CxPlatRefDecrement(&r_ctx->ref_count);
+  if (CxPlatRefDecrement(&r_ctx->ref_count))
+  {
+    HQUIC Registration = r_ctx->Registration;
+    r_ctx->is_released = TRUE;
+    r_ctx->Registration = NULL;
+    MsQuic->RegistrationShutdown(Registration, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+    MsQuic->RegistrationClose(Registration);
+    destroy_r_ctx(r_ctx);
+  }
 }
 
 inline BOOLEAN

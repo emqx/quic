@@ -867,7 +867,7 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
   ATOM(ATOM_QUIC_SEND_ECN_CONGESTION_COUNT, send_ecn_congestion_count);       \
   ATOM(ATOM_UNDEFINED, undefined);
 
-extern QuicerRegistrationCTX *G_r_ctx;
+extern QuicerRegistrationCTX G_r_ctx;
 extern pthread_mutex_t GRegLock;
 
 const QUIC_API_TABLE *MsQuic = NULL;
@@ -1045,7 +1045,7 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerConfigCTX *config_ctx = (QuicerConfigCTX *)obj;
   // Check if Registration is closed or not
-  if (G_r_ctx && config_ctx->Configuration)
+  if (config_ctx->Configuration)
     {
       MsQuic->ConfigurationClose(config_ctx->Configuration);
     }
@@ -1061,7 +1061,7 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   deinit_r_ctx(reg_ctx);
   if (MsQuic && reg_ctx->Registration)
     {
-      MsQuic->RegistrationClose(reg_ctx->Registration);
+      //MsQuic->RegistrationClose(reg_ctx->Registration);
     }
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
@@ -1346,15 +1346,21 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 
       pthread_mutex_lock(&GRegLock);
       // end of the world
-      if (G_r_ctx && !G_r_ctx->is_released)
+      if (!G_r_ctx.is_released)
         {
           // Make MsQuic debug check pass:
           //   Zero Registration when closing MsQuic
-          MsQuic->RegistrationClose(G_r_ctx->Registration);
-          G_r_ctx->Registration = NULL;
-          G_r_ctx->is_released = TRUE;
-          destroy_r_ctx(G_r_ctx);
-          G_r_ctx = NULL;
+          if (!get_reg_handle(&G_r_ctx))
+          {
+            CXPLAT_DBG_ASSERTMSG(FALSE, "Global Registration closed before MsQuic");
+          }
+          while(G_r_ctx.ref_count != 2)
+            {
+              printf("shutdown lib wait for global reg cnt to be 2\nnow: %ld\n",
+                     G_r_ctx.ref_count);
+            }
+          put_reg_handle(&G_r_ctx);
+          put_reg_handle(&G_r_ctx);
         }
       pthread_mutex_unlock(&GRegLock);
 

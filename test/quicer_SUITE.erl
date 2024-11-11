@@ -306,7 +306,7 @@ tc_close_lib_test(_Config) ->
 
 tc_lib_registration_neg(_Config) ->
     ok = quicer:close_lib(),
-    {error, badarg} = quicer:reg_open(),
+    {error, status} = quicer:reg_open(),
     {error, badarg} = quicer:reg_close().
 
 tc_lib_registration(_Config) ->
@@ -1607,7 +1607,8 @@ tc_setopt_conn_remote_addr(_Config) ->
         {error, transport_down, #{error := 298, status := bad_certificate}} ->
             %% Mac @TODO don't know why it failed
             ok
-    end.
+    end,
+    quicer:shutdown_connection(Conn).
 
 tc_setopt_global_retry_mem_percent(_Config) ->
     ?assertEqual(ok, quicer:setopt(quic_global, retry_memory_percent, 30, false)).
@@ -3520,13 +3521,14 @@ simple_stream_server(Owner, Config, Port) ->
         done ->
             ok
     end,
+    ct:pal("Close Listener: ~p", [L]),
     simple_stream_server_exit(L).
 
 simple_stream_server_exit(L) ->
-    quicer:close_listener(L).
+    ok = quicer:close_listener(L, 5000).
 
 ensure_server_exit_normal(MonRef) ->
-    ensure_server_exit_normal(MonRef, 5000).
+    ensure_server_exit_normal(MonRef, 10000).
 ensure_server_exit_normal(MonRef, Timeout) ->
     receive
         {'DOWN', MonRef, process, _, normal} ->

@@ -343,6 +343,8 @@ close_listener(Listener) ->
     ok | {error, badarg | closed | timeout}.
 close_listener(Listener, Timeout) ->
     case quicer_nif:close_listener(Listener) of
+        closed ->
+            ok;
         ok when Timeout == 0 ->
             ok;
         ok ->

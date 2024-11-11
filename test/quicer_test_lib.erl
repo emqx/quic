@@ -421,8 +421,20 @@ cleanup_msquic() ->
     ok.
 
 reset_global_reg() ->
-    quicer:reg_close(),
-    quicer:reg_open().
+  quicer:reg_close(),
+  retry_reg_open().
+
+retry_reg_open() ->
+  case quicer:reg_open() of
+    ok ->
+      ok;
+    {error, status} = E ->
+      E;
+    {error, Reason} ->
+      ct:pal("Failed to open global registration: ~p, retry....", [Reason]),
+      timer:sleep(50),
+      retry_reg_open()
+  end.
 
 shutdown_all_listeners() ->
     lists:foreach(
@@ -430,7 +442,8 @@ shutdown_all_listeners() ->
             quicer:terminate_listener(Id)
         end,
         quicer:listeners()
-    ).
+     ).
+    %lists:map(fun(L) -> quicer:close_listener(L) end, quicer:get_listeners()).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

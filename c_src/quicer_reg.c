@@ -19,8 +19,9 @@ limitations under the License.
 static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
-QuicerRegistrationCTX *G_r_ctx = NULL;
+QuicerRegistrationCTX G_r_ctx = {.is_released = TRUE};
 pthread_mutex_t GRegLock = PTHREAD_MUTEX_INITIALIZER;
+extern pthread_mutex_t MsQuicLock;
 
 /*
 ** Open global registration.
@@ -34,9 +35,9 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS status;
   ERL_NIF_TERM res = ATOM_OK;
 
-  if (!MsQuic || G_r_ctx)
+  if (!MsQuic)
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      return ERROR_TUPLE_2(ATOM_STATUS);
     }
 
   pthread_mutex_lock(&GRegLock);
@@ -51,30 +52,30 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-  QuicerRegistrationCTX *r_ctx = init_r_ctx();
-  if (!r_ctx)
+  if (!G_r_ctx.is_released)
     {
       pthread_mutex_unlock(&GRegLock);
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      return ERROR_TUPLE_2(ATOM_BADARG);
     }
+
+  init_r_ctx(&G_r_ctx);
+  CXPLAT_FRE_ASSERT(G_r_ctx.ref_count==1);
+
+  QuicerRegistrationCTX *r_ctx = &G_r_ctx;
 
   if (QUIC_FAILED(
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
     {
-      enif_release_resource(r_ctx);
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
       goto exit;
     }
-  CxPlatRefInitialize(&r_ctx->ref_count);
-  G_r_ctx = r_ctx;
+
   pthread_mutex_unlock(&GRegLock);
 
   // nif owns the global registration
   // thus not return to the erlang side
   return ATOM_OK;
-
 exit:
-  destroy_r_ctx(r_ctx);
   pthread_mutex_unlock(&GRegLock);
   return res;
 }
@@ -87,27 +88,23 @@ deregistration(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  // @TODO error_code should be configurable
-  int error_code = 0;
+  ERL_NIF_TERM res = ATOM_OK;
+  pthread_mutex_lock(&MsQuicLock);
   if (!MsQuic)
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto exit;
     }
 
   pthread_mutex_lock(&GRegLock);
-  if (G_r_ctx && !G_r_ctx->is_released)
+  if (!G_r_ctx.is_released)
     {
-      MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
-      // Do not defer the closing the global registration
-      // to resource dealloc callback because a common scenario is to
-      // close the lib after close the global registration.
-      MsQuic->RegistrationClose(G_r_ctx->Registration);
-      G_r_ctx->Registration = NULL;
-      destroy_r_ctx(G_r_ctx);
-      G_r_ctx = NULL;
+      put_reg_handle(&G_r_ctx);
     }
   pthread_mutex_unlock(&GRegLock);
-  return ATOM_OK;
+exit:
+  pthread_mutex_unlock(&MsQuicLock);
+  return res;
 }
 
 ERL_NIF_TERM
@@ -127,7 +124,7 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  QuicerRegistrationCTX *r_ctx = init_r_ctx();
+  QuicerRegistrationCTX *r_ctx = init_r_ctx(NULL);
   if (!r_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
@@ -195,7 +192,6 @@ shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM *argv)
     {
       // void return, trigger callback, no blocking
       MsQuic->RegistrationShutdown(r_ctx->Registration, silent, error_code);
-      destroy_r_ctx(r_ctx);
     }
 
   return ATOM_OK;

@@ -155,6 +155,7 @@
     %% for server
     start_link/4,
     get_cb_state/1,
+    merge_cb_state/2,
     stream_send/6,
     get_handle/1
 ]).
@@ -218,6 +219,12 @@ start_link(CallbackModule, Listener, Opts, Sup) ->
 -spec get_cb_state(ConnPid :: pid()) -> cb_state() | {error, any()}.
 get_cb_state(ConnPid) ->
     gen_server:call(ConnPid, get_cb_state, infinity).
+
+-spec merge_cb_state(ConnPid :: pid(), New :: map()) -> cb_state() | {error, any()}.
+merge_cb_state(ConnPid, New) when is_map(New) ->
+    gen_server:call(ConnPid, {merge_cb_state, New}, infinity);
+merge_cb_state(_ConnPid, _New) ->
+    {error, unsupported_type}.
 
 -spec stream_send(
     ConnPid :: pid(),
@@ -325,6 +332,12 @@ init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) when CallbackModul
     | {stop, Reason :: term(), NewState :: term()}.
 handle_call(get_cb_state, _From, #{callback_state := CbState} = State) ->
     {reply, CbState, State};
+handle_call({merge_cb_state, New}, _From, #{callback_state := CbState} = State) when
+    is_map(New)
+->
+    NewCBState = maps:merge(CbState, New),
+    NewState = State#{callback_state := NewCBState},
+    {reply, NewCBState, NewState};
 handle_call(get_handle, _From, #{conn := Connection} = State) ->
     {reply, Connection, State};
 handle_call(

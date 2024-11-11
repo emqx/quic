@@ -20,7 +20,7 @@ limitations under the License.
 #include "quicer_tls.h"
 #include <msquichelper.h>
 
-extern QuicerRegistrationCTX *G_r_ctx;
+extern QuicerRegistrationCTX G_r_ctx;
 extern pthread_mutex_t MsQuicLock;
 
 static ERL_NIF_TERM get_stream_opt(ErlNifEnv *env,
@@ -218,11 +218,6 @@ ServerLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
 
-  if (!G_r_ctx)
-    {
-      return ATOM_REG_FAILED;
-    }
-
   if (!create_settings(env, option, &Settings))
     {
       return ATOM_BADARG;
@@ -274,11 +269,6 @@ ClientLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
   ERL_NIF_TERM ret = ATOM_OK;
-
-  if (!G_r_ctx)
-    {
-      return ATOM_REG_FAILED;
-    }
 
   //
   // Configures the client's idle timeout.
@@ -2644,7 +2634,6 @@ parse_registration(ErlNifEnv *env,
           return FALSE;
         }
     }
-
   return TRUE;
 }
 
