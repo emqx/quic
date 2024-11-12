@@ -47,6 +47,7 @@ closeLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM ATOM_TRUE;
 ERL_NIF_TERM ATOM_FALSE;
+ERL_NIF_TERM ATOM_GLOBAL;
 
 // quicer internal 'errors'
 ERL_NIF_TERM ATOM_OK;
@@ -475,6 +476,7 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
 #define INIT_ATOMS                                                            \
   ATOM(ATOM_TRUE, true);                                                      \
   ATOM(ATOM_FALSE, false);                                                    \
+  ATOM(ATOM_GLOBAL, global);                                                    \
                                                                               \
   ATOM(ATOM_OK, ok);                                                          \
   ATOM(ATOM_ERROR, error);                                                    \
@@ -1057,12 +1059,10 @@ void
 resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   TP_CB_3(start, (uintptr_t)obj, 0);
-  QuicerRegistrationCTX *reg_ctx = (QuicerRegistrationCTX *)obj;
-  deinit_r_ctx(reg_ctx);
-  if (MsQuic && reg_ctx->Registration)
-    {
-      //MsQuic->RegistrationClose(reg_ctx->Registration);
-    }
+  QuicerRegistrationCTX *r_ctx = (QuicerRegistrationCTX *)obj;
+  CXPLAT_FRE_ASSERT(r_ctx->ref_count == 0);
+  CXPLAT_FRE_ASSERT(!r_ctx->Registration);
+  deinit_r_ctx(r_ctx);
   TP_CB_3(end, (uintptr_t)obj, 0);
 }
 
@@ -1356,7 +1356,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
           }
           while(G_r_ctx.ref_count != 2)
             {
-              printf("shutdown lib wait for global reg cnt to be 2\nnow: %ld\n",
+              printf("closelib wait for global reg cnt to be 2 but now: %ld\n",
                      G_r_ctx.ref_count);
             }
           put_reg_handle(&G_r_ctx);
@@ -1766,6 +1766,7 @@ static ErlNifFunc nif_funcs[] = {
   { "count_reg_conns", 0, count_reg_connsX, 0},
   { "count_reg_conns", 1, count_reg_connsX, 0},
   /* for DEBUG */
+  { "get_registration_refcnt", 1, get_registration_refcnt, 0},
   { "get_conn_rid", 1, get_conn_rid1, 1},
   { "get_stream_rid", 1, get_stream_rid1, 1},
   { "get_listeners", 0, get_listenersX, 0},

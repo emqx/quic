@@ -49,19 +49,6 @@ deinit_r_ctx(QuicerRegistrationCTX *r_ctx)
   enif_mutex_destroy(r_ctx->lock);
 }
 
-void
-destroy_r_ctx(QuicerRegistrationCTX *r_ctx)
-{
-  if (r_ctx == &G_r_ctx)
-  {
-    deinit_r_ctx(r_ctx);
-  }
-  else
-  {
-    enif_release_resource(r_ctx);
-  }
-}
-
 QuicerListenerCTX *
 init_l_ctx()
 {
@@ -98,10 +85,6 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
   if (l_ctx->config_resource)
     {
       destroy_config_ctx(l_ctx->config_resource);
-    }
-  if (l_ctx->r_ctx)
-    {
-      enif_release_resource(l_ctx->r_ctx);
     }
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);
@@ -172,6 +155,7 @@ init_c_ctx()
 void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
+  CXPLAT_FRE_ASSERT(!c_ctx->r_ctx);
   enif_free_env(c_ctx->env);
 #if defined(QUICER_USE_TRUSTED_STORE)
   if (c_ctx->trusted != NULL)
@@ -189,12 +173,6 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
   if (c_ctx->peer_cert)
     {
       X509_free(c_ctx->peer_cert);
-    }
-
-  if (c_ctx->r_ctx)
-    {
-      put_reg_handle(c_ctx->r_ctx);
-      c_ctx->r_ctx = NULL;
     }
   enif_mutex_destroy(c_ctx->lock);
 }
@@ -376,6 +354,8 @@ put_conn_handle(QuicerConnCTX *c_ctx)
       c_ctx->Connection = NULL;
       c_ctx->is_closed = TRUE;
       MsQuic->SetCallbackHandler(Connection, NULL, NULL);
+      put_reg_handle(c_ctx->r_ctx);
+      c_ctx->r_ctx = NULL;
       MsQuic->ConnectionClose(Connection);
     }
 }
@@ -420,7 +400,14 @@ put_reg_handle(QuicerRegistrationCTX *r_ctx)
     r_ctx->Registration = NULL;
     MsQuic->RegistrationShutdown(Registration, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
     MsQuic->RegistrationClose(Registration);
-    destroy_r_ctx(r_ctx);
+    if (r_ctx == &G_r_ctx)
+    {
+      deinit_r_ctx(r_ctx);
+    }
+    else
+    {
+      enif_release_resource(r_ctx);
+    }
   }
 }
 

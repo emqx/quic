@@ -25,6 +25,7 @@
     shutdown_registration/3,
     close_registration/1,
     get_registration_name/1,
+    get_registration_refcnt/1,
     listen/2,
     start_listener/3,
     stop_listener/1,
@@ -90,6 +91,7 @@
     shutdown_registration/0,
     close_registration/0,
     get_registration_name/0,
+    get_registration_refcnt/0,
     get_listeners/0,
     get_connections/0,
     get_owner/0,
@@ -103,6 +105,7 @@
 -type shutdown_registration() :: ok | {error, badarg}.
 -type close_registration() :: ok | {error, badarg}.
 -type get_registration_name() :: {ok, string()} | {error, badarg}.
+-type get_registration_refcnt() :: {error, closed} | integer().
 -type get_listeners() :: [listener_handle()].
 -type get_connections() :: [connection_handle()].
 -type get_owner() :: {ok, pid()} | {error, undefined | badarg}.
@@ -217,6 +220,10 @@ close_registration(_Handle) ->
 
 -spec get_registration_name(reg_handle()) -> get_registration_name().
 get_registration_name(_Handle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec get_registration_refcnt(reg_handle()) -> get_registration_refcnt().
+get_registration_refcnt(_Handle) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec listen(listen_on(), listen_opts()) ->

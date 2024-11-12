@@ -574,11 +574,6 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // It is safe to use r_ctx here since
   // it is passed as argument which beam still has reference to
 
-  if (r_ctx != &G_r_ctx)
-  {
-    enif_keep_resource(r_ctx);
-  }
-
   c_ctx->r_ctx = r_ctx;
   enif_mutex_lock(r_ctx->lock);
 
@@ -621,7 +616,6 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   return SUCCESS(eHandle);
 
 exit:
-  enif_release_resource(r_ctx);
   enif_release_resource(c_ctx);
   return res;
 }
@@ -672,11 +666,6 @@ async_connect3(ErlNifEnv *env,
           // r_ctx is already kept in open_connectionX
           r_ctx = c_ctx->r_ctx;
           is_reuse_handle = TRUE;
-          /* // @FIXME: I don't think it is necessary. */
-          /* if (!get_reg_handle(r_ctx)) */
-          /*   { */
-          /*     return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION); */
-          /*   } */
         }
       else
         {
@@ -925,10 +914,6 @@ Error:
       MsQuic->ConnectionClose(Connection);
     }
 
-  if (!is_reuse_handle)
-    {
-      enif_release_resource(r_ctx);
-    }
   return res;
 }
 

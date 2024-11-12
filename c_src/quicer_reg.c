@@ -19,7 +19,7 @@ limitations under the License.
 static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
-QuicerRegistrationCTX G_r_ctx = {.is_released = TRUE};
+QuicerRegistrationCTX G_r_ctx = {.name = "global", .is_released = TRUE};
 pthread_mutex_t GRegLock = PTHREAD_MUTEX_INITIALIZER;
 extern pthread_mutex_t MsQuicLock;
 
@@ -136,7 +136,7 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           || strlen(r_ctx->name) == 0))
     {
       res = ERROR_TUPLE_2(ATOM_BADARG);
-      goto exit;
+      goto err_exit;
     }
 
   RegConfig.AppName = r_ctx->name;
@@ -144,13 +144,12 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
     {
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
-      goto exit;
+      goto err_exit;
     }
-  CxPlatRefInitialize(&r_ctx->ref_count);
   return SUCCESS(enif_make_resource(env, r_ctx));
 
-exit:
-  destroy_r_ctx(r_ctx);
+err_exit:
+  enif_release_resource(r_ctx);
   return res;
 }
 
@@ -214,7 +213,7 @@ close_registration(ErlNifEnv *env,
   r_ctx->Registration = NULL;
   enif_mutex_unlock(r_ctx->lock);
   MsQuic->RegistrationClose(Registration);
-  destroy_r_ctx(r_ctx);
+  put_reg_handle(r_ctx);
   return ATOM_OK;
 }
 
@@ -234,6 +233,31 @@ get_registration_name1(ErlNifEnv *env,
   ERL_NIF_TERM name = enif_make_string(env, r_ctx->name, ERL_NIF_LATIN1);
   enif_mutex_unlock(r_ctx->lock);
   return SUCCESS(name);
+}
+
+ERL_NIF_TERM
+get_registration_refcnt(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM *argv)
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  ERL_NIF_TERM ectx = argv[0];
+  CXPLAT_DBG_ASSERT(argc == 1);
+
+  if (IS_SAME_TERM(ectx, ATOM_GLOBAL))
+    {
+      r_ctx = &G_r_ctx;
+    }
+  else if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!get_reg_handle(r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+  CXPLAT_REF_COUNT cnt = r_ctx->ref_count;
+  put_reg_handle(r_ctx);
+  return enif_make_int64(env, cnt-1);
 }
 
 BOOLEAN

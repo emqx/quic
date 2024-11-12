@@ -43,9 +43,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
   if (is_worker)
     {
-      printf("trying lock!!!\n");
       enif_mutex_lock(l_ctx->lock);
-      printf("trying unlock!!!\n");
     }
 
   switch (Event->Type)
@@ -98,13 +96,16 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           // We are going to reject the connection,
           // we will not be the owner of this connection
           // msquic will close the Connection Handle internally.
-          // Set it to NULL to avoid close it in resource_conn_dealloc_callback
-          // or in the put_conn_handle.
+          // Set MsQuic Handles to NULL to avoid double free in
+          // resource_conn_dealloc_callback
+          // AND
+          // put_*_handle
           c_ctx->Connection = NULL;
+          c_ctx->r_ctx = NULL;
+
           put_conn_handle(c_ctx);
           put_reg_handle(r_ctx);
           CXPLAT_FRE_ASSERTMSG(r_ctx->ref_count > 0, "Listener should still own the r_ctx");
-          c_ctx->r_ctx = NULL;
           // However, we still need to release the c_ctx resource
           // @NOTE: we don't hold the lock of c_ctx since it is new conn.
           // @TODO: the next step should be part of put_conn_handle/1 and need to be tested
@@ -236,8 +237,8 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
       // **Note**, this callback event in msquic can be triggered by either
       // MsQuicListenerClose or MsQuicListenerStop.
-      printf("!!!!!!!handle stop complete\n");
       env = l_ctx->env;
+
       enif_send(NULL,
                 &(l_ctx->listenerPid),
                 env,
@@ -683,6 +684,7 @@ get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       Entry = Entry->Flink;
     }
   enif_mutex_unlock(r_ctx->lock);
+  put_reg_handle(r_ctx);
   return res;
 }
 

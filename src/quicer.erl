@@ -28,6 +28,7 @@
     shutdown_registration/1,
     shutdown_registration/3,
     get_registration_name/1,
+    get_registration_refcnt/1,
     reg_open/0,
     reg_open/1,
     reg_close/0
@@ -238,6 +239,12 @@ close_registration(Handle) ->
     quicer_nif:get_registration_name().
 get_registration_name(Handle) ->
     quicer_nif:get_registration_name(Handle).
+
+%% @doc get registration reference count
+-spec get_registration_refcnt(global | reg_handle()) ->
+    quicer_nif:get_registration_refcnt().
+get_registration_refcnt(Handle) ->
+    quicer_nif:get_registration_refcnt(Handle).
 
 %% @doc GRegistraion should be opened before calling traffic APIs.
 %%

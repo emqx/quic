@@ -912,9 +912,8 @@ tc_listener_stopped_when_owner_die(Config) ->
             {ok, _L0} = quicer:listen(Port, default_listen_opts(Config))
         end
     ),
-    %% Then the old listener can be closed but timeout since it is already stopped
-    %% and no stop event is triggered
-    {error, timeout} = quicer:close_listener(L0, _timeout = 10),
+    %% Then the old listener can be closed normally
+    ok = quicer:close_listener(L0, _timeout = 10),
     %% Then the new listener can be closed
     ok = quicer:close_listener(L1).
 

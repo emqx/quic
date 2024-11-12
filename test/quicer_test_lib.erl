@@ -421,6 +421,21 @@ cleanup_msquic() ->
     ok.
 
 reset_global_reg() ->
+  case quicer:get_listeners() of
+    [] ->
+      ok;
+    Other ->
+        ct:pal("Warn: Listeners not cleaned up: ~p", [Other]),
+        lists:foreach(
+            fun(L) -> quicer:close_listener(L) end, Other
+        )
+  end,
+  case quicer:get_registration_refcnt(global) of
+    1 ->
+        ok;
+    N ->
+      ct:pal("Warn: Global registration refcnt not 1: ~p", [N])
+  end,
   quicer:reg_close(),
   retry_reg_open().
 
@@ -429,6 +444,7 @@ retry_reg_open() ->
     ok ->
       ok;
     {error, status} = E ->
+      %% Lib is closed.
       E;
     {error, Reason} ->
       ct:pal("Failed to open global registration: ~p, retry....", [Reason]),
