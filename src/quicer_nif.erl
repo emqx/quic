@@ -205,11 +205,11 @@ reg_close() ->
 new_registration(_Name, _Profile) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec shutdown_registration(reg_handle()) -> shutdown_registration().
+-spec shutdown_registration(global | reg_handle()) -> shutdown_registration().
 shutdown_registration(_Handle) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec shutdown_registration(reg_handle(), IsSilent :: boolean(), ErrorCode :: uint64()) ->
+-spec shutdown_registration(global | reg_handle(), IsSilent :: boolean(), ErrorCode :: uint64()) ->
     shutdown_registration().
 shutdown_registration(_Handle, _IsSilent, _ErrorCode) ->
     erlang:nif_error(nif_library_not_loaded).

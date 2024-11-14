@@ -570,7 +570,7 @@ tc_stream_acceptor_down(Config) ->
             quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
             receive
                 {quic, closed, Conn, _} ->
-                    ct:pal("Connecion is closed")
+                    ct:pal("Connection is closed")
             end,
             quicer:shutdown_connection(Conn)
         end,
@@ -2858,7 +2858,7 @@ tc_multi_streams_example_server_1(Config) ->
             quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
             receive
                 {quic, closed, Conn, _} ->
-                    ct:pal("Connecion is closed")
+                    ct:pal("Connection is closed")
             end,
             quicer:shutdown_connection(Conn)
         end,

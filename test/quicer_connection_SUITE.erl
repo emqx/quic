@@ -88,7 +88,7 @@ init_per_group(suite_reg, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_group(suite_reg, Config) ->
-    Reg = proplists:get_value(quic_registration, Config),
+    Reg = ?config(quic_registration, Config),
     quicer:shutdown_registration(Reg),
     ok = quicer:close_registration(Reg);
 end_per_group(_GroupName, _Config) ->
@@ -929,11 +929,11 @@ tc_conn_count_for_registered_listeners(Config) ->
     {ok, RegC} = quicer:new_registration(
         "clients", quic_execution_profile_max_throughput
     ),
-    %% WHEN: When there is no connections from clients.
+    %% WHEN: there is no connections from clients.
     {ok, L} = quicer:listen(Port, default_listen_opts(Config ++ [{quic_registration, RegL}])),
     {ok, {_, _Port}} = quicer:sockname(L),
     %% THEN: The Listener registration has 0 connection
-    ?assertEqual(0, length(quicer:get_connections(RegL))),
+    ?assertEqual(0, quicer:count_reg_conns(RegL)),
     %% WHEN: N clients are connected
     NClients = 10,
     CPids = lists:map(
@@ -973,9 +973,7 @@ tc_conn_count_for_registered_listeners(Config) ->
     ?assertEqual(0, quicer:count_reg_conns(global)),
 
     lists:foreach(fun(Pid) -> Pid ! done end, CPids),
-    quicer:stop_listener(L),
-    timer:sleep(1000),
-    quicer:close_listener(L),
+    ok = quicer:close_listener(L),
     ok = quicer:close_registration(RegL),
     ok = quicer:close_registration(RegC),
     ok.

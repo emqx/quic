@@ -256,6 +256,7 @@ end_per_testcase(tc_open_listener_neg_1, _Config) ->
     quicer:open_lib(),
     quicer:reg_open();
 end_per_testcase(tc_lib_registration_neg, _Config) ->
+    quicer:open_lib(),
     quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
     quicer:terminate_listener(mqtt),
@@ -339,7 +340,7 @@ tc_lib_re_registration(_Config) ->
             ok = quicer:reg_close(),
             ok = quicer:reg_open()
     end,
-    {error, badarg} = quicer:reg_open(),
+    ok = quicer:reg_open(),
     ok = quicer:reg_close(),
     ok = quicer:reg_close().
 
@@ -1607,7 +1608,8 @@ tc_setopt_conn_remote_addr(_Config) ->
         {ok, _} ->
             ok;
         {error, transport_down, #{error := 298, status := bad_certificate}} ->
-            %% Mac @TODO don't know why it failed
+            %% Mac
+            {unix, darwin} = os:type(),
             ok
     end,
     quicer:shutdown_connection(Conn).
@@ -2035,7 +2037,7 @@ tc_stream_open_flag_unidirectional(Config) ->
         {quic, <<"ping1">>, Stm, _} ->
             ct:fail("unidirectional stream should not receive any");
         {quic, stream_closed, Stm, #{is_conn_shutdown := _, is_app_closing := false}} ->
-            ct:pal("stream is closed due to connecion idle")
+            ct:pal("stream is closed due to connection idle")
     end,
     ?assert(is_integer(Rid)),
     ?assert(Rid =/= 0),
@@ -2111,7 +2113,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
     end,
     receive
         {quic, closed, Conn, _Flags} ->
-            ct:pal("Connecion is closed ~p", [Conn])
+            ct:pal("Connection is closed ~p", [Conn])
     end,
     quicer:terminate_listener(mqtt),
     ?assert(is_integer(Rid)).

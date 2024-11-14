@@ -296,7 +296,7 @@ SYNC call in non-callback-context
 | QUIC_LISTENER_EVENT_NEW_CONNECTION | {quic,  new_conn         , connection_handle()}  |
 | QUIC_LISTENER_EVENT_STOP_COMPLETE  | {quic,  listener_stopped , listener_handle()}    |
 
-** Connecion Events
+** Connection Events
 
 *QUIC_CONNECTION_EVENT* in msquic.h
 

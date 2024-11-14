@@ -229,10 +229,16 @@ shutdown_registration(Handle, IsSilent, ErrCode) ->
     quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
 
 %% @doc close a registration.
--spec close_registration(reg_handle()) ->
-    quicer_nif:close_registration().
+-spec close_registration(reg_handle()) -> ok.
 close_registration(Handle) ->
-    quicer_nif:close_registration(Handle).
+    case quicer_nif:close_registration(Handle) of
+        ok ->
+            ok;
+        N ->
+            io:format("pending close_registration refcnt: ~p~n", [N]),
+            timer:sleep(100),
+            close_registration(Handle)
+    end.
 
 %% @doc get registration name
 -spec get_registration_name(reg_handle()) ->

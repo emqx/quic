@@ -476,7 +476,7 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
 #define INIT_ATOMS                                                            \
   ATOM(ATOM_TRUE, true);                                                      \
   ATOM(ATOM_FALSE, false);                                                    \
-  ATOM(ATOM_GLOBAL, global);                                                    \
+  ATOM(ATOM_GLOBAL, global);                                                  \
                                                                               \
   ATOM(ATOM_OK, ok);                                                          \
   ATOM(ATOM_ERROR, error);                                                    \
@@ -954,7 +954,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
   // must be closed otherwise will trigger callback and casue race cond.
   // This ensures no callbacks during cleanup here.
-  assert(c_ctx->is_closed == TRUE); // in dealloc
+  CXPLAT_FRE_ASSERT(c_ctx->is_closed == TRUE); // in dealloc
   if (c_ctx->Connection)
     {
       TP_CB_3(close, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
@@ -1046,7 +1046,6 @@ resource_config_dealloc_callback(__unused_parm__ ErlNifEnv *env,
 {
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerConfigCTX *config_ctx = (QuicerConfigCTX *)obj;
-  // Check if Registration is closed or not
   if (config_ctx->Configuration)
     {
       MsQuic->ConfigurationClose(config_ctx->Configuration);
@@ -1060,7 +1059,7 @@ resource_reg_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   TP_CB_3(start, (uintptr_t)obj, 0);
   QuicerRegistrationCTX *r_ctx = (QuicerRegistrationCTX *)obj;
-  CXPLAT_FRE_ASSERT(r_ctx->ref_count == 0);
+  CXPLAT_FRE_ASSERT(!get_reg_handle(r_ctx));
   CXPLAT_FRE_ASSERT(!r_ctx->Registration);
   deinit_r_ctx(r_ctx);
   TP_CB_3(end, (uintptr_t)obj, 0);
@@ -1351,13 +1350,16 @@ closeLib(__unused_parm__ ErlNifEnv *env,
           // Make MsQuic debug check pass:
           //   Zero Registration when closing MsQuic
           if (!get_reg_handle(&G_r_ctx))
-          {
-            CXPLAT_DBG_ASSERTMSG(FALSE, "Global Registration closed before MsQuic");
-          }
-          while(G_r_ctx.ref_count != 2)
+            {
+              CXPLAT_DBG_ASSERTMSG(FALSE,
+                                   "Global Registration closed before MsQuic");
+            }
+          // @FIXME: This is unsafe, but we have no choice for now
+          while (G_r_ctx.ref_count != 2)
             {
               printf("closelib wait for global reg cnt to be 2 but now: %ld\n",
-                     G_r_ctx.ref_count);
+                     (long)G_r_ctx.ref_count);
+              sleep(1);
             }
           put_reg_handle(&G_r_ctx);
           put_reg_handle(&G_r_ctx);

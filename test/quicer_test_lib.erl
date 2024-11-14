@@ -421,36 +421,53 @@ cleanup_msquic() ->
     ok.
 
 reset_global_reg() ->
-  case quicer:get_listeners() of
-    [] ->
-      ok;
-    Other ->
-        ct:pal("Warn: Listeners not cleaned up: ~p", [Other]),
-        lists:foreach(
-            fun(L) -> quicer:close_listener(L) end, Other
-        )
-  end,
-  case quicer:get_registration_refcnt(global) of
-    1 ->
-        ok;
-    N ->
-      ct:pal("Warn: Global registration refcnt not 1: ~p", [N])
-  end,
-  quicer:reg_close(),
-  retry_reg_open().
+    case quicer:get_listeners() of
+        [] ->
+            ok;
+        Other ->
+            ct:pal("Warn: Listeners not cleaned up: ~p", [Other]),
+            lists:foreach(
+                fun(L) -> quicer:close_listener(L) end, Other
+            )
+    end,
+    case quicer:get_registration_refcnt(global) of
+        1 ->
+            ok;
+        {error, closed} ->
+            ct:pal("global registration closed"),
+            quicer:reg_open();
+        N ->
+            ct:pal("Warn: Global registration refcnt not 1: ~p", [N])
+    end,
+    quicer:shutdown_registration(global),
+    retry_reg_close(),
+    retry_reg_open().
+
+retry_reg_close() ->
+    case quicer:reg_close() of
+        ok ->
+            ok;
+        N when is_integer(N) ->
+            ct:pal(
+                "Failed to close global registration refcnt: ~p, Conns: ~p, Listeners: ~p~nretry....",
+                [
+                    N,
+                    quicer:get_connections(),
+                    quicer:get_listeners()
+                ]
+            ),
+            timer:sleep(50),
+            retry_reg_close()
+    end.
 
 retry_reg_open() ->
-  case quicer:reg_open() of
-    ok ->
-      ok;
-    {error, status} = E ->
-      %% Lib is closed.
-      E;
-    {error, Reason} ->
-      ct:pal("Failed to open global registration: ~p, retry....", [Reason]),
-      timer:sleep(50),
-      retry_reg_open()
-  end.
+    case quicer:reg_open() of
+        ok ->
+            ok;
+        {error, status} = E ->
+            %% Lib is closed.
+            E
+    end.
 
 shutdown_all_listeners() ->
     lists:foreach(
@@ -458,8 +475,8 @@ shutdown_all_listeners() ->
             quicer:terminate_listener(Id)
         end,
         quicer:listeners()
-     ).
-    %lists:map(fun(L) -> quicer:close_listener(L) end, quicer:get_listeners()).
+    ).
+%lists:map(fun(L) -> quicer:close_listener(L) end, quicer:get_listeners()).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

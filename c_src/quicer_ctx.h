@@ -28,6 +28,32 @@ limitations under the License.
 #define _CTX_NIF_WRITE_
 #define _CTX_NIF_READ_
 
+#define KEEP_R_CTX(CTX) (r_ctx == &G_r_ctx) ? void : enif_keep_resource(CTX);
+#define REL_R_CTX(CTX) (r_ctx == &G_r_ctx) ? void : enif_release_resource(CTX);
+
+#define CONN_LINK_REGISTRATION(CTX, RCTX)                                     \
+  LINK_REGISTRATION(CTX, RCTX, Connections)
+#define LISTENER_LINK_REGISTRATION(CTX, RCTX)                                 \
+  LINK_REGISTRATION(CTX, RCTX, Listeners)
+#define UNLINK_REGISTRATION(CTX, RCTX)                                        \
+  do                                                                          \
+    {                                                                         \
+      enif_mutex_lock(RCTX->lock);                                            \
+      CxPlatListEntryRemove(&CTX->RegistrationLink);                          \
+      enif_mutex_unlock(RCTX->lock);                                          \
+    }                                                                         \
+  while (0)
+
+#define LINK_REGISTRATION(CTX, RCTX, LISTNAME)                                \
+  do                                                                          \
+    {                                                                         \
+      enif_mutex_lock(RCTX->lock);                                            \
+      CxPlatListInsertTail(&RCTX->LISTNAME, &CTX->RegistrationLink);          \
+      enif_mutex_unlock(RCTX->lock);                                          \
+      CTX->r_ctx = RCTX;                                                      \
+    }                                                                         \
+  while (0)
+
 /*
  * Registration
  */
@@ -51,12 +77,13 @@ typedef struct QuicerConfigCTX
 {
   ErlNifEnv *env;
   HQUIC Configuration;
+  CXPLAT_REF_COUNT ref_count;
 } QuicerConfigCTX;
 
 typedef struct QuicerListenerCTX
 {
-  // config_resource is allocated in 'init_l_ctx'
-  QuicerConfigCTX *config_resource;
+  // config_ctx is allocated in 'init_l_ctx'
+  QuicerConfigCTX *config_ctx;
   QuicerRegistrationCTX *r_ctx;
   HQUIC Listener;
   // track lifetime of Connection handle
@@ -84,10 +111,10 @@ typedef struct QuicerListenerCTX
 typedef struct QuicerConnCTX
 {
   uint32_t magic;
-  // config_resource
-  // for server, inherit from l_ctx
+  // config_ctx
+  // for server, inherited and shared with l_ctx
   // for client, alloc on its own
-  QuicerConfigCTX *config_resource;
+  QuicerConfigCTX *config_ctx;
   QuicerRegistrationCTX *r_ctx;
   CXPLAT_LIST_ENTRY RegistrationLink;
   HQUIC Connection;
@@ -196,6 +223,9 @@ BOOLEAN get_listener_handle(QuicerListenerCTX *l_ctx);
 
 void put_reg_handle(QuicerRegistrationCTX *r_ctx);
 BOOLEAN get_reg_handle(QuicerRegistrationCTX *r_ctx);
+
+void put_config_handle(QuicerConfigCTX *config_ctx);
+BOOLEAN get_config_handle(QuicerConfigCTX *config_ctx);
 
 void cache_stream_id(QuicerStreamCTX *s_ctx);
 

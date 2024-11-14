@@ -365,7 +365,7 @@ The stream acceptor will no longer get new incoming stream.
 ### New incoming connection
 
 ``` erlang
-{quic, new_conn, connection_handle(), ConnecionInfo :: #{ version      := integer()
+{quic, new_conn, connection_handle(), ConnectionInfo :: #{ version      := integer()
                                                          , local_addr   := string()
                                                          , remote_addr  := string()
                                                          , server_name  := binary()

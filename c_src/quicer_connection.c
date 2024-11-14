@@ -266,6 +266,33 @@ dump_sslkeylogfile(_In_z_ const char *FileName,
   fclose(File);
 }
 
+// Assign registration for c_ctx
+// 1. use `quic_registration` option if set, otherwise use global registration
+// 2. take the registration handle for resource management
+// 3. link c_ctx to r_ctx for resource management
+// return FALSE for invalid quic_registration or the registration handle is
+// closed
+static BOOLEAN
+assign_registration(ErlNifEnv *env,
+                    ERL_NIF_TERM eoptions,
+                    QuicerConnCTX *c_ctx)
+{
+
+  QuicerRegistrationCTX *r_ctx = NULL;
+  if (!parse_registration(env, eoptions, &r_ctx))
+    {
+      return FALSE;
+    }
+
+  r_ctx = r_ctx ? r_ctx : &G_r_ctx;
+
+  if (!get_reg_handle(r_ctx))
+    {
+      return FALSE;
+    }
+  CONN_LINK_REGISTRATION(c_ctx, r_ctx);
+  return TRUE;
+}
 //
 // The clients's callback for connection events from MsQuic.
 //
@@ -382,19 +409,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     }
   enif_clear_env(env);
 
-  QuicerConfigCTX *conf_ctx = c_ctx->config_resource;
   if (is_destroy)
     {
       enif_mutex_lock(c_ctx->lock);
       c_ctx->is_closed = TRUE; // client shutdown completed
-      c_ctx->config_resource = NULL;
       enif_mutex_unlock(c_ctx->lock);
 
       put_conn_handle(c_ctx);
-      if (conf_ctx)
-        {
-          enif_release_resource(conf_ctx);
-        }
       destroy_c_ctx(c_ctx);
     }
   return status;
@@ -499,20 +520,14 @@ ServerConnectionCallback(HQUIC Connection,
     }
   enif_clear_env(env);
 
-  QuicerConfigCTX *conf_ctx = c_ctx->config_resource;
-
   if (is_destroy)
     {
       enif_mutex_lock(c_ctx->lock);
       c_ctx->is_closed = TRUE; // server shutdown_complete
-      c_ctx->config_resource = NULL;
+      // c_ctx->config_ctx = NULL;
       enif_mutex_unlock(c_ctx->lock);
 
       put_conn_handle(c_ctx);
-      if (conf_ctx)
-        {
-          enif_release_resource(conf_ctx);
-        }
       destroy_c_ctx(c_ctx);
     }
   return status;
@@ -546,7 +561,7 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       r_ctx = &G_r_ctx;
     }
 
-  if(!get_reg_handle(r_ctx))
+  if (!get_reg_handle(r_ctx))
     {
       return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
     }
@@ -573,10 +588,9 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   // It is safe to use r_ctx here since
   // it is passed as argument which beam still has reference to
+  CONN_LINK_REGISTRATION(c_ctx, r_ctx);
 
-  c_ctx->r_ctx = r_ctx;
   enif_mutex_lock(r_ctx->lock);
-
   if (!r_ctx->Registration)
     {
       res = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
@@ -603,40 +617,30 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   CxPlatRefInitialize(&(c_ctx->ref_count));
-
-  // link to registration
-  if (r_ctx)
-    {
-      enif_mutex_lock(r_ctx->lock);
-      CxPlatListInsertTail(&r_ctx->Connections, &c_ctx->RegistrationLink);
-      enif_mutex_unlock(r_ctx->lock);
-    }
-
   eHandle = enif_make_resource(env, c_ctx);
   return SUCCESS(eHandle);
 
 exit:
-  enif_release_resource(c_ctx);
+  put_conn_handle(c_ctx);
   return res;
 }
 
 ERL_NIF_TERM
-async_connect3(ErlNifEnv *env,
-               __unused_parm__ int argc,
-               const ERL_NIF_TERM argv[])
+async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
+  CXPLAT_FRE_ASSERT(argc == 3);
   ERL_NIF_TERM ehost = argv[0];
   ERL_NIF_TERM eport = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
   ERL_NIF_TERM eHandle = ATOM_UNDEFINED;
-  // Usually we should not get this error
   // If we get it is internal logic error
   ERL_NIF_TERM res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
 
   QuicerConnCTX *c_ctx = NULL;
   QuicerRegistrationCTX *r_ctx = NULL;
   BOOLEAN is_reuse_handle = FALSE;
+  BOOLEAN is_destroy = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -658,13 +662,19 @@ async_connect3(ErlNifEnv *env,
   // Check option 'handle' for opened connection
   if (enif_get_map_value(env, eoptions, ATOM_HANDLE, &eHandle))
     {
-      /* Reuse c_ctx from existing connecion handle */
+      /* Reuse c_ctx from existing connection handle */
       if (enif_get_resource(env, eHandle, ctx_connection_t, (void **)&c_ctx))
         {
           assert(c_ctx->is_closed);
           assert(c_ctx->owner);
-          // r_ctx is already kept in open_connectionX
+          // r_ctx is already kept when open the connection
           r_ctx = c_ctx->r_ctx;
+          // @NOTE: get reg handle for this fun call, put it before return
+          if (!get_reg_handle(r_ctx))
+            {
+              c_ctx->r_ctx = NULL;
+              return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+            }
           is_reuse_handle = TRUE;
         }
       else
@@ -675,34 +685,22 @@ async_connect3(ErlNifEnv *env,
   else
     {
       /* Alloc new c_ctx */
-      assert(!is_reuse_handle);
-      assert(!c_ctx);
-      assert(!r_ctx);
+      CXPLAT_FRE_ASSERT(!is_reuse_handle);
+      CXPLAT_FRE_ASSERT(!c_ctx);
+      CXPLAT_FRE_ASSERT(!r_ctx);
 
       c_ctx = init_c_ctx();
 
       // Get Reg for c_ctx, quic_registration is optional
-      if (!parse_registration(env, eoptions, &c_ctx->r_ctx))
-        {
-          enif_release_resource(c_ctx);
-          return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
-        }
 
-      // Fallback to G_r_ctx
-      if (!c_ctx->r_ctx)
-      {
-        c_ctx->r_ctx = &G_r_ctx;
-      }
-
-      CXPLAT_DBG_ASSERT(c_ctx->r_ctx);
-      r_ctx = c_ctx->r_ctx;
-
-      if (!get_reg_handle(r_ctx))
+      if (!assign_registration(env, eoptions, c_ctx))
         {
           c_ctx->r_ctx = NULL;
           enif_release_resource(c_ctx);
           return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
         }
+      CXPLAT_DBG_ASSERT(c_ctx->r_ctx);
+      r_ctx = c_ctx->r_ctx;
 
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
         {
@@ -718,8 +716,8 @@ async_connect3(ErlNifEnv *env,
         }
     }
 
-  assert(r_ctx);
-  assert(c_ctx);
+  CXPLAT_FRE_ASSERT(r_ctx);
+  CXPLAT_FRE_ASSERT(c_ctx);
 
   // Now we have c_ctx either
   // a) passed in as handle
@@ -730,11 +728,12 @@ async_connect3(ErlNifEnv *env,
     }
 
   Registration = r_ctx->Registration;
-  assert(c_ctx->owner);
+  CXPLAT_DBG_ASSERT(Registration);
+  CXPLAT_DBG_ASSERT(c_ctx->owner);
 
-  // Allocate config_resource for client connection
+  // Allocate config_ctx for client connection
   // @TODO client config handle should be reused if needed.
-  if (NULL == (c_ctx->config_resource = init_config_ctx()))
+  if (NULL == (c_ctx->config_ctx = init_config_ctx()))
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
       goto Error;
@@ -763,21 +762,17 @@ async_connect3(ErlNifEnv *env,
     }
 #endif // QUICER_USE_TRUSTED_STORE
 
-  // convert eoptions to Configuration
+  // Convert eoptions to Configuration
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
-      env, &eoptions, Registration, &(c_ctx->config_resource->Configuration));
+      env, &eoptions, Registration, &(c_ctx->config_ctx->Configuration));
 
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(estatus);
-      if (!is_reuse_handle)
-        {
-          enif_release_resource(c_ctx);
-        }
-      // @FIXME: why not return?
-      return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
+      goto Error;
     }
 
+  // Open Connection if not reused
   if (!is_reuse_handle)
     {
       if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration,
@@ -787,28 +782,22 @@ async_connect3(ErlNifEnv *env,
         {
           assert(c_ctx->Connection == NULL);
           res = ERROR_TUPLE_2(ATOM_CONN_OPEN_ERROR);
+          goto Error;
         }
       else
         {
           assert(c_ctx->is_closed);
-          CxPlatRefInitialize(&c_ctx->ref_count);
           res = parse_conn_resume_ticket(env, eoptions, c_ctx);
           // we could only lock it after resume ticket is set
           enif_mutex_lock(c_ctx->lock);
-        }
-      if (!IS_SAME_TERM(ATOM_OK, res))
-        {
-          goto Error;
+          if (!IS_SAME_TERM(ATOM_OK, res))
+            {
+              is_destroy = TRUE;
+              goto Error;
+            }
         }
     }
   c_ctx->is_closed = FALSE; // connection opened.
-
-  if (!is_reuse_handle && r_ctx)
-    {
-      enif_mutex_lock(r_ctx->lock);
-      CxPlatListInsertTail(&r_ctx->Connections, &c_ctx->RegistrationLink);
-      enif_mutex_unlock(r_ctx->lock);
-    }
 
   // optional set sslkeylogfile
   parse_sslkeylogfile_option(env, eoptions, c_ctx);
@@ -832,7 +821,7 @@ async_connect3(ErlNifEnv *env,
       goto Error;
     }
 
-  // @TODO client async_connect_3 should able to take a config_resource as
+  // @TODO client async_connect_3 should able to take a config_ctx as
   // input ERL TERM so that we don't need to call ClientLoadConfiguration
   assert(!c_ctx->is_closed && c_ctx->Connection);
 
@@ -851,12 +840,12 @@ async_connect3(ErlNifEnv *env,
 
   // c_ctx->lock should be taken to prevent parallel access from callback as
   // work trigged by starting of the connection.
-  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
-                      c_ctx->Connection,
-                      c_ctx->config_resource->Configuration,
-                      QUIC_ADDRESS_FAMILY_UNSPEC,
-                      host,
-                      port)))
+  if (QUIC_FAILED(Status
+                  = MsQuic->ConnectionStart(c_ctx->Connection,
+                                            c_ctx->config_ctx->Configuration,
+                                            QUIC_ADDRESS_FAMILY_UNSPEC,
+                                            host,
+                                            port)))
     {
       AcceptorDestroy(c_ctx->owner);
       c_ctx->owner = NULL;
@@ -866,54 +855,34 @@ async_connect3(ErlNifEnv *env,
           c_ctx->Connection = NULL;
         }
 
-      if (c_ctx->config_resource)
-        {
-          destroy_config_ctx(c_ctx->config_resource);
-          c_ctx->config_resource = NULL;
-        }
-
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
       TP_NIF_3(start_fail, (uintptr_t)(c_ctx->Connection), Status);
+      is_destroy = TRUE;
       goto Error;
     }
 
   eHandle = enif_make_resource(env, c_ctx);
 
   enif_mutex_unlock(c_ctx->lock);
+
+  if (is_reuse_handle)
+    {
+      put_reg_handle(r_ctx);
+    }
+
   return SUCCESS(eHandle);
 
 Error:
-  if (r_ctx)
-  {
-    put_reg_handle(r_ctx);
-    c_ctx->r_ctx = NULL;
-  }
-  HQUIC Connection = c_ctx->Connection;
-  if (Connection)
-    {
-      /*
-       Prevent double ConnectionClose
-       @NOTE:
-       We could not call MsQuic->SetCallbackHandler to set callback to NULL
-       becasue this function is async, not thread safe.
-       */
-      c_ctx->Connection = NULL;
-      c_ctx->is_closed = TRUE;
-    }
-
-  // Error exit, it must be closed or Handle is NULL
-  CXPLAT_FRE_ASSERT(c_ctx->is_closed || NULL == c_ctx->Connection);
   enif_mutex_unlock(c_ctx->lock);
-
-  if (Connection)
+  if (is_reuse_handle)
     {
-      // @NOTE:
-      // It will trigger 'connection shutdown completed' callback
-      // thus it is important to not release the resource c_ctx for callback
-      // to access the c_ctx
-      MsQuic->ConnectionClose(Connection);
+      put_reg_handle(r_ctx);
     }
-
+  put_conn_handle(c_ctx);
+  if (is_destroy)
+    {
+      destroy_c_ctx(c_ctx);
+    }
   return res;
 }
 
@@ -1112,9 +1081,8 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
       return QUIC_STATUS_INVALID_STATE;
     }
 
-  if (QUIC_FAILED(
-          Status = MsQuic->ConnectionSetConfiguration(
-              c_ctx->Connection, c_ctx->config_resource->Configuration)))
+  if (QUIC_FAILED(Status = MsQuic->ConnectionSetConfiguration(
+                      c_ctx->Connection, c_ctx->config_ctx->Configuration)))
     {
       return Status;
     }
@@ -1791,7 +1759,7 @@ get_connectionsX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // becasue deref c_ctx may cause connection close and then trigger callback
   // that destroy c_ctx which locks r_ctx in another thread, causing dead lock
   put_conn_handles(env, res);
-  put_reg_handle(r_ctx); //get_connectionsX
+  put_reg_handle(r_ctx); // get_connectionsX
 
   if (argc == 0) // use global registration
     {

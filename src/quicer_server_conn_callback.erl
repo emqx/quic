@@ -135,7 +135,7 @@ connected(
     %% @TODO configurable behavior of spawing stream acceptor
     _ = quicer_stream:start_link(Callback, Conn, SOpts),
     {ok, S#{conn => Conn}};
-connected(_Connecion, _Flags, S) ->
+connected(_Connection, _Flags, S) ->
     {ok, S}.
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->

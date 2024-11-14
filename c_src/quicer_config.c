@@ -1334,7 +1334,7 @@ get_stream_opt(ErlNifEnv *env,
     {
       res = get_level_param(env,
                             s_ctx->Stream,
-                            s_ctx->c_ctx->config_resource->Configuration,
+                            s_ctx->c_ctx->config_ctx->Configuration,
                             optname,
                             elevel);
       goto Exit;
@@ -1448,7 +1448,7 @@ set_stream_opt(ErlNifEnv *env,
     {
       res = set_level_param(env,
                             s_ctx->Stream,
-                            s_ctx->c_ctx->config_resource->Configuration,
+                            s_ctx->c_ctx->config_ctx->Configuration,
                             optname,
                             optval,
                             elevel);
@@ -1521,13 +1521,13 @@ get_connection_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      if (!c_ctx->config_resource)
+      if (!c_ctx->config_ctx)
         {
           goto Exit;
         }
       res = get_level_param(env,
                             c_ctx->Connection,
-                            c_ctx->config_resource->Configuration,
+                            c_ctx->config_ctx->Configuration,
                             optname,
                             elevel);
       goto Exit;
@@ -1714,13 +1714,13 @@ set_connection_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      if (!c_ctx->config_resource)
+      if (!c_ctx->config_ctx)
         {
           goto Exit;
         }
       res = set_level_param(env,
                             c_ctx->Connection,
-                            c_ctx->config_resource->Configuration,
+                            c_ctx->config_ctx->Configuration,
                             optname,
                             optval,
                             elevel);
@@ -2052,13 +2052,13 @@ get_listener_opt(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
-  enif_keep_resource(l_ctx);
+  get_listener_handle(l_ctx);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
       res = get_level_param(env,
                             l_ctx->Listener,
-                            l_ctx->config_resource->Configuration,
+                            l_ctx->config_ctx->Configuration,
                             optname,
                             elevel);
       goto Exit;
@@ -2113,7 +2113,7 @@ get_listener_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
     }
 Exit:
-  enif_release_resource(l_ctx);
+  put_listener_handle(l_ctx);
   return res;
 }
 
@@ -2147,7 +2147,7 @@ set_listener_opt(ErlNifEnv *env,
     {
       res = set_level_param(env,
                             l_ctx->Listener,
-                            l_ctx->config_resource->Configuration,
+                            l_ctx->config_ctx->Configuration,
                             optname,
                             optval,
                             elevel);

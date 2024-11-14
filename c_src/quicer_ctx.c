@@ -23,21 +23,27 @@ QuicerRegistrationCTX *
 init_r_ctx(QuicerRegistrationCTX *r_ctx)
 {
   if (!r_ctx)
-  {
-    r_ctx= enif_alloc_resource(ctx_reg_t, sizeof(QuicerRegistrationCTX));
-  }
+    {
+      r_ctx = enif_alloc_resource(ctx_reg_t, sizeof(QuicerRegistrationCTX));
+      CxPlatZeroMemory(r_ctx, sizeof(QuicerRegistrationCTX));
+      CxPlatRefInitialize(&r_ctx->ref_count);
+    }
+  else
+    {
+      // G_r_ctx
+      CXPLAT_FRE_ASSERT(r_ctx == &G_r_ctx);
+      CXPLAT_FRE_ASSERT(r_ctx->ref_count == 0);
+    }
   if (!r_ctx)
     {
       return NULL;
     }
-  CxPlatZeroMemory(r_ctx, sizeof(QuicerRegistrationCTX));
   r_ctx->env = enif_alloc_env();
   r_ctx->Registration = NULL;
-  r_ctx->is_released = FALSE;
+  r_ctx->is_released = FALSE; // @TODO remove this field
   r_ctx->lock = enif_mutex_create("quicer:r_ctx");
   CxPlatListInitializeHead(&r_ctx->Listeners);
   CxPlatListInitializeHead(&r_ctx->Connections);
-  CxPlatRefInitialize(&r_ctx->ref_count);
   return r_ctx;
 }
 
@@ -60,7 +66,7 @@ init_l_ctx()
     }
   CxPlatZeroMemory(l_ctx, sizeof(QuicerListenerCTX));
   l_ctx->env = enif_alloc_env();
-  l_ctx->config_resource = init_config_ctx();
+  l_ctx->config_ctx = NULL;
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
 #if defined(QUICER_USE_TRUSTED_STORE)
@@ -69,6 +75,7 @@ init_l_ctx()
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   CxPlatListInitializeHead(&l_ctx->RegistrationLink);
+  CxPlatRefInitialize(&l_ctx->ref_count);
   return l_ctx;
 }
 
@@ -81,11 +88,8 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
       X509_STORE_free(l_ctx->trusted_store);
     }
 #endif // QUICER_USE_TRUSTED_STORE
+
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
-  if (l_ctx->config_resource)
-    {
-      destroy_config_ctx(l_ctx->config_resource);
-    }
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);
 }
@@ -93,34 +97,15 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
 void
 destroy_l_ctx(QuicerListenerCTX *l_ctx)
 {
-  QuicerRegistrationCTX *r_ctx = l_ctx->r_ctx;
-  if (r_ctx)
-  {
-    CXPLAT_DBG_ASSERT(r_ctx->ref_count > 0);
-    enif_mutex_lock(r_ctx->lock);
-    CxPlatListEntryRemove(&l_ctx->RegistrationLink);
-    enif_mutex_unlock(r_ctx->lock);
-  }
 
   // @note, Destroy config asap as it holds rundown
   // ref count in registration
-
-  destroy_config_ctx(l_ctx->config_resource);
-
-  l_ctx->config_resource = NULL;
   if (l_ctx->is_monitored)
     {
       enif_demonitor_process(l_ctx->env, l_ctx, &l_ctx->owner_mon);
       l_ctx->is_monitored = FALSE;
     }
   enif_release_resource(l_ctx);
-
-  // NOTE: do it last otherwise deadlock
-  if (r_ctx)
-  {
-    // for config_resource
-    put_reg_handle(r_ctx);
-  }
 }
 
 QuicerConnCTX *
@@ -146,16 +131,17 @@ init_c_ctx()
   c_ctx->event_mask = 0;
   c_ctx->ssl_keylogfile = NULL;
   c_ctx->is_closed = TRUE; // init
-  c_ctx->config_resource = NULL;
+  c_ctx->config_ctx = NULL;
   c_ctx->peer_cert = NULL;
   CxPlatListInitializeHead(&c_ctx->RegistrationLink);
+  CxPlatRefInitialize(&c_ctx->ref_count);
   return c_ctx;
 }
 
 void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
-  CXPLAT_FRE_ASSERT(!c_ctx->r_ctx);
+  // CXPLAT_FRE_ASSERT(!c_ctx->r_ctx);
   enif_free_env(c_ctx->env);
 #if defined(QUICER_USE_TRUSTED_STORE)
   if (c_ctx->trusted != NULL)
@@ -164,11 +150,18 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
       c_ctx->trusted = NULL;
     }
 #endif // QUICER_USE_TRUSTED_STORE
-  if (c_ctx->config_resource)
+  // @note, for the conn failed to get opened/started
+  if (c_ctx->config_ctx)
     {
-      enif_release_resource(c_ctx->config_resource);
+      put_config_handle(c_ctx->config_ctx);
     }
   AcceptorQueueDestroy(c_ctx->acceptor_queue);
+
+  if (c_ctx->r_ctx)
+    {
+      UNLINK_REGISTRATION(c_ctx, c_ctx->r_ctx);
+      put_reg_handle(c_ctx->r_ctx);
+    }
 
   if (c_ctx->peer_cert)
     {
@@ -189,14 +182,7 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
       c_ctx->trusted = NULL;
     }
 #endif // QUICER_USE_TRUSTED_STORE
-  QuicerRegistrationCTX *r_ctx = c_ctx->r_ctx;
 
-  if (r_ctx)
-  {
-    enif_mutex_lock(r_ctx->lock);
-    CxPlatListEntryRemove(&c_ctx->RegistrationLink);
-    enif_mutex_unlock(r_ctx->lock);
-  }
   if (c_ctx->is_monitored)
     {
       enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
@@ -219,6 +205,7 @@ init_config_ctx()
   CxPlatZeroMemory(config_ctx, sizeof(QuicerConfigCTX));
   config_ctx->env = enif_alloc_env();
   config_ctx->Configuration = NULL;
+  CxPlatRefInitialize(&config_ctx->ref_count);
   return config_ctx;
 }
 
@@ -233,8 +220,6 @@ destroy_config_ctx(QuicerConfigCTX *config_ctx)
 {
   if (config_ctx)
     {
-      MsQuic->ConfigurationClose(config_ctx->Configuration);
-      config_ctx->Configuration = NULL;
       enif_release_resource(config_ctx);
     }
 }
@@ -348,15 +333,38 @@ get_stream_handle(QuicerStreamCTX *s_ctx)
 inline void
 put_conn_handle(QuicerConnCTX *c_ctx)
 {
-  if (CxPlatRefDecrement(&c_ctx->ref_count) && c_ctx->Connection)
+  // if (CxPlatRefDecrement(&c_ctx->ref_count) && c_ctx->Connection)
+  if (CxPlatRefDecrement(&c_ctx->ref_count))
     {
       HQUIC Connection = c_ctx->Connection;
+      QuicerRegistrationCTX *r_ctx = c_ctx->r_ctx;
+      QuicerConfigCTX *config_ctx = c_ctx->config_ctx;
       c_ctx->Connection = NULL;
+      c_ctx->config_ctx = NULL;
       c_ctx->is_closed = TRUE;
-      MsQuic->SetCallbackHandler(Connection, NULL, NULL);
-      put_reg_handle(c_ctx->r_ctx);
       c_ctx->r_ctx = NULL;
-      MsQuic->ConnectionClose(Connection);
+
+      // Close connection handle
+      if (Connection)
+        {
+          MsQuic->SetCallbackHandler(Connection, NULL, NULL);
+          MsQuic->ConnectionClose(Connection);
+        }
+
+      // Deref config_ctx
+      if (config_ctx)
+        {
+          put_config_handle(config_ctx);
+        }
+
+      // Unlink from registration
+      // @NOTE: maybe not yet linked
+      if (r_ctx)
+        {
+          UNLINK_REGISTRATION(c_ctx, r_ctx);
+          // Deref Registration
+          put_reg_handle(r_ctx);
+        }
     }
 }
 
@@ -369,24 +377,35 @@ get_conn_handle(QuicerConnCTX *c_ctx)
 inline void
 put_listener_handle(QuicerListenerCTX *l_ctx)
 {
-  if (CxPlatRefDecrement(&l_ctx->ref_count) && l_ctx->Listener)
+  if (CxPlatRefDecrement(&l_ctx->ref_count))
     {
-      printf("closing listener...\n");
+      QuicerRegistrationCTX *r_ctx = l_ctx->r_ctx;
       HQUIC Listener = l_ctx->Listener;
       l_ctx->Listener = NULL;
       l_ctx->is_closed = TRUE;
+      l_ctx->r_ctx = NULL;
+
+      // Close listener handle
       MsQuic->ListenerClose(Listener);
+
+      // Deref config_ctx
+      put_config_handle(l_ctx->config_ctx);
+      l_ctx->config_ctx = NULL;
+
+      // Deref Registration Handle
+      CXPLAT_DBG_ASSERT(r_ctx->ref_count > 0);
+
+      UNLINK_REGISTRATION(l_ctx, r_ctx);
+      put_reg_handle(r_ctx);
+
+      // destroy l_ctx
+      destroy_l_ctx(l_ctx);
     }
-  else {
-    printf("listener refcnt--> %ld\n", l_ctx->ref_count);
-  }
 }
 
 inline BOOLEAN
 get_listener_handle(QuicerListenerCTX *l_ctx)
 {
-  printf("*** get listener refcnt--> %ld\n", l_ctx->ref_count+1);
-  //l_ctx->ref_count+1 == 2? abort(): 0;
   return CxPlatRefIncrementNonZero(&l_ctx->ref_count, 1);
 }
 
@@ -394,27 +413,46 @@ inline void
 put_reg_handle(QuicerRegistrationCTX *r_ctx)
 {
   if (CxPlatRefDecrement(&r_ctx->ref_count))
-  {
-    HQUIC Registration = r_ctx->Registration;
-    r_ctx->is_released = TRUE;
-    r_ctx->Registration = NULL;
-    MsQuic->RegistrationShutdown(Registration, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
-    MsQuic->RegistrationClose(Registration);
-    if (r_ctx == &G_r_ctx)
     {
-      deinit_r_ctx(r_ctx);
+      HQUIC Registration = r_ctx->Registration;
+      r_ctx->is_released = TRUE;
+      r_ctx->Registration = NULL;
+      MsQuic->RegistrationShutdown(
+          Registration, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+      MsQuic->RegistrationClose(Registration);
+      if (r_ctx == &G_r_ctx)
+        {
+          deinit_r_ctx(r_ctx);
+        }
+      else
+        {
+          enif_release_resource(r_ctx);
+        }
     }
-    else
-    {
-      enif_release_resource(r_ctx);
-    }
-  }
 }
 
 inline BOOLEAN
 get_reg_handle(QuicerRegistrationCTX *r_ctx)
 {
-  return CxPlatRefIncrementNonZero(&r_ctx->ref_count, 1);
+  BOOLEAN res = CxPlatRefIncrementNonZero(&r_ctx->ref_count, 1);
+  return res;
+}
+
+inline void
+put_config_handle(QuicerConfigCTX *config_ctx)
+{
+  if (CxPlatRefDecrement(&config_ctx->ref_count))
+    {
+      MsQuic->ConfigurationClose(config_ctx->Configuration);
+      config_ctx->Configuration = NULL;
+      enif_release_resource(config_ctx);
+    }
+}
+
+inline BOOLEAN
+get_config_handle(QuicerConfigCTX *config_ctx)
+{
+  return CxPlatRefIncrementNonZero(&config_ctx->ref_count, 1);
 }
 
 void
