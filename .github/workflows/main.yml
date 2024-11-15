@@ -21,9 +21,41 @@ jobs:
       run: |
         rebar3 fmt -c
 
-  mac:
-    timeout-minutes: 60
+  pre-check:
+    name: Pre check
     needs: formatting-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt
+        otp:
+          - 26.2.5.3
+        rebar3:
+          - 3.23.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+        with:
+          submodules: recursive
+      - uses: erlef/setup-beam@2f0cc07b4b9bea248ae098aba9e1a8a1de5ec24c # v1.17.5
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: ${{ matrix.rebar3 }}
+      - name: release build with debug log off
+        run: |
+          echo "github ref: ${{ github.event.ref }}"
+          echo "github ref: ${{ github.ref }}"
+          sudo sysctl -w kernel.core_pattern=core
+          ulimit -c unlimited
+          export CMAKE_BUILD_TYPE=Debug
+          export QUICER_TLS_VER=sys
+          make ci
+
+  mac-mesh:
+    timeout-minutes: 60
+    needs: pre-check
     strategy:
       fail-fast: false
       matrix:
@@ -78,8 +110,8 @@ jobs:
           retention-days: 1
 
 
-  linux:
-    needs: formatting-check
+  linux-mesh:
+    needs: pre-check
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
