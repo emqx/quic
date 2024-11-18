@@ -610,13 +610,13 @@ tc_listener_conf_reload_listen_on(Config) ->
     ),
 
     ct:pal("C1 status : ~p", [sys:get_status(ClientConnPid)]),
-    %{ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
+    {ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
     %% WHEN: the listener is reloaded with ListenOn (new bind address)
     NewPort = select_port(),
     ok = quicer_listener:reload(QuicApp, NewPort, ListenerOpts),
     %% THEN: the listener handle is unchanged
     %%
-    %?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
+    ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
 
     %% THEN: start new connection to old port
     ?assertMatch(
