@@ -301,14 +301,17 @@ put_stream_handle(QuicerStreamCTX *s_ctx)
 {
   if (CxPlatRefDecrement(&s_ctx->ref_count))
     {
-      HQUIC Stream = s_ctx->Stream;
       CXPLAT_DBG_ASSERT(s_ctx->is_closed);
+      HQUIC Stream = s_ctx->Stream;
+      QuicerConnCTX *c_ctx = s_ctx->c_ctx;
       s_ctx->Stream = NULL;
       s_ctx->is_closed = TRUE;
       MsQuic->SetCallbackHandler(Stream, NULL, NULL);
       MsQuic->StreamClose(Stream);
+      destroy_s_ctx(s_ctx);
+
       CXPLAT_DBG_ASSERT(s_ctx->c_ctx != NULL);
-      if (s_ctx->c_ctx)
+      if (c_ctx)
         {
           put_conn_handle(s_ctx->c_ctx);
           s_ctx->c_ctx = NULL;

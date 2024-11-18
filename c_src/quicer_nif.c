@@ -1017,7 +1017,7 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
   enif_mutex_lock(s_ctx->lock);
   if (s_ctx && s_ctx->owner && DeadPid
       && !enif_compare_pids(&s_ctx->owner->Pid, DeadPid)
-      && get_stream_handle(s_ctx))
+      && LOCAL_REFCNT(get_stream_handle(s_ctx)))
     {
       TP_CB_3(start, (uintptr_t)s_ctx->Stream, 0);
       if (QUIC_FAILED(status = MsQuic->StreamShutdown(
@@ -1033,7 +1033,7 @@ resource_stream_down_callback(__unused_parm__ ErlNifEnv *env,
         {
           TP_CB_3(shutdown_success, (uintptr_t)s_ctx->Stream, status);
         }
-      put_stream_handle(s_ctx);
+      LOCAL_REFCNT(put_stream_handle(s_ctx));
     }
   enif_mutex_unlock(s_ctx->lock);
 }
@@ -1521,18 +1521,15 @@ atom_status(ErlNifEnv *env, QUIC_STATUS status)
 ERL_NIF_TERM
 controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+  CXPLAT_FRE_ASSERT(2 == argc);
   QuicerStreamCTX *s_ctx = NULL;
   QuicerConnCTX *c_ctx = NULL;
   ErlNifPid target, caller;
   ERL_NIF_TERM new_owner = argv[1];
   ERL_NIF_TERM res = ATOM_OK;
-  if (argc != 2)
-    {
-      return ATOM_BADARG;
-    }
 
   // precheck
-  if (!enif_get_local_pid(env, argv[1], &target))
+  if (!enif_get_local_pid(env, new_owner, &target))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -1545,7 +1542,7 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
-      if (!get_stream_handle(s_ctx))
+      if (!LOCAL_REFCNT(get_stream_handle(s_ctx)))
         {
           return ERROR_TUPLE_2(ATOM_CLOSED);
         }
@@ -1553,7 +1550,7 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       enif_mutex_lock(s_ctx->lock);
       res = stream_controlling_process(env, s_ctx, &caller, &new_owner);
       enif_mutex_unlock(s_ctx->lock);
-      put_stream_handle(s_ctx);
+      LOCAL_REFCNT(put_stream_handle(s_ctx));
     }
   else if (enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
@@ -1566,6 +1563,7 @@ controlling_process(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       enif_mutex_unlock(c_ctx->lock);
       put_conn_handle(c_ctx);
     }
+  // @TODO: add listener controlling process
   else
     {
       return ERROR_TUPLE_2(ATOM_BADARG);

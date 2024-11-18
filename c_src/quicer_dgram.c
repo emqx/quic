@@ -27,10 +27,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM eFlags = argv[2];
   uint32_t sendflags;
 
-  if (3 != argc)
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
+  CXPLAT_FRE_ASSERT(argc == 3);
 
   if (!enif_get_resource(env, econn, ctx_connection_t, (void **)&c_ctx))
     {
@@ -73,6 +70,10 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
+  if (!get_conn_handle(c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
   enif_mutex_lock(c_ctx->lock);
 
   HQUIC Connection = c_ctx->Connection;
@@ -87,6 +88,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   dgram_send_ctx->Buffer.Length = (uint32_t)bin->size;
 
   QUIC_STATUS Status;
+  ERL_NIF_TERM ret = SUCCESS(ETERM_UINT_64(bin_size));
   if (QUIC_FAILED(Status = MsQuic->DatagramSend(Connection,
                                                 &dgram_send_ctx->Buffer,
                                                 1,
@@ -94,14 +96,12 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
                                                 dgram_send_ctx)))
     {
       destroy_dgram_send_ctx(dgram_send_ctx);
-      enif_mutex_unlock(c_ctx->lock);
-      return ERROR_TUPLE_3(ATOM_DGRAM_SEND_ERROR, ATOM_STATUS(Status));
+      ret = ERROR_TUPLE_3(ATOM_DGRAM_SEND_ERROR, ATOM_STATUS(Status));
     }
-  else
-    {
-      enif_mutex_unlock(c_ctx->lock);
-      return SUCCESS(ETERM_UINT_64(bin_size));
-    }
+
+  enif_mutex_unlock(c_ctx->lock);
+  put_conn_handle(c_ctx);
+  return ret;
 }
 
 void

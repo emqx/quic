@@ -60,6 +60,9 @@ limitations under the License.
     }                                                                         \
   while (0)
 
+#define LOCAL_REFCNT(XX) XX
+#define DESTRUCT_REFCNT(XX) XX
+#define CALLBACK_DESTRUCT_REFCNT(XX) DESTRUCT_REFCNT(XX)
 /*
  * Registration
  */

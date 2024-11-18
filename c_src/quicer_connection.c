@@ -115,8 +115,9 @@ ERL_NIF_TERM parse_conn_event_mask(ErlNifEnv *env,
 QUIC_STATUS selected_owner_unreachable(QuicerStreamCTX *s_ctx);
 
 ERL_NIF_TERM
-peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+  CXPLAT_FRE_ASSERT(1 == argc);
   ERL_NIF_TERM ctx = argv[0];
   ERL_NIF_TERM DerCert;
   ERL_NIF_TERM res = ATOM_UNDEFINED;
@@ -124,8 +125,10 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   QuicerConnCTX *c_ctx;
   int len = 0;
   unsigned char *tmp;
+
   if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
+      // @FIXME: get s_ctx handle first.
       c_ctx = ((QuicerStreamCTX *)q_ctx)->c_ctx;
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
@@ -135,6 +138,11 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   else
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!c_ctx || !LOCAL_REFCNT(get_conn_handle(c_ctx)))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
   assert(c_ctx);
@@ -168,6 +176,7 @@ peercert1(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
 exit:
   enif_mutex_unlock(c_ctx->lock);
+  LOCAL_REFCNT(put_conn_handle(c_ctx));
   return res;
 }
 
@@ -415,7 +424,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       c_ctx->is_closed = TRUE; // client shutdown completed
       enif_mutex_unlock(c_ctx->lock);
 
-      put_conn_handle(c_ctx);
+      CXPLAT_DBG_ASSERT(c_ctx->Connection);
+      // just for safty
+      if (c_ctx->Connection)
+        {
+          put_conn_handle(c_ctx);
+        }
     }
   return status;
 }
@@ -732,7 +746,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (NULL == (c_ctx->config_ctx = init_config_ctx()))
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-      goto Error;
+      goto ErrorNoLock;
     }
 
 #ifdef QUICER_USE_TRUSTED_STORE
@@ -742,7 +756,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
       // TLS opt error not file content error
       res = ERROR_TUPLE_2(ATOM_CACERTFILE);
-      goto Error;
+      goto ErrorNoLock;
     }
 
   if (cacertfile)
@@ -751,7 +765,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         {
           free(cacertfile);
           res = ERROR_TUPLE_2(ATOM_CERT_ERROR);
-          goto Error;
+          goto ErrorNoLock;
         }
       free(cacertfile);
       cacertfile = NULL;
@@ -765,7 +779,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(estatus);
-      goto Error;
+      goto ErrorNoLock;
     }
 
   // Open Connection if not reused
@@ -868,6 +882,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 Error:
   enif_mutex_unlock(c_ctx->lock);
+ErrorNoLock:
   if (is_reuse_handle)
     {
       // we get the handle at the begining of this function
@@ -929,12 +944,11 @@ async_accept2(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-shutdown_connection3(ErlNifEnv *env,
-                     __unused_parm__ int argc,
-                     const ERL_NIF_TERM argv[])
+shutdown_connection3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
   uint32_t app_errcode = 0, flags = 0;
+  CXPLAT_FRE_ASSERT(3 == argc);
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -969,7 +983,7 @@ shutdown_connection3(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
+sockname1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   void *q_ctx;
   HQUIC Handle = NULL;
@@ -978,24 +992,31 @@ sockname1(ErlNifEnv *env, __unused_parm__ int args, const ERL_NIF_TERM argv[])
   QUIC_ADDR addr;
   uint32_t addrSize = sizeof(addr);
 
+  CXPLAT_FRE_ASSERT(1 == argc);
+
   if (enif_get_resource(env, argv[0], ctx_connection_t, &q_ctx))
     {
-      if (!get_conn_handle((QuicerConnCTX *)q_ctx))
+      QuicerConnCTX *c_ctx = (QuicerConnCTX *)q_ctx;
+      if (!get_conn_handle(c_ctx))
         {
           return ERROR_TUPLE_2(ATOM_CLOSED);
         }
-      Handle = (((QuicerConnCTX *)q_ctx))->Connection;
+      Handle = c_ctx->Connection;
       Param = QUIC_PARAM_CONN_LOCAL_ADDRESS;
       Status = MsQuic->GetParam(Handle, Param, &addrSize, &addr);
-      put_conn_handle((QuicerConnCTX *)q_ctx);
+      put_conn_handle(c_ctx);
     }
   else if (enif_get_resource(env, argv[0], ctx_listener_t, &q_ctx))
     {
-      enif_mutex_lock(((QuicerListenerCTX *)q_ctx)->lock);
-      Handle = ((QuicerListenerCTX *)q_ctx)->Listener;
+      QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)q_ctx;
+      if (!get_listener_handle(l_ctx))
+        {
+          return ERROR_TUPLE_2(ATOM_CLOSED);
+        }
+      Handle = l_ctx->Listener;
       Param = QUIC_PARAM_LISTENER_LOCAL_ADDRESS;
       Status = MsQuic->GetParam(Handle, Param, &addrSize, &addr);
-      enif_mutex_unlock(((QuicerListenerCTX *)q_ctx)->lock);
+      put_listener_handle(l_ctx);
     }
   else
     {
@@ -1856,8 +1877,11 @@ selected_owner_unreachable(QuicerStreamCTX *s_ctx)
   // There is no shared ownership, we must destroy the s_ctx here
   //
   s_ctx->is_closed = TRUE;
-  enif_clear_env(s_ctx->env);
-  destroy_s_ctx(s_ctx);
+  // @NOTE: unset Stream handle to avoid double closing
+  //        becasue we are rejecting it and MsQuic internally will
+  //        close it.
+  s_ctx->Stream = NULL;
+  DESTRUCT_REFCNT(put_stream_handle(s_ctx));
   return QUIC_STATUS_UNREACHABLE;
 }
 

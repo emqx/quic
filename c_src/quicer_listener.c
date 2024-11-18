@@ -95,7 +95,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         {
           TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
           Status = QUIC_STATUS_UNREACHABLE;
-          // We are going to reject the connection,
+          // @NOTE: We are going to reject the connection,
           // we will not be the owner of this connection
           // msquic will close the Connection Handle internally.
           c_ctx->Connection = NULL;

@@ -849,10 +849,9 @@ encode_parm_to_eterm(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-getopt3(ErlNifEnv *env,
-        __unused_parm__ int argc,
-        __unused_parm__ const ERL_NIF_TERM argv[])
+getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+  CXPLAT_FRE_ASSERT(3 == argc);
   ERL_NIF_TERM ctx = argv[0];
   ERL_NIF_TERM eopt = argv[1];
   ERL_NIF_TERM elevel = argv[2];
@@ -884,12 +883,12 @@ getopt3(ErlNifEnv *env,
         {
           return SUCCESS(ETERM_UINT_64(((QuicerStreamCTX *)q_ctx)->StreamID));
         }
-      if (!get_stream_handle(q_ctx))
+      if (!LOCAL_REFCNT(get_stream_handle(q_ctx)))
         {
           goto Exit;
         }
       res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
-      put_stream_handle(q_ctx);
+      LOCAL_REFCNT(put_stream_handle(q_ctx));
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
@@ -961,8 +960,9 @@ set_level_param(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+  CXPLAT_FRE_ASSERT(4 == argc);
   ERL_NIF_TERM ctx = argv[0];
   ERL_NIF_TERM eopt = argv[1];
   ERL_NIF_TERM evalue = argv[2];
@@ -982,13 +982,13 @@ setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
-      if (!get_stream_handle(q_ctx))
+      if (!LOCAL_REFCNT(get_stream_handle(q_ctx)))
         {
           goto Exit;
         }
       res = set_stream_opt(
           env, (QuicerStreamCTX *)q_ctx, eopt, evalue, elevel);
-      put_stream_handle(q_ctx);
+      LOCAL_REFCNT(put_stream_handle(q_ctx));
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
