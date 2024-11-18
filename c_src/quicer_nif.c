@@ -954,7 +954,7 @@ resource_conn_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
   TP_CB_3(start, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
   // must be closed otherwise will trigger callback and casue race cond.
   // This ensures no callbacks during cleanup here.
-  CXPLAT_FRE_ASSERT(c_ctx->is_closed == TRUE); // in dealloc
+  CXPLAT_DBG_ASSERT(c_ctx->is_closed == TRUE); // in dealloc
   if (c_ctx->Connection)
     {
       TP_CB_3(close, (uintptr_t)c_ctx->Connection, c_ctx->is_closed);
@@ -1345,10 +1345,10 @@ closeLib(__unused_parm__ ErlNifEnv *env,
 
       pthread_mutex_lock(&GRegLock);
       // end of the world
-      if (!G_r_ctx.is_released)
+      // @TODO: This is temp solution to ensure closing the global registration
+      // However other none global registration could be still open.
+      if (!G_r_ctx.is_closed)
         {
-          // Make MsQuic debug check pass:
-          //   Zero Registration when closing MsQuic
           if (!get_reg_handle(&G_r_ctx))
             {
               CXPLAT_DBG_ASSERTMSG(FALSE,
@@ -1361,6 +1361,7 @@ closeLib(__unused_parm__ ErlNifEnv *env,
                      (long)G_r_ctx.ref_count);
               sleep(1);
             }
+          G_r_ctx.is_closed = TRUE;
           put_reg_handle(&G_r_ctx);
           put_reg_handle(&G_r_ctx);
         }

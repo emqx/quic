@@ -235,7 +235,7 @@ close_registration(Handle) ->
         ok ->
             ok;
         N ->
-            io:format("pending close_registration refcnt: ~p~n", [N]),
+            logger:info("pending close_registration refcnt: ~p~n", [N]),
             timer:sleep(100),
             close_registration(Handle)
     end.

@@ -53,7 +53,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       if (!get_reg_handle(l_ctx->r_ctx))
         {
-          // l_ctx->r_ctx = NULL;
           Status = QUIC_STATUS_UNREACHABLE;
           goto Error;
         }
@@ -87,6 +86,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       // Keep resource for c_ctx
       CXPLAT_FRE_ASSERT(get_config_handle(l_ctx->config_ctx));
+
       c_ctx->config_ctx = l_ctx->config_ctx;
 
       ACCEPTOR *conn_owner = AcceptorDequeue(l_ctx->acceptor_queue);
@@ -100,12 +100,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           // msquic will close the Connection Handle internally.
           c_ctx->Connection = NULL;
 
-          // However, we still need to release the c_ctx resource
           // @NOTE: we don't hold the lock of c_ctx since it is new conn.
-          // @TODO: the next step should be part of put_conn_handle/1 and need
-          // to be tested carefully with MsQuic implementation.
-          // @TODO: next line is tmp
-          //
           put_conn_handle(c_ctx);
           CXPLAT_FRE_ASSERTMSG(r_ctx->ref_count > 0,
                                "Listener should still own the r_ctx");
@@ -205,17 +200,12 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           // Set it to NULL to avoid close it in resource_conn_dealloc_callback
           c_ctx->Connection = NULL;
 
-          // @TODO: I don't know if we need this, maybe not
-          // put_reg_handle(r_ctx);
-          // c_ctx->r_ctx = NULL;
-
           // However, we still need to free the c_ctx
           // note, we don't hold the lock of c_ctx since it is new conn.
           enif_release_resource(c_ctx);
           goto Error;
         }
 
-      // Link to registration only when ConnectionOpen success
       CXPLAT_DBG_ASSERT(r_ctx);
 
       c_ctx->is_closed = FALSE; // new connection
@@ -329,7 +319,6 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       CXPLAT_DBG_ASSERT(l_ctx->r_ctx != &G_r_ctx);
       if (!get_reg_handle(l_ctx->r_ctx))
         {
-          // avoid destroy_l_ctx to put again it.
           l_ctx->r_ctx = NULL;
           ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
           goto exit;
@@ -425,6 +414,7 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(Status))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
+      l_ctx->is_closed = TRUE;
       put_listener_handle(l_ctx);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
       goto exit;
@@ -474,6 +464,7 @@ close_listener1(ErlNifEnv *env,
 
   enif_mutex_unlock(l_ctx->lock);
 
+  l_ctx->is_closed = TRUE;
   put_listener_handle(l_ctx);
   ret = ATOM_CLOSED;
   return ret;

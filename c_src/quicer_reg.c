@@ -19,7 +19,7 @@ limitations under the License.
 static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
-QuicerRegistrationCTX G_r_ctx = { .name = "global", .is_released = TRUE };
+QuicerRegistrationCTX G_r_ctx = { .name = "global", .is_closed = TRUE };
 pthread_mutex_t GRegLock = PTHREAD_MUTEX_INITIALIZER;
 extern pthread_mutex_t MsQuicLock;
 
@@ -52,11 +52,12 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         }
     }
 
+  // This verifies the context is indeed released.
   if (!get_reg_handle(&G_r_ctx))
     {
       // reg is closed
-      CXPLAT_FRE_ASSERTMSG(G_r_ctx.ref_count == 0,
-                           "G_r_ctx should have 0 user ");
+      CXPLAT_DBG_ASSERT(G_r_ctx.is_closed);
+      CXPLAT_DBG_ASSERT(G_r_ctx.ref_count == 0);
       init_r_ctx(&G_r_ctx);
       QuicerRegistrationCTX *r_ctx = &G_r_ctx;
       if (QUIC_FAILED(status = MsQuic->RegistrationOpen(&RegConfig,
@@ -65,6 +66,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           res = ERROR_TUPLE_2(ATOM_STATUS(status));
           goto exit;
         }
+      r_ctx->is_closed = FALSE;
       // Now it is safe for others to use
       CxPlatRefInitialize(&r_ctx->ref_count);
     }
@@ -113,6 +115,7 @@ deregistration(ErlNifEnv *env,
   else
     {
       HQUIC Registration = G_r_ctx.Registration;
+      G_r_ctx.is_closed = TRUE;
       G_r_ctx.Registration = NULL;
       MsQuic->RegistrationClose(Registration);
       deinit_r_ctx(&G_r_ctx);

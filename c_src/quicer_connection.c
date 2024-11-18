@@ -878,6 +878,7 @@ Error:
     {
       put_reg_handle(r_ctx);
     }
+  c_ctx->is_closed = TRUE;
   put_conn_handle(c_ctx);
   if (is_destroy)
     {

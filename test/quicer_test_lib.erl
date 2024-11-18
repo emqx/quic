@@ -476,7 +476,6 @@ shutdown_all_listeners() ->
         end,
         quicer:listeners()
     ).
-%lists:map(fun(L) -> quicer:close_listener(L) end, quicer:get_listeners()).
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

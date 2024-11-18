@@ -26,6 +26,7 @@ init_r_ctx(QuicerRegistrationCTX *r_ctx)
     {
       r_ctx = enif_alloc_resource(ctx_reg_t, sizeof(QuicerRegistrationCTX));
       CxPlatZeroMemory(r_ctx, sizeof(QuicerRegistrationCTX));
+      // Only for none global registration
       CxPlatRefInitialize(&r_ctx->ref_count);
     }
   else
@@ -40,7 +41,7 @@ init_r_ctx(QuicerRegistrationCTX *r_ctx)
     }
   r_ctx->env = enif_alloc_env();
   r_ctx->Registration = NULL;
-  r_ctx->is_released = FALSE; // @TODO remove this field
+  r_ctx->is_closed = TRUE;
   r_ctx->lock = enif_mutex_create("quicer:r_ctx");
   CxPlatListInitializeHead(&r_ctx->Listeners);
   CxPlatListInitializeHead(&r_ctx->Connections);
@@ -50,7 +51,7 @@ init_r_ctx(QuicerRegistrationCTX *r_ctx)
 void
 deinit_r_ctx(QuicerRegistrationCTX *r_ctx)
 {
-  r_ctx->is_released = TRUE;
+  r_ctx->is_closed = TRUE;
   enif_free_env(r_ctx->env);
   enif_mutex_destroy(r_ctx->lock);
 }
@@ -141,7 +142,6 @@ init_c_ctx()
 void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
-  // CXPLAT_FRE_ASSERT(!c_ctx->r_ctx);
   enif_free_env(c_ctx->env);
 #if defined(QUICER_USE_TRUSTED_STORE)
   if (c_ctx->trusted != NULL)
@@ -333,12 +333,12 @@ get_stream_handle(QuicerStreamCTX *s_ctx)
 inline void
 put_conn_handle(QuicerConnCTX *c_ctx)
 {
-  // if (CxPlatRefDecrement(&c_ctx->ref_count) && c_ctx->Connection)
   if (CxPlatRefDecrement(&c_ctx->ref_count))
     {
       HQUIC Connection = c_ctx->Connection;
       QuicerRegistrationCTX *r_ctx = c_ctx->r_ctx;
       QuicerConfigCTX *config_ctx = c_ctx->config_ctx;
+      CXPLAT_DBG_ASSERT(c_ctx->is_closed);
       c_ctx->Connection = NULL;
       c_ctx->config_ctx = NULL;
       c_ctx->is_closed = TRUE;
@@ -382,13 +382,14 @@ put_listener_handle(QuicerListenerCTX *l_ctx)
       QuicerRegistrationCTX *r_ctx = l_ctx->r_ctx;
       HQUIC Listener = l_ctx->Listener;
       l_ctx->Listener = NULL;
+      CXPLAT_DBG_ASSERT(l_ctx->is_closed);
       l_ctx->is_closed = TRUE;
       l_ctx->r_ctx = NULL;
 
       // Close listener handle
       MsQuic->ListenerClose(Listener);
 
-      // Deref config_ctx
+      // Deref config_ctx as it has shared ownership.
       put_config_handle(l_ctx->config_ctx);
       l_ctx->config_ctx = NULL;
 
@@ -415,7 +416,8 @@ put_reg_handle(QuicerRegistrationCTX *r_ctx)
   if (CxPlatRefDecrement(&r_ctx->ref_count))
     {
       HQUIC Registration = r_ctx->Registration;
-      r_ctx->is_released = TRUE;
+      CXPLAT_DBG_ASSERT(r_ctx->is_closed);
+      r_ctx->is_closed = TRUE;
       r_ctx->Registration = NULL;
       MsQuic->RegistrationShutdown(
           Registration, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);

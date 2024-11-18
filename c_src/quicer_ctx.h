@@ -28,9 +28,6 @@ limitations under the License.
 #define _CTX_NIF_WRITE_
 #define _CTX_NIF_READ_
 
-#define KEEP_R_CTX(CTX) (r_ctx == &G_r_ctx) ? void : enif_keep_resource(CTX);
-#define REL_R_CTX(CTX) (r_ctx == &G_r_ctx) ? void : enif_release_resource(CTX);
-
 #define CONN_LINK_REGISTRATION(CTX, RCTX)                                     \
   LINK_REGISTRATION(CTX, RCTX, Connections)
 #define LISTENER_LINK_REGISTRATION(CTX, RCTX)                                 \
@@ -63,7 +60,7 @@ typedef struct QuicerRegistrationCTX
   HQUIC Registration;
   // Tracking lifetime of Registration handle
   CXPLAT_REF_COUNT ref_count;
-  BOOLEAN is_released;
+  BOOLEAN is_closed;
   char name[UINT8_MAX + 1];
   ErlNifMutex *lock;
   CXPLAT_LIST_ENTRY Listeners;
