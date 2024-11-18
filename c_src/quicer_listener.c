@@ -104,7 +104,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           put_conn_handle(c_ctx);
           CXPLAT_FRE_ASSERTMSG(r_ctx->ref_count > 0,
                                "Listener should still own the r_ctx");
-          enif_release_resource(c_ctx);
           goto Error;
         }
       TP_CB_3(acceptor_hit, (uintptr_t)c_ctx->Connection, 0);
@@ -202,7 +201,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
           // However, we still need to free the c_ctx
           // note, we don't hold the lock of c_ctx since it is new conn.
-          enif_release_resource(c_ctx);
+          put_conn_handle(c_ctx);
           goto Error;
         }
 
@@ -427,7 +426,6 @@ exit: // errors..
   free_certificate(&CredConfig);
   l_ctx->is_closed = TRUE;
   put_listener_handle(l_ctx);
-  enif_release_resource(l_ctx);
   return ret;
 }
 

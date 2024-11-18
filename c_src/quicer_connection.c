@@ -416,7 +416,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       enif_mutex_unlock(c_ctx->lock);
 
       put_conn_handle(c_ctx);
-      destroy_c_ctx(c_ctx);
     }
   return status;
 }
@@ -528,7 +527,6 @@ ServerConnectionCallback(HQUIC Connection,
       enif_mutex_unlock(c_ctx->lock);
 
       put_conn_handle(c_ctx);
-      destroy_c_ctx(c_ctx);
     }
   return status;
 }
@@ -639,7 +637,6 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QuicerConnCTX *c_ctx = NULL;
   QuicerRegistrationCTX *r_ctx = NULL;
   BOOLEAN is_reuse_handle = FALSE;
-  BOOLEAN is_destroy = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -695,7 +692,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       if (!assign_registration(env, eoptions, c_ctx))
         {
           c_ctx->r_ctx = NULL;
-          enif_release_resource(c_ctx);
+          put_conn_handle(c_ctx);
           return ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
         }
       CXPLAT_DBG_ASSERT(c_ctx->r_ctx);
@@ -703,14 +700,14 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
       if ((c_ctx->owner = AcceptorAlloc()) == NULL)
         {
-          enif_release_resource(c_ctx);
+          put_conn_handle(c_ctx);
           return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
         }
 
       // set owner
       if (!enif_self(env, &(c_ctx->owner->Pid)))
         {
-          enif_release_resource(c_ctx);
+          put_conn_handle(c_ctx);
           return ERROR_TUPLE_2(ATOM_BAD_PID);
         }
     }
@@ -791,7 +788,6 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           enif_mutex_lock(c_ctx->lock);
           if (!IS_SAME_TERM(ATOM_OK, res))
             {
-              is_destroy = TRUE;
               goto Error;
             }
         }
@@ -856,7 +852,6 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
       res = ERROR_TUPLE_2(ATOM_CONN_START_ERROR);
       TP_NIF_3(start_fail, (uintptr_t)(c_ctx->Connection), Status);
-      is_destroy = TRUE;
       goto Error;
     }
 
@@ -880,10 +875,6 @@ Error:
     }
   c_ctx->is_closed = TRUE;
   put_conn_handle(c_ctx);
-  if (is_destroy)
-    {
-      destroy_c_ctx(c_ctx);
-    }
   return res;
 }
 
@@ -1323,14 +1314,18 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
 
   QuicerStreamCTX *s_ctx = init_s_ctx();
   BOOLEAN is_orphan = FALSE;
-  enif_keep_resource(c_ctx);
+
+  if (!get_conn_handle(c_ctx))
+    {
+      return QUIC_STATUS_UNREACHABLE;
+    }
+
   s_ctx->c_ctx = c_ctx;
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
   // @TODO Generally, we rely on outer caller to clean the env,
   // or we should clean the env in this function.
   env = s_ctx->env;
-  get_conn_handle(c_ctx);
   s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
 
   ACCEPTOR *acc = AcceptorDequeue(c_ctx->acceptor_queue);

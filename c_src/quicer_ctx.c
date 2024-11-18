@@ -99,8 +99,6 @@ void
 destroy_l_ctx(QuicerListenerCTX *l_ctx)
 {
 
-  // @note, Destroy config asap as it holds rundown
-  // ref count in registration
   if (l_ctx->is_monitored)
     {
       enif_demonitor_process(l_ctx->env, l_ctx, &l_ctx->owner_mon);
@@ -188,7 +186,6 @@ destroy_c_ctx(QuicerConnCTX *c_ctx)
       c_ctx->is_monitored = FALSE;
     }
 
-  // maybe we should move it to put_conn_handle
   enif_release_resource(c_ctx);
 }
 
@@ -212,15 +209,6 @@ void
 deinit_config_ctx(QuicerConfigCTX *config_ctx)
 {
   enif_free_env(config_ctx->env);
-}
-
-void
-destroy_config_ctx(QuicerConfigCTX *config_ctx)
-{
-  if (config_ctx)
-    {
-      enif_release_resource(config_ctx);
-    }
 }
 
 QuicerStreamCTX *
@@ -311,7 +299,7 @@ destroy_dgram_send_ctx(QuicerDgramSendCTX *dgram_send_ctx)
 inline void
 put_stream_handle(QuicerStreamCTX *s_ctx)
 {
-  if (CxPlatRefDecrement(&s_ctx->ref_count) && s_ctx->Stream)
+  if (CxPlatRefDecrement(&s_ctx->ref_count))
     {
       HQUIC Stream = s_ctx->Stream;
       CXPLAT_DBG_ASSERT(s_ctx->is_closed);
@@ -323,6 +311,7 @@ put_stream_handle(QuicerStreamCTX *s_ctx)
       if (s_ctx->c_ctx)
         {
           put_conn_handle(s_ctx->c_ctx);
+          s_ctx->c_ctx = NULL;
         }
     }
 }
@@ -366,6 +355,7 @@ put_conn_handle(QuicerConnCTX *c_ctx)
         {
           PUT_UNLINK_REGISTRATION(c_ctx, r_ctx);
         }
+      destroy_c_ctx(c_ctx);
     }
 }
 

@@ -313,7 +313,6 @@ async_start_stream2(ErlNifEnv *env,
   // This is optional
   get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &s_ctx->event_mask);
 
-  enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -505,8 +504,6 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  // release in resource_stream_dealloc_callback
-  enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
 
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
