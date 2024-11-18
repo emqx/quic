@@ -427,8 +427,7 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 exit_no_reg:
   CXPLAT_FRE_ASSERT(l_ctx->r_ctx);
-  put_reg_handle(l_ctx->r_ctx);
-  UNLINK_REGISTRATION(l_ctx, l_ctx->r_ctx);
+  PUT_UNLINK_REGISTRATION(l_ctx, l_ctx->r_ctx);
   l_ctx->r_ctx = NULL;
 exit: // errors..
 #if defined(QUICER_USE_TRUSTED_STORE)

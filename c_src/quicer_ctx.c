@@ -159,8 +159,7 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
 
   if (c_ctx->r_ctx)
     {
-      UNLINK_REGISTRATION(c_ctx, c_ctx->r_ctx);
-      put_reg_handle(c_ctx->r_ctx);
+      PUT_UNLINK_REGISTRATION(c_ctx, c_ctx->r_ctx);
     }
 
   if (c_ctx->peer_cert)
@@ -361,9 +360,7 @@ put_conn_handle(QuicerConnCTX *c_ctx)
       // @NOTE: maybe not yet linked
       if (r_ctx)
         {
-          UNLINK_REGISTRATION(c_ctx, r_ctx);
-          // Deref Registration
-          put_reg_handle(r_ctx);
+          PUT_UNLINK_REGISTRATION(c_ctx, r_ctx);
         }
     }
 }
@@ -396,8 +393,7 @@ put_listener_handle(QuicerListenerCTX *l_ctx)
       // Deref Registration Handle
       CXPLAT_DBG_ASSERT(r_ctx->ref_count > 0);
 
-      UNLINK_REGISTRATION(l_ctx, r_ctx);
-      put_reg_handle(r_ctx);
+      PUT_UNLINK_REGISTRATION(l_ctx, r_ctx);
 
       // destroy l_ctx
       destroy_l_ctx(l_ctx);

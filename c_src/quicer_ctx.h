@@ -30,8 +30,17 @@ limitations under the License.
 
 #define CONN_LINK_REGISTRATION(CTX, RCTX)                                     \
   LINK_REGISTRATION(CTX, RCTX, Connections)
+
 #define LISTENER_LINK_REGISTRATION(CTX, RCTX)                                 \
   LINK_REGISTRATION(CTX, RCTX, Listeners)
+#define PUT_UNLINK_REGISTRATION(CTX, RCTX)                                    \
+  do                                                                          \
+    {                                                                         \
+      UNLINK_REGISTRATION(CTX, RCTX);                                         \
+      put_reg_handle(RCTX);                                                   \
+    }                                                                         \
+  while (0)
+
 #define UNLINK_REGISTRATION(CTX, RCTX)                                        \
   do                                                                          \
     {                                                                         \
