@@ -873,6 +873,8 @@ tc_stream_controlling_process_demon(Config) ->
                 {'DOWN', MonRef2, process, NewOwner2, normal} ->
                     ok
             end,
+            %% Give time for resource down callback to happen
+            timer:sleep(100),
             ?assertNotMatch({ok, _}, quicer:send(Stm, <<"owner_changed">>)),
             SPid ! done,
             ensure_server_exit_normal(Ref)
