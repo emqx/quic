@@ -616,7 +616,6 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
-  CxPlatRefInitialize(&(c_ctx->ref_count));
   eHandle = enif_make_resource(env, c_ctx);
   return SUCCESS(eHandle);
 
@@ -876,6 +875,7 @@ Error:
   enif_mutex_unlock(c_ctx->lock);
   if (is_reuse_handle)
     {
+      // we get the handle at the begining of this function
       put_reg_handle(r_ctx);
     }
   c_ctx->is_closed = TRUE;
@@ -1332,7 +1332,6 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   env = s_ctx->env;
   get_conn_handle(c_ctx);
   s_ctx->Stream = Event->PEER_STREAM_STARTED.Stream;
-  CxPlatRefInitialize(&(s_ctx->ref_count));
 
   ACCEPTOR *acc = AcceptorDequeue(c_ctx->acceptor_queue);
 

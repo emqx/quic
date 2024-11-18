@@ -300,7 +300,6 @@ async_start_stream2(ErlNifEnv *env,
 
   if (!get_conn_handle(c_ctx))
     {
-      //@TODO maybe other error like conn_closed?
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
@@ -342,7 +341,6 @@ async_start_stream2(ErlNifEnv *env,
                               ClientStreamCallback,
                               s_ctx,
                               &(s_ctx->Stream));
-  CxPlatRefInitialize(&s_ctx->ref_count);
 
   if (QUIC_FAILED(Status))
     {
@@ -372,9 +370,6 @@ async_start_stream2(ErlNifEnv *env,
 
   if (QUIC_FAILED(Status))
     {
-      enif_mutex_lock(s_ctx->lock);
-      s_ctx->is_closed = TRUE;
-      enif_mutex_unlock(s_ctx->lock);
       res = ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
@@ -388,8 +383,9 @@ async_start_stream2(ErlNifEnv *env,
   return SUCCESS(res);
 
 ErrorExit:
+  s_ctx->is_closed = TRUE;
+  put_stream_handle(s_ctx);
   destroy_s_ctx(s_ctx);
-  put_conn_handle(c_ctx);
   return res;
 }
 
@@ -583,7 +579,6 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       s_ctx->Stream = NULL;
       goto ErrorExit;
     }
-  CxPlatRefInitialize(&(s_ctx->ref_count));
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 

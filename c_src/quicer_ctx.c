@@ -248,6 +248,7 @@ init_s_ctx()
   s_ctx->is_closed = TRUE; // init
   s_ctx->event_mask = 0;
   s_ctx->sig_queue = NULL;
+  CxPlatRefInitialize(&s_ctx->ref_count);
   return s_ctx;
 }
 
@@ -313,13 +314,16 @@ put_stream_handle(QuicerStreamCTX *s_ctx)
   if (CxPlatRefDecrement(&s_ctx->ref_count) && s_ctx->Stream)
     {
       HQUIC Stream = s_ctx->Stream;
-      Stream = s_ctx->Stream;
+      CXPLAT_DBG_ASSERT(s_ctx->is_closed);
       s_ctx->Stream = NULL;
       s_ctx->is_closed = TRUE;
       MsQuic->SetCallbackHandler(Stream, NULL, NULL);
       MsQuic->StreamClose(Stream);
-      assert(s_ctx->c_ctx != NULL);
-      put_conn_handle(s_ctx->c_ctx);
+      CXPLAT_DBG_ASSERT(s_ctx->c_ctx != NULL);
+      if (s_ctx->c_ctx)
+        {
+          put_conn_handle(s_ctx->c_ctx);
+        }
     }
 }
 
