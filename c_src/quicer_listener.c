@@ -288,7 +288,7 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ret);
     }
 
-  // Now build l_ctx
+  // New l_ctx
   QuicerListenerCTX *l_ctx = init_l_ctx();
 
   if (!l_ctx)
@@ -342,7 +342,7 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!enif_self(env, &(l_ctx->listenerPid)))
     {
       ret = ERROR_TUPLE_2(ATOM_BAD_PID);
-      goto exit_no_reg;
+      goto exit;
     }
 
   Registration = l_ctx->r_ctx->Registration;
@@ -357,9 +357,8 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!IS_SAME_TERM(ATOM_OK, ret))
     {
       // @TODO unsure 3 elem tuple is the best way to return error
-      put_config_handle(l_ctx->config_ctx);
       ret = ERROR_TUPLE_3(ATOM_CONFIG_ERROR, ret);
-      goto exit_no_reg;
+      goto exit;
     }
 
   // mon will be removed when triggered or when l_ctx is dealloc.
@@ -368,7 +367,7 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           env, l_ctx, &l_ctx->listenerPid, &l_ctx->owner_mon))
     {
       ret = ERROR_TUPLE_2(ATOM_BAD_MON);
-      goto exit_no_reg;
+      goto exit;
     }
 
   l_ctx->is_monitored = TRUE;
@@ -380,11 +379,8 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
                       l_ctx,
                       &l_ctx->Listener)))
     {
-      // Server Configuration should be destroyed
-      put_config_handle(l_ctx->config_ctx);
-      l_ctx->config_ctx->Configuration = NULL;
       ret = ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
-      goto exit_no_reg;
+      goto exit;
     }
   l_ctx->is_closed = FALSE;
 
@@ -415,7 +411,6 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
       l_ctx->is_closed = TRUE;
-      put_listener_handle(l_ctx);
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
       goto exit;
     }
@@ -425,15 +420,13 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   free_certificate(&CredConfig);
   return OK_TUPLE_2(listenHandle);
 
-exit_no_reg:
-  CXPLAT_FRE_ASSERT(l_ctx->r_ctx);
-  PUT_UNLINK_REGISTRATION(l_ctx, l_ctx->r_ctx);
-  l_ctx->r_ctx = NULL;
 exit: // errors..
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_free(trusted_store);
 #endif // QUICER_USE_TRUSTED_STORE
   free_certificate(&CredConfig);
+  l_ctx->is_closed = TRUE;
+  put_listener_handle(l_ctx);
   enif_release_resource(l_ctx);
   return ret;
 }

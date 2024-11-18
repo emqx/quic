@@ -376,6 +376,7 @@ put_listener_handle(QuicerListenerCTX *l_ctx)
 {
   if (CxPlatRefDecrement(&l_ctx->ref_count))
     {
+      CXPLAT_DBG_ASSERT(l_ctx->is_closed);
       QuicerRegistrationCTX *r_ctx = l_ctx->r_ctx;
       HQUIC Listener = l_ctx->Listener;
       l_ctx->Listener = NULL;
@@ -387,13 +388,17 @@ put_listener_handle(QuicerListenerCTX *l_ctx)
       MsQuic->ListenerClose(Listener);
 
       // Deref config_ctx as it has shared ownership.
-      put_config_handle(l_ctx->config_ctx);
+      if (l_ctx->config_ctx)
+        {
+          put_config_handle(l_ctx->config_ctx);
+        }
       l_ctx->config_ctx = NULL;
 
       // Deref Registration Handle
-      CXPLAT_DBG_ASSERT(r_ctx->ref_count > 0);
-
-      PUT_UNLINK_REGISTRATION(l_ctx, r_ctx);
+      if (r_ctx)
+        {
+          PUT_UNLINK_REGISTRATION(l_ctx, r_ctx);
+        }
 
       // destroy l_ctx
       destroy_l_ctx(l_ctx);
