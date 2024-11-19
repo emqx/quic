@@ -437,8 +437,6 @@ close_listener1(ErlNifEnv *env,
   QuicerListenerCTX *l_ctx;
   ERL_NIF_TERM ret = ATOM_OK;
 
-  // BOOLEAN is_worker = (enif_thread_type() == ERL_NIF_THR_UNDEFINED);
-
   if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
