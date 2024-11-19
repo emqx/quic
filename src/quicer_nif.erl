@@ -102,7 +102,7 @@
 %% NIF fuction return types
 -type abi_version() :: integer().
 -type new_registration() :: {ok, reg_handle()} | {error, atom_reason()}.
--type shutdown_registration() :: ok | {error, badarg}.
+-type shutdown_registration() :: ok | {error, badarg | invalid_state}.
 -type close_registration() :: ok | {error, badarg}.
 -type get_registration_name() :: {ok, string()} | {error, badarg}.
 -type get_registration_refcnt() :: {error, closed} | integer().
@@ -189,11 +189,11 @@ open_lib(_LttngLib) ->
 close_lib() ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec reg_open() -> ok | {error, badarg}.
+-spec reg_open() -> ok | {error, badarg | invalid_state}.
 reg_open() ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec reg_open(execution_profile()) -> ok | {error, badarg}.
+-spec reg_open(execution_profile()) -> ok | {error, badarg | invalid_state}.
 reg_open(_) ->
     erlang:nif_error(nif_library_not_loaded).
 

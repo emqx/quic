@@ -37,7 +37,7 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (!MsQuic)
     {
-      return ERROR_TUPLE_2(ATOM_STATUS);
+      return ERROR_TUPLE_2(ATOM_ERROR_INVALID_STATE);
     }
 
   pthread_mutex_lock(&GRegLock);
@@ -217,7 +217,7 @@ shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM *argv)
     }
   else
     {
-      return ATOM_STATUS;
+      return ERROR_TUPLE_2(ATOM_ERROR_INVALID_STATE);
     }
   return ATOM_OK;
 }

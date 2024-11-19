@@ -345,7 +345,6 @@ async_start_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto ErrorExit;
     }
   // Now we have Stream handle
-  // @FIXME we should have a refcnt here?
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
   res = enif_make_copy(env, s_ctx->eHandle);
 
@@ -368,6 +367,8 @@ async_start_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (QUIC_FAILED(Status))
     {
+      // revert the enif_make_resource...
+      enif_release_resource(s_ctx);
       res = ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
@@ -382,6 +383,7 @@ async_start_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 ErrorExit:
   s_ctx->is_closed = TRUE;
+  // destruct as no return to the NIF caller
   DESTRUCT_REFCNT(put_stream_handle(s_ctx));
   return res;
 }

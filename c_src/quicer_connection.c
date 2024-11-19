@@ -1360,10 +1360,11 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
       acc = AcceptorAlloc();
       if (!acc)
         {
+          s_ctx->Stream = NULL;
           return QUIC_STATUS_UNREACHABLE;
         }
       // We must copy here, otherwise it will become double free
-      // in resource dealloc callbacks (for Stream and Connection)
+      // for Stream and Connection
       CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
 
       // We set it to passive and let new owner set it to active after handoff
@@ -1872,16 +1873,11 @@ put_conn_handles(ErlNifEnv *env, ERL_NIF_TERM conn_handles)
 QUIC_STATUS
 selected_owner_unreachable(QuicerStreamCTX *s_ctx)
 {
-  //
-  // s_ctx ownership transfer failed
-  // There is no shared ownership, we must destroy the s_ctx here
-  //
   s_ctx->is_closed = TRUE;
   // @NOTE: unset Stream handle to avoid double closing
   //        becasue we are rejecting it and MsQuic internally will
   //        close it.
   s_ctx->Stream = NULL;
-  DESTRUCT_REFCNT(put_stream_handle(s_ctx));
   return QUIC_STATUS_UNREACHABLE;
 }
 

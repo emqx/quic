@@ -464,7 +464,7 @@ retry_reg_open() ->
     case quicer:reg_open() of
         ok ->
             ok;
-        {error, status} = E ->
+        {error, invalid_state} = E ->
             %% Lib is closed.
             E
     end.

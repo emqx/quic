@@ -307,7 +307,7 @@ tc_close_lib_test(_Config) ->
 
 tc_lib_registration_neg(_Config) ->
     ok = quicer:close_lib(),
-    {error, status} = quicer:reg_open(),
+    {error, invalid_state} = quicer:reg_open(),
     {error, badarg} = quicer:reg_close().
 
 tc_lib_registration(_Config) ->

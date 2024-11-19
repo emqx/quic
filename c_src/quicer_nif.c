@@ -994,7 +994,7 @@ resource_stream_dealloc_callback(__unused_parm__ ErlNifEnv *env, void *obj)
 {
   QuicerStreamCTX *s_ctx = (QuicerStreamCTX *)obj;
   TP_CB_3(start, (uintptr_t)s_ctx->Stream, s_ctx->is_closed);
-  assert(s_ctx->is_closed == TRUE);
+  CXPLAT_DBG_ASSERT(s_ctx->is_closed == TRUE);
   if (s_ctx->Stream && !s_ctx->is_closed)
     {
       MsQuic->StreamClose(s_ctx->Stream);
