@@ -308,14 +308,13 @@ put_stream_handle(QuicerStreamCTX *s_ctx)
       s_ctx->is_closed = TRUE;
       MsQuic->SetCallbackHandler(Stream, NULL, NULL);
       MsQuic->StreamClose(Stream);
-      destroy_s_ctx(s_ctx);
-
       CXPLAT_DBG_ASSERT(s_ctx->c_ctx != NULL);
       if (c_ctx)
         {
           put_conn_handle(s_ctx->c_ctx);
           s_ctx->c_ctx = NULL;
         }
+      destroy_s_ctx(s_ctx);
     }
 }
 
