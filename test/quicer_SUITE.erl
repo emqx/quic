@@ -74,6 +74,7 @@
     tc_stream_get_owner_remote/1,
 
     tc_dgram_client_send/1,
+    tc_dgram_client_send_iolist/1,
 
     % , tc_getopt_raw/1
     tc_getopt/1,
@@ -887,20 +888,39 @@ tc_dgram_client_send(Config) ->
     Owner = self(),
     {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
     receive
-        listener_ready ->
-            Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
-            {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
-            {ok, Stm} = quicer:start_stream(Conn, []),
-            {ok, 4} = quicer:send(Stm, <<"ping">>),
-            {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
-            flush_streams_available(Conn),
-            flush_datagram_state_changed(Conn),
-            dgram_client_recv_loop(Conn, false, false),
-            SPid ! done,
-            ok = ensure_server_exit_normal(Ref)
-    after 1000 ->
-        ct:fail("timeout here")
-    end.
+        listener_ready -> ok
+    after 1000 -> ct:fail("listener_ready timeout")
+    end,
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
+
+    flush_streams_available(Conn),
+    flush_datagram_state_changed(Conn),
+    dgram_client_recv_loop(Conn, false, false),
+    SPid ! done,
+    ok = ensure_server_exit_normal(Ref).
+
+tc_dgram_client_send_iolist(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 1000 -> ct:fail("listener_ready timeout")
+    end,
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    {ok, 4} = quicer:send_dgram(Conn, [<<"pi">>, "ng"]),
+    flush_streams_available(Conn),
+    flush_datagram_state_changed(Conn),
+    dgram_client_recv_loop(Conn, false, false),
+    SPid ! done,
+    ok = ensure_server_exit_normal(Ref).
 
 dgram_client_recv_loop(Conn, true, true) ->
     ok = quicer:close_connection(Conn);

@@ -232,3 +232,7 @@ tc_open_global_reg(_Config) ->
 tc_shutdown_global_reg(_Config) ->
     ?assertEqual(ok, quicer:shutdown_registration(global)),
     ?assertEqual(ok, quicer:reg_close()).
+
+tc_get_links_link_closed(_Config) ->
+    ok = quicer:reg_close(),
+    ?assertEqual({error, quic_registration}, quicer:get_connections()).

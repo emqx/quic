@@ -71,6 +71,7 @@
         BUCKET,
         begin
             quicer_nif:set_snab_kc_pid(whereis(snabbkaffe_collector)),
+            ?assert(whereis(snabbkaffe_collector) == quicer_nif:get_snab_kc_pid()),
             RUN
         end,
         CHECK

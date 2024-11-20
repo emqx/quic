@@ -888,6 +888,7 @@ tc_get_conn_owner_server(Config) ->
     end),
     receive
         {quic, new_conn, SConn, _} ->
+            {error, badarg} = quicer:get_conn_owner(undefined),
             {ok, Pid} = quicer:get_conn_owner(SConn),
             ?assertEqual(self(), Pid),
             quicer:close_connection(SConn),
@@ -977,6 +978,18 @@ tc_conn_count_for_registered_listeners(Config) ->
     ok = quicer:close_registration(RegL),
     ok = quicer:close_registration(RegC),
     ok.
+
+tc_invalid_conn_reg(_Config) ->
+    Opts = default_conn_opts() ++ [{quic_registration, erlang:make_ref()}],
+    ?assertEqual({error, quic_registration}, quicer:connect("localhost", 443, Opts, 5000)).
+
+tc_closed_conn_reg(_Config) ->
+    {ok, ThisReg} = quicer:new_registration(
+        atom_to_list(?FUNCTION_NAME), quic_execution_profile_max_throughput
+    ),
+    ok = quicer:close_registration(ThisReg),
+    Opts = default_conn_opts() ++ [{quic_registration, ThisReg}],
+    ?assertEqual({error, quic_registration}, quicer:connect("localhost", 443, Opts, 5000)).
 
 %%%
 %%% Helpers
