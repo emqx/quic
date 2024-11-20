@@ -10,9 +10,10 @@
 |            | 'connection owner' receive events of a connection                |
 |            | 'stream owner' receive application data and events from a stream |
 |            | 'listener owner' receive events from listener                    |
-|            | When owner is dead, related resources would be released          |
+|            | When owner is dead, related resources will be released           |
 | l_ctx      | listener nif context                                             |
 | c_ctx      | connection nif context                                           |
 | s_ctx      | stream nif context                                               |
-
+| r_ctx      | registration nif context                                         |
+| config_ctx | configuration nif context                                        |
 
