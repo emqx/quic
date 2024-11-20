@@ -3,9 +3,8 @@ on: ["push", "pull_request"]
 name: Test Coveralls
 
 jobs:
-
-  build:
-    name: Build
+  run-cover:
+    name: Run Cover
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -19,6 +18,9 @@ jobs:
           - false
         arch:
           - x86_64
+        openssl:
+          - openssl3
+          - openssl
     steps:
     - name: Checkout
       uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
@@ -29,31 +31,37 @@ jobs:
         rebar3-version: ${{ matrix.rebar3 }}
 
     - name: Run cover
+      env:
+        QUICER_TLS_VER: ${{ matrix.openssl }}
       run: |
         sudo apt-get install lcov
+        export QUICER_TLS_VER
         make cover
 
     - name: Coveralls C
       uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        flag-name: run-c-lcov
+        flag-name: run-c-lcov-${{ matrix.openssl }}
         files: coverage/proper-lcov.info coverage/lcov.info
         parallel: true
         git-branch: ${{ github.ref_name }}
         git-commit: ${{ github.sha }}
 
     - name: Run cover with feature switches
+      env:
+        QUICER_TLS_VER: ${{ matrix.openssl }}
       run: |
         sudo apt-get install lcov
         export QUICER_USE_TRUSTED_STORE=1
+        export QUICER_TLS_VER
         make cover
 
     - name: Coveralls C
       uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        flag-name: run-c-lcov-feature
+        flag-name: run-c-lcov-feature-${{ matrix.openssl }}
         files: coverage/proper-lcov.info coverage/lcov.info
         parallel: true
         git-branch: ${{ github.ref_name }}
@@ -61,9 +69,15 @@ jobs:
 
     - name: Coveralls Erl
       env:
+        COVERALLS_FLAG_NAME: erlang-${{ matrix.openssl }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: rebar3 as test coveralls send
 
+  finalize:
+    needs: run-cover
+    name: finalize
+    runs-on: ubuntu-latest
+    steps:
     - name: Coveralls Finished
       uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
       with:
