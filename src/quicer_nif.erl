@@ -25,6 +25,7 @@
     shutdown_registration/3,
     close_registration/1,
     get_registration_name/1,
+    get_registration_refcnt/1,
     listen/2,
     start_listener/3,
     stop_listener/1,
@@ -46,7 +47,9 @@
     controlling_process/2,
     peercert/1,
     enable_sig_buffer/1,
-    flush_stream_buffered_sigs/1
+    flush_stream_buffered_sigs/1,
+    count_reg_conns/0,
+    count_reg_conns/1
 ]).
 
 -export([
@@ -88,6 +91,7 @@
     shutdown_registration/0,
     close_registration/0,
     get_registration_name/0,
+    get_registration_refcnt/0,
     get_listeners/0,
     get_connections/0,
     get_owner/0,
@@ -98,9 +102,10 @@
 %% NIF fuction return types
 -type abi_version() :: integer().
 -type new_registration() :: {ok, reg_handle()} | {error, atom_reason()}.
--type shutdown_registration() :: ok | {error, badarg}.
+-type shutdown_registration() :: ok | {error, badarg | invalid_state}.
 -type close_registration() :: ok | {error, badarg}.
 -type get_registration_name() :: {ok, string()} | {error, badarg}.
+-type get_registration_refcnt() :: {error, closed} | integer().
 -type get_listeners() :: [listener_handle()].
 -type get_connections() :: [connection_handle()].
 -type get_owner() :: {ok, pid()} | {error, undefined | badarg}.
@@ -184,11 +189,11 @@ open_lib(_LttngLib) ->
 close_lib() ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec reg_open() -> ok | {error, badarg}.
+-spec reg_open() -> ok | {error, badarg | invalid_state}.
 reg_open() ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec reg_open(execution_profile()) -> ok | {error, badarg}.
+-spec reg_open(execution_profile()) -> ok | {error, badarg | invalid_state}.
 reg_open(_) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -200,11 +205,11 @@ reg_close() ->
 new_registration(_Name, _Profile) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec shutdown_registration(reg_handle()) -> shutdown_registration().
+-spec shutdown_registration(global | reg_handle()) -> shutdown_registration().
 shutdown_registration(_Handle) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec shutdown_registration(reg_handle(), IsSilent :: boolean(), ErrorCode :: uint64()) ->
+-spec shutdown_registration(global | reg_handle(), IsSilent :: boolean(), ErrorCode :: uint64()) ->
     shutdown_registration().
 shutdown_registration(_Handle, _IsSilent, _ErrorCode) ->
     erlang:nif_error(nif_library_not_loaded).
@@ -215,6 +220,10 @@ close_registration(_Handle) ->
 
 -spec get_registration_name(reg_handle()) -> get_registration_name().
 get_registration_name(_Handle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec get_registration_refcnt(reg_handle()) -> get_registration_refcnt().
+get_registration_refcnt(_Handle) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec listen(listen_on(), listen_opts()) ->
@@ -228,8 +237,12 @@ listen(_ListenOn, _Options) ->
     ok | {error, closed | badarg}.
 start_listener(_Listener, _ListenOn, _Opts) ->
     erlang:nif_error(nif_library_not_loaded).
-
--spec close_listener(listener_handle()) -> ok | {error, closed | badarg}.
+%% @doc close the listener
+%% return closed if the listener is closed.
+%% return ok if the listener is stopped then closed, and caller should expect listener_stopped signal.
+%%
+%% @end
+-spec close_listener(listener_handle()) -> ok | closed | {error, closed | badarg}.
 close_listener(_Listener) ->
     erlang:nif_error(nif_library_not_loaded).
 
@@ -398,6 +411,13 @@ get_connections() ->
 
 -spec get_connections(reg_handle()) -> [connection_handle()] | {error, badarg}.
 get_connections(_RegHandle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec count_reg_conns() -> non_neg_integer().
+count_reg_conns() ->
+    erlang:nif_error(nif_library_not_loaded).
+-spec count_reg_conns(reg_handle()) -> non_neg_integer() | {error, badarg}.
+count_reg_conns(_RegHandle) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec copy_stream_handle(stream_handle()) -> {ok, stream_handle()} | {error, badarg}.

@@ -22,7 +22,7 @@ limitations under the License.
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 
-extern QuicerRegistrationCTX *G_r_ctx;
+extern QuicerRegistrationCTX G_r_ctx;
 extern pthread_mutex_t GRegLock;
 
 BOOLEAN parse_registration(ErlNifEnv *env,
@@ -37,7 +37,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerListenerCTX *l_ctx = (QuicerListenerCTX *)Context;
   QuicerConnCTX *c_ctx = NULL;
-  BOOLEAN is_destroy = FALSE;
 
   BOOLEAN is_worker = (enif_thread_type() == ERL_NIF_THR_UNDEFINED);
 
@@ -50,20 +49,31 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
     {
     case QUIC_LISTENER_EVENT_NEW_CONNECTION:
 
+      CXPLAT_DBG_ASSERT(l_ctx->r_ctx);
+
+      if (!get_reg_handle(l_ctx->r_ctx))
+        {
+          Status = QUIC_STATUS_UNREACHABLE;
+          goto Error;
+        }
+      QuicerRegistrationCTX *r_ctx = l_ctx->r_ctx;
+
       //
       // Note, c_ctx is newly init here, don't grab lock.
       //
       if (!(c_ctx = init_c_ctx()))
         {
           Status = QUIC_STATUS_OUT_OF_MEMORY;
+          put_reg_handle(r_ctx);
           goto Error;
         }
 
-      c_ctx->r_ctx = l_ctx->r_ctx;
+      // assign r_ctx of c_ctx
+      CONN_LINK_REGISTRATION(c_ctx, l_ctx->r_ctx);
+
       ErlNifEnv *env = c_ctx->env;
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
-      CxPlatRefInitialize(&(c_ctx->ref_count));
 
 #if defined(QUICER_USE_TRUSTED_STORE)
       if (l_ctx->trusted_store)
@@ -72,10 +82,12 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
           c_ctx->trusted = l_ctx->trusted_store;
         }
 #endif // QUICER_USE_TRUSTED_STORE
-      assert(l_ctx->config_resource);
+      CXPLAT_DBG_ASSERT(l_ctx->config_ctx);
+
       // Keep resource for c_ctx
-      enif_keep_resource(l_ctx->config_resource);
-      c_ctx->config_resource = l_ctx->config_resource;
+      CXPLAT_FRE_ASSERT(get_config_handle(l_ctx->config_ctx));
+
+      c_ctx->config_ctx = l_ctx->config_ctx;
 
       ACCEPTOR *conn_owner = AcceptorDequeue(l_ctx->acceptor_queue);
 
@@ -83,16 +95,15 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         {
           TP_CB_3(no_acceptor, (uintptr_t)c_ctx->Connection, 0);
           Status = QUIC_STATUS_UNREACHABLE;
-          // We are going to reject the connection,
+          // @NOTE: We are going to reject the connection,
           // we will not be the owner of this connection
           // msquic will close the Connection Handle internally.
-          // Set it to NULL to avoid close it in resource_conn_dealloc_callback
-          // or in the put_conn_handle.
           c_ctx->Connection = NULL;
-          put_conn_handle(c_ctx);
-          // However, we still need to free the c_ctx
+
           // @NOTE: we don't hold the lock of c_ctx since it is new conn.
-          enif_release_resource(c_ctx);
+          put_conn_handle(c_ctx);
+          CXPLAT_FRE_ASSERTMSG(r_ctx->ref_count > 0,
+                               "Listener should still own the r_ctx");
           goto Error;
         }
       TP_CB_3(acceptor_hit, (uintptr_t)c_ctx->Connection, 0);
@@ -190,10 +201,13 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
           // However, we still need to free the c_ctx
           // note, we don't hold the lock of c_ctx since it is new conn.
-          enif_release_resource(c_ctx);
+          put_conn_handle(c_ctx);
           goto Error;
         }
 
+      CXPLAT_DBG_ASSERT(r_ctx);
+
+      c_ctx->is_closed = FALSE; // new connection
       //
       // A new connection is being attempted by a client. For the handshake to
       // proceed, the server must provide a configuration for QUIC to use. The
@@ -203,50 +217,22 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
 
-      QuicerRegistrationCTX *r_ctx;
-      if (l_ctx->r_ctx)
-        {
-          r_ctx = l_ctx->r_ctx;
-        }
-      else
-        {
-          r_ctx = G_r_ctx;
-        }
-
-      if (r_ctx)
-        {
-          enif_mutex_lock(r_ctx->lock);
-          CxPlatListInsertTail(&r_ctx->Connections, &c_ctx->RegistrationLink);
-          enif_mutex_unlock(r_ctx->lock);
-        }
-
-      c_ctx->is_closed = FALSE; // new connection
       enif_clear_env(env);
       break;
 
     case QUIC_LISTENER_EVENT_STOP_COMPLETE:
-      // **Note**, this callback event in msquic can be triggered by either
-      // MsQuicListenerClose or MsQuicListenerStop.
+      // **Note**, this callback event from msquic can be triggered by either
+      // `MsQuicListenerClose` or `MsQuicListenerStop`.
       env = l_ctx->env;
+
       enif_send(NULL,
                 &(l_ctx->listenerPid),
-                NULL,
+                env,
                 enif_make_tuple3(env,
                                  ATOM_QUIC,
                                  ATOM_LISTENER_STOPPED,
                                  enif_make_resource(env, l_ctx)));
-      if (!l_ctx->Listener)
-        {
-          // @NOTE This callback is part of the listener *close* process
-          // Listener is already closing, we can destroy the l_ctx now
-          // as the handle is NULL no subsequent msquic API is allowed/possible
-          assert(!l_ctx->is_stopped);
-          is_destroy = TRUE;
-        }
-      else
-        {
-          l_ctx->is_stopped = TRUE;
-        }
+      l_ctx->is_stopped = TRUE;
       enif_clear_env(env);
       break;
     default:
@@ -258,15 +244,11 @@ Error:
     {
       enif_mutex_unlock(l_ctx->lock);
     }
-  if (is_destroy)
-    {
-      destroy_l_ctx(l_ctx);
-    }
   return Status;
 }
 
 ERL_NIF_TERM
-listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM ret = ATOM_OK;
@@ -277,7 +259,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   QUIC_ADDR Address = {};
   HQUIC Registration = NULL;
 
-  QuicerRegistrationCTX *target_r_ctx = NULL;
+  CXPLAT_FRE_ASSERT(argc == 2);
 
   if (!enif_is_map(env, options))
     {
@@ -305,7 +287,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ret);
     }
 
-  // Now build l_ctx
+  // New l_ctx
   QuicerListenerCTX *l_ctx = init_l_ctx();
 
   if (!l_ctx)
@@ -319,16 +301,8 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 #if defined(QUICER_USE_TRUSTED_STORE)
   l_ctx->trusted_store = trusted_store;
 #endif // QUICER_USE_TRUSTED_STORE
-  CxPlatRefInitialize(&l_ctx->ref_count);
 
-  // *********  ANY ERROR below this line should goto `exit`   **************
-
-  // Set owner for l_ctx
-  if (!enif_self(env, &(l_ctx->listenerPid)))
-    {
-      ret = ERROR_TUPLE_2(ATOM_BAD_PID);
-      goto exit;
-    }
+  // *********  ANY ERROR below this line should goto `exit-*`   **************
 
   // Get Reg for l_ctx, quic_registration is optional
   if (!parse_registration(env, options, &l_ctx->r_ctx))
@@ -339,44 +313,45 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
 
   if (l_ctx->r_ctx)
     {
-      // quic_registration is set
-      enif_keep_resource(l_ctx->r_ctx);
+      // quic_registration is set,
+      // none-global registration.
+      CXPLAT_DBG_ASSERT(l_ctx->r_ctx != &G_r_ctx);
       if (!get_reg_handle(l_ctx->r_ctx))
         {
+          l_ctx->r_ctx = NULL;
           ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
           goto exit;
         }
-      Registration = l_ctx->r_ctx->Registration;
-      target_r_ctx = l_ctx->r_ctx;
     }
   else
     {
       // quic_registration is not set, use global registration
-      target_r_ctx = G_r_ctx;
-      pthread_mutex_lock(&GRegLock);
-
-      if (!G_r_ctx)
-        {
-          pthread_mutex_unlock(&GRegLock);
-          ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
-          goto exit;
-        }
-
-      enif_keep_resource(G_r_ctx);
-      if (!get_reg_handle(G_r_ctx))
+      if (!get_reg_handle(&G_r_ctx))
         {
           ret = ERROR_TUPLE_2(ATOM_QUIC_REGISTRATION);
           goto exit;
         }
-      Registration = G_r_ctx->Registration;
-      pthread_mutex_unlock(&GRegLock);
+      l_ctx->r_ctx = &G_r_ctx;
     }
+
+  LISTENER_LINK_REGISTRATION(l_ctx, l_ctx->r_ctx);
+
+  CXPLAT_DBG_ASSERT(l_ctx->r_ctx);
+  // Set owner for l_ctx
+  if (!enif_self(env, &(l_ctx->listenerPid)))
+    {
+      ret = ERROR_TUPLE_2(ATOM_BAD_PID);
+      goto exit;
+    }
+
+  Registration = l_ctx->r_ctx->Registration;
+  l_ctx->config_ctx = init_config_ctx();
 
   // Now load server config
   ret = ServerLoadConfiguration(env,
                                 &options,
                                 Registration,
-                                &l_ctx->config_resource->Configuration,
+                                &l_ctx->config_ctx->Configuration,
                                 &CredConfig);
   if (!IS_SAME_TERM(ATOM_OK, ret))
     {
@@ -403,22 +378,10 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
                       l_ctx,
                       &l_ctx->Listener)))
     {
-      // Server Configuration should be destroyed
-      // @FIXME here leaks config?
-      // enif_release_resource(l_ctx->config_resource);
-      l_ctx->config_resource->Configuration = NULL;
       ret = ERROR_TUPLE_3(ATOM_LISTENER_OPEN_ERROR, ATOM_STATUS(Status));
       goto exit;
     }
   l_ctx->is_closed = FALSE;
-
-  // Link to registration only when ListenerOpen success
-  if (target_r_ctx)
-    {
-      enif_mutex_lock(target_r_ctx->lock);
-      CxPlatListInsertTail(&target_r_ctx->Listeners, &l_ctx->RegistrationLink);
-      enif_mutex_unlock(target_r_ctx->lock);
-    }
 
   // Now try to start listener
   unsigned alpn_buffer_length = 0;
@@ -446,9 +409,7 @@ listen2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
   if (QUIC_FAILED(Status))
     {
       TP_NIF_3(start_fail, (uintptr_t)(l_ctx->Listener), Status);
-      HQUIC Listener = l_ctx->Listener;
-      l_ctx->Listener = NULL;
-      MsQuic->ListenerClose(Listener);
+      l_ctx->is_closed = TRUE;
       ret = ERROR_TUPLE_3(ATOM_LISTENER_START_ERROR, ATOM_STATUS(Status));
       goto exit;
     }
@@ -463,7 +424,8 @@ exit: // errors..
   X509_STORE_free(trusted_store);
 #endif // QUICER_USE_TRUSTED_STORE
   free_certificate(&CredConfig);
-  destroy_l_ctx(l_ctx);
+  l_ctx->is_closed = TRUE;
+  put_listener_handle(l_ctx);
   return ret;
 }
 
@@ -473,36 +435,26 @@ close_listener1(ErlNifEnv *env,
                 const ERL_NIF_TERM argv[])
 {
   QuicerListenerCTX *l_ctx;
-  BOOLEAN is_destroy = FALSE;
   ERL_NIF_TERM ret = ATOM_OK;
+
   if (!enif_get_resource(env, argv[0], ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
   enif_mutex_lock(l_ctx->lock);
+
   if (l_ctx->is_closed)
     {
       enif_mutex_unlock(l_ctx->lock);
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
-  HQUIC l = l_ctx->Listener;
-  // set before destroy_l_ctx
-  l_ctx->Listener = NULL;
-  l_ctx->is_closed = TRUE;
-
-  // If is_stopped, it means the listener is already stopped.
-  // there will be no callback for QUIC_LISTENER_EVENT_STOP_COMPLETE
-  // so we need to destroy the l_ctx otherwise it will leak.
-  is_destroy = l_ctx->is_stopped;
 
   enif_mutex_unlock(l_ctx->lock);
 
-  MsQuic->ListenerClose(l);
-  if (is_destroy)
-    {
-      destroy_l_ctx(l_ctx);
-    }
+  l_ctx->is_closed = TRUE;
+  put_listener_handle(l_ctx);
+  ret = ATOM_CLOSED;
   return ret;
 }
 
@@ -535,6 +487,7 @@ stop_listener1(ErlNifEnv *env,
 exit:
   enif_mutex_unlock(l_ctx->lock);
   put_listener_handle(l_ctx);
+  CXPLAT_FRE_ASSERT(l_ctx->ref_count > 0);
   return ret;
 }
 
@@ -606,7 +559,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   // ===================================================
-  // Safe to access l_ctx  now
+  // Safe to access l_ctx now
   // ===================================================
   enif_mutex_lock(l_ctx->lock);
 
@@ -617,14 +570,9 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
-  QuicerRegistrationCTX *target_r_ctx = NULL;
-
-  // This is a read, do not need to bump the ref count
-  target_r_ctx = l_ctx->r_ctx ? l_ctx->r_ctx : G_r_ctx;
-
   ret = ServerLoadConfiguration(env,
                                 &options,
-                                target_r_ctx->Registration,
+                                l_ctx->r_ctx->Registration,
                                 &new_config_ctx->Configuration,
                                 &CredConfig);
   free_certificate(&CredConfig);
@@ -636,7 +584,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
-  QuicerConfigCTX *old_config_ctx = l_ctx->config_resource;
+  QuicerConfigCTX *old_config_ctx = l_ctx->config_ctx;
 
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_free(l_ctx->trusted_store);
@@ -664,29 +612,30 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
   l_ctx->is_stopped = FALSE;
 
-  l_ctx->config_resource = new_config_ctx;
+  l_ctx->config_ctx = new_config_ctx;
   // the ongoing handshake will be completed with the old config
-  enif_release_resource(old_config_ctx);
+  // @TODO We should close config ASAP to make acceptor fail
+  put_config_handle(old_config_ctx);
 
 exit:
   enif_mutex_unlock(l_ctx->lock);
   return ret;
 }
 
+// Get listeners from registration
 ERL_NIF_TERM
 get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerRegistrationCTX *r_ctx = NULL;
   ERL_NIF_TERM res = enif_make_list(env, 0);
-  if (argc == 0) // use global registration
+  BOOLEAN isGlobal = argc == 0 ? TRUE : FALSE;
+  if (isGlobal)
     {
-      pthread_mutex_lock(&GRegLock);
-      if (!G_r_ctx)
+      if (!get_reg_handle(&G_r_ctx))
         {
-          pthread_mutex_unlock(&GRegLock);
           return res;
         }
-      r_ctx = G_r_ctx;
+      r_ctx = &G_r_ctx;
     }
   else
     {
@@ -705,10 +654,9 @@ get_listenersX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       Entry = Entry->Flink;
     }
   enif_mutex_unlock(r_ctx->lock);
-
-  if (argc == 0) // use global registration
+  if (isGlobal)
     {
-      pthread_mutex_unlock(&GRegLock);
+      put_reg_handle(r_ctx);
     }
   return res;
 }

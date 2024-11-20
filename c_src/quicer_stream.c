@@ -140,9 +140,8 @@ ServerStreamCallback(HQUIC Stream, void *Context, QUIC_STREAM_EVENT *Event)
 
   if (is_destroy)
     {
-      put_stream_handle(s_ctx);
       // must be called after mutex unlock
-      destroy_s_ctx(s_ctx);
+      CALLBACK_DESTRUCT_REFCNT(put_stream_handle(s_ctx));
     }
   return status;
 }
@@ -242,16 +241,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       // must be called after mutex unlock,
-      put_stream_handle(s_ctx);
-      destroy_s_ctx(s_ctx);
+      CALLBACK_DESTRUCT_REFCNT(put_stream_handle(s_ctx));
     }
   return status;
 }
 
 ERL_NIF_TERM
-async_start_stream2(ErlNifEnv *env,
-                    __unused_parm__ int argc,
-                    const ERL_NIF_TERM argv[])
+async_start_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   QuicerConnCTX *c_ctx = NULL;
@@ -261,6 +257,8 @@ async_start_stream2(ErlNifEnv *env,
   unsigned int start_flag = QUIC_STREAM_START_FLAG_NONE; // default
   ERL_NIF_TERM eopen_flag;
   unsigned int open_flag = QUIC_STREAM_OPEN_FLAG_NONE; // default
+
+  CXPLAT_FRE_ASSERT(2 == argc);
 
   ERL_NIF_TERM eoptions = argv[1];
 
@@ -300,7 +298,6 @@ async_start_stream2(ErlNifEnv *env,
 
   if (!get_conn_handle(c_ctx))
     {
-      //@TODO maybe other error like conn_closed?
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
@@ -314,7 +311,6 @@ async_start_stream2(ErlNifEnv *env,
   // This is optional
   get_uint32_from_map(env, eoptions, ATOM_QUIC_EVENT_MASK, &s_ctx->event_mask);
 
-  enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
   // Caller should be the owner of this stream.
   s_ctx->owner = AcceptorAlloc();
@@ -342,7 +338,6 @@ async_start_stream2(ErlNifEnv *env,
                               ClientStreamCallback,
                               s_ctx,
                               &(s_ctx->Stream));
-  CxPlatRefInitialize(&s_ctx->ref_count);
 
   if (QUIC_FAILED(Status))
     {
@@ -360,7 +355,7 @@ async_start_stream2(ErlNifEnv *env,
   //
   // We need to take a refcnt to avoid handle get closed as the StreamStart
   // may trigger callback in another thread.
-  if (!get_stream_handle(s_ctx))
+  if (!LOCAL_REFCNT(get_stream_handle(s_ctx)))
     {
       res = ERROR_TUPLE_2(ATOM_CLOSED);
       goto ErrorExit;
@@ -368,13 +363,12 @@ async_start_stream2(ErlNifEnv *env,
   HQUIC Stream = s_ctx->Stream;
   Status = MsQuic->StreamStart(Stream, start_flag);
   cache_stream_id(s_ctx);
-  put_stream_handle(s_ctx);
+  LOCAL_REFCNT(put_stream_handle(s_ctx));
 
   if (QUIC_FAILED(Status))
     {
-      enif_mutex_lock(s_ctx->lock);
-      s_ctx->is_closed = TRUE;
-      enif_mutex_unlock(s_ctx->lock);
+      // revert the enif_make_resource...
+      enif_release_resource(s_ctx);
       res = ERROR_TUPLE_3(ATOM_STREAM_START_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
@@ -388,19 +382,19 @@ async_start_stream2(ErlNifEnv *env,
   return SUCCESS(res);
 
 ErrorExit:
-  destroy_s_ctx(s_ctx);
-  put_conn_handle(c_ctx);
+  s_ctx->is_closed = TRUE;
+  // destruct as no return to the NIF caller
+  DESTRUCT_REFCNT(put_stream_handle(s_ctx));
   return res;
 }
 
 // accept streams on top of connection.
 ERL_NIF_TERM
-async_accept_stream2(ErlNifEnv *env,
-                     __unused_parm__ int argc,
-                     const ERL_NIF_TERM argv[])
+async_accept_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QuicerConnCTX *c_ctx;
   ERL_NIF_TERM active_val;
+  CXPLAT_FRE_ASSERT(2 == argc);
 
   if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
     {
@@ -455,11 +449,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   unsigned int open_flag = QUIC_STREAM_OPEN_FLAG_NONE; // default
   uint32_t sendflags = 0;
 
-  if (4 != argc)
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
+  CXPLAT_FRE_ASSERT(4 == argc);
   ERL_NIF_TERM eHandle = argv[0];
   ERL_NIF_TERM ebin = argv[1];
   ERL_NIF_TERM eoptions = argv[2];
@@ -502,15 +492,13 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
-  // Allocate ctxs
+  // Allocate s_ctx
   QuicerStreamCTX *s_ctx = init_s_ctx();
   if (!s_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
-  // release in resource_stream_dealloc_callback
-  enif_keep_resource(c_ctx);
   s_ctx->c_ctx = c_ctx;
 
   QuicerStreamSendCTX *send_ctx = init_send_ctx();
@@ -583,7 +571,6 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       s_ctx->Stream = NULL;
       goto ErrorExit;
     }
-  CxPlatRefInitialize(&(s_ctx->ref_count));
   // Now we have Stream handle
   s_ctx->eHandle = enif_make_resource(s_ctx->imm_env, s_ctx);
 
@@ -616,7 +603,6 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
                                               send_ctx)))
     {
       enif_mutex_unlock(s_ctx->lock);
-      put_stream_handle(s_ctx);
       res = ERROR_TUPLE_3(ATOM_STREAM_SEND_ERROR, ATOM_STATUS(Status));
       goto ErrorExit;
     }
@@ -633,11 +619,8 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 ErrorExit:
   destroy_send_ctx(send_ctx);
-  destroy_s_ctx(s_ctx);
-  put_conn_handle(c_ctx);
-  // Do not close the stream here, it will be done
-  // in resource_stream_dealloc_callback triggered by
-  // destroy_s_ctx
+  s_ctx->is_closed = TRUE;
+  DESTRUCT_REFCNT(put_stream_handle(s_ctx));
   return res;
 }
 
@@ -651,17 +634,14 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   ERL_NIF_TERM res = ATOM_OK;
   uint32_t sendflags = 0;
 
-  if (3 != argc)
-    {
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
+  CXPLAT_FRE_ASSERT(3 == argc);
 
   if (!enif_get_resource(env, estream, ctx_stream_t, (void **)&s_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!get_stream_handle(s_ctx))
+  if (!LOCAL_REFCNT(get_stream_handle(s_ctx)))
     {
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
@@ -734,14 +714,14 @@ send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 ErrorExit:
   destroy_send_ctx(send_ctx);
 Exit:
-  put_stream_handle(s_ctx);
+  LOCAL_REFCNT(put_stream_handle(s_ctx));
   return res;
 }
 
 ERL_NIF_TERM
-recv2(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-
+  CXPLAT_FRE_ASSERT(argc == 2);
   QuicerStreamCTX *s_ctx;
   ErlNifBinary bin;
   ERL_NIF_TERM estream = argv[0];
@@ -834,14 +814,15 @@ Exit:
 }
 
 ERL_NIF_TERM
-shutdown_stream3(ErlNifEnv *env,
-                 __unused_parm__ int argc,
-                 const ERL_NIF_TERM argv[])
+shutdown_stream3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
   QuicerStreamCTX *s_ctx;
   uint32_t app_errcode = 0, flags = 0;
+
+  CXPLAT_FRE_ASSERT(3 == argc);
+
   if (!enif_get_resource(env, argv[0], ctx_stream_t, (void **)&s_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
@@ -858,7 +839,7 @@ shutdown_stream3(ErlNifEnv *env,
       ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!get_stream_handle(s_ctx))
+  if (!LOCAL_REFCNT(get_stream_handle(s_ctx)))
     {
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
@@ -867,7 +848,7 @@ shutdown_stream3(ErlNifEnv *env,
     {
       ret = ERROR_TUPLE_2(ATOM_STATUS(Status));
     }
-  put_stream_handle(s_ctx);
+  LOCAL_REFCNT(put_stream_handle(s_ctx));
   return ret;
 }
 

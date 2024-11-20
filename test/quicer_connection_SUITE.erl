@@ -88,7 +88,7 @@ init_per_group(suite_reg, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_group(suite_reg, Config) ->
-    Reg = proplists:get_value(quic_registration, Config),
+    Reg = ?config(quic_registration, Config),
     quicer:shutdown_registration(Reg),
     ok = quicer:close_registration(Reg);
 end_per_group(_GroupName, _Config) ->
@@ -888,6 +888,7 @@ tc_get_conn_owner_server(Config) ->
     end),
     receive
         {quic, new_conn, SConn, _} ->
+            {error, badarg} = quicer:get_conn_owner(undefined),
             {ok, Pid} = quicer:get_conn_owner(SConn),
             ?assertEqual(self(), Pid),
             quicer:close_connection(SConn),
@@ -916,6 +917,79 @@ tc_shutdown_conn_before_handshake(Config) ->
         ct:fail("conn from client timeout")
     end,
     quicer:close_listener(L).
+
+tc_conn_count_default(_Config) ->
+    ?assertEqual(0, quicer:count_reg_conns(global)).
+
+tc_conn_count_for_registered_listeners(Config) ->
+    Port = select_port(),
+    %% GIVEN: registrations are created for server listener and clients
+    {ok, RegL} = quicer:new_registration(
+        "listener", quic_execution_profile_max_throughput
+    ),
+    {ok, RegC} = quicer:new_registration(
+        "clients", quic_execution_profile_max_throughput
+    ),
+    %% WHEN: there is no connections from clients.
+    {ok, L} = quicer:listen(Port, default_listen_opts(Config ++ [{quic_registration, RegL}])),
+    {ok, {_, _Port}} = quicer:sockname(L),
+    %% THEN: The Listener registration has 0 connection
+    ?assertEqual(0, quicer:count_reg_conns(RegL)),
+    %% WHEN: N clients are connected
+    NClients = 10,
+    CPids = lists:map(
+        fun(_) ->
+            {ok, L} = quicer:async_accept(L, #{}),
+            spawn(fun() ->
+                {ok, CConn} = quicer:connect(
+                    "localhost",
+                    Port,
+                    [{quic_registration, RegC} | default_conn_opts()],
+                    1000
+                ),
+                receive
+                    done ->
+                        quicer:close_connection(CConn)
+                end
+            end)
+        end,
+        lists:seq(1, NClients)
+    ),
+    lists:foreach(
+        fun(_) ->
+            receive
+                {quic, new_conn, Conn, _} ->
+                    quicer:handshake(Conn)
+            after 1000 ->
+                ct:fail("conn from client timeout")
+            end
+        end,
+        lists:seq(1, NClients)
+    ),
+    %% THEN: The Listener registration has N connections
+    ?assertEqual(NClients, quicer:count_reg_conns(RegL)),
+    %% THEN: The Client registration has N connections
+    ?assertEqual(NClients, quicer:count_reg_conns(RegC)),
+    %% THEN: The default global registration has 0 connections
+    ?assertEqual(0, quicer:count_reg_conns(global)),
+
+    lists:foreach(fun(Pid) -> Pid ! done end, CPids),
+    ok = quicer:close_listener(L),
+    ok = quicer:close_registration(RegL),
+    ok = quicer:close_registration(RegC),
+    ok.
+
+tc_invalid_conn_reg(_Config) ->
+    Opts = default_conn_opts() ++ [{quic_registration, erlang:make_ref()}],
+    ?assertEqual({error, quic_registration}, quicer:connect("localhost", 443, Opts, 5000)).
+
+tc_closed_conn_reg(_Config) ->
+    {ok, ThisReg} = quicer:new_registration(
+        atom_to_list(?FUNCTION_NAME), quic_execution_profile_max_throughput
+    ),
+    ok = quicer:close_registration(ThisReg),
+    Opts = default_conn_opts() ++ [{quic_registration, ThisReg}],
+    ?assertEqual({error, quic_registration}, quicer:connect("localhost", 443, Opts, 5000)).
 
 %%%
 %%% Helpers

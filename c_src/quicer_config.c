@@ -20,7 +20,7 @@ limitations under the License.
 #include "quicer_tls.h"
 #include <msquichelper.h>
 
-extern QuicerRegistrationCTX *G_r_ctx;
+extern QuicerRegistrationCTX G_r_ctx;
 extern pthread_mutex_t MsQuicLock;
 
 static ERL_NIF_TERM get_stream_opt(ErlNifEnv *env,
@@ -218,11 +218,6 @@ ServerLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
 
-  if (!G_r_ctx)
-    {
-      return ATOM_REG_FAILED;
-    }
-
   if (!create_settings(env, option, &Settings))
     {
       return ATOM_BADARG;
@@ -274,11 +269,6 @@ ClientLoadConfiguration(ErlNifEnv *env,
 {
   QUIC_SETTINGS Settings = { 0 };
   ERL_NIF_TERM ret = ATOM_OK;
-
-  if (!G_r_ctx)
-    {
-      return ATOM_REG_FAILED;
-    }
 
   //
   // Configures the client's idle timeout.
@@ -859,10 +849,9 @@ encode_parm_to_eterm(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-getopt3(ErlNifEnv *env,
-        __unused_parm__ int argc,
-        __unused_parm__ const ERL_NIF_TERM argv[])
+getopt3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+  CXPLAT_FRE_ASSERT(3 == argc);
   ERL_NIF_TERM ctx = argv[0];
   ERL_NIF_TERM eopt = argv[1];
   ERL_NIF_TERM elevel = argv[2];
@@ -894,12 +883,12 @@ getopt3(ErlNifEnv *env,
         {
           return SUCCESS(ETERM_UINT_64(((QuicerStreamCTX *)q_ctx)->StreamID));
         }
-      if (!get_stream_handle(q_ctx))
+      if (!LOCAL_REFCNT(get_stream_handle(q_ctx)))
         {
           goto Exit;
         }
       res = get_stream_opt(env, (QuicerStreamCTX *)q_ctx, eopt, elevel);
-      put_stream_handle(q_ctx);
+      LOCAL_REFCNT(put_stream_handle(q_ctx));
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
@@ -971,8 +960,9 @@ set_level_param(ErlNifEnv *env,
 }
 
 ERL_NIF_TERM
-setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
+setopt4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
+  CXPLAT_FRE_ASSERT(4 == argc);
   ERL_NIF_TERM ctx = argv[0];
   ERL_NIF_TERM eopt = argv[1];
   ERL_NIF_TERM evalue = argv[2];
@@ -992,13 +982,13 @@ setopt4(ErlNifEnv *env, __unused_parm__ int argc, const ERL_NIF_TERM argv[])
     }
   else if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
-      if (!get_stream_handle(q_ctx))
+      if (!LOCAL_REFCNT(get_stream_handle(q_ctx)))
         {
           goto Exit;
         }
       res = set_stream_opt(
           env, (QuicerStreamCTX *)q_ctx, eopt, evalue, elevel);
-      put_stream_handle(q_ctx);
+      LOCAL_REFCNT(put_stream_handle(q_ctx));
     }
   else if (enif_get_resource(env, ctx, ctx_connection_t, &q_ctx))
     {
@@ -1344,7 +1334,7 @@ get_stream_opt(ErlNifEnv *env,
     {
       res = get_level_param(env,
                             s_ctx->Stream,
-                            s_ctx->c_ctx->config_resource->Configuration,
+                            s_ctx->c_ctx->config_ctx->Configuration,
                             optname,
                             elevel);
       goto Exit;
@@ -1458,7 +1448,7 @@ set_stream_opt(ErlNifEnv *env,
     {
       res = set_level_param(env,
                             s_ctx->Stream,
-                            s_ctx->c_ctx->config_resource->Configuration,
+                            s_ctx->c_ctx->config_ctx->Configuration,
                             optname,
                             optval,
                             elevel);
@@ -1531,13 +1521,13 @@ get_connection_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      if (!c_ctx->config_resource)
+      if (!c_ctx->config_ctx)
         {
           goto Exit;
         }
       res = get_level_param(env,
                             c_ctx->Connection,
-                            c_ctx->config_resource->Configuration,
+                            c_ctx->config_ctx->Configuration,
                             optname,
                             elevel);
       goto Exit;
@@ -1724,13 +1714,13 @@ set_connection_opt(ErlNifEnv *env,
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
-      if (!c_ctx->config_resource)
+      if (!c_ctx->config_ctx)
         {
           goto Exit;
         }
       res = set_level_param(env,
                             c_ctx->Connection,
-                            c_ctx->config_resource->Configuration,
+                            c_ctx->config_ctx->Configuration,
                             optname,
                             optval,
                             elevel);
@@ -2062,13 +2052,13 @@ get_listener_opt(ErlNifEnv *env,
     {
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
-  enif_keep_resource(l_ctx);
+  get_listener_handle(l_ctx);
 
   if (!IS_SAME_TERM(ATOM_FALSE, elevel))
     {
       res = get_level_param(env,
                             l_ctx->Listener,
-                            l_ctx->config_resource->Configuration,
+                            l_ctx->config_ctx->Configuration,
                             optname,
                             elevel);
       goto Exit;
@@ -2123,7 +2113,7 @@ get_listener_opt(ErlNifEnv *env,
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
     }
 Exit:
-  enif_release_resource(l_ctx);
+  put_listener_handle(l_ctx);
   return res;
 }
 
@@ -2157,7 +2147,7 @@ set_listener_opt(ErlNifEnv *env,
     {
       res = set_level_param(env,
                             l_ctx->Listener,
-                            l_ctx->config_resource->Configuration,
+                            l_ctx->config_ctx->Configuration,
                             optname,
                             optval,
                             elevel);
@@ -2644,7 +2634,6 @@ parse_registration(ErlNifEnv *env,
           return FALSE;
         }
     }
-
   return TRUE;
 }
 

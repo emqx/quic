@@ -28,6 +28,7 @@
     shutdown_registration/1,
     shutdown_registration/3,
     get_registration_name/1,
+    get_registration_refcnt/1,
     reg_open/0,
     reg_open/1,
     reg_close/0
@@ -94,7 +95,8 @@
     wait_for_handoff/2,
     handoff_stream/2,
     handoff_stream/3,
-    perf_counters/0
+    perf_counters/0,
+    count_reg_conns/1
 ]).
 
 %% helpers
@@ -227,16 +229,28 @@ shutdown_registration(Handle, IsSilent, ErrCode) ->
     quicer_nif:shutdown_registration(Handle, IsSilent, ErrCode).
 
 %% @doc close a registration.
--spec close_registration(reg_handle()) ->
-    quicer_nif:close_registration().
+-spec close_registration(reg_handle()) -> ok.
 close_registration(Handle) ->
-    quicer_nif:close_registration(Handle).
+    case quicer_nif:close_registration(Handle) of
+        ok ->
+            ok;
+        N ->
+            logger:info("pending close_registration refcnt: ~p~n", [N]),
+            timer:sleep(100),
+            close_registration(Handle)
+    end.
 
 %% @doc get registration name
 -spec get_registration_name(reg_handle()) ->
     quicer_nif:get_registration_name().
 get_registration_name(Handle) ->
     quicer_nif:get_registration_name(Handle).
+
+%% @doc get registration reference count
+-spec get_registration_refcnt(global | reg_handle()) ->
+    quicer_nif:get_registration_refcnt().
+get_registration_refcnt(Handle) ->
+    quicer_nif:get_registration_refcnt(Handle).
 
 %% @doc GRegistraion should be opened before calling traffic APIs.
 %%
@@ -342,6 +356,8 @@ close_listener(Listener) ->
     ok | {error, badarg | closed | timeout}.
 close_listener(Listener, Timeout) ->
     case quicer_nif:close_listener(Listener) of
+        closed ->
+            ok;
         ok when Timeout == 0 ->
             ok;
         ok ->
@@ -1078,6 +1094,12 @@ get_connections(global) ->
     quicer_nif:get_connections();
 get_connections(Reg) ->
     quicer_nif:get_connections(Reg).
+
+-spec count_reg_conns(reg_handle() | global) -> non_neg_integer().
+count_reg_conns(global) ->
+    quicer_nif:count_reg_conns();
+count_reg_conns(Reg) ->
+    quicer_nif:count_reg_conns(Reg).
 
 -spec get_conn_owner(connection_handle()) -> quicer_nif:get_owner().
 get_conn_owner(Conn) ->

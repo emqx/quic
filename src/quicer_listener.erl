@@ -220,6 +220,8 @@ handle_cast(_Request, State) ->
     | {noreply, NewState :: term(), hibernate}
     | {stop, Reason :: normal | term(), NewState :: term()}.
 handle_info({quic, listener_stopped, L}, #state{listener = L} = State) ->
+    %% uncontroled stop:
+    _ = quicer:close_listener(L),
     {stop, normal, State};
 handle_info(_Info, State) ->
     {noreply, State}.

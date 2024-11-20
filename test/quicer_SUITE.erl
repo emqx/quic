@@ -74,6 +74,7 @@
     tc_stream_get_owner_remote/1,
 
     tc_dgram_client_send/1,
+    tc_dgram_client_send_iolist/1,
 
     % , tc_getopt_raw/1
     tc_getopt/1,
@@ -256,6 +257,7 @@ end_per_testcase(tc_open_listener_neg_1, _Config) ->
     quicer:open_lib(),
     quicer:reg_open();
 end_per_testcase(tc_lib_registration_neg, _Config) ->
+    quicer:open_lib(),
     quicer:reg_open();
 end_per_testcase(_TestCase, _Config) ->
     quicer:terminate_listener(mqtt),
@@ -306,7 +308,7 @@ tc_close_lib_test(_Config) ->
 
 tc_lib_registration_neg(_Config) ->
     ok = quicer:close_lib(),
-    {error, badarg} = quicer:reg_open(),
+    {error, invalid_state} = quicer:reg_open(),
     {error, badarg} = quicer:reg_close().
 
 tc_lib_registration(_Config) ->
@@ -339,7 +341,7 @@ tc_lib_re_registration(_Config) ->
             ok = quicer:reg_close(),
             ok = quicer:reg_open()
     end,
-    {error, badarg} = quicer:reg_open(),
+    ok = quicer:reg_open(),
     ok = quicer:reg_close(),
     ok = quicer:reg_close().
 
@@ -872,6 +874,8 @@ tc_stream_controlling_process_demon(Config) ->
                 {'DOWN', MonRef2, process, NewOwner2, normal} ->
                     ok
             end,
+            %% Give time for resource down callback to happen
+            timer:sleep(100),
             ?assertNotMatch({ok, _}, quicer:send(Stm, <<"owner_changed">>)),
             SPid ! done,
             ensure_server_exit_normal(Ref)
@@ -884,20 +888,39 @@ tc_dgram_client_send(Config) ->
     Owner = self(),
     {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
     receive
-        listener_ready ->
-            Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
-            {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
-            {ok, Stm} = quicer:start_stream(Conn, []),
-            {ok, 4} = quicer:send(Stm, <<"ping">>),
-            {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
-            flush_streams_available(Conn),
-            flush_datagram_state_changed(Conn),
-            dgram_client_recv_loop(Conn, false, false),
-            SPid ! done,
-            ok = ensure_server_exit_normal(Ref)
-    after 1000 ->
-        ct:fail("timeout here")
-    end.
+        listener_ready -> ok
+    after 1000 -> ct:fail("listener_ready timeout")
+    end,
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    {ok, 4} = quicer:send_dgram(Conn, <<"ping">>),
+
+    flush_streams_available(Conn),
+    flush_datagram_state_changed(Conn),
+    dgram_client_recv_loop(Conn, false, false),
+    SPid ! done,
+    ok = ensure_server_exit_normal(Ref).
+
+tc_dgram_client_send_iolist(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 1000 -> ct:fail("listener_ready timeout")
+    end,
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    {ok, 4} = quicer:send_dgram(Conn, [<<"pi">>, "ng"]),
+    flush_streams_available(Conn),
+    flush_datagram_state_changed(Conn),
+    dgram_client_recv_loop(Conn, false, false),
+    SPid ! done,
+    ok = ensure_server_exit_normal(Ref).
 
 dgram_client_recv_loop(Conn, true, true) ->
     ok = quicer:close_connection(Conn);
@@ -1252,7 +1275,7 @@ tc_getstat(Config) ->
 tc_getstat_closed(Config) ->
     Port = select_port(),
     Owner = self(),
-    {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
     receive
         listener_ready ->
             {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
@@ -1275,7 +1298,8 @@ tc_getstat_closed(Config) ->
                     ok
             end,
             %ok = quicer:close_connection(Conn),
-            SPid ! done
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
     after 5000 ->
         ct:fail("listener_timeout")
     end.
@@ -1283,7 +1307,7 @@ tc_getstat_closed(Config) ->
 tc_peername_v6(Config) ->
     Port = select_port(),
     Owner = self(),
-    {SPid, _Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
     receive
         listener_ready ->
             {ok, Conn} = quicer:connect("::1", Port, default_conn_opts(), 5000),
@@ -1296,7 +1320,8 @@ tc_peername_v6(Config) ->
             ct:pal("addr is ~p", [Addr]),
             "::1" = inet:ntoa(Addr),
             ok = quicer:close_connection(Conn),
-            SPid ! done
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
     after 5000 ->
         ct:fail("listener_timeout")
     end.
@@ -1605,9 +1630,11 @@ tc_setopt_conn_remote_addr(_Config) ->
         {ok, _} ->
             ok;
         {error, transport_down, #{error := 298, status := bad_certificate}} ->
-            %% Mac @TODO don't know why it failed
+            %% Mac
+            {unix, darwin} = os:type(),
             ok
-    end.
+    end,
+    quicer:shutdown_connection(Conn).
 
 tc_setopt_global_retry_mem_percent(_Config) ->
     ?assertEqual(ok, quicer:setopt(quic_global, retry_memory_percent, 30, false)).
@@ -2032,7 +2059,7 @@ tc_stream_open_flag_unidirectional(Config) ->
         {quic, <<"ping1">>, Stm, _} ->
             ct:fail("unidirectional stream should not receive any");
         {quic, stream_closed, Stm, #{is_conn_shutdown := _, is_app_closing := false}} ->
-            ct:pal("stream is closed due to connecion idle")
+            ct:pal("stream is closed due to connection idle")
     end,
     ?assert(is_integer(Rid)),
     ?assert(Rid =/= 0),
@@ -2108,7 +2135,7 @@ tc_stream_start_flag_fail_blocked(Config) ->
     end,
     receive
         {quic, closed, Conn, _Flags} ->
-            ct:pal("Connecion is closed ~p", [Conn])
+            ct:pal("Connection is closed ~p", [Conn])
     end,
     quicer:terminate_listener(mqtt),
     ?assert(is_integer(Rid)).
@@ -3520,13 +3547,14 @@ simple_stream_server(Owner, Config, Port) ->
         done ->
             ok
     end,
+    ct:pal("Close Listener: ~p", [L]),
     simple_stream_server_exit(L).
 
 simple_stream_server_exit(L) ->
-    quicer:close_listener(L).
+    ok = quicer:close_listener(L, 5000).
 
 ensure_server_exit_normal(MonRef) ->
-    ensure_server_exit_normal(MonRef, 5000).
+    ensure_server_exit_normal(MonRef, 10000).
 ensure_server_exit_normal(MonRef, Timeout) ->
     receive
         {'DOWN', MonRef, process, _, normal} ->

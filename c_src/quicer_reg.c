@@ -19,8 +19,9 @@ limitations under the License.
 static BOOLEAN parse_reg_conf(ERL_NIF_TERM eprofile,
                               QUIC_REGISTRATION_CONFIG *RegConfig);
 
-QuicerRegistrationCTX *G_r_ctx = NULL;
+QuicerRegistrationCTX G_r_ctx = { .name = "global", .is_closed = TRUE };
 pthread_mutex_t GRegLock = PTHREAD_MUTEX_INITIALIZER;
+extern pthread_mutex_t MsQuicLock;
 
 /*
 ** Open global registration.
@@ -34,9 +35,9 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS status;
   ERL_NIF_TERM res = ATOM_OK;
 
-  if (!MsQuic || G_r_ctx)
+  if (!MsQuic)
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      return ERROR_TUPLE_2(ATOM_ERROR_INVALID_STATE);
     }
 
   pthread_mutex_lock(&GRegLock);
@@ -51,30 +52,32 @@ registration(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
         }
     }
 
-  QuicerRegistrationCTX *r_ctx = init_r_ctx();
-  if (!r_ctx)
+  // This verifies the context is indeed released.
+  if (!get_reg_handle(&G_r_ctx))
     {
-      pthread_mutex_unlock(&GRegLock);
-      return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      // reg is closed
+      CXPLAT_DBG_ASSERT(G_r_ctx.is_closed);
+      CXPLAT_DBG_ASSERT(G_r_ctx.ref_count == 0);
+      init_r_ctx(&G_r_ctx);
+      QuicerRegistrationCTX *r_ctx = &G_r_ctx;
+      if (QUIC_FAILED(status = MsQuic->RegistrationOpen(&RegConfig,
+                                                        &r_ctx->Registration)))
+        {
+          res = ERROR_TUPLE_2(ATOM_STATUS(status));
+          goto exit;
+        }
+      r_ctx->is_closed = FALSE;
+      // Now it is safe for others to use
+      CxPlatRefInitialize(&r_ctx->ref_count);
     }
-
-  if (QUIC_FAILED(
-          status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
+  else
     {
-      enif_release_resource(r_ctx);
-      res = ERROR_TUPLE_2(ATOM_STATUS(status));
-      goto exit;
+      // already opened, deref now
+      put_reg_handle(&G_r_ctx);
     }
-  CxPlatRefInitialize(&r_ctx->ref_count);
-  G_r_ctx = r_ctx;
   pthread_mutex_unlock(&GRegLock);
-
-  // nif owns the global registration
-  // thus not return to the erlang side
   return ATOM_OK;
-
 exit:
-  destroy_r_ctx(r_ctx);
   pthread_mutex_unlock(&GRegLock);
   return res;
 }
@@ -83,31 +86,43 @@ exit:
 ** For global registration only
 */
 ERL_NIF_TERM
-deregistration(__unused_parm__ ErlNifEnv *env,
+deregistration(ErlNifEnv *env,
                __unused_parm__ int argc,
                __unused_parm__ const ERL_NIF_TERM argv[])
 {
-  // @TODO error_code should be configurable
-  int error_code = 0;
+  ERL_NIF_TERM res = ATOM_OK;
+  pthread_mutex_lock(&MsQuicLock);
   if (!MsQuic)
     {
-      return ERROR_TUPLE_2(ATOM_BADARG);
+      res = ERROR_TUPLE_2(ATOM_BADARG);
+      goto exit;
     }
 
-  pthread_mutex_lock(&GRegLock);
-  if (G_r_ctx && !G_r_ctx->is_released)
+  CXPLAT_REF_COUNT expected = 1;
+  if (!__atomic_compare_exchange_n(&G_r_ctx.ref_count,
+                                   &expected,
+                                   0,
+                                   FALSE,
+                                   __ATOMIC_SEQ_CST,
+                                   __ATOMIC_SEQ_CST))
     {
-      MsQuic->RegistrationShutdown(G_r_ctx->Registration, FALSE, error_code);
-      // Do not defer the closing the global registration
-      // to resource dealloc callback because a common scenario is to
-      // close the lib after close the global registration.
-      MsQuic->RegistrationClose(G_r_ctx->Registration);
-      G_r_ctx->Registration = NULL;
-      destroy_r_ctx(G_r_ctx);
-      G_r_ctx = NULL;
+      // @NOTE, if already closed, should return ATOM_OK
+      if (expected != 0)
+        {
+          res = enif_make_int64(env, expected);
+        }
     }
-  pthread_mutex_unlock(&GRegLock);
-  return ATOM_OK;
+  else
+    {
+      HQUIC Registration = G_r_ctx.Registration;
+      G_r_ctx.is_closed = TRUE;
+      G_r_ctx.Registration = NULL;
+      MsQuic->RegistrationClose(Registration);
+      deinit_r_ctx(&G_r_ctx);
+    }
+exit:
+  pthread_mutex_unlock(&MsQuicLock);
+  return res;
 }
 
 ERL_NIF_TERM
@@ -127,7 +142,7 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  QuicerRegistrationCTX *r_ctx = init_r_ctx();
+  QuicerRegistrationCTX *r_ctx = init_r_ctx(NULL);
   if (!r_ctx)
     {
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
@@ -139,7 +154,7 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           || strlen(r_ctx->name) == 0))
     {
       res = ERROR_TUPLE_2(ATOM_BADARG);
-      goto exit;
+      goto err_exit;
     }
 
   RegConfig.AppName = r_ctx->name;
@@ -147,13 +162,12 @@ new_registration2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           status = MsQuic->RegistrationOpen(&RegConfig, &r_ctx->Registration)))
     {
       res = ERROR_TUPLE_2(ATOM_STATUS(status));
-      goto exit;
+      goto err_exit;
     }
-  CxPlatRefInitialize(&r_ctx->ref_count);
   return SUCCESS(enif_make_resource(env, r_ctx));
 
-exit:
-  destroy_r_ctx(r_ctx);
+err_exit:
+  put_reg_handle(r_ctx);
   return res;
 }
 
@@ -164,7 +178,11 @@ shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM *argv)
   ErlNifUInt64 error_code = 0;
   BOOLEAN silent = FALSE;
   ERL_NIF_TERM ectx = argv[0];
-  if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
+  if (IS_SAME_TERM(ectx, ATOM_GLOBAL))
+    {
+      r_ctx = &G_r_ctx;
+    }
+  else if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -191,13 +209,16 @@ shutdown_registration_x(ErlNifEnv *env, int argc, const ERL_NIF_TERM *argv)
         }
     }
 
-  if (r_ctx->Registration && !r_ctx->is_released)
+  if (get_reg_handle(r_ctx))
     {
       // void return, trigger callback, no blocking
       MsQuic->RegistrationShutdown(r_ctx->Registration, silent, error_code);
-      destroy_r_ctx(r_ctx);
+      put_reg_handle(r_ctx);
     }
-
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_ERROR_INVALID_STATE);
+    }
   return ATOM_OK;
 }
 
@@ -207,19 +228,38 @@ close_registration(ErlNifEnv *env,
                    const ERL_NIF_TERM argv[])
 {
   QuicerRegistrationCTX *r_ctx = NULL;
-  HQUIC Registration = NULL;
   ERL_NIF_TERM ectx = argv[0];
+  ERL_NIF_TERM res = ATOM_OK;
   if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-  enif_mutex_lock(r_ctx->lock);
-  Registration = r_ctx->Registration;
-  r_ctx->Registration = NULL;
-  enif_mutex_unlock(r_ctx->lock);
-  MsQuic->RegistrationClose(Registration);
-  destroy_r_ctx(r_ctx);
-  return ATOM_OK;
+
+  CXPLAT_REF_COUNT expected = 1;
+
+  if (!__atomic_compare_exchange_n(&r_ctx->ref_count,
+                                   &expected,
+                                   0,
+                                   FALSE,
+                                   __ATOMIC_SEQ_CST,
+                                   __ATOMIC_SEQ_CST))
+    {
+      // @NOTE, if already closed, should return default ATOM_OK
+      if (expected != 0)
+        {
+          res = enif_make_int64(env, expected);
+        }
+    }
+  else
+    {
+      HQUIC Registration = r_ctx->Registration;
+      r_ctx->Registration = NULL;
+      MsQuic->RegistrationClose(Registration);
+      // @NOTE, we don't use put_reg_handle
+      // because we are pretty sure that the ref_count is 0 now
+      enif_release_resource(r_ctx);
+    }
+  return res;
 }
 
 ERL_NIF_TERM
@@ -238,6 +278,33 @@ get_registration_name1(ErlNifEnv *env,
   ERL_NIF_TERM name = enif_make_string(env, r_ctx->name, ERL_NIF_LATIN1);
   enif_mutex_unlock(r_ctx->lock);
   return SUCCESS(name);
+}
+
+ERL_NIF_TERM
+get_registration_refcnt(ErlNifEnv *env,
+                        __unused_parm__ int argc,
+                        const ERL_NIF_TERM *argv)
+{
+  QuicerRegistrationCTX *r_ctx = NULL;
+  ERL_NIF_TERM ectx = argv[0];
+  CXPLAT_DBG_ASSERT(argc == 1);
+
+  if (IS_SAME_TERM(ectx, ATOM_GLOBAL))
+    {
+      r_ctx = &G_r_ctx;
+    }
+  else if (!enif_get_resource(env, ectx, ctx_reg_t, (void **)&r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!get_reg_handle(r_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+  CXPLAT_REF_COUNT cnt = r_ctx->ref_count;
+  put_reg_handle(r_ctx);
+  return enif_make_int64(env, cnt - 1);
 }
 
 BOOLEAN

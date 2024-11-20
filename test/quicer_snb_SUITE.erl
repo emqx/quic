@@ -71,6 +71,7 @@
         BUCKET,
         begin
             quicer_nif:set_snab_kc_pid(whereis(snabbkaffe_collector)),
+            ?assert(whereis(snabbkaffe_collector) == quicer_nif:get_snab_kc_pid()),
             RUN
         end,
         CHECK
@@ -570,7 +571,7 @@ tc_stream_acceptor_down(Config) ->
             quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
             receive
                 {quic, closed, Conn, _} ->
-                    ct:pal("Connecion is closed")
+                    ct:pal("Connection is closed")
             end,
             quicer:shutdown_connection(Conn)
         end,
@@ -2858,7 +2859,7 @@ tc_multi_streams_example_server_1(Config) ->
             quicer:async_shutdown_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0),
             receive
                 {quic, closed, Conn, _} ->
-                    ct:pal("Connecion is closed")
+                    ct:pal("Connection is closed")
             end,
             quicer:shutdown_connection(Conn)
         end,

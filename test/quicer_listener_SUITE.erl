@@ -102,12 +102,14 @@ end_per_group(_GroupName, _Config) ->
 init_per_testcase(tc_listener_conf_reload_listen_on_neg, Config) ->
     case os:type() of
         {unix, darwin} -> {skip, "Not runnable on MacOS"};
-        _ -> Config
+        _ -> init_per_testcase(default, Config)
     end;
-init_per_testcase(_TestCase, Config) ->
+init_per_testcase(default, Config) ->
     application:ensure_all_started(quicer),
     quicer_test_lib:cleanup_msquic(),
-    Config.
+    Config;
+init_per_testcase(_TestCase, Config) ->
+    init_per_testcase(default, Config).
 
 %%--------------------------------------------------------------------
 %% @spec end_per_testcase(TestCase, Config0) ->
@@ -119,7 +121,13 @@ init_per_testcase(_TestCase, Config) ->
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, Config) ->
     RegH = proplists:get_value(quic_registration, Config, global),
-    [quicer:close_listener(L, 1000) || L <- quicer:get_listeners(RegH)],
+    lists:foreach(
+        fun(L) ->
+            ct:pal("end_per_testcase: closing listener ~p", [L]),
+            quicer:close_listener(L, 1000)
+        end,
+        quicer:get_listeners(RegH)
+    ),
     quicer_test_lib:report_active_connections(),
     ok.
 
@@ -242,7 +250,7 @@ tc_open_listener(Config) ->
 tc_open_listener_with_inval_reg(Config) ->
     Port = select_port(),
     Config1 = proplists:delete(quic_registration, Config),
-    %% Given invalid  registration
+    %% Given invalid registration
     Reg = erlang:make_ref(),
     %% When try to listen with the invalid registration
     Res = quicer:listen(Port, default_listen_opts([{quic_registration, Reg} | Config1])),
@@ -265,6 +273,7 @@ tc_open_listener_with_new_reg(Config) ->
     {ok, P} = snabbkaffe:retry(100, 10, fun() -> {ok, _} = gen_udp:open(Port) end),
     ok = gen_udp:close(P),
     ok = quicer:shutdown_registration(Reg),
+    ok = quicer:close_registration(Reg),
     ok.
 
 tc_open_listener_with_cert_password(Config) ->
@@ -497,7 +506,7 @@ tc_listener_conf_reload(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
 
-    %% Given a QUIC connection between example client and example server
+    %% GIVEN: a QUIC connection between example client and example server
     {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
     ClientConnOpts = default_conn_opts_verify(Config, ca),
     {ok, ClientConnPid} = example_client_connection:start_link(
@@ -591,7 +600,7 @@ tc_listener_conf_reload_listen_on(Config) ->
     ],
     Options = {ListenerOpts, ConnectionOpts, StreamOpts},
 
-    %% Given a QUIC connection between example client and example server
+    %% GIVEN: a QUIC connection between example client and example server
     {ok, QuicApp} = quicer:spawn_listener(sample, Port, Options),
     ClientConnOpts = default_conn_opts_verify(Config, ca),
     {ok, ClientConnPid} = example_client_connection:start_link(
@@ -602,11 +611,11 @@ tc_listener_conf_reload_listen_on(Config) ->
 
     ct:pal("C1 status : ~p", [sys:get_status(ClientConnPid)]),
     {ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
-
     %% WHEN: the listener is reloaded with ListenOn (new bind address)
     NewPort = select_port(),
     ok = quicer_listener:reload(QuicApp, NewPort, ListenerOpts),
     %% THEN: the listener handle is unchanged
+    %%
     ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
 
     %% THEN: start new connection to old port
@@ -729,8 +738,7 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
         quicer_test_lib:report_unhandled_messages(),
         ct:fail("nothing from conn 2")
     end,
-
-    quicer_listener:stop_listener(QuicApp).
+    quicer:stop_listener(?FUNCTION_NAME).
 
 tc_stop_close_listener(Config) ->
     Port = select_port(),
@@ -912,9 +920,8 @@ tc_listener_stopped_when_owner_die(Config) ->
             {ok, _L0} = quicer:listen(Port, default_listen_opts(Config))
         end
     ),
-    %% Then the old listener can be closed but timeout since it is already stopped
-    %% and no stop event is triggered
-    {error, timeout} = quicer:close_listener(L0, _timeout = 10),
+    %% Then the old listener can be closed normally
+    ok = quicer:close_listener(L0, _timeout = 10),
     %% Then the new listener can be closed
     ok = quicer:close_listener(L1).
 

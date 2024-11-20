@@ -50,7 +50,7 @@ start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 start_listener(AppName, Port, Options) ->
-    supervisor:start_child(?MODULE, chid_spec(AppName, Port, Options)).
+    supervisor:start_child(?MODULE, child_spec(AppName, Port, Options)).
 
 stop_listener(AppName) ->
     _ = supervisor:terminate_child(?MODULE, ?CHILD_ID(AppName)),
@@ -119,7 +119,7 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-chid_spec(AppName, ListenOn, Options) ->
+child_spec(AppName, ListenOn, Options) ->
     #{
         id => ?CHILD_ID(AppName),
         start => {quicer_listener, start_link, [AppName, ListenOn, Options]},

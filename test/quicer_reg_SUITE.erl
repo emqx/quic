@@ -148,6 +148,7 @@ do_tc_new_reg(_Config) ->
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
     quicer:shutdown_registration(Reg),
+    quicer:close_registration(Reg),
     ok.
 
 tc_shutdown_reg_1(_Config) ->
@@ -155,6 +156,7 @@ tc_shutdown_reg_1(_Config) ->
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
     ok = quicer:shutdown_registration(Reg),
+    ok = quicer:close_registration(Reg),
     ok.
 
 tc_shutdown_1_abnormal(_Config) ->
@@ -168,26 +170,30 @@ tc_shutdown_3_abnormal(_Config) ->
     ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, 1, 2)),
     ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, 1, foo)),
     ?assertEqual({error, badarg}, quicer:shutdown_registration(Reg, true, -1)),
-    ok = quicer:shutdown_registration(Reg).
+    ok = quicer:shutdown_registration(Reg),
+    ok = quicer:close_registration(Reg).
 
 tc_shutdown_ok(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
-    ok = quicer:shutdown_registration(Reg).
+    ok = quicer:shutdown_registration(Reg),
+    ok = quicer:close_registration(Reg).
 
 tc_shutdown_twice(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
     ok = quicer:shutdown_registration(Reg),
-    ok = quicer:shutdown_registration(Reg).
+    ok = quicer:shutdown_registration(Reg),
+    ok = quicer:close_registration(Reg).
 
 tc_shutdown_with_reason(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
-    ok = quicer:shutdown_registration(Reg, false, 123).
+    ok = quicer:shutdown_registration(Reg, false, 123),
+    ok = quicer:close_registration(Reg).
 
 tc_get_reg_name(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
@@ -195,19 +201,38 @@ tc_get_reg_name(_Config) ->
     {ok, Reg} = quicer:new_registration(Name, Profile),
     ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)),
     ok = quicer:shutdown_registration(Reg),
-    ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)).
+    ?assertEqual({ok, Name}, quicer:get_registration_name(Reg)),
+    ok = quicer:close_registration(Reg).
 
 tc_close_with_opened_conn(_Config) ->
     Name = atom_to_list(?FUNCTION_NAME),
     Profile = quic_execution_profile_low_latency,
     {ok, Reg} = quicer:new_registration(Name, Profile),
-    {ok, Conn} = quicer_nif:open_connection(#{quic_registration => Reg}),
     %% @NOTE This is a hack to make sure the connection is abled to be closed
     %%       which is triggered by the registration close
-    _ = timer:apply_after(
-        1000,
-        quicer,
-        connect,
-        ["localhost", 5060, [{alpn, ["sample"]}, {handle, Conn}], 1000]
-    ),
+    spawn(fun() ->
+        {ok, Conn} = quicer:open_connection(#{quic_registration => Reg}),
+        quicer:connect("localhost", 5060, [{alpn, ["sample"]}, {handle, Conn}], 1000)
+    end),
+    _ = quicer:shutdown_registration(Reg),
     ?assertEqual(ok, quicer:close_registration(Reg)).
+
+tc_close_global_reg(_Config) ->
+    ?assertEqual(ok, quicer:reg_close()),
+    %% close more
+    ?assertEqual(ok, quicer:reg_close()),
+    %% close one more
+    ?assertEqual(ok, quicer:reg_close()),
+    quicer:reg_open().
+
+tc_open_global_reg(_Config) ->
+    ?assertEqual(ok, quicer:reg_close()),
+    ?assertEqual(ok, quicer:reg_open()).
+
+tc_shutdown_global_reg(_Config) ->
+    ?assertEqual(ok, quicer:shutdown_registration(global)),
+    ?assertEqual(ok, quicer:reg_close()).
+
+tc_get_links_link_closed(_Config) ->
+    ok = quicer:reg_close(),
+    ?assertEqual({error, quic_registration}, quicer:get_connections()).
