@@ -36,10 +36,15 @@ jobs:
           chmod a+x rebar3
           mkdir -p $HOME/bin/
           mv rebar3 $HOME/bin/
-      - name: run sanitizer-check
+      - name: run check
         run: |
           export PATH=$PATH:$HOME/bin/
           . /home/runner/OTP/default/activate
+
+          if [[ "valgrind-check" == ${{ matrix.check }} ]]; then
+            sudo apt install valgrind
+          fi
+
           tools/run/bin/${{ matrix.check }} ${{ matrix.scope }}
       - name: Archive logs
         uses: actions/upload-artifact@v3
