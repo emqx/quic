@@ -23,6 +23,7 @@ jobs:
         openssl:
           - openssl3
           - openssl
+          - sys
         os:
           - macos-14
           - macos-13
