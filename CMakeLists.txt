@@ -174,7 +174,7 @@ endif()
 add_library(quicer_nif SHARED ${SOURCES})
 
 if (OPENSSL_INCLUDE_DIR)
-  # for OS SYS
+  # for sys crypto
   target_include_directories(quicer_nif PUBLIC ${OPENSSL_INCLUDE_DIR})
 else()
   target_include_directories(quicer_nif PUBLIC "c_build/_deps/opensslquic-build/${QUIC_TLS}/include")
