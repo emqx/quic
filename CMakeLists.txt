@@ -46,7 +46,7 @@ if (DEFINED ENV{QUICER_TLS_VER})
     endif()
     set(QUIC_USE_SYSTEM_LIBCRYPTO "ON")
   else()
-    set(QUIC_TLS $ENV{QUICER_TLS_VER})
+    set(QUIC_TLS $ENV{QUICER_TLS_VER} CACHE STRING "QUIC_TLS")
   endif()
 
 endif()
@@ -173,8 +173,12 @@ endif()
 
 add_library(quicer_nif SHARED ${SOURCES})
 
-# for macOS Workaround to use opensslquic head files.
-target_include_directories(quicer_nif PUBLIC "c_build/_deps/opensslquic-build/openssl/include")
+if (OPENSSL_INCLUDE_DIR)
+  # for OS SYS
+  target_include_directories(quicer_nif PUBLIC ${OPENSSL_INCLUDE_DIR})
+else()
+  target_include_directories(quicer_nif PUBLIC "c_build/_deps/opensslquic-build/${QUIC_TLS}/include")
+endif()
 
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
   target_link_libraries(quicer_nif PRIVATE quicer_static "-Wl,--no-gc-sections -pthread") # no gc because of erlang nif symbols
