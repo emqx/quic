@@ -62,8 +62,11 @@ jobs:
         os:
           - macos-14
         otp:
-          - 25
           - 26
+        openssl:
+          - openssl3
+          - openssl
+          - sys
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -83,6 +86,8 @@ jobs:
           brew install erlang@${{ matrix.otp }}
           echo "$(brew --prefix erlang@${{ matrix.otp }})/bin" >> $GITHUB_PATH
       - name: release build
+        env:
+          QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
           wget https://s3.amazonaws.com/rebar3/rebar3
           sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
