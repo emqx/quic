@@ -63,22 +63,32 @@ start_link(ListenerH, ConnOpts) ->
     {ok, {SupFlags :: supervisor:sup_flags(), [ChildSpec :: supervisor:child_spec()]}}
     | ignore.
 init([ListenerH, Opts]) ->
+    OptsTab = init_opts_tab(Opts),
     SupFlags = #{
         strategy => simple_one_for_one,
         intensity => 1,
         period => 5
     },
-
     OneChild = #{
         id => ignored,
-        start => {quicer_connection, start_link, [undefined, ListenerH, Opts]},
+        start => {quicer_connection, start_acceptor, [ListenerH, OptsTab]},
         restart => temporary,
         shutdown => 5000,
         type => worker
     },
-
     {ok, {SupFlags, [OneChild]}}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+init_opts_tab({LOpts, COpts, SOpts}) ->
+    SharedTab = ets:new(quicer_listener_tab, [set, {keypos, 1}, {read_concurrency, true}]),
+    true = store_config(SharedTab, l_opts, LOpts),
+    true = store_config(SharedTab, c_opts, COpts),
+    true = store_config(SharedTab, s_opts, SOpts),
+    SharedTab.
+
+store_config(Tab, K, V) when is_list(V) ->
+    store_config(Tab, K, maps:from_list(V));
+store_config(Tab, K, V) ->
+    true = ets:insert(Tab, {K, V}).
