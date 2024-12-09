@@ -217,12 +217,13 @@ start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_map
 start_link(CallbackModule, Listener, Opts, Sup) ->
     gen_server:start_link(?MODULE, [CallbackModule, Listener, Opts, Sup], []).
 
--define(DEFAULT_SPAWN_OPTS, [{spawn_opt, [link]}]).
+-define(DEFAULT_ACCEPTOR_START_OPTS, [{spawn_opt, [link]}]).
 %% @doc start acceptor with shared Listener confs
+-spec start_acceptor(listener_handle(), ets:tid(), pid()) -> {ok, pid()} | {error, any()}.
 start_acceptor(ListenHandle, Tab, Sup) when is_pid(Sup) ->
     [{c_opts, #{conn_callback := CallbackModule} = Conf}] = ets:lookup(Tab, c_opts),
-    StartOpts = maps:get(spawn_opts, Conf, ?DEFAULT_SPAWN_OPTS),
-    gen_server:start(?MODULE, [CallbackModule, ListenHandle, Tab, Sup], StartOpts).
+    StartOpts = maps:get(proc_start_opts, Conf, ?DEFAULT_ACCEPTOR_START_OPTS),
+    gen_server:start_link(?MODULE, [CallbackModule, ListenHandle, Tab, Sup], StartOpts).
 
 -spec get_cb_state(ConnPid :: pid()) -> cb_state() | {error, any()}.
 get_cb_state(ConnPid) ->
@@ -285,7 +286,8 @@ init([CallbackModule, {Host, Port}, {COpts, SOpts}]) when
         callback => CallbackModule,
         conn_opts => COpts,
         stream_opts => SOpts,
-        sup => undefined
+        sup => undefined,
+        is_server => false
     },
     {ok, Conn} = quicer:async_connect(Host, Port, COpts),
     State1 = State0#{conn := Conn},
@@ -298,7 +300,7 @@ init([CallbackModule, {Host, Port}, {COpts, SOpts}]) when
         Other ->
             Other
     end;
-%% For Server
+%% For Server, deprecating since v0.2
 init([CallbackModule, Listener, {LOpts, COpts, SOpts}, Sup]) when is_list(COpts) ->
     init([CallbackModule, Listener, {LOpts, maps:from_list(COpts), SOpts}, Sup]);
 init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) when CallbackModule =/= undefined ->
@@ -309,7 +311,8 @@ init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) when CallbackModul
         callback => CallbackModule,
         conn_opts => COpts,
         stream_opts => SOpts,
-        sup => Sup
+        sup => Sup,
+        is_server => true
     },
     %% Async Acceptor
     {ok, Listener} = quicer_nif:async_accept(Listener, COpts),
@@ -322,11 +325,26 @@ init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) when CallbackModul
         Other ->
             Other
     end;
-init([CallbackModule, Listener, ConfTab, Sup]) ->
-    [{l_opts, LOpts}] = ets:lookup(ConfTab, l_opts),
-    [{c_opts, COpts}] = ets:lookup(ConfTab, c_opts),
-    [{s_opts, SOpts}] = ets:lookup(ConfTab, s_opts),
-    init([CallbackModule, Listener, {LOpts, COpts, SOpts}, Sup]).
+%% For Acceptor since v0.2
+init([_, _, _ConfTab, _] = Args) ->
+    acceptor_init(Args).
+acceptor_init([CallbackModule, Listener, ConfTab, Sup]) ->
+    process_flag(trap_exit, true),
+    State0 = #{
+        listener => Listener,
+        callback => CallbackModule,
+        conf_tab => ConfTab,
+        sup => Sup,
+        is_server => true,
+        conn => undefined,
+        conn_opts => undefined,
+        stream_opts => undefined,
+        callback_state => undefined
+    },
+    %% Async Acceptor
+    NOOP = #{},
+    {ok, Listener} = quicer_nif:async_accept(Listener, NOOP),
+    {ok, State0}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -400,16 +418,31 @@ handle_cast(_Request, State) ->
     | {noreply, NewState :: term(), Timeout :: timeout()}
     | {noreply, NewState :: term(), hibernate}
     | {stop, Reason :: normal | term(), NewState :: term()}.
+%% deprecating this clause
 handle_info(
     {quic, new_conn, C, Props},
     #{callback := M, sup := Sup, callback_state := CBState} = State
-) ->
+) when is_map(CBState) ->
     ?tp_ignore_side_effects_in_prod(debug, #{
         module => ?MODULE, conn => C, props => Props, event => new_conn
     }),
     %% I become the connection owner, I should start an new acceptor.
     Sup =/= undefined andalso (catch supervisor:start_child(Sup, [Sup])),
     default_cb_ret(M:new_conn(C, Props, CBState), State#{conn := C});
+handle_info(
+    {quic, new_conn, C, Props},
+    #{callback := M, sup := Sup, callback_state := undefined, conf_tab := ConfTab} = State
+) ->
+    %% deferred init
+    COpts = ets:lookup_element(ConfTab, c_opts, 2),
+    SOpts = ets:lookup_element(ConfTab, s_opts, 2),
+    Sup =/= undefined andalso (catch supervisor:start_child(Sup, [Sup])),
+    case M:init(COpts#{stream_opts => SOpts}) of
+        {ok, CBState0} ->
+            default_cb_ret(M:new_conn(C, Props, CBState0), State#{conn := C});
+        Other ->
+            Other
+    end;
 handle_info(
     {quic, connected, C, #{is_resumed := IsResumed} = Props},
     #{

@@ -101,7 +101,8 @@ reload(Pid, NewConf) ->
 %% @NOTE: the acceptor opts and stream opts are not reloaded.
 %%%       if you want to reload them, you should restart the listener (terminate and spawn).
 %% @end
--spec reload(pid(), quicer:listen_on(), NewConf :: map()) -> ok | {error, _}.
+-spec reload(pid(), quicer:listen_on(), NewConf :: map() | {map(), map(), map()}) ->
+    ok | {error, _}.
 reload(Pid, ListenOn, NewConf) ->
     gen_server:call(Pid, {reload, ListenOn, NewConf}, infinity).
 
@@ -261,7 +262,8 @@ terminate(_Reason, #state{listener = L}) ->
     _ = quicer:close_listener(L),
     ok.
 
--spec do_reload(quicer:listen_on(), map(), #state{}) -> {ok | {error, any()}, #state{}}.
+-spec do_reload(quicer:listen_on(), map() | {map(), map(), map()}, #state{}) ->
+    {ok | {error, any()}, #state{}}.
 do_reload(ListenOn, NewConf, #state{opts_tab = OptsTab} = State) ->
     _ = quicer:stop_listener(State#state.listener),
     Res = quicer:start_listener(
@@ -271,21 +273,27 @@ do_reload(ListenOn, NewConf, #state{opts_tab = OptsTab} = State) ->
     ),
     case Res of
         ok ->
-            true = ets:insert(OptsTab, {l_opts, to_map(NewConf)}),
+            true = conf_tab_refresh(OptsTab, NewConf),
             {ok, State#state{listen_on = ListenOn}};
         Error ->
             {Error, State}
     end.
 
-init_opts_tab({LOpts, COpts, SOpts}) ->
+init_opts_tab({_LOpts, _COpts, _SOpts} = Opts) ->
     Tab = ets:new(quicer_listener_tab, [set, {keypos, 1}, {read_concurrency, true}]),
-    %% @NOTE: Be careful with the lifecyle of the table.
-    true = ets:insert(Tab, [
+    %% @NOTE: Be careful with the lifecyle of the items in this table.
+    %%        handles in this table cannot be released until table is gone.
+    true = conf_tab_refresh(Tab, Opts),
+    Tab.
+
+conf_tab_refresh(Tab, {LOpts, COpts, SOpts}) ->
+    ets:insert(Tab, [
         {l_opts, to_map(LOpts)},
         {c_opts, to_map(COpts)},
         {s_opts, to_map(SOpts)}
-    ]),
-    Tab.
+    ]);
+conf_tab_refresh(Tab, LOpts) ->
+    ets:insert(Tab, {l_opts, to_map(LOpts)}).
 
 to_map(Opts) when is_list(Opts) ->
     maps:from_list(Opts);

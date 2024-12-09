@@ -45,7 +45,9 @@
     async_connect/3,
     handshake/1,
     handshake/2,
+    handshake/3,
     async_handshake/1,
+    async_handshake/2,
     accept/2,
     accept/3,
     async_accept/2,
@@ -447,12 +449,8 @@ async_connect(Host, Port, Opts) when is_map(Opts) ->
 handshake(Conn) ->
     handshake(Conn, 5000).
 
-%% @doc Complete TLS handshake after accepted a Connection
-%% @see handshake/2
-%% @see async_handshake/1
 -spec handshake(connection_handle(), timeout()) ->
-    {ok, connection_handle()}
-    | {error, any()}.
+    {ok, connection_handle()} | {error, any()}.
 handshake(Conn, Timeout) ->
     case async_handshake(Conn) of
         {error, _} = E ->
@@ -466,13 +464,43 @@ handshake(Conn, Timeout) ->
             end
     end.
 
+%% @doc Complete TLS handshake after accepted a Connection
+%% @see handshake/2
+%% @see async_handshake/1
+-spec handshake(connection_handle(), conn_opts(), timeout()) ->
+    {ok, connection_handle()}
+    | {error, any()}.
+handshake(Conn, ConnOpts, Timeout) ->
+    case async_handshake(Conn, ConnOpts) of
+        {error, _} = E ->
+            E;
+        ok ->
+            receive
+                {quic, connected, Conn, _} -> {ok, Conn};
+                {quic, closed, Conn, _Flags} -> {error, closed}
+            after Timeout ->
+                {error, timeout}
+            end
+    end.
+
 %% @doc Complete TLS handshake after accepted a Connection.
-%% Caller should expect to receive ```{quic, connected, connection_handle()}'''
 %%
 %% @see handshake/2
+%% @see async_handshake/2
 -spec async_handshake(connection_handle()) -> ok | {error, any()}.
 async_handshake(Conn) ->
     quicer_nif:async_handshake(Conn).
+
+%% @doc Complete TLS handshake after accepted a Connection.
+%%      also set connection options which override the default listener options.
+%%
+%% @see handshake/2
+%% @see async_handshake/1
+-spec async_handshake(connection_handle(), conn_opts()) -> ok | {error, any()}.
+async_handshake(Conn, ConnOpts) when is_list(ConnOpts) ->
+    async_handshake(Conn, maps:from_list(ConnOpts));
+async_handshake(Conn, ConnOpts) ->
+    quicer_nif:async_handshake(Conn, ConnOpts).
 
 %% @doc Accept new Connection (Server)
 %%
