@@ -153,6 +153,7 @@
 -export([
     start_link/3,
     %% for server
+    start_acceptor/3,
     start_link/4,
     get_cb_state/1,
     merge_cb_state/2,
@@ -215,6 +216,13 @@ start_link(undefined, Listener, {_LOpts, COpts, _SOpts} = Opts, Sup) when is_map
     end;
 start_link(CallbackModule, Listener, Opts, Sup) ->
     gen_server:start_link(?MODULE, [CallbackModule, Listener, Opts, Sup], []).
+
+-define(DEFAULT_SPAWN_OPTS, [{spawn_opt, [link]}]).
+%% @doc start acceptor with shared Listener confs
+start_acceptor(ListenHandle, Tab, Sup) when is_pid(Sup) ->
+    [{c_opts, #{conn_callback := CallbackModule} = Conf}] = ets:lookup(Tab, c_opts),
+    StartOpts = maps:get(spawn_opts, Conf, ?DEFAULT_SPAWN_OPTS),
+    gen_server:start(?MODULE, [CallbackModule, ListenHandle, Tab, Sup], StartOpts).
 
 -spec get_cb_state(ConnPid :: pid()) -> cb_state() | {error, any()}.
 get_cb_state(ConnPid) ->
@@ -313,7 +321,12 @@ init([CallbackModule, Listener, {_LOpts, COpts, SOpts}, Sup]) when CallbackModul
         %% ignore, {stop, Reason} ...
         Other ->
             Other
-    end.
+    end;
+init([CallbackModule, Listener, ConfTab, Sup]) ->
+    [{l_opts, LOpts}] = ets:lookup(ConfTab, l_opts),
+    [{c_opts, COpts}] = ets:lookup(ConfTab, c_opts),
+    [{s_opts, SOpts}] = ets:lookup(ConfTab, s_opts),
+    init([CallbackModule, Listener, {LOpts, COpts, SOpts}, Sup]).
 
 %%--------------------------------------------------------------------
 %% @private
