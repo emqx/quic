@@ -48,9 +48,10 @@ ERL_NIF_TERM
 get_conn_rid1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM
-async_handshake_1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+async_handshake_2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
-QUIC_STATUS continue_connection_handshake(QuicerConnCTX *c_ctx);
+QUIC_STATUS continue_connection_handshake(QuicerConnCTX *c_ctx,
+                                          QUIC_SETTINGS *settings);
 
 ERL_NIF_TERM
 peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);

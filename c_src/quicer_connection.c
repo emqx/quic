@@ -899,17 +899,11 @@ async_accept2(ErlNifEnv *env,
               const ERL_NIF_TERM argv[])
 {
   ERL_NIF_TERM listener = argv[0];
-  ERL_NIF_TERM conn_opts = argv[1];
   QuicerListenerCTX *l_ctx = NULL;
-  ERL_NIF_TERM active_val = ATOM_TRUE;
   if (!enif_get_resource(env, listener, ctx_listener_t, (void **)&l_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
-
-  // Set parm active is optional
-  enif_get_map_value(
-      env, conn_opts, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val);
 
   ACCEPTOR *acceptor = AcceptorAlloc();
   if (!acceptor)
@@ -923,24 +917,11 @@ async_accept2(ErlNifEnv *env,
       return ERROR_TUPLE_2(ATOM_BAD_PID);
     }
 
-  if (!set_owner_recv_mode(acceptor, env, active_val))
-    {
-      AcceptorDestroy(acceptor);
-      return ERROR_TUPLE_2(ATOM_BADARG);
-    }
-
-  if (!create_settings(env, &conn_opts, &acceptor->Settings))
-    {
-      AcceptorDestroy(acceptor);
-      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
-    }
-
   AcceptorEnqueue(l_ctx->acceptor_queue, acceptor);
 
   assert(enif_is_process_alive(env, &(acceptor->Pid)));
 
-  ERL_NIF_TERM listenHandle = enif_make_resource(env, l_ctx);
-  return SUCCESS(listenHandle);
+  return SUCCESS(listener);
 }
 
 ERL_NIF_TERM
@@ -1080,7 +1061,7 @@ get_conn_rid1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 QUIC_STATUS
-continue_connection_handshake(QuicerConnCTX *c_ctx)
+continue_connection_handshake(QuicerConnCTX *c_ctx, QUIC_SETTINGS *Settings)
 {
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
 
@@ -1104,20 +1085,28 @@ continue_connection_handshake(QuicerConnCTX *c_ctx)
   Status = MsQuic->SetParam(c_ctx->Connection,
                             QUIC_PARAM_CONN_SETTINGS,
                             sizeof(QUIC_SETTINGS),
-                            &c_ctx->owner->Settings);
+                            Settings);
   return Status;
 }
 
 ERL_NIF_TERM
-async_handshake_1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+async_handshake_2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 {
   QuicerConnCTX *c_ctx;
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
   ERL_NIF_TERM res = ATOM_OK;
-  CXPLAT_FRE_ASSERT(argc == 1);
+  CXPLAT_FRE_ASSERT(argc == 2);
+  ERL_NIF_TERM econn = argv[0];
+  ERL_NIF_TERM econn_opts = argv[1];
+  QUIC_SETTINGS Settings = { 0 };
+  ERL_NIF_TERM active_val = ATOM_TRUE;
 
-  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+  // Set parm active is optional
+  enif_get_map_value(
+      env, econn_opts, ATOM_QUIC_STREAM_OPTS_ACTIVE, &active_val);
+
+  if (!enif_get_resource(env, econn, ctx_connection_t, (void **)&c_ctx))
     {
       return ERROR_TUPLE_2(ATOM_BADARG);
     }
@@ -1129,9 +1118,19 @@ async_handshake_1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 
-  if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx)))
+  if (!create_settings(env, &econn_opts, &Settings))
+    {
+      return ERROR_TUPLE_2(ATOM_PARAM_ERROR);
+    }
+
+  if (QUIC_FAILED(Status = continue_connection_handshake(c_ctx, &Settings)))
     {
       res = ERROR_TUPLE_2(ATOM_STATUS(Status));
+    }
+
+  if (!set_owner_recv_mode(c_ctx->owner, env, active_val))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
     }
 
   put_conn_handle(c_ctx);

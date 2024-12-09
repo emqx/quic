@@ -32,7 +32,7 @@
     close_listener/1,
     async_connect/3,
     async_accept/2,
-    async_handshake/1,
+    async_handshake/2,
     async_shutdown_connection/3,
     async_accept_stream/2,
     start_stream/2,
@@ -272,9 +272,9 @@ async_connect(_Host, _Port, _Opts) ->
 async_accept(_Listener, _Opts) ->
     erlang:nif_error(nif_library_not_loaded).
 
--spec async_handshake(connection_handle()) ->
+-spec async_handshake(connection_handle(), conn_opts()) ->
     ok | {error, badarg | atom_reason()}.
-async_handshake(_Connection) ->
+async_handshake(_Connection, _ConnOpts) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec async_shutdown_connection(connection_handle(), conn_shutdown_flag(), app_errno()) ->

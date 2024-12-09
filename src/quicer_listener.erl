@@ -26,6 +26,7 @@
     unlock/2,
     reload/2,
     reload/3,
+    get_conf/2,
     get_handle/2,
     count_conns/1
 ]).
@@ -45,7 +46,7 @@
     listener :: quicer:listener_handle(),
     conn_sup :: pid(),
     alpn :: [string()],
-    opts :: quicer:listener_opts()
+    opts_tab :: ets:tid()
 }).
 
 -export_type([listener_name/0]).
@@ -113,6 +114,11 @@ get_handle(Pid, Timeout) ->
 count_conns(Pid) ->
     gen_server:call(Pid, count_conns, infinity).
 
+%% @doc get the listener configuration
+-spec get_conf(pid(), timeout()) -> {map(), map(), map()}.
+get_conf(Pid, Timeout) ->
+    gen_server:call(Pid, get_conf, Timeout).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -134,15 +140,16 @@ init([Name, ListenOn, {LOpts, COpts, SOpts}]) when is_list(LOpts) ->
     init([Name, ListenOn, {maps:from_list(LOpts), COpts, SOpts}]);
 init([Name, ListenOn, {#{conn_acceptors := N, alpn := Alpn} = LOpts, _COpts, _SOpts} = Opts]) ->
     process_flag(trap_exit, true),
+    OptsTab = init_opts_tab(Opts),
     {ok, L} = quicer:listen(ListenOn, maps:without([conn_acceptors], LOpts)),
-    {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, Opts]),
+    {ok, ConnSup} = supervisor:start_link(quicer_conn_acceptor_sup, [L, OptsTab]),
     _ = [{ok, _} = supervisor:start_child(ConnSup, [ConnSup]) || _ <- lists:seq(1, N)],
     {ok, #state{
         name = Name,
         listen_on = ListenOn,
         listener = L,
         conn_sup = ConnSup,
-        opts = LOpts,
+        opts_tab = OptsTab,
         alpn = Alpn
     }}.
 
@@ -167,10 +174,11 @@ handle_call(lock, _From, State) ->
     Res = quicer:stop_listener(State#state.listener),
     {reply, Res, State};
 handle_call(unlock, _From, State) ->
+    LOpts = ets:lookup_element(State#state.opts_tab, l_opts, 2),
     Res = quicer:start_listener(
         State#state.listener,
         State#state.listen_on,
-        State#state.opts
+        LOpts
     ),
     {reply, Res, State};
 handle_call({reload, NewConf}, _From, State) ->
@@ -184,12 +192,21 @@ handle_call(
     _From,
     #state{
         conn_sup = ConnSup,
-        opts = #{conn_acceptors := NoAcceptors}
+        opts_tab = OptsTab
     } =
         State
 ) ->
-    ConnPids = supervisor:which_children(ConnSup),
-    {reply, length(ConnPids) - NoAcceptors, State};
+    #{conn_acceptors := NoAcceptors} = ets:lookup_element(OptsTab, l_opts, 2),
+    {active, ActiveCnt} = lists:nth(2, supervisor:count_children(ConnSup)),
+    {reply, ActiveCnt - NoAcceptors, State};
+handle_call(get_conf, _From, #state{opts_tab = OptsTab} = State) ->
+    {reply,
+        {
+            ets:lookup_element(OptsTab, l_opts, 2),
+            ets:lookup_element(OptsTab, c_opts, 2),
+            ets:lookup_element(OptsTab, s_opts, 2)
+        },
+        State};
 handle_call(Request, _From, State) ->
     Reply = {error, {unimpl, Request}},
     {reply, Reply, State}.
@@ -245,7 +262,7 @@ terminate(_Reason, #state{listener = L}) ->
     ok.
 
 -spec do_reload(quicer:listen_on(), map(), #state{}) -> {ok | {error, any()}, #state{}}.
-do_reload(ListenOn, NewConf, State) ->
+do_reload(ListenOn, NewConf, #state{opts_tab = OptsTab} = State) ->
     _ = quicer:stop_listener(State#state.listener),
     Res = quicer:start_listener(
         State#state.listener,
@@ -254,7 +271,23 @@ do_reload(ListenOn, NewConf, State) ->
     ),
     case Res of
         ok ->
-            {ok, State#state{listen_on = ListenOn, opts = NewConf}};
+            true = ets:insert(OptsTab, {l_opts, to_map(NewConf)}),
+            {ok, State#state{listen_on = ListenOn}};
         Error ->
             {Error, State}
     end.
+
+init_opts_tab({LOpts, COpts, SOpts}) ->
+    Tab = ets:new(quicer_listener_tab, [set, {keypos, 1}, {read_concurrency, true}]),
+    %% @NOTE: Be careful with the lifecyle of the table.
+    true = ets:insert(Tab, [
+        {l_opts, to_map(LOpts)},
+        {c_opts, to_map(COpts)},
+        {s_opts, to_map(SOpts)}
+    ]),
+    Tab.
+
+to_map(Opts) when is_list(Opts) ->
+    maps:from_list(Opts);
+to_map(Opts) when is_map(Opts) ->
+    Opts.

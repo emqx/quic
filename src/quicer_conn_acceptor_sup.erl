@@ -62,21 +62,19 @@ start_link(ListenerH, ConnOpts) ->
 -spec init(Args :: term()) ->
     {ok, {SupFlags :: supervisor:sup_flags(), [ChildSpec :: supervisor:child_spec()]}}
     | ignore.
-init([ListenerH, Opts]) ->
+init([ListenerH, OptsTab]) ->
     SupFlags = #{
         strategy => simple_one_for_one,
         intensity => 1,
         period => 5
     },
-
     OneChild = #{
         id => ignored,
-        start => {quicer_connection, start_link, [undefined, ListenerH, Opts]},
+        start => {quicer_connection, start_acceptor, [ListenerH, OptsTab]},
         restart => temporary,
         shutdown => 5000,
         type => worker
     },
-
     {ok, {SupFlags, [OneChild]}}.
 
 %%%===================================================================
