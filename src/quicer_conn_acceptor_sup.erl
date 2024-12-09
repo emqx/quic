@@ -62,8 +62,7 @@ start_link(ListenerH, ConnOpts) ->
 -spec init(Args :: term()) ->
     {ok, {SupFlags :: supervisor:sup_flags(), [ChildSpec :: supervisor:child_spec()]}}
     | ignore.
-init([ListenerH, Opts]) ->
-    OptsTab = init_opts_tab(Opts),
+init([ListenerH, OptsTab]) ->
     SupFlags = #{
         strategy => simple_one_for_one,
         intensity => 1,
@@ -81,14 +80,3 @@ init([ListenerH, Opts]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-init_opts_tab({LOpts, COpts, SOpts}) ->
-    SharedTab = ets:new(quicer_listener_tab, [set, {keypos, 1}, {read_concurrency, true}]),
-    true = store_config(SharedTab, l_opts, LOpts),
-    true = store_config(SharedTab, c_opts, COpts),
-    true = store_config(SharedTab, s_opts, SOpts),
-    SharedTab.
-
-store_config(Tab, K, V) when is_list(V) ->
-    store_config(Tab, K, maps:from_list(V));
-store_config(Tab, K, V) ->
-    true = ets:insert(Tab, {K, V}).
