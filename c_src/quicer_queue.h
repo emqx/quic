@@ -55,10 +55,7 @@ typedef struct ACCEPTOR
   ErlNifPid Pid;
   ACCEPTOR_RECV_MODE active;
   uint16_t active_count; /* counter for active_n */
-  QUIC_SETTINGS Settings;
   void *reserved1;
-  void *reserved2;
-  void *reserved3;
 } ACCEPTOR;
 
 typedef struct AcceptorsQueue

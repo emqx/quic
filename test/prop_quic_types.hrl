@@ -61,6 +61,7 @@
     | {conn_acceptors, non_neg_integer()}
     | {settings, [quicer_setting()]}.
 
+-define(UINT32_MAX, 4294967295).
 -type quicer_setting() ::
     {max_bytes_per_key, uint64()}
     | {handshake_idle_timeout_ms, uint64()}
@@ -87,6 +88,41 @@
     | {pacing_enabled, uint8()}
     | {migration_enabled, uint8()}
     | {datagram_receive_enabled, uint8()}
+    | {server_resumption_level, 0 | 1 | 2}
+    | {minimum_mtu, uint16()}
+    | {maximum_mtu, uint16()}
+    | {mtu_discovery_search_complete_timeout_us, uint64()}
+    | {mtu_discovery_missing_probe_count, uint8()}
+    | {max_binding_stateless_operations, uint16()}
+    | {stateless_operation_expiration_ms, uint16()}.
+
+%% happy quicer_settings that msquic won't return invalid_param
+-type quicer_setting_with_range() ::
+    {max_bytes_per_key, 0..(4 bsl 34 - 1)}
+    | {handshake_idle_timeout_ms, 0..(1 bsl 62 - 1)}
+    | {idle_timeout_ms, 0..(1 bsl 62 - 1)}
+    | {tls_client_max_send_buffer, uint32()}
+    | {tls_server_max_send_buffer, uint32()}
+    | {stream_recv_window_default, 1..?UINT32_MAX}
+    | {stream_recv_buffer_default, 4096..?UINT32_MAX}
+    | {conn_flow_control_window, uint32()}
+    | {max_stateless_operations, uint32()}
+    | {initial_window_packets, uint32()}
+    | {send_idle_timeout_ms, uint32()}
+    | {initial_rtt_ms, 1..?UINT32_MAX}
+    | {max_ack_delay_ms, 1..(1 bsl 14 - 1)}
+    | {disconnect_timeout_ms, 1..600000}
+    | {keep_alive_interval_ms, uint32()}
+    | {congestion_control_algorithm, 0 | 1}
+    | {peer_bidi_stream_count, uint16()}
+    | {peer_unidi_stream_count, uint16()}
+    | {retry_memory_limit, uint16()}
+    | {load_balancing_mode, 0..2}
+    | {max_operations_per_drain, uint8()}
+    | {send_buffering_enabled, 0 | 1}
+    | {pacing_enabled, 0 | 1}
+    | {migration_enabled, 0 | 1}
+    | {datagram_receive_enabled, 0 | 1}
     | {server_resumption_level, 0 | 1 | 2}
     | {minimum_mtu, uint16()}
     | {maximum_mtu, uint16()}
