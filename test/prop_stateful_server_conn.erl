@@ -95,6 +95,7 @@ initial_state() ->
 command(#{handle := Handle}) ->
     frequency([
         {200, {call, quicer, handshake, [Handle, 1000]}},
+        {100, {call, quicer, handshake, [Handle, valid_quicer_settings(), 1000]}},
         {100, {call, quicer, getopt, [Handle, ?LET({Opt, _}, conn_opt(), Opt)]}},
         {100,
             {call, quicer, async_accept_stream, [Handle, ?LET(Opts, quicer_acceptor_opts(), Opts)]}},
@@ -326,6 +327,9 @@ do_next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->
 step_calls(#{calls := Calls} = S) ->
     S#{calls := Calls + 1}.
 %%% Generators
+
+valid_quicer_settings() ->
+    quicer_prop_gen:valid_quicer_settings().
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% Listener helper %%%
