@@ -118,7 +118,7 @@
     | {peer_unidi_stream_count, uint16()}
     | {retry_memory_limit, uint16()}
     | {load_balancing_mode, 0..2}
-    | {max_operations_per_drain, uint8()}
+    | {max_operations_per_drain, 1..(1 bsl 8 - 1)}
     | {send_buffering_enabled, 0 | 1}
     | {pacing_enabled, 0 | 1}
     | {migration_enabled, 0 | 1}

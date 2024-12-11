@@ -301,8 +301,8 @@ valid_quicer_settings() ->
             quicer_setting_val_is_power_2(stream_recv_window_bidi_local_default, Opts) andalso
             quicer_setting_val_is_power_2(stream_recv_window_bidi_remote_default, Opts) andalso
             quicer_setting_val_is_power_2(stream_recv_window_unidi_default, Opts) andalso
-            (proplists:get_value(maximum_mtu, Opts, 1500) >
-                proplists:get_value(minimum_mtu, Opts, 1248))
+            (proplists:get_value(maximum_mtu, lists:reverse(Opts), 1500) >
+                proplists:get_value(minimum_mtu, lists:reverse(Opts), 1248))
     ).
 
 -spec ensure_dummy_listener(non_neg_integer()) -> _.
