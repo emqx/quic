@@ -106,7 +106,7 @@
     | {stream_recv_window_default, 1..?UINT32_MAX}
     | {stream_recv_buffer_default, 4096..?UINT32_MAX}
     | {conn_flow_control_window, uint32()}
-    | {max_stateless_operations, uint32()}
+    | {max_stateless_operations, 1..16}
     | {initial_window_packets, uint32()}
     | {send_idle_timeout_ms, uint32()}
     | {initial_rtt_ms, 1..?UINT32_MAX}
@@ -129,7 +129,7 @@
     | {mtu_discovery_search_complete_timeout_us, uint64()}
     | {mtu_discovery_missing_probe_count, uint8()}
     | {max_binding_stateless_operations, uint16()}
-    | {stateless_operation_expiration_ms, uint16()}.
+    | {stateless_operation_expiration_ms, 10..(1 bsl 16 -1)}.
 
 -type quicer_conn_opts() :: [conn_opt()].
 -type conn_opt() ::
