@@ -549,6 +549,7 @@ tc_datagram_disallowed(Config) ->
     %% THEN: It get an error
     ?assertEqual({error, dgram_send_error, invalid_state}, quicer:send_dgram(Conn, <<"dg_ping">>)),
     quicer:shutdown_connection(Conn),
+    ok = quicer:terminate_listener(mqtt),
     ok.
 
 tc_datagram_peer_allowed(Config) ->
@@ -585,6 +586,7 @@ tc_datagram_peer_allowed(Config) ->
         ok
     end,
     quicer:shutdown_connection(Conn),
+    ok = quicer:terminate_listener(mqtt),
     ok.
 
 tc_datagram_local_peer_allowed(Config) ->

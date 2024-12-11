@@ -129,7 +129,7 @@
     | {mtu_discovery_search_complete_timeout_us, uint64()}
     | {mtu_discovery_missing_probe_count, uint8()}
     | {max_binding_stateless_operations, uint16()}
-    | {stateless_operation_expiration_ms, 10..(1 bsl 16 -1)}.
+    | {stateless_operation_expiration_ms, 10..(1 bsl 16 - 1)}.
 
 -type quicer_conn_opts() :: [conn_opt()].
 -type conn_opt() ::

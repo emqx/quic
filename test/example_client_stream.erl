@@ -37,6 +37,7 @@
 -export([handle_stream_data/4]).
 
 -include("quicer.hrl").
+-include("quicer_ct.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 
 init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
@@ -47,7 +48,7 @@ init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
         is_local => false,
         is_unidir => quicer:is_unidirectional(Flags)
     },
-    ct:pal("init_handoff ~p", [{InitState, _StreamOpts}]),
+    ?LOG("init_handoff ~p", [{InitState, _StreamOpts}]),
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
@@ -94,11 +95,11 @@ peer_send_shutdown(Stream, _Flags, S) ->
 send_complete(_Stream, false, S) ->
     {ok, S};
 send_complete(_Stream, true = _IsCanceled, S) ->
-    ct:pal("~p : send is canceled", [?FUNCTION_NAME]),
+    ?LOG("~p : send is canceled", [?FUNCTION_NAME]),
     {ok, S}.
 
 send_shutdown_complete(_Stream, _Flags, S) ->
-    ct:pal("~p : stream send is complete", [?FUNCTION_NAME]),
+    ?LOG("~p : stream send is complete", [?FUNCTION_NAME]),
     {ok, S}.
 
 start_completed(Stream, #{status := success, stream_id := StreamId} = P, S) ->
@@ -114,14 +115,21 @@ start_completed(_Stream, #{status := Other}, S) ->
 %% Local stream, Unidir
 handle_stream_data(Stream, Bin, _Flags, #{is_local := true, is_unidir := false} = State) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => local_bidir}),
-    ct:pal("Client recv: ~p from ~p", [Bin, Stream]),
+    ?LOG("Client recv: ~p from ~p", [Bin, Stream]),
     {ok, State};
 %% Remote stream
 handle_stream_data(
     Stream, Bin, _Flags, #{is_local := false, is_unidir := true, conn := _Conn} = State
 ) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => remote_unidir}),
-    ct:pal("Client recv: ~p from ~p", [Bin, Stream]),
+    ?LOG("Client recv: ~p from ~p", [Bin, Stream]),
+    {ok, State};
+handle_stream_data(
+    Stream, Bin, _Flags, #{is_local := false, is_unidir := false, conn := _Conn} = State
+) ->
+    %% for proper test
+    ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => remote_unidir}),
+    ?LOG("Client recv: ~p from ~p", [Bin, Stream]),
     {ok, State};
 handle_stream_data(
     _Stream,
