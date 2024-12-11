@@ -106,7 +106,7 @@
     | {stream_recv_window_default, 1..?UINT32_MAX}
     | {stream_recv_buffer_default, 4096..?UINT32_MAX}
     | {conn_flow_control_window, uint32()}
-    | {max_stateless_operations, 1..16}
+    %| {max_stateless_operations, 1..16}
     | {initial_window_packets, uint32()}
     | {send_idle_timeout_ms, uint32()}
     | {initial_rtt_ms, 1..?UINT32_MAX}
