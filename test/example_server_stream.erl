@@ -39,6 +39,7 @@
 
 -include("quicer.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
+-include("quicer_ct.hrl").
 
 init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
     InitState = #{
@@ -48,7 +49,7 @@ init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
         is_local => false,
         is_unidir => quicer:is_unidirectional(Flags)
     },
-    ct:pal("init_handoff ~p", [{InitState, _StreamOpts}]),
+    ?LOG("init_handoff ~p", [{InitState, _StreamOpts}]),
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
@@ -99,11 +100,11 @@ peer_send_shutdown(Stream, _Flags, S) ->
 send_complete(_Stream, false, S) ->
     {ok, S};
 send_complete(_Stream, true = _IsCanceled, S) ->
-    ct:pal("~p : send is canceled", [?FUNCTION_NAME]),
+    ?LOG("~p : send is canceled", [?FUNCTION_NAME]),
     {ok, S}.
 
 send_shutdown_complete(_Stream, _Flags, S) ->
-    ct:pal("~p : stream send is complete", [?FUNCTION_NAME]),
+    ?LOG("~p : stream send is complete", [?FUNCTION_NAME]),
     {ok, S}.
 
 start_completed(_Stream, #{status := success, stream_id := StreamId}, S) ->
@@ -121,7 +122,7 @@ handle_stream_data(
 handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     %% for bidir stream, we just echo in place.
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => bidir}),
-    ct:pal("Server recv: ~p from ~p", [Bin, Stream]),
+    ?LOG("Server recv: ~p from ~p", [Bin, Stream]),
     case quicer:send(Stream, Bin) of
         {ok, _} ->
             {ok, State};
@@ -132,7 +133,7 @@ handle_stream_data(
     Stream, Bin, _Flags, #{is_unidir := true, peer_stream := PeerStream, conn := Conn} = State
 ) ->
     ?tp(debug, #{stream => Stream, data => Bin, module => ?MODULE, dir => unidir}),
-    ct:pal("Server recv: ~p from ~p", [Bin, Stream]),
+    ?LOG("Server recv: ~p from ~p", [Bin, Stream]),
 
     case PeerStream of
         undefined ->

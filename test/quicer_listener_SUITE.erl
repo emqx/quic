@@ -521,16 +521,22 @@ tc_listener_conf_reload(Config) ->
     %% WHEN: the listener is reloaded with new listener opts (New cert, key and cacert).
     ok = quicer_listener:lock(QuicApp, infinity),
     ok = quicer_listener:unlock(QuicApp, infinity),
-    NewListenerOpts =
-        ListenerOpts ++
-            [
-                {certfile, filename:join(DataDir, "other-server.pem")},
-                {keyfile, filename:join(DataDir, "other-server.key")},
-                {cacertfile, filename:join(DataDir, "other-ca.pem")}
-            ],
+
+    NewCerts = [
+        {certfile, filename:join(DataDir, "other-server.pem")},
+        {keyfile, filename:join(DataDir, "other-server.key")},
+        {cacertfile, filename:join(DataDir, "other-ca.pem")}
+    ],
+    NewListenerOpts = ListenerOpts ++ NewCerts,
     ok = quicer_listener:reload(QuicApp, NewListenerOpts),
     %% THEN: the listener handle is unchanged
     ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
+
+    %% THEN: the listener conf is changed
+    {LMap, CMap, SMap} = quicer_listener:get_conf(QuicApp, 5000),
+    ?assertEqual(LMap, maps:from_list(NewListenerOpts)),
+    ?assertEqual(CMap, maps:from_list(ConnectionOpts)),
+    ?assertEqual(SMap, maps:from_list(StreamOpts)),
 
     %% THEN: start new connection with old cacert must fail
     ?assertMatch(

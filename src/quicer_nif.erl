@@ -33,6 +33,7 @@
     async_connect/3,
     async_accept/2,
     async_handshake/1,
+    async_handshake/2,
     async_shutdown_connection/3,
     async_accept_stream/2,
     start_stream/2,
@@ -276,6 +277,10 @@ async_accept(_Listener, _Opts) ->
     ok | {error, badarg | atom_reason()}.
 async_handshake(_Connection) ->
     erlang:nif_error(nif_library_not_loaded).
+-spec async_handshake(connection_handle(), conn_opts()) ->
+    ok | {error, badarg | atom_reason()}.
+async_handshake(_Connection, _ConnOpts) ->
+    erlang:nif_error(nif_library_not_loaded).
 
 -spec async_shutdown_connection(connection_handle(), conn_shutdown_flag(), app_errno()) ->
     ok | {error, badarg}.
@@ -319,7 +324,7 @@ recv(_Stream, _Len) ->
 
 -spec send_dgram(connection_handle(), iodata(), send_flags()) ->
     {ok, BytesSent :: pos_integer()}
-    | {error, badarg | not_enough_memory | closed}
+    | {error, badarg | not_enough_memory | invalid_parameter | closed}
     | {error, dgram_send_error, atom_reason()}.
 send_dgram(_Conn, _Data, _Flags) ->
     erlang:nif_error(nif_library_not_loaded).

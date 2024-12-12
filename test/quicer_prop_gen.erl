@@ -32,6 +32,7 @@
     valid_reg_handle/0,
     valid_handle/0,
     valid_csend_stream_opts/0,
+    valid_quicer_settings/0,
     pid/0,
     data/0,
     quicer_send_flags/0,
@@ -290,6 +291,20 @@ valid_csend_stream_opts() ->
         )
     ).
 
+%% @see msquic/src/core/settings.c
+valid_quicer_settings() ->
+    ?SUCHTHAT(
+        Opts,
+        ?LET(Q, list(quicer_setting_with_range()), Q),
+        %% Conds below from msquic/src/core/settings.c
+        quicer_setting_val_is_power_2(stream_recv_window_default, Opts) andalso
+            quicer_setting_val_is_power_2(stream_recv_window_bidi_local_default, Opts) andalso
+            quicer_setting_val_is_power_2(stream_recv_window_bidi_remote_default, Opts) andalso
+            quicer_setting_val_is_power_2(stream_recv_window_unidi_default, Opts) andalso
+            (proplists:get_value(maximum_mtu, lists:reverse(Opts), 1500) >
+                proplists:get_value(minimum_mtu, lists:reverse(Opts), 1248))
+    ).
+
 -spec ensure_dummy_listener(non_neg_integer()) -> _.
 ensure_dummy_listener(Port) ->
     case is_pid(whereis(?dummy_listener)) of
@@ -335,3 +350,11 @@ acceptor_loop(L) ->
         _ ->
             acceptor_loop(L)
     end.
+
+-spec quicer_setting_val_is_power_2(atom(), proplists:proplist()) -> boolean().
+quicer_setting_val_is_power_2(Key, Opts) ->
+    is_pow_2(maps:get(Key, maps:from_list(Opts), 2)).
+is_pow_2(N) when is_integer(N), N > 0 ->
+    (N band (N - 1)) == 0;
+is_pow_2(_) ->
+    false.

@@ -20,7 +20,7 @@
 
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
-
+-include("quicer_ct.hrl").
 %% API
 -export([start_link/3]).
 
@@ -83,7 +83,7 @@ new_conn(_Conn, #{version := _Vsn}, #{stream_opts := _SOpts} = S) ->
 
 connected(Conn, Flags, #{conn := Conn} = S) ->
     ?tp(debug, #{module => ?MODULE, conn => Conn, flags => Flags, event => connected}),
-    ct:pal("~p connected and expecting NST within 100ms", [?MODULE]),
+    ?LOG("~p connected and expecting NST within 100ms", [?MODULE]),
     {100, maps:merge(S, Flags)}.
 
 resumed(Conn, Data, #{resumed_callback := ResumeFun} = S) when
@@ -116,7 +116,7 @@ new_stream(
                     {ok, CBState#{streams := [{E, Stream} | Streams]}}
             end;
         Other ->
-            ct:pal("Start accepting remote stream error ~p", [Other]),
+            ?LOG("Start accepting remote stream error ~p", [Other]),
             {ok, CBState#{streams := [{start_error, Stream} | Streams]}}
     end.
 

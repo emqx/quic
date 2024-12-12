@@ -549,6 +549,7 @@ tc_datagram_disallowed(Config) ->
     %% THEN: It get an error
     ?assertEqual({error, dgram_send_error, invalid_state}, quicer:send_dgram(Conn, <<"dg_ping">>)),
     quicer:shutdown_connection(Conn),
+    ok = quicer:terminate_listener(mqtt),
     ok.
 
 tc_datagram_peer_allowed(Config) ->
@@ -585,6 +586,7 @@ tc_datagram_peer_allowed(Config) ->
         ok
     end,
     quicer:shutdown_connection(Conn),
+    ok = quicer:terminate_listener(mqtt),
     ok.
 
 tc_datagram_local_peer_allowed(Config) ->
@@ -990,6 +992,16 @@ tc_closed_conn_reg(_Config) ->
     ok = quicer:close_registration(ThisReg),
     Opts = default_conn_opts() ++ [{quic_registration, ThisReg}],
     ?assertEqual({error, quic_registration}, quicer:connect("localhost", 443, Opts, 5000)).
+
+tc_conn_probe(_) ->
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:async_connect("localhost", 65535, Opts),
+    ?assertMatch(
+        #probe_state{final_at = TS, final = ?QUIC_DATAGRAM_SEND_CANCELED} when
+            TS =/= undefined,
+        quicer:probe(Conn, 5000)
+    ),
+    ok.
 
 %%%
 %%% Helpers

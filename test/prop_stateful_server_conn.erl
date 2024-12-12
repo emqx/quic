@@ -95,11 +95,14 @@ initial_state() ->
 command(#{handle := Handle}) ->
     frequency([
         {200, {call, quicer, handshake, [Handle, 1000]}},
+        {100, {call, quicer, handshake, [Handle, valid_quicer_settings(), 1000]}},
         {100, {call, quicer, getopt, [Handle, ?LET({Opt, _}, conn_opt(), Opt)]}},
         {100,
             {call, quicer, async_accept_stream, [Handle, ?LET(Opts, quicer_acceptor_opts(), Opts)]}},
         {100, {call, quicer, peername, [Handle]}},
         {50, {call, quicer, peercert, [Handle]}},
+        {50, {call, quicer, probe, [Handle, 5000]}},
+        {50, {call, quicer, send_dgram, [Handle, binary()]}},
         {10, {call, quicer, negotiated_protocol, [Handle]}},
         {10, {call, quicer, get_connections, []}},
         {10, {call, quicer, get_conn_owner, [Handle]}},
@@ -154,6 +157,10 @@ postcondition(
     %% @FIXME https://github.com/emqx/quic/issues/266
     true;
 postcondition(#{state := S}, {call, quicer, handshake, _Args}, {error, invalid_state}) when
+    S =/= accepted
+->
+    true;
+postcondition(#{state := S}, {call, quicer, handshake, _Args}, {error, timeout}) when
     S =/= accepted
 ->
     true;
@@ -294,6 +301,36 @@ postcondition(#{state := closed}, {call, _Mod, _Fun, _Args}, {error, closed}) ->
 postcondition(#{state := accepted}, {call, _Mod, _Fun, _Args}, {error, closed}) ->
     %% handshake didnt take place on time
     true;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, probe, [_, _]},
+    {error, dgram_send_error, _}
+) ->
+    ConnState =/= connected;
+postcondition(
+    #{state := _ConnState},
+    {call, quicer, probe, [_, _]},
+    #probe_state{final = FinalState, final_at = FinalTs}
+) ->
+    FinalState =/= undefined andalso FinalTs =/= undefined;
+postcondition(
+    #{state := _ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {ok, _}
+) ->
+    true;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {error, _, _}
+) ->
+    ConnState =/= connected;
+postcondition(
+    #{state := ConnState},
+    {call, quicer, send_dgram, [_, _]},
+    {error, _}
+) ->
+    ConnState =/= connected;
 postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
     false.
 
@@ -302,7 +339,9 @@ postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
 next_state(State, Res, Call) ->
     step_calls(do_next_state(State, Res, Call)).
 
-do_next_state(#{state := _} = State, {error, closed}, {call, quicer, _, _Args}) ->
+do_next_state(
+    #{state := _} = State, {error, closed}, {call, _M, _F, _A}
+) ->
     State#{state := closed};
 do_next_state(#{state := accepted} = State, {error, _}, {call, quicer, handshake, _Args}) ->
     State;
@@ -326,6 +365,9 @@ do_next_state(State, _Res, {call, _Mod, _Fun, _Args}) ->
 step_calls(#{calls := Calls} = S) ->
     S#{calls := Calls + 1}.
 %%% Generators
+
+valid_quicer_settings() ->
+    quicer_prop_gen:valid_quicer_settings().
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% Listener helper %%%
@@ -365,7 +407,8 @@ default_listen_opts() ->
         {handshake_idle_timeout_ms, 100},
         % QUIC_SERVER_RESUME_AND_ZERORTT
         {server_resumption_level, 2},
-        {peer_bidi_stream_count, 10}
+        {peer_bidi_stream_count, 10},
+        {datagram_receive_enabled, true}
     ].
 
 default_conn_opts() ->
@@ -376,5 +419,6 @@ default_conn_opts() ->
         {idle_timeout_ms, 5000},
         {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
         {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"}
+        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"},
+        {datagram_receive_enabled, true}
     ].

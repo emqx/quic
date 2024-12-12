@@ -45,7 +45,9 @@
     async_connect/3,
     handshake/1,
     handshake/2,
+    handshake/3,
     async_handshake/1,
+    async_handshake/2,
     accept/2,
     accept/3,
     async_accept/2,
@@ -59,6 +61,7 @@
     close_connection/4,
     async_close_connection/1,
     async_close_connection/3,
+    probe/2,
     accept_stream/2,
     accept_stream/3,
     async_accept_stream/2,
@@ -69,6 +72,7 @@
     async_send/2,
     async_send/3,
     recv/2,
+    async_send_dgram/2,
     send_dgram/2,
     shutdown_stream/1,
     shutdown_stream/2,
@@ -174,7 +178,10 @@
     quicer_addr/0,
 
     %% Registraion Profiles
-    registration_profile/0
+    registration_profile/0,
+
+    %% probes
+    probe_res/0
 ]).
 
 -type connection_opts() :: proplists:proplist() | conn_opts().
@@ -447,12 +454,8 @@ async_connect(Host, Port, Opts) when is_map(Opts) ->
 handshake(Conn) ->
     handshake(Conn, 5000).
 
-%% @doc Complete TLS handshake after accepted a Connection
-%% @see handshake/2
-%% @see async_handshake/1
 -spec handshake(connection_handle(), timeout()) ->
-    {ok, connection_handle()}
-    | {error, any()}.
+    {ok, connection_handle()} | {error, any()}.
 handshake(Conn, Timeout) ->
     case async_handshake(Conn) of
         {error, _} = E ->
@@ -466,13 +469,43 @@ handshake(Conn, Timeout) ->
             end
     end.
 
+%% @doc Complete TLS handshake after accepted a Connection
+%% @see handshake/2
+%% @see async_handshake/1
+-spec handshake(connection_handle(), conn_opts(), timeout()) ->
+    {ok, connection_handle()}
+    | {error, any()}.
+handshake(Conn, ConnOpts, Timeout) ->
+    case async_handshake(Conn, ConnOpts) of
+        {error, _} = E ->
+            E;
+        ok ->
+            receive
+                {quic, connected, Conn, _} -> {ok, Conn};
+                {quic, closed, Conn, _Flags} -> {error, closed}
+            after Timeout ->
+                {error, timeout}
+            end
+    end.
+
 %% @doc Complete TLS handshake after accepted a Connection.
-%% Caller should expect to receive ```{quic, connected, connection_handle()}'''
 %%
 %% @see handshake/2
+%% @see async_handshake/2
 -spec async_handshake(connection_handle()) -> ok | {error, any()}.
 async_handshake(Conn) ->
     quicer_nif:async_handshake(Conn).
+
+%% @doc Complete TLS handshake after accepted a Connection.
+%%      also set connection options which override the default listener options.
+%%
+%% @see handshake/2
+%% @see async_handshake/1
+-spec async_handshake(connection_handle(), conn_opts()) -> ok | {error, any()}.
+async_handshake(Conn, ConnOpts) when is_list(ConnOpts) ->
+    async_handshake(Conn, maps:from_list(ConnOpts));
+async_handshake(Conn, ConnOpts) ->
+    quicer_nif:async_handshake(Conn, ConnOpts).
 
 %% @doc Accept new Connection (Server)
 %%
@@ -816,34 +849,48 @@ do_recv(Stream, Count, Buff) ->
             E
     end.
 
-%% @doc Sending Unreliable Datagram
+%% @doc Sending Unreliable Datagram.
+%% Caller should handle the async signals for the send results
 %%
-%% ref: [https://datatracker.ietf.org/doc/html/draft-ietf-quic-datagram]
-%% @see send/2
+%% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
+%% @see send/2 send_dgram/2
+-spec async_send_dgram(connection_handle(), binary()) ->
+    {ok, non_neg_integer()}
+    | {error, badarg | not_enough_mem | invalid_parameter | closed}
+    | {error, dgram_send_error, atom_reason()}.
+async_send_dgram(Conn, Data) ->
+    quicer_nif:send_dgram(Conn, Data, _IsSyncRel = 1).
+
+%% @doc Sending Unreliable Datagram
+%%  return error only if sending could not be scheduled such as
+%%  not_enough_mem, connection is already closed or wrong args.
+%%  otherwise, it is fire and forget.
+%%
+%% %% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
+%% @see send/2, async_send_dgram/2
 -spec send_dgram(connection_handle(), binary()) ->
-    {ok, BytesSent :: pos_integer()}
-    | {error, badarg | not_enough_mem | closed}
+    {ok, BytesSent :: non_neg_integer()}
+    | {error, badarg | not_enough_mem | invalid_parameter | closed}
     | {error, dgram_send_error, atom_reason()}.
 send_dgram(Conn, Data) ->
     case quicer_nif:send_dgram(Conn, Data, _IsSync = 1) of
-        %% @todo we need find tuned event mask
         {ok, _Len} = OK ->
-            receive
-                {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_SENT}} ->
-                    receive
-                        {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
-                            OK;
-                        {quic, dgram_send_state, Conn, #{state := Other}} ->
-                            {error, dgram_send_error, Other}
-                    end;
-                {quic, dgram_send_state, Conn, #{state := ?QUIC_DATAGRAM_SEND_ACKNOWLEDGED}} ->
+            case quicer_lib:handle_dgram_send_states(Conn) of
+                ok ->
                     OK;
-                {quic, dgram_send_state, Conn, #{state := Other}} ->
-                    {error, dgram_send_error, Other}
+                {error, E} ->
+                    {error, dgram_send_error, E}
             end;
+        {error, E} ->
+            {error, E};
         E ->
             E
     end.
+
+%% @doc Probe conn state with 0 len dgram.
+-spec probe(connection_handle(), timeout()) -> probe_res().
+probe(Conn, Timeout) ->
+    quicer_lib:probe(Conn, Timeout).
 
 %% @doc Shutdown stream gracefully, with infinity timeout
 %%

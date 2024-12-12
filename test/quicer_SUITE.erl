@@ -75,6 +75,8 @@
 
     tc_dgram_client_send/1,
     tc_dgram_client_send_iolist/1,
+    tc_dgram_client_send_fail/1,
+    tc_dgram_client_send_exceed_mtu/1,
 
     % , tc_getopt_raw/1
     tc_getopt/1,
@@ -859,7 +861,7 @@ tc_stream_controlling_process_demon(Config) ->
             ok = quicer:setopt(Stm, active, true),
             {ok, _Len} = quicer:send(Stm, <<"owner_changed">>),
             receive
-                {quic, <<"owner_changed">>, Stm, _} ->
+                {quic, <<"owner_changed">>, _Stm, _} ->
                     ok
             end,
             %% Set controlling_process again
@@ -882,6 +884,48 @@ tc_stream_controlling_process_demon(Config) ->
     after 6000 ->
         ct:fail("timeout")
     end.
+
+tc_dgram_client_send_fail(_) ->
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:async_connect("localhost", 65535, Opts),
+    ?assertEqual(
+        %% fire and forget
+        {ok, 4},
+        quicer:send_dgram(Conn, <<"ping">>)
+    ),
+    ok.
+
+tc_dgram_client_send_exceed_mtu(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server_dgram(Owner, Config, Port) end),
+    receive
+        listener_ready ->
+            ok
+    after 1000 ->
+        ct:fail("timeout here")
+    end,
+    %% GIVEN: datagram is enabled
+    Opts = default_conn_opts() ++ [{datagram_receive_enabled, 1}],
+    {ok, Conn} = quicer:connect("localhost", Port, Opts, 5000),
+    {ok, Stm} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stm, <<"ping">>),
+    {ok, V2stats} = quicer:getopt(Conn, statistics_v2),
+    MtuMax = proplists:get_value(send_path_mtu, V2stats),
+    %% WHEN: send a datagram that is less than MTU-100
+    Length = MtuMax - 100,
+    %% THEN: send should success
+    {ok, Length} = quicer:send_dgram(Conn, crypto:strong_rand_bytes(Length)),
+    ?assertEqual(
+        {error, dgram_send_error, invalid_parameter},
+        quicer:send_dgram(Conn, crypto:strong_rand_bytes(MtuMax * 2))
+    ),
+    flush_streams_available(Conn),
+    flush_datagram_state_changed(Conn),
+    %% WHEN: send a datagram that is 2xMTU size
+    %% THEN: send should fail
+    SPid ! done,
+    ok = ensure_server_exit_normal(Ref).
 
 tc_dgram_client_send(Config) ->
     Port = select_port(),

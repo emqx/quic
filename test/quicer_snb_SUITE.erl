@@ -353,7 +353,7 @@ tc_slow_conn(Config) ->
                     },
                     #{
                         ?snk_kind := debug,
-                        function := "async_handshake_1",
+                        function := "async_handshake_X",
                         tag := "start",
                         mark := 0,
                         resource_id := _Rid

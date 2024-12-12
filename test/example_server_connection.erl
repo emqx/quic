@@ -29,6 +29,7 @@
 
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
 -include("quicer_types.hrl").
+-include("quicer_ct.hrl").
 
 %% Callback init
 -export([init/1]).
@@ -149,7 +150,7 @@ dgram_recv(C, Bin, _Flag, S) ->
     case quicer:send_dgram(C, Bin) of
         {ok, _} -> ok;
         %% for testing when peer disable the receiving
-        Error -> ct:pal("send dgram error: ~p~n", [Error])
+        Error -> ?LOG("send dgram error: ~p~n", [Error])
     end,
     {ok, S}.
 
