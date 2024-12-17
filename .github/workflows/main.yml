@@ -29,6 +29,7 @@ jobs:
       matrix:
         os:
           - macos-14
+          - macos-15
         otp:
           - '27'
         rebar3:
