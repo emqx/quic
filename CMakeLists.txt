@@ -143,6 +143,19 @@ set(SOURCES
 # @todo remove -DSO_ATTACH_REUSEPORT_CBPF=51
 add_compile_options(-DSO_ATTACH_REUSEPORT_CBPF=51)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    string(REPLACE "." ";" set_version_list ${CMAKE_CXX_COMPILER_VERSION})
+    list(GET set_version_list 0 major_version)
+    # Check for Clang version >= 16.0
+    if (major_version GREATER_EQUAL 16)
+        message(STATUS "Clang version >= 16.0 detected, enabling '-Wno-invalid-unevaluated-string'.")
+        # Add the warning option
+        add_compile_options(-Wno-invalid-unevaluated-string)
+    else()
+        message(STATUS "Clang version < 16.0, skipping '-Wno-invalid-unevaluated-string'.")
+    endif()
+endif()
+
 # for lttng, quicer_tp.h
 include_directories(c_src)
 # for templ files

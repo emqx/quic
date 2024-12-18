@@ -61,6 +61,7 @@ jobs:
       matrix:
         os:
           - macos-14
+          - macos-15
         otp:
           - 26
         openssl:
@@ -89,6 +90,7 @@ jobs:
         env:
           QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
+          export QUICER_TLS_VER
           wget https://s3.amazonaws.com/rebar3/rebar3
           sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
