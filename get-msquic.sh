@@ -40,10 +40,13 @@ patch_2_3_8()
 {
     local patch_1="https://github.com/microsoft/msquic/commit/12edf3725475d4a99e5598df3289bace47b8f56e.patch"
     local patch_2="https://github.com/microsoft/msquic/commit/e0201eb4e007e7524aef007be67f2281f949f102.patch"
+    local patch_3="https://github.com/microsoft/msquic/commit/b16a14a72e8c74407ee4a079a1f57efe0246f739.patch"
+    local patch_4="https://github.com/microsoft/msquic/pull/4717/commits/9261dacc1dd9a67f6fa8d5fbe663082508b4c605.patch"
     mkdir -p "$patch_dir"
     echo "Patching Msquic 2.3.8"
-    do_patch "$patch_1"
-    do_patch "$patch_2"
+    for p in patch_1 patch_2 patch_3 patch_4; do
+        do_patch "${!p}"
+    done
 }
 
 if [ ! -d msquic ]; then
