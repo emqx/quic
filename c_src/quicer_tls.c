@@ -16,10 +16,68 @@ limitations under the License.
 #include "quicer_tls.h"
 
 /*
-** Build QUIC_CREDENTIAL_CONFIG from options, certfile, keyfile and password
+** Build QUIC_CREDENTIAL_CONFIG from options with an in-memory Certificate and Private Key.
+** Should not be called directly, use `parse_cert_options` instead.
 */
 BOOLEAN
-parse_cert_options(ErlNifEnv *env,
+parse_cert_options_in_memory(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+  ERL_NIF_TERM asn1_term;
+  ErlNifBinary asn1_bin;
+  QUIC_CERTIFICATE_PKCS12 *CertInMem = NULL;
+
+  if (!CredConfig)
+    {
+      return FALSE;
+    }
+
+  if (!enif_get_map_value(env, options, ATOM_CERTKEYASN1, &asn1_term))
+    {
+      goto error;
+    }
+
+  if (!enif_inspect_binary(env, asn1_term, &asn1_bin))
+    {
+      goto error;
+    }
+
+    CertInMem = (QUIC_CERTIFICATE_PKCS12 *)CXPLAT_ALLOC_NONPAGED(
+            sizeof(QUIC_CERTIFICATE_PKCS12), QUICER_CERTIFICATE_PKCS12);
+    if (!CertInMem)
+      {
+        goto error;
+      }
+
+    // TODO Tag probably wrong
+    char *allocated_asn1 = (char *)CXPLAT_ALLOC_NONPAGED(asn1_bin.size, QUIC_POOL_TEST);
+    if (!allocated_asn1)
+      {
+        goto error;
+      }
+    CxPlatCopyMemory(allocated_asn1, asn1_bin.data, asn1_bin.size);
+
+    // Tie it all together:
+    CertInMem->Asn1BlobLength = asn1_bin.size;
+    CertInMem->Asn1Blob = (uint8_t const*)allocated_asn1;
+    // @TODO add password support: https://github.com/microsoft/msquic/blob/9610803b6eed56f6b8e9506f2fb8cc702195a3a2/src/inc/msquic.h#L339
+    CertInMem->PrivateKeyPassword = NULL;
+    CredConfig->CertificatePkcs12 = CertInMem;
+    CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12;
+
+  return TRUE;
+error:
+  CXPLAT_FREE(CertInMem, QUICER_CERTIFICATE_PKCS12);
+  return FALSE;
+}
+
+/*
+** Build QUIC_CREDENTIAL_CONFIG from options with file based Certificate and Private Key.
+** Should not be called directly, use `parse_cert_options` instead.
+*/
+BOOLEAN
+parse_cert_options_file(ErlNifEnv *env,
                    ERL_NIF_TERM options,
                    QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
@@ -88,6 +146,62 @@ error:
   free(keyfile);
   free(password);
   return FALSE;
+}
+
+/*
+** Build QUIC_CREDENTIAL_CONFIG from options, certfile, keyfile and password.
+**
+** This function parses some options and then delegates to either
+** `parse_cert_options_in_memory` or `parse_cert_options_file`.
+*/
+BOOLEAN
+parse_cert_options(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+  char *certfile = NULL;
+  char *keyfile = NULL;
+  BOOLEAN result = FALSE;
+
+  if (!CredConfig)
+    {
+      return FALSE;
+    }
+
+  // KISS code. Can be optimized for memory usage
+  certfile = str_from_map(env, ATOM_CERTFILE, &options, NULL, PATH_MAX + 1);
+  keyfile = str_from_map(env, ATOM_KEYFILE, &options, NULL, PATH_MAX + 1);
+
+  if (certfile && keyfile)
+    {
+      // @NOTE we do not pass through the already parsed options. This keeps ownership clean.
+      result = parse_cert_options_file(env, options, CredConfig);
+    }
+  else
+    {
+      ERL_NIF_TERM asn1_term;
+
+      if (!enif_get_map_value(env, options, ATOM_CERTKEYASN1, &asn1_term))
+        {
+          fprintf(stderr, "No certkeyasn1");
+          result = FALSE;
+          goto exit;
+        }
+      if (!enif_is_binary(env, asn1_term))
+        {
+          fprintf(stderr, "certkeyasn1 was not a binary");
+          result = FALSE;
+          goto exit;
+        }
+
+      result = parse_cert_options_in_memory(env, options, CredConfig);
+    }
+
+exit:
+  free(certfile);
+  free(keyfile);
+
+  return result;
 }
 
 /*
