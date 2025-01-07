@@ -76,6 +76,8 @@ typedef struct QuicerListenerCTX
   BOOLEAN is_stopped;
   BOOLEAN allow_insecure;
   CXPLAT_LIST_ENTRY RegistrationLink;
+  char *ssl_keylogfile;
+  uint16_t ssl_keylogfile_len;
   void *reserved1;
   void *reserved2;
   void *reserved3;

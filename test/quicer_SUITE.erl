@@ -2472,9 +2472,12 @@ tc_stream_send_shutdown_complete(Config) ->
 tc_conn_opt_sslkeylogfile(Config) ->
     Port = select_port(),
     TargetFName = "SSLKEYLOGFILE",
+    ServerTargetFName = "SERVERSSLKEYLOGFILE",
     file:delete(TargetFName),
     application:ensure_all_started(quicer),
-    ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+    ListenerOpts = [
+        {sslkeylogfile, ServerTargetFName}, {conn_acceptors, 32} | default_listen_opts(Config)
+    ],
     ConnectionOpts = [
         {conn_callback, quicer_server_conn_callback},
         {stream_acceptors, 32}
@@ -2498,7 +2501,8 @@ tc_conn_opt_sslkeylogfile(Config) ->
     ),
     quicer:close_connection(Conn),
     timer:sleep(100),
-    {ok, #file_info{type = regular}} = file:read_file_info(TargetFName).
+    {ok, #file_info{type = regular}} = file:read_file_info(TargetFName),
+    {ok, #file_info{type = regular}} = file:read_file_info(ServerTargetFName).
 
 tc_insecure_traffic(Config) ->
     Port = select_port(),
