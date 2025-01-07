@@ -94,6 +94,7 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
     {
       enif_release_resource(l_ctx->r_ctx);
     }
+  CXPLAT_FREE(l_ctx->ssl_keylogfile, QUICER_TRACE);
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);
 }
