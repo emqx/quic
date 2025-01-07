@@ -335,11 +335,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       // A monitor is automatically removed when it triggers or when the
       // resource is deallocated.
       status = handle_connection_event_connected(c_ctx, Event);
-      // Client dump SSL KEY
-      if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
-        {
-          dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
-        }
       break;
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
       //
@@ -1186,6 +1181,15 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
 
   ERL_NIF_TERM report = make_event_with_props(
       c_ctx->env, ATOM_CONNECTED, ConnHandle, props_name, props_value, 2);
+
+  // Client&Server Dump SSL Key Log File
+  if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
+    {
+      dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
+      // @NOTE: only free ssl_keylogfile not TlsSecrets
+      CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
+      c_ctx->ssl_keylogfile = NULL;
+    }
 
   // testing this, just unblock acceptor
   // should pick a 'acceptor' here?

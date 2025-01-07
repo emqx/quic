@@ -217,6 +217,16 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                                  (void *)ServerConnectionCallback,
                                  c_ctx);
 
+      if (l_ctx->ssl_keylogfile)
+        {
+          char *ssl_keylogfile
+              = CXPLAT_ALLOC_NONPAGED(l_ctx->ssl_keylogfile_len, QUICER_TRACE);
+          strncpy(ssl_keylogfile,
+                  l_ctx->ssl_keylogfile,
+                  l_ctx->ssl_keylogfile_len);
+          set_conn_sslkeylogfile(c_ctx, ssl_keylogfile);
+        }
+
       enif_clear_env(env);
       break;
 
@@ -400,6 +410,12 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       ret = ERROR_TUPLE_2(ATOM_ALPN);
       goto exit;
     }
+
+  l_ctx->ssl_keylogfile
+      = str_from_map(env, ATOM_SSL_KEYLOGFILE_NAME, &options, NULL, PATH_MAX);
+  l_ctx->ssl_keylogfile_len
+      = l_ctx->ssl_keylogfile ? strlen(l_ctx->ssl_keylogfile) + 1 : 0;
+  CXPLAT_FRE_ASSERT(l_ctx->ssl_keylogfile_len < PATH_MAX);
 
   // Start Listener
   Status = MsQuic->ListenerStart(

@@ -91,6 +91,7 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
 #endif // QUICER_USE_TRUSTED_STORE
 
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
+  CXPLAT_FREE(l_ctx->ssl_keylogfile, QUICER_TRACE);
   enif_mutex_destroy(l_ctx->lock);
   enif_free_env(l_ctx->env);
 }

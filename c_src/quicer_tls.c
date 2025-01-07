@@ -262,15 +262,21 @@ parse_sslkeylogfile_option(ErlNifEnv *env,
                            ERL_NIF_TERM eoptions,
                            QuicerConnCTX *c_ctx)
 {
-  QUIC_STATUS Status;
 
-  char *keylogfile = str_from_map(
-      env, ATOM_SSL_KEYLOGFILE_NAME, &eoptions, NULL, PATH_MAX + 1);
+  char *keylogfile
+      = str_from_map(env, ATOM_SSL_KEYLOGFILE_NAME, &eoptions, NULL, PATH_MAX);
 
   if (!keylogfile)
     {
       return;
     }
+  set_conn_sslkeylogfile(c_ctx, keylogfile);
+}
+
+void
+set_conn_sslkeylogfile(QuicerConnCTX *c_ctx, char *keylogfile)
+{
+  QUIC_STATUS Status;
 
   // Allocate the TLS secrets
   QUIC_TLS_SECRETS *TlsSecrets
