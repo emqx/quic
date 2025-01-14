@@ -102,11 +102,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: install rebar3
-        run: |
-          wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
-          cp ./rebar3 /usr/local/bin/rebar3
-
       - uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
 
       - uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
