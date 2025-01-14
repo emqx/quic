@@ -18,14 +18,17 @@ jobs:
       fail-fast: false
       matrix:
         otp:
-          - 26
+          - '26'
+          - '27'
+        rebar3:
+          - '3.23.0'
         openssl:
           - openssl3
           - openssl
           - sys
         os:
           - macos-14
-          - macos-13
+          - macos-15
     runs-on: ${{ matrix.os }}
     steps:
 
@@ -51,7 +54,7 @@ jobs:
         env:
           QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
-          wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
+          wget https://github.com/erlang/rebar3/releases/download/${{ matrix.rebar3 }}/rebar3
           sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           export QUICER_TLS_VER
@@ -69,8 +72,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp:
-          - 26.2.5.2-1
+        erlang:
+          - otp: 26.2.5.2-3
+            builder: 5.4-4:1.15.7-26.2.5.2-3
+          - otp: 27.2-2
+            builder: 5.4-4:1.17.3-27.2-2
         openssl:
           - openssl3
           - openssl
@@ -110,18 +116,21 @@ jobs:
       - name: build release
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          IMAGE=ghcr.io/emqx/emqx-builder/5.3-13:1.15.7-${{ matrix.otp }}-${{ matrix.os }}
-          docker run -i --rm -v $(pwd):/wd --workdir /wd --platform=linux/${{ matrix.arch }} \
-          -e BUILD_RELEASE=1 -e QUICER_TLS_VER=${{ matrix.openssl }} \
-          $IMAGE bash -euc 'git config --global --add safe.directory /wd; \
-          grep -q "\"Amazon Linux 2\"" /etc/os-release && alternatives --set python /usr/bin/python2; \
-          which yum && yum install -y perl-IPC-Cmd; \
-          make'
+          docker run -i --rm -v $(pwd):/wd --workdir /wd \
+            --platform=linux/${{ matrix.arch }} \
+            -e BUILD_RELEASE=1 \
+            -e QUICER_TLS_VER=${{ matrix.openssl }} \
+            ghcr.io/emqx/emqx-builder/${{ matrix.erlang.builder }}-${{ matrix.os }} \
+              bash -euc '\
+                git config --global --add safe.directory /wd; \
+                grep -q "\"Amazon Linux 2\"" /etc/os-release && alternatives --set python /usr/bin/python2; \
+                which yum && yum install -y perl-IPC-Cmd; \
+                make'
 
       - uses: actions/upload-artifact@v4
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: quicer-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.otp }}-${{ matrix.openssl }}
+          name: quicer-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.erlang.otp }}-${{ matrix.openssl }}
           path: |
             _packages/*.gz
             _packages/*.gz.sha256
