@@ -7,11 +7,15 @@ on:
         description: 'Ref to release'
         required: false
         default: ''
+      ref_name:
+        description: 'Tag to (re)release'
+        required: false
   push:
     tags:
       - "*"
     branches:
       - 'ci/**'
+
 jobs:
   mac:
     strategy:
@@ -50,7 +54,6 @@ jobs:
           ref: ${{ github.event.inputs.ref }}
 
       - name: build release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
@@ -61,7 +64,6 @@ jobs:
           BUILD_RELEASE=1 make
 
       - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           name: quicer-${{ matrix.os }}-${{ matrix.otp }}-${{ matrix.openssl }}
           path: |
@@ -101,6 +103,7 @@ jobs:
       - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.ref }}
 
       - uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
 
@@ -109,7 +112,6 @@ jobs:
           platforms: ${{ matrix.arch }}
 
       - name: build release
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           docker run -i --rm -v $(pwd):/wd --workdir /wd \
             --platform=linux/${{ matrix.arch }} \
@@ -123,7 +125,6 @@ jobs:
                 make'
 
       - uses: actions/upload-artifact@v4
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           name: quicer-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.erlang.otp }}-${{ matrix.openssl }}
           path: |
@@ -135,7 +136,7 @@ jobs:
     needs:
       - mac
       - emqx-linux
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event.inputs.ref_name || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -145,7 +146,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: quicer ${{ github.ref_name }} Released
+          name: quicer ${{ github.event.inputs.ref_name || github.ref_name }} Released
+          tag_name: ${{ github.event.inputs.ref_name || github.ref_name }}
           files: packages/*
           draft: true
           prerelease: false
