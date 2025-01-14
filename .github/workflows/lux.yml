@@ -7,8 +7,8 @@ jobs:
     strategy:
       matrix:
         otp:
-          - 25.3.2
-          - 26.2.1
+          - '26.2.1'
+          - '27.2'
     steps:
       - name: Checkout
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
@@ -17,7 +17,7 @@ jobs:
       - uses: erlef/setup-beam@2f0cc07b4b9bea248ae098aba9e1a8a1de5ec24c # v1.17.5
         with:
           otp-version: ${{ matrix.otp }}
-          rebar3-version: 3.23.0
+          rebar3-version: '3.23.0'
 
       - name: build lux
         run: |
