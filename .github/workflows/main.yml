@@ -15,8 +15,8 @@ jobs:
     - name: Prepare OTP and rebar3
       uses: erlef/setup-beam@v1.18.2
       with:
-        otp-version: 26
-        rebar3-version: 3.20.0
+        otp-version: '27'
+        rebar3-version: '3.23.0'
     - name: Run erlfmt for erlang code
       run: |
         rebar3 fmt -c
@@ -30,7 +30,9 @@ jobs:
         os:
           - macos-14
         otp:
-          - 26
+          - '27'
+        rebar3:
+          - '3.23.0'
         openssl:
           - openssl3
           - openssl
@@ -57,7 +59,7 @@ jobs:
         env:
           QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
-          wget https://s3.amazonaws.com/rebar3/rebar3
+          wget https://github.com/erlang/rebar3/releases/download/${{ matrix.rebar3 }}/rebar3
           sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
@@ -92,15 +94,15 @@ jobs:
       matrix:
         # https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt
         otp:
-          - 25.3.2.9
-          - 26.2.5.3
-          - 27.1
+          - '25.3.2.9'
+          - '26.2.5.3'
+          - '27.2'
         openssl:
           - openssl3
           - openssl
           - sys
         rebar3:
-          - 3.23.0
+          - '3.23.0'
         build_type:
           - RelWithDebInfo
           - Debug
