@@ -402,7 +402,13 @@ report_active_connections() ->
     report_active_connections(fun ct:comment/2).
 report_active_connections(LogFun) ->
     erlang:garbage_collect(),
-    {ok, Cnts} = quicer:perf_counters(),
+    case quicer:perf_counters() of
+        {ok, Cnts} ->
+            ok;
+        {error, not_found} ->
+            %% Library is likely not loaded.
+            Cnts = [{strm_active, 0}, {conn_active, 0}]
+    end,
     ActiveStrms = proplists:get_value(strm_active, Cnts),
     ActiveConns = proplists:get_value(conn_active, Cnts),
     0 =/= (ActiveStrms + ActiveConns) andalso
