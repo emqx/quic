@@ -48,4 +48,6 @@ eoptions_to_cred_config(ErlNifEnv *env,
                         ERL_NIF_TERM eoptions,
                         QUIC_CREDENTIAL_CONFIG *CredConfig,
                         X509_STORE **trusted_store);
+
+void set_conn_sslkeylogfile(QuicerConnCTX *c_ctx, char *keylogfile);
 #endif // QUICER_TLS_H_
