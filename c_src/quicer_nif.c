@@ -17,11 +17,12 @@ limitations under the License.
 #include "quicer_nif.h"
 
 #include <dlfcn.h>
+#include <features.h>
 
 #include "quicer_listener.h"
 #include "quicer_vsn.h"
 
-#if defined(__linux__)
+#if defined(__GLIBC__)
 #include <malloc.h>
 #endif
 
@@ -1701,7 +1702,7 @@ make_event(ErlNifEnv *env,
                           prop);      // 4th element, event props :: any()) //
 }
 
-#if defined(__linux__)
+#if defined(__GLIBC__)
 ERL_NIF_TERM
 do_malloc_trim(__unused_parm__ ErlNifEnv *env,
                __unused_parm__ int argc,
@@ -1779,7 +1780,7 @@ static ErlNifFunc nif_funcs[] = {
   { "copy_stream_handle", 1, copy_stream_handle, 0},
   /* for testing */
   { "mock_buffer_sig", 3, mock_buffer_sig, 0},
-#if defined(__linux__)
+#if defined(__GLIBC__)
   { "malloc_trim", 0, do_malloc_trim, 0},
   { "malloc_stats", 0, do_malloc_stats, 0},
 #endif
