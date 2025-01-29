@@ -17,7 +17,10 @@ limitations under the License.
 #include "quicer_nif.h"
 
 #include <dlfcn.h>
+
+#if defined(__linux__)
 #include <features.h>
+#endif
 
 #include "quicer_listener.h"
 #include "quicer_vsn.h"
