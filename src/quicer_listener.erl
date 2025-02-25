@@ -17,6 +17,8 @@
 
 -behaviour(gen_server).
 
+-include("quicer_types.hrl").
+
 %% API
 -export([
     start_link/3,
@@ -49,9 +51,18 @@
     opts_tab :: ets:tid()
 }).
 
--export_type([listener_name/0]).
+-export_type([
+    listener_name/0,
+    listener_opts/0
+]).
 
 -type listener_name() :: atom().
+
+-type listener_opts() :: {
+    listen_opts() | proplists:proplist(),
+    conn_opts() | proplists:proplist(),
+    stream_opts() | proplists:proplist()
+}.
 
 %%%===================================================================
 %%% API
@@ -101,7 +112,7 @@ reload(Pid, NewConf) ->
 %% @NOTE: the acceptor opts and stream opts are not reloaded.
 %%%       if you want to reload them, you should restart the listener (terminate and spawn).
 %% @end
--spec reload(pid(), quicer:listen_on(), NewConf :: map() | {map(), map(), map()}) ->
+-spec reload(pid(), quicer:listen_on(), NewConf :: listener_opts()) ->
     ok | {error, _}.
 reload(Pid, ListenOn, NewConf) ->
     gen_server:call(Pid, {reload, ListenOn, NewConf}, infinity).
@@ -116,7 +127,7 @@ count_conns(Pid) ->
     gen_server:call(Pid, count_conns, infinity).
 
 %% @doc get the listener configuration
--spec get_conf(pid(), timeout()) -> {map(), map(), map()}.
+-spec get_conf(pid(), timeout()) -> listener_opts().
 get_conf(Pid, Timeout) ->
     gen_server:call(Pid, get_conf, Timeout).
 
@@ -262,14 +273,14 @@ terminate(_Reason, #state{listener = L}) ->
     _ = quicer:close_listener(L),
     ok.
 
--spec do_reload(quicer:listen_on(), map() | {map(), map(), map()}, #state{}) ->
+-spec do_reload(quicer:listen_on(), listener_opts(), #state{}) ->
     {ok | {error, any()}, #state{}}.
-do_reload(ListenOn, NewConf, #state{opts_tab = OptsTab} = State) ->
+do_reload(ListenOn, {LOpts, _, _} = NewConf, #state{opts_tab = OptsTab} = State) ->
     _ = quicer:stop_listener(State#state.listener),
     Res = quicer:start_listener(
         State#state.listener,
         ListenOn,
-        NewConf
+        LOpts
     ),
     case Res of
         ok ->
@@ -291,9 +302,7 @@ conf_tab_refresh(Tab, {LOpts, COpts, SOpts}) ->
         {l_opts, to_map(LOpts)},
         {c_opts, to_map(COpts)},
         {s_opts, to_map(SOpts)}
-    ]);
-conf_tab_refresh(Tab, LOpts) ->
-    ets:insert(Tab, {l_opts, to_map(LOpts)}).
+    ]).
 
 to_map(Opts) when is_list(Opts) ->
     maps:from_list(Opts);

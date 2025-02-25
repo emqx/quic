@@ -184,8 +184,7 @@
     probe_res/0
 ]).
 
--type connection_opts() :: proplists:proplist() | conn_opts().
--type listener_opts() :: proplists:proplist() | listen_opts().
+-type listener_opts() :: quicer_listener:listener_opts().
 
 %% @doc Return ABI version of the library.
 -spec abi_version() -> quicer_nif:abi_version().
@@ -316,7 +315,7 @@ stop_listener(Handle) ->
 -spec spawn_listener(
     Appname :: atom() | listener_handle(),
     listen_on(),
-    {listener_opts(), connection_opts(), stream_opts() | user_opts()}
+    listener_opts()
 ) ->
     {ok, pid()} | {error, any()}.
 spawn_listener(AppName, Port, Options) when is_atom(AppName) ->
