@@ -185,7 +185,6 @@
 ]).
 
 -type connection_opts() :: proplists:proplist() | conn_opts().
--type listener_opts() :: proplists:proplist() | listen_opts().
 
 %% @doc Return ABI version of the library.
 -spec abi_version() -> quicer_nif:abi_version().

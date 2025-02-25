@@ -74,6 +74,12 @@
 -type registration_profile() :: execution_profile().
 -type quic_handle_level() :: quic_tls | quic_configuration | false.
 
+-type listener_opts() :: {
+    map() | proplists:proplist(),
+    map() | proplists:proplist(),
+    map() | proplists:proplist()
+}.
+
 -type listen_on() :: inet:port_number() | string().
 -type listen_opts() :: listen_security_opts() | quic_settings().
 -type listen_security_opts() :: #{

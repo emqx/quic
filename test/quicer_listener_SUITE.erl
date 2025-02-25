@@ -528,7 +528,7 @@ tc_listener_conf_reload(Config) ->
         {cacertfile, filename:join(DataDir, "other-ca.pem")}
     ],
     NewListenerOpts = ListenerOpts ++ NewCerts,
-    ok = quicer_listener:reload(QuicApp, NewListenerOpts),
+    ok = quicer_listener:reload(QuicApp, {NewListenerOpts, ConnectionOpts, StreamOpts}),
     %% THEN: the listener handle is unchanged
     ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
 
@@ -619,7 +619,7 @@ tc_listener_conf_reload_listen_on(Config) ->
     {ok, LHandle} = quicer_listener:get_handle(QuicApp, 5000),
     %% WHEN: the listener is reloaded with ListenOn (new bind address)
     NewPort = select_port(),
-    ok = quicer_listener:reload(QuicApp, NewPort, ListenerOpts),
+    ok = quicer_listener:reload(QuicApp, NewPort, Options),
     %% THEN: the listener handle is unchanged
     %%
     ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
@@ -702,7 +702,7 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
     %% WHEN: the listener is reloaded with ListenOn (new invalid bind address)
     NewPort = 1,
     %% THEN: We get error
-    {error, _, _} = quicer_listener:reload(QuicApp, NewPort, ListenerOpts),
+    {error, _, _} = quicer_listener:reload(QuicApp, NewPort, Options),
     %% THEN: the listener handle is unchanged
     ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
 
