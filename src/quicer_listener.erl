@@ -58,6 +58,12 @@
 
 -type listener_name() :: atom().
 
+-type listener_opts() :: {
+    listen_opts() | proplists:proplist(),
+    conn_opts() | proplists:proplist(),
+    stream_opts() | proplists:proplist()
+}.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
