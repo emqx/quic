@@ -25,8 +25,20 @@ Project Status: Preview
 
 ``` erlang
 {deps, [
-    {quicer, {git, "https://github.com/qzhuyan/quic.git", {tag, "0.1.0"}}},
+    {quicer, {git, "https://github.com/emqx/quic.git", {tag, "0.2.4"}}},
     ...
+```
+
+## mix.exs
+
+``` elixir
+defp deps do
+  [
+    {:dep_from_git, git: "https://github.com/emqx/quic.git", tag: "0.2.4"},
+    ...
+  ]
+end
+
 ```
 
 # Examples
