@@ -34,7 +34,7 @@ Project Status: Preview
 ``` elixir
 defp deps do
   [
-    {:dep_from_git, git: "https://github.com/emqx/quic.git", tag: "0.2.4"},
+    {:quicer, git: "https://github.com/emqx/quic.git", tag: "0.2.4"},
     ...
   ]
 end
