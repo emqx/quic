@@ -852,7 +852,8 @@ do_recv(Stream, Count, Buff) ->
 %% Caller should handle the async signals for the send results
 %%
 %% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
-%% @see send/2 send_dgram/2
+%% @see send/2
+%% @see send_dgram/2
 -spec async_send_dgram(connection_handle(), binary()) ->
     {ok, non_neg_integer()}
     | {error, badarg | not_enough_mem | invalid_parameter | closed}
@@ -866,7 +867,8 @@ async_send_dgram(Conn, Data) ->
 %%  otherwise, it is fire and forget.
 %%
 %% %% ref: [https://datatracker.ietf.org/doc/html/rfc9221]
-%% @see send/2, async_send_dgram/2
+%% @see send/2
+%% @see async_send_dgram/2
 -spec send_dgram(connection_handle(), binary()) ->
     {ok, BytesSent :: non_neg_integer()}
     | {error, badarg | not_enough_mem | invalid_parameter | closed}
