@@ -59,7 +59,7 @@ prop_client_state_test() ->
 %%%%%%%%%%%%%
 %% @doc Initial model value at system start. Should be deterministic.
 initial_state() ->
-    net_kernel:start([?MODULE, shortnames]),
+    %% net_kernel:start([?MODULE, shortnames]),
     {ok, H} = quicer:connect("localhost", 14568, default_conn_opts(), 10000),
     #{
         state => connected,
