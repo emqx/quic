@@ -1,0 +1,23 @@
+From 9261dacc1dd9a67f6fa8d5fbe663082508b4c605 Mon Sep 17 00:00:00 2001
+From: William Yang <mscame@gmail.com>
+Date: Thu, 19 Dec 2024 13:36:38 +0100
+Subject: [PATCH] fix(epoll): buffer overflow when GSO off
+
+---
+ src/platform/datapath_epoll.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/platform/datapath_epoll.c b/src/platform/datapath_epoll.c
+index 92ad4a34aa..9176427831 100644
+--- a/src/platform/datapath_epoll.c
++++ b/src/platform/datapath_epoll.c
+@@ -2154,7 +2154,8 @@ CxPlatSendDataFinalizeSendBuffer(
+         struct iovec* IoVec = &SendData->Iovs[SendData->BufferCount - 1];
+         IoVec->iov_base = SendData->ClientBuffer.Buffer;
+         IoVec->iov_len = SendData->ClientBuffer.Length;
+-        if (SendData->TotalSize + SendData->SegmentSize > sizeof(SendData->Buffer) ||
++        if (SendData->SegmentSize == 0 ||
++            SendData->TotalSize + SendData->SegmentSize > sizeof(SendData->Buffer) ||
+             SendData->BufferCount == SendData->SocketContext->DatapathPartition->Datapath->SendIoVecCount) {
+             SendData->ClientBuffer.Buffer = NULL;
+         } else {
