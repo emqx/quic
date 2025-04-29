@@ -51,6 +51,7 @@
     tc_stream_client_send_binary/1,
     tc_stream_client_send_iolist/1,
     tc_stream_client_async_send/1,
+    tc_stream_client_send_seq/1,
 
     tc_stream_passive_receive/1,
     tc_stream_passive_receive_shutdown/1,
@@ -386,6 +387,36 @@ tc_stream_client_send_binary(Config) ->
             flush_datagram_state_changed(Conn),
             receive
                 {quic, <<"pong">>, _, _} ->
+                    ok = quicer:close_stream(Stm),
+                    ok = quicer:close_connection(Conn);
+                Other ->
+                    ct:fail("Unexpected Msg ~p", [Other])
+            end,
+            SPid ! done,
+            ok = ensure_server_exit_normal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
+tc_stream_client_send_seq(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready ->
+            {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+            {ok, Stm} = quicer:start_stream(Conn, []),
+            {ok, 1} = quicer:send(Stm, <<16>>),
+            Payload = list_to_binary(lists:seq(2, 30)),
+            Len = byte_size(Payload),
+            {ok, 33} = quicer:send(Stm, <<Len:32, Payload/binary>>),
+            flush_streams_available(Conn),
+            flush_datagram_state_changed(Conn),
+            receive
+                {quic, <<16, Len:32, _/binary>>, _, _} ->
+                    ok = quicer:close_stream(Stm),
+                    ok = quicer:close_connection(Conn);
+                {quic, <<16>>, _, _} ->
                     ok = quicer:close_stream(Stm),
                     ok = quicer:close_connection(Conn);
                 Other ->
