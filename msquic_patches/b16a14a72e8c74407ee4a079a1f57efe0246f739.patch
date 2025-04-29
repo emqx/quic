@@ -1,0 +1,22 @@
+From b16a14a72e8c74407ee4a079a1f57efe0246f739 Mon Sep 17 00:00:00 2001
+From: William Yang <mscame@gmail.com>
+Date: Thu, 16 May 2024 10:21:54 +0200
+Subject: [PATCH] fix: buffer overflow in quic_trace
+
+---
+ src/generated/stdout/quic_trace.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/generated/stdout/quic_trace.c b/src/generated/stdout/quic_trace.c
+index d550d20101..8c79b270bf 100644
+--- a/src/generated/stdout/quic_trace.c
++++ b/src/generated/stdout/quic_trace.c
+@@ -49,7 +49,7 @@ char * casted_clog_bytearray(const uint8_t * const data,
+         param->str = CXPLAT_ALLOC_PAGED(len * 2 + 1, QUIC_POOL_TMP_ALLOC);
+         if (param->str) {
+             EncodeHexBuffer((uint8_t *)data, (uint8_t)len, param->str);
+-            param->str[len * 2 + 1] = 0;
++            param->str[len * 2] = 0;
+         }
+ 
+     } else {

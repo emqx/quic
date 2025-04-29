@@ -1,0 +1,43 @@
+From 12edf3725475d4a99e5598df3289bace47b8f56e Mon Sep 17 00:00:00 2001
+From: Nick Banks <nibanks@microsoft.com>
+Date: Mon, 18 Mar 2024 12:34:17 -0400
+Subject: [PATCH] Fix Posix QuicAddrToString (#4197)
+
+---
+ src/inc/msquic_posix.h | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/inc/msquic_posix.h b/src/inc/msquic_posix.h
+index 612d67afb4..27393e1233 100644
+--- a/src/inc/msquic_posix.h
++++ b/src/inc/msquic_posix.h
+@@ -489,16 +489,18 @@ QuicAddrToString(
+     _Out_ QUIC_ADDR_STR* AddrStr
+     )
+ {
++    size_t AvailSpace = sizeof(AddrStr->Address);
+     char* Address = AddrStr->Address;
+     if (Addr->Ip.sa_family == QUIC_ADDRESS_FAMILY_INET6 && Addr->Ipv6.sin6_port != 0) {
+         Address[0] = '[';
+         Address++;
++        AvailSpace--;
+     }
+     if (inet_ntop(
+             Addr->Ip.sa_family == QUIC_ADDRESS_FAMILY_INET ? AF_INET : AF_INET6,
+             Addr->Ip.sa_family == QUIC_ADDRESS_FAMILY_INET ? (void*)&Addr->Ipv4.sin_addr : (void*)&Addr->Ipv6.sin6_addr,
+             Address,
+-            sizeof(QUIC_ADDR_STR)) == NULL) {
++            AvailSpace) == NULL) {
+         return FALSE;
+     }
+     if (Addr->Ipv4.sin_port != 0) {
+@@ -507,7 +509,8 @@ QuicAddrToString(
+             Address[0] = ']';
+             Address++;
+         }
+-        snprintf(Address, 64, ":%hu", ntohs(Addr->Ipv4.sin_port));
++        AvailSpace = sizeof(AddrStr->Address) - (Address - AddrStr->Address);
++        snprintf(Address, AvailSpace, ":%hu", ntohs(Addr->Ipv4.sin_port));
+     }
+     return TRUE;
+ }

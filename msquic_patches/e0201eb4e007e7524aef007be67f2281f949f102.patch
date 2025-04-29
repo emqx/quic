@@ -1,0 +1,25 @@
+From e0201eb4e007e7524aef007be67f2281f949f102 Mon Sep 17 00:00:00 2001
+From: Nick Banks <nibanks@microsoft.com>
+Date: Wed, 25 Sep 2024 14:16:29 -0400
+Subject: [PATCH] Zero out memory from PacketNumber in
+ QuicBindingPreprocessPacket (#4560)
+
+---
+ src/core/binding.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/binding.c b/src/core/binding.c
+index 68d538f8fd..b0296a0ca5 100644
+--- a/src/core/binding.c
++++ b/src/core/binding.c
+@@ -1134,7 +1134,9 @@ QuicBindingPreprocessPacket(
+     _Out_ BOOLEAN* ReleaseDatagram
+     )
+ {
+-    CxPlatZeroMemory(&Packet->PacketNumber, sizeof(QUIC_RX_PACKET) - sizeof(uint64_t));
++    CxPlatZeroMemory(   // Zero out everything from PacketNumber forward
++        &Packet->PacketNumber,
++        sizeof(QUIC_RX_PACKET) - offsetof(QUIC_RX_PACKET, PacketNumber));
+     Packet->AvailBuffer = Packet->Buffer;
+     Packet->AvailBufferLength = Packet->BufferLength;
+ 

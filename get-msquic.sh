@@ -10,7 +10,12 @@ do_patch()
 {
     patch_source="$1"
     patch_file="${patch_dir}/$(basename ${patch_source})"
-    curl -f -L -o "${patch_file}" "$patch_source"
+
+    if [ -f "${patch_file}" ]; then
+        echo "Patch ${patch_file} already exists, skipping download"
+    else
+        curl -f -L -o "${patch_file}" "$patch_source"
+    fi
     if patch -p1 -f --dry-run -s < "${patch_file}" 2>/dev/null; then
         patch -p1 < "${patch_file}"
     else
@@ -42,7 +47,9 @@ patch_2_3_8()
     local patch_2="https://github.com/microsoft/msquic/commit/e0201eb4e007e7524aef007be67f2281f949f102.patch"
     local patch_3="https://github.com/microsoft/msquic/commit/b16a14a72e8c74407ee4a079a1f57efe0246f739.patch"
     local patch_4="https://github.com/microsoft/msquic/pull/4717/commits/9261dacc1dd9a67f6fa8d5fbe663082508b4c605.patch"
-    mkdir -p "$patch_dir"
+    if [ ! -d "$patch_dir" ]; then
+        ln -s ../msquic_patches "$patch_dir"
+    fi
     echo "Patching Msquic 2.3.8"
     for p in patch_1 patch_2 patch_3 patch_4; do
         do_patch "${!p}"
