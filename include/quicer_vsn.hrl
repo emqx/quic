@@ -13,8 +13,6 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 %%--------------------------------------------------------------------
--hank ignore.
-
 -ifndef(QUICER_VSN_HRL).
 -define(QUICER_VSN_HRL, true).
 -define(QUICER_ABI_VERSION, 1).
