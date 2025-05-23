@@ -135,7 +135,7 @@ command(#{stream_set := SS}) ->
         {call, quicer, start_stream, [C, ?LET(Opts, quicer_stream_opts(), Opts)]},
         {call, quicer, async_accept_stream, [C, ?LET(Opt, stream_accept_opts(), Opt)]},
         {call, quicer, async_send, [random_stream(SS), binary()]},
-        {call, quicer, async_send, [remote_stream(SS), binary()]},
+        {call, quicer, async_send, [remote_stream(), binary()]},
         {call, ?MODULE, send_recv, [random_stream(SS), binary()]},
         {call, quicer, async_shutdown_stream, [random_stream(SS)]},
         {call, quicer, async_close_stream, [random_stream(SS)]},
@@ -248,7 +248,7 @@ close_remote_stream() ->
         ok
     end.
 
-remote_stream(_) ->
+remote_stream() ->
     receive
         {new_stream, Stream, _, _} ->
             quicer:async_send(Stream, binary())

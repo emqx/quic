@@ -178,14 +178,9 @@
     select_free_port/1
 ]).
 
-%% -include_lib("proper/include/proper.hrl").
 -include_lib("common_test/include/ct.hrl").
 -include_lib("kernel/include/inet.hrl").
 -include_lib("stdlib/include/assert.hrl").
-
--define(PROPTEST(M, F), true = proper:quickcheck(M:F())).
-
--define(SERVER_KEY_PASSWORD, "sErve7r8Key$!").
 
 all() ->
     quicer_test_lib:all_tcs(?MODULE).

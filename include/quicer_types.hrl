@@ -19,6 +19,9 @@
 
 -include("quicer.hrl").
 
+%% https://github.com/AdRoll/rebar3_hank/issues/155
+-hank([{unused_macros, [{"MASK", 1}]}]).
+
 -define(BIT(Bits), (1 bsl (Bits))).
 -define(MASK(Bits), (?BIT(Bits) - 1)).
 
