@@ -100,6 +100,8 @@
     reg_handle/0
 ]).
 
+-define(QUICER_ABI_VERSION, 1).
+
 %% NIF fuction return types
 -type abi_version() :: integer().
 -type new_registration() :: {ok, reg_handle()} | {error, atom_reason()}.
@@ -117,7 +119,6 @@
 -include_lib("kernel/include/file.hrl").
 -include("quicer.hrl").
 -include("quicer_types.hrl").
--include("quicer_vsn.hrl").
 
 -spec abi_version() -> abi_version().
 abi_version() ->

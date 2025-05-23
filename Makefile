@@ -84,7 +84,7 @@ clang-format:
 	clang-format-14 --Werror --dry-run c_src/*
 
 .PHONY: ci
-ci: test dialyzer
+ci: test dialyzer hank
 
 .PHONY: tar
 tar:
@@ -97,3 +97,7 @@ doc:
 .PHONY: publish
 publish:
 	$(REBAR) as doc hex publish
+
+.PHONY: hank
+hank:
+	$(REBAR) hank

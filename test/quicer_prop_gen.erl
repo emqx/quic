@@ -44,6 +44,9 @@
 
 -include("prop_quic_types.hrl").
 
+-define(dummy_listener, dummy_listener).
+-define(DUMMY_PORT, 14567).
+
 valid_handle() ->
     oneof([
         valid_connection_handle(),
