@@ -117,6 +117,7 @@
 -include_lib("kernel/include/file.hrl").
 -include("quicer.hrl").
 -include("quicer_types.hrl").
+-include("quicer_vsn.hrl").
 
 -spec abi_version() -> abi_version().
 abi_version() ->
