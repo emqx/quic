@@ -18,6 +18,9 @@
 
 -include("quicer_types.hrl").
 
+%% this module uses optional callbacks that should be implemented in this generic module
+-hank([unused_callbacks]).
+
 -export([
     start/4,
     start_link/3,

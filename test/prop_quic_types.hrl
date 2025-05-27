@@ -21,9 +21,6 @@
     destructor :: fun()
 }).
 
--define(dummy_listener, dummy_listener).
--define(DUMMY_PORT, 14567).
-
 -define(valid_flags(FlagType),
     (?SUCHTHAT(
         Flag,
