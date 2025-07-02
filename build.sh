@@ -69,15 +69,31 @@ download() {
 }
 
 # rebar3 deref softlinks while packaging
-# so we dref at here to keep one dynlib file to avoid dup files in EMQX package
+# so we deref at here to keep one dynlib file to avoid dup files in EMQX package
 # - priv/libquicer_nif.so
-# - priv/libquicer_nif.so.1
+# - priv/libquicer_nif.so.1  
 # - priv/libquicer_nif.so.504
+# Also handle msquic symlinks in lib/ subdirectory for mix release compatibility
 remove_dups() {
-    cp -L $TARGET_SO ${TARGET_SO}tmp
+    # Handle main NIF library symlinks (though with CMakeLists.txt changes, there should be none)
+    if [ -L "$TARGET_SO" ]; then
+        cp -L $TARGET_SO ${TARGET_SO}tmp
+        rm -f ${TARGET_SO}.*
+        rm -f ${TARGET_SO}-.*
+        mv ${TARGET_SO}tmp $TARGET_SO
+    fi
+    
+    # Remove versioned symlinks but keep only the base versioned file
     rm -f ${TARGET_SO}.*
     rm -f ${TARGET_SO}-.*
-    mv ${TARGET_SO}tmp $TARGET_SO
+    
+    # Handle msquic library symlinks in lib/ subdirectory  
+    if [ -d "priv/lib" ]; then
+        # Remove the symlinks, keeping only the actual versioned file
+        find priv/lib -type l -name "libmsquic.so*" | while read -r symlink; do
+            rm -f "$symlink"
+        done
+    fi
 }
 
 release() {
@@ -119,6 +135,7 @@ else
         fi
     else
         build
+        remove_dups
     fi
 fi
 

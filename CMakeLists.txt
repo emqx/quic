@@ -206,8 +206,7 @@ add_dependencies(quicer_static msquic)
 set_target_properties(quicer_nif
     PROPERTIES
         LIBRARY_OUTPUT_NAME quicer_nif${LIBNAME_SUFFIX}
-        VERSION ${QUICER_VERSION}
-        SOVERSION ${QUICER_ABI_VERSION}
+
 )
 include(GNUInstallDirs)
 install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
