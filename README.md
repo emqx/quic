@@ -41,6 +41,15 @@ end
 
 ```
 
+## Mix Release Compatibility
+
+This library has been optimized for `mix release` compatibility. The build process ensures that no symlinks are created in the `priv/` directory, preventing file duplication during release packaging. This keeps the library size minimal (~14MB) instead of growing to ~23MB due to symlink dereferencing.
+
+The build automatically:
+- Creates single library files without versioned symlinks
+- Removes any symlinks that might be created during the build process
+- Maintains compatibility with hot upgrades through proper ABI versioning
+
 # Examples
 
 ## Ping Pong server and client
