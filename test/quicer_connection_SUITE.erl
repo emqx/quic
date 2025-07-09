@@ -23,6 +23,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("snabbkaffe/include/snabbkaffe.hrl").
+-include_lib("kernel/include/file.hrl").
 
 -import(quicer_test_lib, [
     default_listen_opts/1,
@@ -286,6 +287,12 @@ tc_conn_basic_verify_peer_no_cacert(Config) ->
     SPid ! done,
     ensure_server_exit_normal(Ref),
     ok.
+
+tc_sslkeylog_when_verify_fail(Config) ->
+    ServerTargetFName = "SSLKEYLOGFILE",
+    file:delete(ServerTargetFName),
+    ok = tc_conn_basic_verify_peer_no_cacert([{sslkeylogfile, ServerTargetFName} | Config]),
+    {ok, #file_info{type = regular}} = file:read_file_info(ServerTargetFName).
 
 tc_conn_timeout(Config) ->
     Port = select_port(),
