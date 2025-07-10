@@ -91,6 +91,8 @@ static QUIC_STATUS handle_connection_event_peer_certificate_received(
 
 static void put_conn_handles(ErlNifEnv *env, ERL_NIF_TERM conn_handles);
 
+static void safe_dump_conn_tls_secrets(QuicerConnCTX *c_ctx);
+
 BOOLEAN
 parse_registration(ErlNifEnv *env,
                    ERL_NIF_TERM options,
@@ -275,6 +277,20 @@ dump_sslkeylogfile(_In_z_ const char *FileName,
   fclose(File);
 }
 
+static void
+safe_dump_conn_tls_secrets(QuicerConnCTX *c_ctx)
+{
+
+  if (NULL != c_ctx && NULL != c_ctx->TlsSecrets
+      && NULL != c_ctx->ssl_keylogfile)
+    {
+      dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
+      // @NOTE: only free ssl_keylogfile not TlsSecrets
+      CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
+      c_ctx->ssl_keylogfile = NULL;
+    }
+}
+
 // Assign registration for c_ctx
 // 1. use `quic_registration` option if set, otherwise use global registration
 // 2. take the registration handle for resource management
@@ -416,6 +432,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   if (is_destroy)
     {
       enif_mutex_lock(c_ctx->lock);
+      safe_dump_conn_tls_secrets(c_ctx);
       c_ctx->is_closed = TRUE; // client shutdown completed
       enif_mutex_unlock(c_ctx->lock);
 
@@ -531,8 +548,8 @@ ServerConnectionCallback(HQUIC Connection,
   if (is_destroy)
     {
       enif_mutex_lock(c_ctx->lock);
-      c_ctx->is_closed = TRUE; // server shutdown_complete
-      // c_ctx->config_ctx = NULL;
+      safe_dump_conn_tls_secrets(c_ctx);
+      c_ctx->is_closed = TRUE;
       enif_mutex_unlock(c_ctx->lock);
 
       put_conn_handle(c_ctx);
@@ -1183,13 +1200,7 @@ handle_connection_event_connected(QuicerConnCTX *c_ctx,
       c_ctx->env, ATOM_CONNECTED, ConnHandle, props_name, props_value, 2);
 
   // Client&Server Dump SSL Key Log File
-  if (NULL != c_ctx->TlsSecrets && NULL != c_ctx->ssl_keylogfile)
-    {
-      dump_sslkeylogfile(c_ctx->ssl_keylogfile, *(c_ctx->TlsSecrets));
-      // @NOTE: only free ssl_keylogfile not TlsSecrets
-      CXPLAT_FREE(c_ctx->ssl_keylogfile, QUICER_TRACE);
-      c_ctx->ssl_keylogfile = NULL;
-    }
+  safe_dump_conn_tls_secrets(c_ctx);
 
   // testing this, just unblock acceptor
   // should pick a 'acceptor' here?
