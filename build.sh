@@ -23,9 +23,33 @@ build() {
         JOBS="$(nproc)"
     fi
     ./get-msquic.sh "$MSQUIC_VERSION"
-    cmake -B c_build -G "${GENERATOR}"
+    
+    # Configure CMake with symlinks disabled by default for mix release compatibility
+    CMAKE_OPTS=""
+    if [ "${QUICER_ENABLE_INSTALL_SYMLINKS:-0}" = "1" ]; then
+        CMAKE_OPTS="-DQUICER_ENABLE_INSTALL_SYMLINKS=ON"
+        echo "QUICER: Building with symlinks enabled for hot upgrade support"
+    else
+        CMAKE_OPTS="-DQUICER_ENABLE_INSTALL_SYMLINKS=OFF"
+        echo "QUICER: Building without symlinks for mix release compatibility"
+    fi
+    
+    cmake -B c_build -G "${GENERATOR}" ${CMAKE_OPTS}
     $MakeCmd -C c_build -j "$JOBS"
-    $MakeCmd -C c_build install
+    
+    # Install behavior depends on symlink option
+    if [ "${QUICER_ENABLE_INSTALL_SYMLINKS:-0}" = "1" ]; then
+        $MakeCmd -C c_build install
+    else
+        # Copy the built library directly to priv without symlinks
+        cp c_build/priv/libquicer_nif${LIBNAME_SUFFIX}.so priv/libquicer_nif.so
+        # Also copy msquic library if it exists
+        if [ -d "c_build/priv/lib" ]; then
+            mkdir -p priv/lib
+            cp c_build/priv/lib/libmsquic.so* priv/lib/ 2>/dev/null || true
+        fi
+    fi
+    
     ## MacOS
     if [ -f priv/libquicer_nif.dylib ]; then
         # https://developer.apple.com/forums/thread/696460
@@ -131,11 +155,12 @@ else
             build
         else
             echo "QUICER: NOTE! nif library is downloaded from prebuilt releases, not compiled from source!"
+            # Only remove dups for prebuilt downloads as they may contain symlinks
             remove_dups
         fi
     else
         build
-        remove_dups
+        # No need to call remove_dups as we control symlinks at CMake level
     fi
 fi
 

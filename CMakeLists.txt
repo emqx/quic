@@ -6,6 +6,11 @@ project(quicer)
 ## Bump manually when ABI changes
 set(QUICER_ABI_VERSION 1)
 
+## Option to control symlink creation for hot upgrade support
+## When OFF, no symlinks are created (better for mix release)
+## When ON, versioned symlinks are created (required for hot upgrade)
+option(QUICER_ENABLE_INSTALL_SYMLINKS "Enable installation of versioned symlinks for hot upgrade support" OFF)
+
 SET(Erlang_EI_INCLUDE_DIRS   ${Erlang_OTP_LIB_DIR}/${Erlang_EI_DIR}/include)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/priv/)
 
@@ -203,13 +208,23 @@ target_include_directories(quicer_nif PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include
 add_dependencies(quicer_nif quicer_static)
 add_dependencies(quicer_static msquic)
 
-set_target_properties(quicer_nif
-    PROPERTIES
-        LIBRARY_OUTPUT_NAME quicer_nif${LIBNAME_SUFFIX}
-
-)
+if(QUICER_ENABLE_INSTALL_SYMLINKS)
+    set_target_properties(quicer_nif
+        PROPERTIES
+            LIBRARY_OUTPUT_NAME quicer_nif${LIBNAME_SUFFIX}
+            VERSION ${QUICER_VERSION}
+            SOVERSION ${QUICER_ABI_VERSION}
+    )
+else()
+    set_target_properties(quicer_nif
+        PROPERTIES
+            LIBRARY_OUTPUT_NAME quicer_nif${LIBNAME_SUFFIX}
+    )
+endif()
 include(GNUInstallDirs)
-install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
+if(QUICER_ENABLE_INSTALL_SYMLINKS)
+    install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
+endif()
 
 ## workaround for emqx forked rebar3
 ## For none-emqx rebar3, it should be just a noop of 'Up-to-date' instead of 'installing'
