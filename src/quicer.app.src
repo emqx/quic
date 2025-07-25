@@ -30,7 +30,9 @@
         "get-msquic.sh",
         "c_build",
         "build.sh",
-        "pkgname.sh"
+        "pkgname.sh",
+        "templates",
+        "msquic_patches"
     ]},
     {exclude_regexps, ["priv/.*.so"]}
 ]}.
