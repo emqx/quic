@@ -42,7 +42,7 @@ build() {
         $MakeCmd -C c_build install
     else
         # Copy the built library directly to priv without symlinks
-        cp c_build/priv/libquicer_nif${LIBNAME_SUFFIX}.so priv/libquicer_nif.so
+        cp c_build/priv/libquicer_nif*.so priv/libquicer_nif.so
         # Also copy msquic library if it exists
         if [ -d "c_build/priv/lib" ]; then
             mkdir -p priv/lib
