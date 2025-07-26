@@ -37,7 +37,7 @@ build() {
 }
 
 download() {
-    TAG="$(git describe --tags | head -1)"
+    TAG=${QUICER_VERSION:-"$(git describe --tags | head -1)"}
     URL="https://github.com/emqx/quic/releases/download/$TAG/$PKGNAME"
     mkdir -p _packages
     if [ ! -f "_packages/${PKGNAME}" ]; then
