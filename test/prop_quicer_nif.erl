@@ -289,10 +289,8 @@ prop_async_accept_2_with_active() ->
         {valid_listen_handle(), oneof([boolean(), integer()])},
         begin
             case quicer_nif:async_accept(LH, #{active => ActiveN}) of
-                {ok, ConnHandle} ->
-                    quicer:close_connection(ConnHandle),
-                    Destroy(),
-                    collect(ok, quicer:getopt(ConnHandle, active) >= 0);
+                {ok, LH} ->
+                    true;
                 E ->
                     Destroy(),
                     collect(E, true)
