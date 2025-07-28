@@ -31,6 +31,7 @@ jobs:
           - openssl
           - sys
         os:
+          - macos-13
           - macos-14
           - macos-15
     runs-on: ${{ matrix.os }}
@@ -75,10 +76,10 @@ jobs:
       fail-fast: false
       matrix:
         erlang:
-          - otp: 26.2.5.2-3
-            builder: 5.4-4:1.15.7-26.2.5.2-3
-          - otp: 27.2-2
-            builder: 5.4-4:1.17.3-27.2-2
+          - otp: 26.2.5.14-1
+            builder: 5.5-5:1.15.7-26.2.5.14-1
+          - otp: 27.3.4.2-1
+            builder: 5.5-5:1.18.3-27.3.4.2-1
         openssl:
           - openssl3
           - openssl
@@ -97,6 +98,7 @@ jobs:
           - amzn2
           - el9
           - el8
+          - el7
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
     steps:

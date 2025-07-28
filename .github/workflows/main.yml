@@ -128,8 +128,8 @@ jobs:
         # https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt
         otp:
           - '25.3.2.9'
-          - '26.2.5.3'
-          - '27.2'
+          - '26.2.5.14'
+          - '27.3'
         openssl:
           - openssl3
           - openssl
