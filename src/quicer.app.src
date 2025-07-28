@@ -28,9 +28,11 @@
         "CMakeLists.txt",
         "Makefile",
         "get-msquic.sh",
-        "c_build",
         "build.sh",
-        "pkgname.sh"
+        "pkgname.sh",
+        "templates",
+        "msquic_patches",
+        "rel.mk"
     ]},
     {exclude_regexps, ["priv/.*.so"]}
 ]}.
