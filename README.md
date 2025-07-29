@@ -41,6 +41,29 @@ end
 
 ```
 
+## Mix Release Compatibility
+
+This library has been optimized for `mix release` compatibility. By default, the build process creates library files without versioned symlinks, preventing file duplication during release packaging. This keeps the library size minimal (~14MB) instead of growing to ~23MB due to symlink dereferencing.
+
+### CMake Options
+
+- `QUICER_ENABLE_INSTALL_SYMLINKS=OFF` (default): Creates single library files without versioned symlinks for mix release compatibility
+- `QUICER_ENABLE_INSTALL_SYMLINKS=ON`: Creates versioned symlinks required for hot upgrade support
+
+### Environment Variables
+
+Set `QUICER_ENABLE_INSTALL_SYMLINKS=1` to enable symlink creation:
+
+```bash
+export QUICER_ENABLE_INSTALL_SYMLINKS=1
+mix compile
+```
+
+The build automatically:
+- Creates single library files without versioned symlinks by default
+- Maintains compatibility with hot upgrades when symlinks are enabled
+- Removes symlinks from prebuilt downloads to ensure consistency
+
 # Examples
 
 ## Ping Pong server and client
