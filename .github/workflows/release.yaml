@@ -99,6 +99,12 @@ jobs:
           - el9
           - el8
           - el7
+        exclude:
+          - os: el7
+            openssl: sys
+          - os: el7
+            openssl: openssl3
+
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
     steps:
@@ -116,7 +122,8 @@ jobs:
             ghcr.io/emqx/emqx-builder/${{ matrix.erlang.builder }}-${{ matrix.os }} \
               bash -euc '\
                 git config --global --add safe.directory /wd; \
-                grep -q "\"Amazon Linux 2\"" /etc/os-release && alternatives --set python /usr/bin/python2; \
+                grep -q "\"Amazon Linux 2\"\|\"CentOS-7\"" /etc/os-release && alternatives --set python /usr/bin/python2; \
+                export QUICER_TLS_VER; \
                 which yum && yum install -y perl-IPC-Cmd; \
                 make'
 
