@@ -141,16 +141,40 @@ jobs:
       - emqx-linux
     if: github.event.inputs.ref_name || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     steps:
+      - uses: actions/checkout@v4
+
+      # Download all artifacts from both jobs into packages/
       - uses: actions/download-artifact@v4
         with:
           pattern: 'quicer-*'
           path: packages
           merge-multiple: true
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: quicer ${{ github.event.inputs.ref_name || github.ref_name }} Released
-          tag_name: ${{ github.event.inputs.ref_name || github.ref_name }}
-          files: packages/*
-          draft: true
-          prerelease: false
+
+      # Check that packages/ exists and is not empty
+      - name: Check packages directory
+        run: |
+          if [ ! -d packages ] || [ -z "$(ls -A packages)" ]; then
+            echo "No artifacts found in packages/"
+            exit 1
+          fi
+
+      # Create the GitHub Release
+      - name: Create Release (empty)
+        run: |
+          gh release create "${{ github.event.inputs.ref_name || github.ref_name }}" --title "quicer ${{ github.event.inputs.ref_name || github.ref_name }} Released" --notes "Automated release" --draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release assets with delay
+        run: |
+          i=0
+          for f in packages/*; do
+            gh release upload "${{ github.event.inputs.ref_name || github.ref_name }}" "$f" --clobber
+            i=$((i+1))
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Sleeping to avoid rate limit..."
+              sleep 2
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
