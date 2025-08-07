@@ -208,9 +208,16 @@ set_target_properties(quicer_nif
         LIBRARY_OUTPUT_NAME quicer_nif${LIBNAME_SUFFIX}
         VERSION ${QUICER_VERSION}
         SOVERSION ${QUICER_ABI_VERSION}
+        SUFFIX .so
 )
 include(GNUInstallDirs)
 install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
+
+add_custom_command(
+    TARGET quicer_nif POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libquicer_nif.so
+    ${PROJECT_SOURCE_DIR}/priv/libquicer_nif.so)
 
 ## workaround for emqx forked rebar3
 ## For none-emqx rebar3, it should be just a noop of 'Up-to-date' instead of 'installing'
