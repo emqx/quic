@@ -27,7 +27,7 @@ build() {
     $MakeCmd -C c_build -j "$JOBS"
 
     ## Need lttng shared lib "libmsquic.lttng.so"
-    [[ "${QUIC_LOGGING_TYPE:-}" == "lttng" ]]  \
+    [ "${QUIC_LOGGING_TYPE:-}" = "lttng" ]  \
         && $MakeCmd -C c_build install
     true
 }
