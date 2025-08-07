@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ueo
+set -ueo pipefail
 
 MSQUIC_VERSION="$1"
 TARGET_SO='priv/libquicer_nif.so'
