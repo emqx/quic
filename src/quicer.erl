@@ -93,6 +93,7 @@
     negotiated_protocol/1,
     peername/1,
     peercert/1,
+    complete_cert_validation/3,
     listeners/0,
     listener/1,
     controlling_process/2,
@@ -415,7 +416,9 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
                     {ok, H};
                 {quic, transport_shutdown, H, Reason} ->
                     flush(closed, H),
-                    {error, transport_down, Reason}
+                    {error, transport_down, Reason};
+                {quic, peer_cert_received, H, Cert} ->
+                    {ok, H, Cert}
             end;
         {error, _} = Err ->
             Err
@@ -462,7 +465,8 @@ handshake(Conn, Timeout) ->
         ok ->
             receive
                 {quic, connected, Conn, _} -> {ok, Conn};
-                {quic, closed, Conn, _Flags} -> {error, closed}
+                {quic, closed, Conn, _Flags} -> {error, closed};
+                {quic, peer_cert_received, Conn, Cert} -> {ok, Conn, Cert}
             after Timeout ->
                 {error, timeout}
             end
@@ -1086,6 +1090,10 @@ peername(Handle) ->
     {ok, CertDerEncoded :: binary()} | {error, any()}.
 peercert(Handle) ->
     quicer_nif:peercert(Handle).
+
+-spec complete_cert_validation(connection_handle(), boolean(), integer()) -> ok | {error, any()}.
+complete_cert_validation(Conn, IsAccepted, TlsAlert) ->
+    quicer_nif:complete_cert_validation(Conn, IsAccepted, TlsAlert).
 
 %% @doc Return true if stream open flags has unidirectional flag set
 -spec is_unidirectional(stream_open_flags()) -> boolean().
