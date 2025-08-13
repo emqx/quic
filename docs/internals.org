@@ -275,7 +275,7 @@ SYNC call in non-callback-context
 | QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED     | {quic, send_dgram_completed, connection_handle()}                         |
 | QUIC_CONNECTION_EVENT_RESUMED                         | {quic, connection_resumed, connection_handle, false \vert binary()}       |
 | QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED      | {quic, nst_received, connection_handle(), Ticket::binary()}               |
-| QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | @TODO                                                                      |
+| QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | {quic, peer_cert_received, connection_handle(), Cert::binary()}            |
 |-------------------------------------------------------+----------------------------------------------------------------------------|
 
 
@@ -308,6 +308,17 @@ QUIC_STREAM_EVENT_PEER_ACCEPTED             = 9,
 | QUIC_STREAM_EVENT_SEND_SHUTDOWN_COMPLETE | @TODO                                                                           |
 | QUIC_STREAM_EVENT_IDEAL_SEND_BUFFER_SIZE | @TODO                                                                           |
 | QUIC_STREAM_EVENT_PEER_ACCEPTED          | {quic, peer_accepted, stream_handle()}                                         |
+
+* Custom Certificate Validation
+
+When `custom_verify` option is set to `true` in the connection options, the application will receive a `peer_cert_received` event.
+The application can then inspect the certificate and complete the validation by calling `quicer:complete_cert_validation/2`.
+
+** `quicer:complete_cert_validation/2`
+
+This function takes a connection handle and a boolean as arguments.
+If the boolean is `true`, the certificate is accepted and the handshake continues.
+If the boolean is `false`, the certificate is rejected and the connection is terminated.
 
 * Multistreaming Support
 
