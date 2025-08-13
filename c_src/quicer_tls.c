@@ -215,10 +215,34 @@ parse_verify_options(ErlNifEnv *env,
 {
 
   BOOLEAN verify = load_verify(env, &options, FALSE);
+  ERL_NIF_TERM tmp_term;
+  BOOLEAN custom_verify = FALSE;
+
+  if (enif_get_map_value(env, options, ATOM_CUSTOM_VERIFY, &tmp_term))
+    {
+      if (IS_SAME_TERM(tmp_term, ATOM_TRUE))
+        {
+          custom_verify = TRUE;
+        }
+    }
 
   if (is_verify)
     {
       *is_verify = verify;
+    }
+
+  if (custom_verify)
+    {
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+      if (is_server)
+        {
+          CredConfig->Flags
+              |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+        }
+      if (is_verify)
+        {
+          *is_verify = TRUE; // custom verify is always enabled
+        }
     }
 
   if (!verify)
@@ -525,4 +549,63 @@ exit:
 #endif // QUICER_USE_TRUSTED_STORE
   free_certificate(CredConfig);
   return ret;
+}
+
+ERL_NIF_TERM
+complete_cert_validation(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx;
+  QUIC_STATUS Status;
+  BOOLEAN result = FALSE;
+  int alert_code = 0;
+
+  if (argc != 3)
+    {
+      return enif_make_badarg(env);
+    }
+
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!c_ctx->Connection)
+    {
+      // already closed
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
+  if (IS_SAME_TERM(argv[1], ATOM_TRUE))
+    {
+      result = TRUE;
+    }
+  else if (IS_SAME_TERM(argv[1], ATOM_FALSE))
+    {
+      result = FALSE;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_int(env, argv[2], &alert_code))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (get_conn_handle(c_ctx))
+    {
+      Status = MsQuic->ConnectionCertificateValidationComplete(
+          c_ctx->Connection, result, (QUIC_TLS_ALERT_CODES)alert_code);
+      put_conn_handle(c_ctx);
+      if (QUIC_FAILED(Status))
+        {
+          return ERROR_TUPLE_2(ATOM_STATUS(Status));
+        }
+      return ATOM_OK;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
 }

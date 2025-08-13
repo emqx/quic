@@ -784,6 +784,16 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 #endif // QUICER_USE_TRUSTED_STORE
 
+  ERL_NIF_TERM is_custom_verify = ATOM_FALSE;
+  if (enif_get_map_value(env, eoptions, ATOM_CUSTOM_VERIFY, &is_custom_verify)
+      && IS_SAME_TERM(ATOM_TRUE, is_custom_verify))
+    {
+      c_ctx->custom_verify = TRUE;
+    }
+  else
+    {
+      c_ctx->custom_verify = FALSE;
+    }
   // Convert eoptions to Configuration
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
       env, &eoptions, Registration, &(c_ctx->config_ctx->Configuration));
@@ -1644,6 +1654,44 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
       X509_free(c_ctx->peer_cert);
     }
   c_ctx->peer_cert = X509_dup(cert);
+
+  if (c_ctx->custom_verify)
+    {
+      ErlNifEnv *env = c_ctx->env;
+      ERL_NIF_TERM ConnHandle = enif_make_resource(env, c_ctx);
+      ERL_NIF_TERM DerCert;
+      int len = 0;
+      unsigned char *tmp;
+
+      if ((len = i2d_X509(c_ctx->peer_cert, NULL)) < 0)
+        {
+          // unlikely to happen
+          return QUIC_STATUS_INTERNAL_ERROR;
+        }
+
+      unsigned char *data = enif_make_new_binary(env, len, &DerCert);
+
+      if (!data)
+        {
+          return QUIC_STATUS_OUT_OF_MEMORY;
+        }
+
+      // note, using tmp is mandatory, see doc for i2d_X509
+      tmp = data;
+
+      i2d_X509(c_ctx->peer_cert, &tmp);
+
+      ERL_NIF_TERM report
+          = make_event(env, ATOM_PEER_CERT_RECEIVED, ConnHandle, DerCert);
+
+      if (!enif_send(NULL, &c_ctx->owner->Pid, NULL, report))
+        {
+          // @TODO check if this is ok
+          return QUIC_STATUS_UNREACHABLE;
+        }
+      return QUIC_STATUS_PENDING;
+    }
+
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_CTX *x509_ctx
       = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;

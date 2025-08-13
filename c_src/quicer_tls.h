@@ -50,4 +50,7 @@ eoptions_to_cred_config(ErlNifEnv *env,
                         X509_STORE **trusted_store);
 
 void set_conn_sslkeylogfile(QuicerConnCTX *c_ctx, char *keylogfile);
+
+ERL_NIF_TERM
+complete_cert_validation(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 #endif // QUICER_TLS_H_

@@ -32,7 +32,8 @@
     select_free_port/1,
     flush/1,
     ensure_server_exit_normal/1,
-    ensure_server_exit_normal/2
+    ensure_server_exit_normal/2,
+    ensure_server_exit_abnormal/1
 ]).
 
 %%--------------------------------------------------------------------
@@ -151,6 +152,10 @@ groups() ->
 %%--------------------------------------------------------------------
 all() ->
     [
+        tc_conn_custom_verify,
+        tc_conn_custom_verify_fail,
+        tc_conn_custom_verify_bad_client_cert,
+        tc_conn_custom_verify_bad_server_cert,
         {group, global_reg},
         {group, suite_reg}
     ].
@@ -988,6 +993,117 @@ tc_conn_count_for_registered_listeners(Config) ->
     ok = quicer:close_registration(RegC),
     ok.
 
+tc_conn_custom_verify(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            simple_conn_server_custom_verify(Owner, Config, Port)
+        end
+    ),
+    receive
+        listener_ready ->
+            {ok, Conn, Cert} = quicer:connect(
+                "localhost",
+                Port,
+                [{custom_verify, true} | default_conn_opts_client_cert(Config, "ca")],
+                5000
+            ),
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+            {ok, {_, _}} = quicer:sockname(Conn),
+            ct:pal("closing connection : ~p", [Conn]),
+            ok = quicer:close_connection(Conn),
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
+tc_conn_custom_verify_fail(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            simple_conn_server_custom_verify_fail(Owner, Config, Port)
+        end
+    ),
+    receive
+        listener_ready ->
+            {ok, Conn, Cert} = quicer:connect(
+                "localhost", Port, [{custom_verify, true} | default_conn_opts(Config)], 5000
+            ),
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
+            receive
+                {quic, transport_shutdown, Conn, _Reason} ->
+                    ok
+            after 1000 ->
+                ct:fail("client: transport_shutdown timeout")
+            end,
+            SPid ! done,
+            ensure_server_exit_abnormal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
+tc_conn_custom_verify_bad_client_cert(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            simple_conn_server_custom_verify(Owner, Config, Port)
+        end
+    ),
+    receive
+        listener_ready ->
+            {ok, Conn, Cert} = quicer:connect(
+                "localhost",
+                Port,
+                [{custom_verify, true} | default_conn_opts_bad_client_cert(Config, "ca")],
+                5000
+            ),
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+            receive
+                {quic, transport_shutdown, Conn, _Reason} ->
+                    ok
+            after 1000 ->
+                ct:fail("client: transport_shutdown timeout")
+            end,
+            SPid ! done,
+            ensure_server_exit_abnormal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
+tc_conn_custom_verify_bad_server_cert(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            simple_conn_server_custom_verify_bad_cert(Owner, Config, Port)
+        end
+    ),
+    receive
+        listener_ready ->
+            {ok, Conn, Cert} = quicer:connect(
+                "localhost", Port, [{custom_verify, true} | default_conn_opts(Config)], 5000
+            ),
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
+            receive
+                {quic, transport_shutdown, Conn, _Reason} ->
+                    ok
+            after 1000 ->
+                ct:fail("client: transport_shutdown timeout")
+            end,
+            SPid ! done,
+            ensure_server_exit_abnormal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
 tc_invalid_conn_reg(_Config) ->
     Opts = default_conn_opts() ++ [{quic_registration, erlang:make_ref()}],
     ?assertEqual({error, quic_registration}, quicer:connect("localhost", 443, Opts, 5000)).
@@ -1038,18 +1154,50 @@ simple_conn_server_loop(L, Conn, Owner) ->
             quicer:close_listener(L)
     end.
 
-simple_conn_server_close(Owner, Config, Port) ->
-    {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+simple_conn_server_custom_verify(Owner, Config, Port) ->
+    {ok, L} = quicer:listen(Port, [
+        {verify, verify_peer}, {custom_verify, true} | default_listen_opts_client_cert(Config)
+    ]),
     Owner ! listener_ready,
     {ok, Conn} = quicer:accept(L, [], 1000),
-    {error, closed} = quicer:handshake(Conn),
+    {ok, Conn, Cert} = quicer:handshake(Conn),
+    _ = public_key:pkix_decode_cert(Cert, otp),
+    ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+    simple_conn_server_loop(L, Conn, Owner).
+
+simple_conn_server_custom_verify_fail(Owner, Config, Port) ->
+    {ok, L} = quicer:listen(Port, [{custom_verify, true} | default_listen_opts(Config)]),
+    Owner ! listener_ready,
+    {ok, Conn} = quicer:accept(L, [], 1000),
+    {ok, Conn, Cert} = quicer:handshake(Conn),
+    _ = public_key:pkix_decode_cert(Cert, otp),
+    ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
     receive
-        done ->
-            quicer:close_listener(L),
-            ok;
-        {quic, shutdown, Conn} ->
-            quicer:close_listener(L)
-    end.
+        {quic, transport_shutdown, Conn, _Reason} ->
+            ok
+    after 1000 ->
+        ct:fail("server: transport_shutdown timeout")
+    end,
+    quicer:close_listener(L),
+    simple_conn_server_loop(L, Conn, Owner).
+
+simple_conn_server_custom_verify_bad_cert(Owner, Config, Port) ->
+    {ok, L} = quicer:listen(Port, [{custom_verify, true} | default_listen_opts_bad_cert(Config)]),
+    Owner ! listener_ready,
+    {ok, Conn} = quicer:accept(L, [], 1000),
+    {ok, Conn, Cert} = quicer:handshake(Conn),
+    _ = public_key:pkix_decode_cert(Cert, otp),
+    ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+    receive
+        {quic, transport_shutdown, Conn, _Reason} ->
+            ok
+    after 1000 ->
+        ct:fail("server: transport_shutdown timeout")
+    end,
+    quicer:close_listener(L).
+
+simple_conn_server_close(Owner, Config, Port) ->
+    simple_conn_server_client_cert(Owner, Config, Port).
 
 simple_conn_server_client_cert(Owner, Config, Port) ->
     {ok, L} = quicer:listen(Port, default_listen_opts_client_cert(Config)),
@@ -1122,7 +1270,7 @@ default_conn_opts_verify(Config, Ca) ->
     DataDir = ?config(data_dir, Config),
     CACertFile = filename:join(DataDir, Ca) ++ ".pem",
     [
-        {verify, peer},
+        {verify, verify_peer},
         {cacertfile, CACertFile}
         | tl(default_conn_opts())
     ].
@@ -1147,8 +1295,16 @@ default_listen_opts_client_cert(Config) ->
     DataDir = ?config(data_dir, Config),
     [
         {cacertfile, filename:join(DataDir, "ca.pem")},
-        {verify, peer}
+        {verify, verify_peer}
         | proplists:delete(verify, default_listen_opts(Config))
+    ].
+
+default_listen_opts_bad_cert(Config) ->
+    DataDir = ?config(data_dir, Config),
+    [
+        {keyfile, filename:join(DataDir, "other-server.key")},
+        {certfile, filename:join(DataDir, "other-server.pem")}
+        | default_listen_opts(Config)
     ].
 
 echo_server(Owner, Config, Port) ->

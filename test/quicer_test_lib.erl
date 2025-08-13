@@ -32,6 +32,7 @@
     flush/1,
     ensure_server_exit_normal/1,
     ensure_server_exit_normal/2,
+    ensure_server_exit_abnormal/1,
 
     report_active_connections/0,
     report_active_connections/1,
@@ -418,6 +419,19 @@ ensure_server_exit_normal(MonRef, Timeout) ->
             ok;
         {'DOWN', MonRef, process, _, Other} ->
             ct:fail("server exits abnormally ~p ", [Other])
+    after Timeout ->
+        ct:fail("server still running", [])
+    end.
+
+-spec ensure_server_exit_abnormal(reference()) -> ok.
+ensure_server_exit_abnormal(MonRef) ->
+    ensure_server_exit_abnormal(MonRef, 5000).
+ensure_server_exit_abnormal(MonRef, Timeout) ->
+    receive
+        {'DOWN', MonRef, process, _, normal} ->
+            ct:fail("server exits normally which is undesired", []);
+        {'DOWN', MonRef, process, _, _Other} ->
+            ok
     after Timeout ->
         ct:fail("server still running", [])
     end.

@@ -108,6 +108,7 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         }
       TP_CB_3(acceptor_hit, (uintptr_t)c_ctx->Connection, 0);
       c_ctx->owner = conn_owner;
+      c_ctx->custom_verify = l_ctx->custom_verify;
 
       if (l_ctx->allow_insecure)
         {
@@ -416,6 +417,17 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   l_ctx->ssl_keylogfile_len
       = l_ctx->ssl_keylogfile ? strlen(l_ctx->ssl_keylogfile) + 1 : 0;
   CXPLAT_FRE_ASSERT(l_ctx->ssl_keylogfile_len < PATH_MAX);
+
+  ERL_NIF_TERM custom_verify;
+  if (enif_get_map_value(env, options, ATOM_CUSTOM_VERIFY, &custom_verify)
+      && IS_SAME_TERM(custom_verify, ATOM_TRUE))
+    {
+      l_ctx->custom_verify = TRUE;
+    }
+  else
+    {
+      l_ctx->custom_verify = FALSE;
+    }
 
   // Start Listener
   Status = MsQuic->ListenerStart(

@@ -1687,7 +1687,7 @@ get_connection_opt(ErlNifEnv *env,
 
   if (isMalloc == TRUE)
     {
-      free(Buffer);
+      CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
     }
 
 Exit:

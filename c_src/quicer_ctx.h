@@ -114,6 +114,7 @@ typedef struct QuicerListenerCTX
   CXPLAT_LIST_ENTRY RegistrationLink;
   char *ssl_keylogfile;
   uint16_t ssl_keylogfile_len;
+  BOOLEAN custom_verify;
   void *reserved1;
   void *reserved2;
   void *reserved3;
@@ -143,6 +144,7 @@ typedef struct QuicerConnCTX
   // Connection handle closed flag
   // false means the handle is invalid
   BOOLEAN is_closed;
+  BOOLEAN custom_verify;
   // track lifetime of Connection handle
   CXPLAT_REF_COUNT ref_count;
   uint32_t event_mask;

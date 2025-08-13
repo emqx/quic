@@ -45,6 +45,9 @@ static ERL_NIF_TERM stream_controlling_process(ErlNifEnv *env,
 static ERL_NIF_TERM
 closeLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
+ERL_NIF_TERM
+complete_cert_validation(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
+
 /*
 ** atoms in use, initialized while load nif
 */
@@ -153,6 +156,7 @@ ERL_NIF_TERM ATOM_PASSWORD;
 ERL_NIF_TERM ATOM_ALPN;
 ERL_NIF_TERM ATOM_HANDLE;
 ERL_NIF_TERM ATOM_VERIFY;
+ERL_NIF_TERM ATOM_CUSTOM_VERIFY;
 ERL_NIF_TERM ATOM_PEER;
 ERL_NIF_TERM ATOM_NONE;
 ERL_NIF_TERM ATOM_CACERTFILE;
@@ -330,6 +334,7 @@ ERL_NIF_TERM ATOM_TRANS_SHUTDOWN;
 ERL_NIF_TERM ATOM_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_SHUTDOWN;
 ERL_NIF_TERM ATOM_PEER_SEND_ABORTED;
+ERL_NIF_TERM ATOM_PEER_CERT_RECEIVED;
 ERL_NIF_TERM ATOM_PEER_RECEIVE_ABORTED;
 ERL_NIF_TERM ATOM_PEER_ADDRESS_CHANGED;
 ERL_NIF_TERM ATOM_SEND_SHUTDOWN_COMPLETE;
@@ -741,6 +746,7 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
   ATOM(ATOM_ALPN, alpn);                                                      \
   ATOM(ATOM_HANDLE, handle);                                                  \
   ATOM(ATOM_VERIFY, verify);                                                  \
+  ATOM(ATOM_CUSTOM_VERIFY, custom_verify);                                    \
   ATOM(ATOM_CACERTFILE, cacertfile);                                          \
   ATOM(ATOM_PEER, peer);                                                      \
   ATOM(ATOM_NONE, none);                                                      \
@@ -750,6 +756,7 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
   ATOM(ATOM_TRANS_SHUTDOWN, transport_shutdown);                              \
   ATOM(ATOM_SHUTDOWN, shutdown);                                              \
   ATOM(ATOM_PEER_SEND_SHUTDOWN, peer_send_shutdown);                          \
+  ATOM(ATOM_PEER_CERT_RECEIVED, peer_cert_received);                          \
   ATOM(ATOM_PEER_SEND_ABORTED, peer_send_aborted);                            \
   ATOM(ATOM_PEER_RECEIVE_ABORTED, peer_receive_aborted);                      \
   ATOM(ATOM_PEER_ADDRESS_CHANGED, peer_address_changed);                      \
@@ -1767,6 +1774,7 @@ static ErlNifFunc nif_funcs[] = {
   { "setopt", 4, setopt4, 0},
   { "controlling_process", 2, controlling_process, 0},
   { "peercert", 1, peercert1, 0},
+  { "complete_cert_validation", 3, complete_cert_validation, 0},
   { "enable_sig_buffer", 1, enable_sig_buffer, 0},
   { "flush_stream_buffered_sigs", 1, flush_stream_buffered_sigs, 0},
   { "count_reg_conns", 0, count_reg_connsX, 0},
