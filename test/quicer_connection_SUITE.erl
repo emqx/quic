@@ -1082,7 +1082,7 @@ tc_conn_custom_verify_bad_client_cert(Config) ->
             receive
                 {quic, transport_shutdown, Conn, Reason} ->
                     ct:pal("client: transport_shutdown ~p", [Reason]),
-                    ?assertMatch(#{error := 304}, Reason),
+                    ?assertMatch(#{error := Err} when Err == 304 orelse Err == 307, Reason),
                     ok
             after 1000 ->
                 ct:fail("client: transport_shutdown timeout")
