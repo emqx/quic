@@ -91,6 +91,7 @@ init_per_group(suite_reg, Config) ->
 %%--------------------------------------------------------------------
 end_per_group(suite_reg, Config) ->
     Reg = ?config(quic_registration, Config),
+    ct:pal("Unclosed Listeners: ~p", [quicer:get_listeners(Reg)]),
     quicer:shutdown_registration(Reg),
     ok = quicer:close_registration(Reg);
 end_per_group(_GroupName, _Config) ->
@@ -996,6 +997,7 @@ tc_conn_count_for_registered_listeners(Config) ->
 tc_conn_custom_verify(Config) ->
     Port = select_port(),
     Owner = self(),
+    %% GIVEN: A Server will accept the client's cert.
     {SPid, Ref} = spawn_monitor(
         fun() ->
             simple_conn_server_custom_verify(Owner, Config, Port)
@@ -1003,16 +1005,20 @@ tc_conn_custom_verify(Config) ->
     ),
     receive
         listener_ready ->
+            %% WHEN: client connect with custom_verify
             {ok, Conn, Cert} = quicer:connect(
                 "localhost",
                 Port,
                 [{custom_verify, true} | default_conn_opts_client_cert(Config, "ca")],
                 5000
             ),
+            %% THEN: client recv a cert.
             _ = public_key:pkix_decode_cert(Cert, otp),
+            %% THEN: client could accept the cert.
             ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
             {ok, {_, _}} = quicer:sockname(Conn),
             ct:pal("closing connection : ~p", [Conn]),
+            %% THEN: connection could be closed
             ok = quicer:close_connection(Conn),
             SPid ! done,
             ensure_server_exit_normal(Ref)
@@ -1023,6 +1029,7 @@ tc_conn_custom_verify(Config) ->
 tc_conn_custom_verify_fail(Config) ->
     Port = select_port(),
     Owner = self(),
+    %% GIVEN: A Server won't accept the client's cert.
     {SPid, Ref} = spawn_monitor(
         fun() ->
             simple_conn_server_custom_verify_fail(Owner, Config, Port)
@@ -1030,11 +1037,15 @@ tc_conn_custom_verify_fail(Config) ->
     ),
     receive
         listener_ready ->
+            %% WHEN: client connect with custom_verify
             {ok, Conn, Cert} = quicer:connect(
                 "localhost", Port, [{custom_verify, true} | default_conn_opts(Config)], 5000
             ),
+            %% THEN: client recvs a cert.
             _ = public_key:pkix_decode_cert(Cert, otp),
+            %% THEN: client could reject the cert.
             ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
+            %% THEN: connection will be closed
             receive
                 {quic, transport_shutdown, Conn, _Reason} ->
                     ok
@@ -1042,7 +1053,7 @@ tc_conn_custom_verify_fail(Config) ->
                 ct:fail("client: transport_shutdown timeout")
             end,
             SPid ! done,
-            ensure_server_exit_abnormal(Ref)
+            ensure_server_exit_normal(Ref)
     after 1000 ->
         ct:fail("timeout")
     end.
@@ -1057,6 +1068,7 @@ tc_conn_custom_verify_bad_client_cert(Config) ->
     ),
     receive
         listener_ready ->
+            %% GIVEN: client connect with custom_verify but BAD client cert
             {ok, Conn, Cert} = quicer:connect(
                 "localhost",
                 Port,
@@ -1064,15 +1076,19 @@ tc_conn_custom_verify_bad_client_cert(Config) ->
                 5000
             ),
             _ = public_key:pkix_decode_cert(Cert, otp),
+            %% WHEN: client accepts server's cert
             ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+            %% THEN: the connection will still be closed by peer.
             receive
-                {quic, transport_shutdown, Conn, _Reason} ->
+                {quic, transport_shutdown, Conn, Reason} ->
+                    ct:pal("client: transport_shutdown ~p", [Reason]),
+                    ?assertMatch(#{error := 304}, Reason),
                     ok
             after 1000 ->
                 ct:fail("client: transport_shutdown timeout")
             end,
             SPid ! done,
-            ensure_server_exit_abnormal(Ref)
+            ensure_server_exit_normal(Ref)
     after 1000 ->
         ct:fail("timeout")
     end.
@@ -1080,6 +1096,7 @@ tc_conn_custom_verify_bad_client_cert(Config) ->
 tc_conn_custom_verify_bad_server_cert(Config) ->
     Port = select_port(),
     Owner = self(),
+    %% GIVEN: Server has a bad cert.
     {SPid, Ref} = spawn_monitor(
         fun() ->
             simple_conn_server_custom_verify_bad_cert(Owner, Config, Port)
@@ -1091,15 +1108,19 @@ tc_conn_custom_verify_bad_server_cert(Config) ->
                 "localhost", Port, [{custom_verify, true} | default_conn_opts(Config)], 5000
             ),
             _ = public_key:pkix_decode_cert(Cert, otp),
+            %% WHEN: when client reject the cert
             ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
+            %% THEN: connection will be closed.
             receive
-                {quic, transport_shutdown, Conn, _Reason} ->
+                {quic, transport_shutdown, Conn, Reason} ->
+                    ct:pal("client: transport_shutdown ~p", [Reason]),
+                    ?assertMatch(#{error := 298}, Reason),
                     ok
             after 1000 ->
                 ct:fail("client: transport_shutdown timeout")
             end,
             SPid ! done,
-            ensure_server_exit_abnormal(Ref)
+            ensure_server_exit_normal(Ref)
     after 1000 ->
         ct:fail("timeout")
     end.
@@ -1160,39 +1181,44 @@ simple_conn_server_custom_verify(Owner, Config, Port) ->
     ]),
     Owner ! listener_ready,
     {ok, Conn} = quicer:accept(L, [], 1000),
-    {ok, Conn, Cert} = quicer:handshake(Conn),
-    _ = public_key:pkix_decode_cert(Cert, otp),
-    ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
-    simple_conn_server_loop(L, Conn, Owner).
+    case quicer:handshake(Conn) of
+        {ok, Conn, Cert} ->
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+            simple_conn_server_loop(L, Conn, Owner);
+        {error, closed} ->
+            quicer:close_listener(L)
+    end.
 
 simple_conn_server_custom_verify_fail(Owner, Config, Port) ->
     {ok, L} = quicer:listen(Port, [{custom_verify, true} | default_listen_opts(Config)]),
     Owner ! listener_ready,
     {ok, Conn} = quicer:accept(L, [], 1000),
-    {ok, Conn, Cert} = quicer:handshake(Conn),
-    _ = public_key:pkix_decode_cert(Cert, otp),
-    ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
-    receive
-        {quic, transport_shutdown, Conn, _Reason} ->
+    case quicer:handshake(Conn) of
+        {ok, Conn, Cert} ->
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
+            receive
+                {quic, transport_shutdown, Conn, _Reason} ->
+                    ok
+            after 1000 ->
+                ct:fail("server: transport_shutdown timeout")
+            end;
+        {error, closed} ->
             ok
-    after 1000 ->
-        ct:fail("server: transport_shutdown timeout")
     end,
-    quicer:close_listener(L),
-    simple_conn_server_loop(L, Conn, Owner).
+    quicer:close_listener(L).
 
 simple_conn_server_custom_verify_bad_cert(Owner, Config, Port) ->
     {ok, L} = quicer:listen(Port, [{custom_verify, true} | default_listen_opts_bad_cert(Config)]),
     Owner ! listener_ready,
     {ok, Conn} = quicer:accept(L, [], 1000),
-    {ok, Conn, Cert} = quicer:handshake(Conn),
-    _ = public_key:pkix_decode_cert(Cert, otp),
-    ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
-    receive
-        {quic, transport_shutdown, Conn, _Reason} ->
+    case quicer:handshake(Conn) of
+        {ok, Conn, Cert} ->
+            _ = public_key:pkix_decode_cert(Cert, otp),
+            ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS);
+        {error, closed} ->
             ok
-    after 1000 ->
-        ct:fail("server: transport_shutdown timeout")
     end,
     quicer:close_listener(L).
 
