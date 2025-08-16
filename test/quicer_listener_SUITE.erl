@@ -301,8 +301,88 @@ tc_open_listener_with_wrong_cert_password(Config) ->
         quicer:listen(Port, default_listen_opts(PasswordCerts ++ Config))
     ).
 
+%% The certkeyasn1 argument accepts a PKCS12 encoded cert and key.
+tc_open_listener_with_certkeyasn1(Config) ->
+    Port = select_port(),
+    DataDir = ?config(data_dir, Config),
 
+    {ok, CertKeyRaw} = file:read_file(filename:join(DataDir, "server.p12")),
+    Opts = [
+        {certkeyasn1, CertKeyRaw}
+    ],
+    % TODO add a more basic `default_listen_opts_simple` function.
+    Opts1 = default_listen_opts(Opts ++ Config),
+    Opts2 = lists:keydelete(certfile, 1, Opts1),
+    Opts3 = lists:keydelete(keyfile, 1, Opts2),
 
+    {ok, L} = quicer:listen(Port, Opts3),
+    quicer:close_listener(L),
+    ok.
+
+%% Invalid data for the certkeyasn1 argument is rejected.
+tc_open_listener_with_certkeyasn1_invalid_data(Config) ->
+    Port = select_port(),
+
+    CertKeyRaw = <<"123">>,
+    Opts = [
+        {certkeyasn1, CertKeyRaw}
+    ],
+    Opts1 = default_listen_opts(Opts ++ Config),
+    Opts2 = lists:keydelete(certfile, 1, Opts1),
+    Opts3 = lists:keydelete(keyfile, 1, Opts2),
+
+    ?assertMatch(
+        {error, config_error, tls_error},
+        quicer:listen(Port, Opts3)
+    ).
+
+%% Conflicting config; certkeyasn1 AND (certfile OR keyfile); error.
+tc_open_listener_with_certkeyasn1_conflicting_config(Config) ->
+    Port = select_port(),
+
+    CertKeyRaw = <<"123">>,
+    Opts = [
+        {certkeyasn1, CertKeyRaw}
+    ],
+    Opts1 = default_listen_opts(Opts ++ Config),
+    OptsWithoutCertfile = lists:keydelete(certfile, 1, Opts1),
+    OptsWithoutKeyfile = lists:keydelete(keyfile, 1, Opts1),
+
+    % certkeyasn1 AND keyfile; error.
+    ?assertMatch(
+        {error, quic_tls},
+        quicer:listen(Port, OptsWithoutCertfile)
+    ),
+    % certkeyasn1 AND certfile; error.
+    ?assertMatch(
+        {error, quic_tls},
+        quicer:listen(Port, OptsWithoutKeyfile)
+    ),
+    % certkeyasn1 AND certfile AND keyfile; error.
+    ?assertMatch(
+        {error, quic_tls},
+        quicer:listen(Port, Opts1)
+    ).
+
+%% Additional password argument causes an error.
+tc_open_listener_with_certkeyasn1_password_ignored(Config) ->
+    Port = select_port(),
+    DataDir = ?config(data_dir, Config),
+
+    {ok, CertKeyRaw} = file:read_file(filename:join(DataDir, "server.p12")),
+    Opts = [
+        {certkeyasn1, CertKeyRaw},
+        {password, "password"}
+    ],
+    % TODO add a more basic `default_listen_opts_simple` function.
+    Opts1 = default_listen_opts(Opts ++ Config),
+    Opts2 = lists:keydelete(certfile, 1, Opts1),
+    Opts3 = lists:keydelete(keyfile, 1, Opts2),
+
+    ?assertMatch(
+        {error, quic_tls},
+        quicer:listen(Port, Opts3)
+    ).
 
 tc_open_listener_bind(Config) ->
     Port = select_port(),
