@@ -176,6 +176,7 @@ parse_cert_options(ErlNifEnv *env,
     {
       // @NOTE we do not pass through the already parsed options. This keeps ownership clean.
       result = parse_cert_options_file(env, options, CredConfig);
+      // TODO handle case that also certkeyasn1 is set and error
     }
   else
     {

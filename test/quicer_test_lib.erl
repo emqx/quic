@@ -195,6 +195,8 @@ gen_host_cert(H, CaName, Path, Opts) ->
     HPEM = filename(Path, "~s.pem", [H]),
     HPEM2 = filename(Path, "~s_renewed.pem", [H]),
     HEXT = filename(Path, "~s.extfile", [H]),
+    HPKCS12 = filename(Path, "~s.p12", [H]),
+
     PasswordArg =
         case maps:get(password, Opts, undefined) of
             undefined ->
@@ -222,10 +224,12 @@ gen_host_cert(H, CaName, Path, Opts) ->
     CERT_Cmd2 = cert_sign_cmd(
         HEXT, HCSR2, ca_cert_name(Path, CaName), ca_key_name(Path, CaName), HPEM2
     ),
+    CERT_Cmdp12 = key_and_cert_to_pkcs12(HKey, HPEM, HPKCS12),
     ct:pal(os:cmd(CSR_Cmd)),
     ct:pal(os:cmd(CSR_Cmd2)),
     ct:pal(os:cmd(CERT_Cmd)),
     ct:pal(os:cmd(CERT_Cmd2)),
+    ct:pal(os:cmd(CERT_Cmdp12)),
     file:delete(HEXT).
 
 cert_sign_cmd(ExtFile, CSRFile, CACert, CAKey, OutputCert) ->
@@ -256,6 +260,16 @@ csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN) ->
             "-subj \"/C=SE/O=TEST/CN=~s\"",
             [PasswordArg, ECKeyFile, HKey, HCSR, CN, CN]
         )
+    ).
+
+key_and_cert_to_pkcs12(KeyFile, CertFile, OutputFile) ->
+    lists:flatten(
+        %% TODO dont ignore the PW here
+        io_lib:format("openssl pkcs12 -export -out ~s -inkey ~s -in ~s -passout pass:", [
+            OutputFile,
+            KeyFile,
+            CertFile
+        ])
     ).
 
 filename(Path, F, A) ->
