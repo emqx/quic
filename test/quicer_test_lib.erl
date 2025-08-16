@@ -271,7 +271,7 @@ csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN) ->
 
 key_and_cert_to_pkcs12(KeyFile, CertFile, OutputFile) ->
     lists:flatten(
-        %% TODO dont ignore the PW here
+        % We ignore the password option, but it could be added.
         io_lib:format("openssl pkcs12 -export -out ~s -inkey ~s -in ~s -passout pass:", [
             OutputFile,
             KeyFile,
