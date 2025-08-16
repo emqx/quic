@@ -1138,7 +1138,7 @@ default_listener_opts(Config, Verify) ->
         {cacertfile, filename:join(DataDir, "ca.pem")},
         {conn_acceptors, 4},
         {verify, Verify}
-        | tl(default_listen_opts(Config))
+        | lists:keydelete(verify, 1, default_listen_opts(Config))
     ].
 
 default_conn_opts_verify(Config, Ca) ->
