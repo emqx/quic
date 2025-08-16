@@ -341,8 +341,8 @@ tc_open_listener_with_certkeyasn1_conflicting_config(Config) ->
         {certkeyasn1, CertKeyRaw}
         | default_listen_opts(Config)
     ],
-    OptsWithoutCertfile = lists:keydelete(certfile, 1, Opts),
-    OptsWithoutKeyfile = lists:keydelete(keyfile, 1, Opts),
+    OptsWithoutCertfile = proplists:delete(certfile, Opts),
+    OptsWithoutKeyfile = proplists:delete(keyfile, Opts),
 
     % certkeyasn1 AND keyfile; error.
     ?assertMatch(
@@ -1131,7 +1131,7 @@ default_listener_opts(Config, Verify) ->
         {cacertfile, filename:join(DataDir, "ca.pem")},
         {conn_acceptors, 4},
         {verify, Verify}
-        | lists:keydelete(verify, 1, default_listen_opts(Config))
+        | proplists:delete(verify, default_listen_opts(Config))
     ].
 
 default_conn_opts_verify(Config, Ca) ->
