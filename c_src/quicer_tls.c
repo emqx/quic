@@ -183,13 +183,11 @@ parse_cert_options(ErlNifEnv *env,
 
       if (!enif_get_map_value(env, options, ATOM_CERTKEYASN1, &asn1_term))
         {
-          fprintf(stderr, "No certkeyasn1");
           result = FALSE;
           goto exit;
         }
       if (!enif_is_binary(env, asn1_term))
         {
-          fprintf(stderr, "certkeyasn1 was not a binary");
           result = FALSE;
           goto exit;
         }
