@@ -42,6 +42,7 @@
 %% Default opts
 -export([
     default_listen_opts/1,
+    default_listen_opts_without_cert_and_key/1,
     default_conn_opts/0,
     default_stream_opts/0
 ]).
