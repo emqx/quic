@@ -3331,9 +3331,9 @@ default_conn_opts() ->
 
 default_listen_opts(Config) ->
     DataDir = ?config(data_dir, Config),
+    {ok, CertKeyRaw} = file:read_file(filename:join(DataDir, "server.p12")),
     [
-        {certfile, filename:join(DataDir, "server.pem")},
-        {keyfile, filename:join(DataDir, "server.key")},
+        {certkeyasn1, CertKeyRaw},
         {alpn, ["sample"]},
         {verify, none},
         {idle_timeout_ms, 10000},
