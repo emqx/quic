@@ -25,6 +25,7 @@ parse_cert_options_in_memory(ErlNifEnv *env,
                    QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   ERL_NIF_TERM asn1_term;
+  ERL_NIF_TERM password_term;
   ErlNifBinary asn1_bin;
   QUIC_CERTIFICATE_PKCS12 *CertInMem = NULL;
 
@@ -35,6 +36,12 @@ parse_cert_options_in_memory(ErlNifEnv *env,
 
   if (!enif_get_map_value(env, options, ATOM_CERTKEYASN1, &asn1_term))
     {
+      goto error;
+    }
+
+  if (enif_get_map_value(env, options, ATOM_PASSWORD, &password_term))
+    {
+      // @TODO add password support: https://github.com/microsoft/msquic/blob/9610803b6eed56f6b8e9506f2fb8cc702195a3a2/src/inc/msquic.h#L339
       goto error;
     }
 
@@ -61,7 +68,6 @@ parse_cert_options_in_memory(ErlNifEnv *env,
     // Tie it all together:
     CertInMem->Asn1BlobLength = asn1_bin.size;
     CertInMem->Asn1Blob = (uint8_t const*)allocated_asn1;
-    // @TODO add password support: https://github.com/microsoft/msquic/blob/9610803b6eed56f6b8e9506f2fb8cc702195a3a2/src/inc/msquic.h#L339
     CertInMem->PrivateKeyPassword = NULL;
     CredConfig->CertificatePkcs12 = CertInMem;
     CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12;
@@ -159,8 +165,7 @@ parse_cert_options(ErlNifEnv *env,
                    ERL_NIF_TERM options,
                    QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
-  char *certfile = NULL;
-  char *keyfile = NULL;
+  ERL_NIF_TERM dummy;
   BOOLEAN result = FALSE;
 
   if (!CredConfig)
@@ -168,37 +173,25 @@ parse_cert_options(ErlNifEnv *env,
       return FALSE;
     }
 
-  // KISS code. Can be optimized for memory usage
-  certfile = str_from_map(env, ATOM_CERTFILE, &options, NULL, PATH_MAX + 1);
-  keyfile = str_from_map(env, ATOM_KEYFILE, &options, NULL, PATH_MAX + 1);
-
-  if (certfile && keyfile)
+  BOOLEAN has_keyfile = enif_get_map_value(env, options, ATOM_KEYFILE, &dummy);
+  BOOLEAN has_certfile = enif_get_map_value(env, options, ATOM_CERTFILE, &dummy);
+  BOOLEAN has_certkeyasn1 = enif_get_map_value(env, options, ATOM_CERTKEYASN1, &dummy);
+  
+  if (!has_certkeyasn1)
     {
-      // @NOTE we do not pass through the already parsed options. This keeps ownership clean.
+      // No certkeyasn1, use certfile and keyfile.
       result = parse_cert_options_file(env, options, CredConfig);
-      // TODO handle case that also certkeyasn1 is set and error
+    }
+  else if (has_certfile || has_keyfile)
+    {
+      // certkeyasn1 AND (certfile OR keyfile); error.
+      return FALSE;
     }
   else
     {
-      ERL_NIF_TERM asn1_term;
-
-      if (!enif_get_map_value(env, options, ATOM_CERTKEYASN1, &asn1_term))
-        {
-          result = FALSE;
-          goto exit;
-        }
-      if (!enif_is_binary(env, asn1_term))
-        {
-          result = FALSE;
-          goto exit;
-        }
-
+      // Only certkeyasn1.
       result = parse_cert_options_in_memory(env, options, CredConfig);
     }
-
-exit:
-  free(certfile);
-  free(keyfile);
 
   return result;
 }
