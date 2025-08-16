@@ -64,9 +64,16 @@
 default_listen_opts(Config) ->
     DataDir = ?config(data_dir, Config),
     [
-        {verify, none},
         {certfile, filename:join(DataDir, "server.pem")},
-        {keyfile, filename:join(DataDir, "server.key")},
+        {keyfile, filename:join(DataDir, "server.key")}
+        | default_listen_opts_without_cert_and_key(Config)
+    ].
+
+%% Basic default listener opts without cert or key.
+-spec default_listen_opts_without_cert_and_key(proplists:proplist()) -> proplists:proplist().
+default_listen_opts_without_cert_and_key(Config) ->
+    [
+        {verify, none},
         {alpn, ["sample"]},
         {idle_timeout_ms, 10000},
         % QUIC_SERVER_RESUME_AND_ZERORTT
