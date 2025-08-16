@@ -27,6 +27,7 @@
 
 -import(quicer_test_lib, [
     default_listen_opts/1,
+    default_listen_opts_without_cert_and_key/1,
     default_conn_opts/0,
     default_stream_opts/0,
     select_free_port/1
@@ -309,13 +310,10 @@ tc_open_listener_with_certkeyasn1(Config) ->
     {ok, CertKeyRaw} = file:read_file(filename:join(DataDir, "server.p12")),
     Opts = [
         {certkeyasn1, CertKeyRaw}
+        | default_listen_opts_without_cert_and_key(Config)
     ],
-    % TODO add a more basic `default_listen_opts_simple` function.
-    Opts1 = default_listen_opts(Opts ++ Config),
-    Opts2 = lists:keydelete(certfile, 1, Opts1),
-    Opts3 = lists:keydelete(keyfile, 1, Opts2),
 
-    {ok, L} = quicer:listen(Port, Opts3),
+    {ok, L} = quicer:listen(Port, Opts),
     quicer:close_listener(L),
     ok.
 
@@ -326,14 +324,12 @@ tc_open_listener_with_certkeyasn1_invalid_data(Config) ->
     CertKeyRaw = <<"123">>,
     Opts = [
         {certkeyasn1, CertKeyRaw}
+        | default_listen_opts_without_cert_and_key(Config)
     ],
-    Opts1 = default_listen_opts(Opts ++ Config),
-    Opts2 = lists:keydelete(certfile, 1, Opts1),
-    Opts3 = lists:keydelete(keyfile, 1, Opts2),
 
     ?assertMatch(
         {error, config_error, tls_error},
-        quicer:listen(Port, Opts3)
+        quicer:listen(Port, Opts)
     ).
 
 %% Conflicting config; certkeyasn1 AND (certfile OR keyfile); error.
@@ -343,10 +339,10 @@ tc_open_listener_with_certkeyasn1_conflicting_config(Config) ->
     CertKeyRaw = <<"123">>,
     Opts = [
         {certkeyasn1, CertKeyRaw}
+        | default_listen_opts(Config)
     ],
-    Opts1 = default_listen_opts(Opts ++ Config),
-    OptsWithoutCertfile = lists:keydelete(certfile, 1, Opts1),
-    OptsWithoutKeyfile = lists:keydelete(keyfile, 1, Opts1),
+    OptsWithoutCertfile = lists:keydelete(certfile, 1, Opts),
+    OptsWithoutKeyfile = lists:keydelete(keyfile, 1, Opts),
 
     % certkeyasn1 AND keyfile; error.
     ?assertMatch(
@@ -361,7 +357,7 @@ tc_open_listener_with_certkeyasn1_conflicting_config(Config) ->
     % certkeyasn1 AND certfile AND keyfile; error.
     ?assertMatch(
         {error, quic_tls},
-        quicer:listen(Port, Opts1)
+        quicer:listen(Port, Opts)
     ).
 
 %% Additional password argument causes an error.
@@ -373,15 +369,12 @@ tc_open_listener_with_certkeyasn1_password_ignored(Config) ->
     Opts = [
         {certkeyasn1, CertKeyRaw},
         {password, "password"}
+        | default_listen_opts_without_cert_and_key(Config)
     ],
-    % TODO add a more basic `default_listen_opts_simple` function.
-    Opts1 = default_listen_opts(Opts ++ Config),
-    Opts2 = lists:keydelete(certfile, 1, Opts1),
-    Opts3 = lists:keydelete(keyfile, 1, Opts2),
 
     ?assertMatch(
         {error, quic_tls},
-        quicer:listen(Port, Opts3)
+        quicer:listen(Port, Opts)
     ).
 
 tc_open_listener_bind(Config) ->
