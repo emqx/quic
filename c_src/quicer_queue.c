@@ -143,8 +143,9 @@ set_owner_recv_mode(ACCEPTOR *owner, ErlNifEnv *env, ERL_NIF_TERM term)
               // overflow
               return FALSE;
             }
-          owner->active_count += i;
-          owner->active = ACCEPTOR_RECV_MODE_MULTI;
+          owner->active = ((owner->active_count += i) == 0)
+                              ? ACCEPTOR_RECV_MODE_PASSIVE
+                              : ACCEPTOR_RECV_MODE_MULTI;
         }
     }
   else // unsupported arg
