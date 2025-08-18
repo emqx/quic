@@ -52,8 +52,12 @@ init_handoff(Stream, _StreamOpts, Conn, #{flags := Flags}) ->
     {ok, InitState}.
 
 post_handoff(Stream, _PostData, State) ->
-    ok = quicer:setopt(Stream, active, true),
-    {ok, State}.
+    case quicer:setopt(Stream, active, true) of
+        ok ->
+            {ok, State};
+        {error, closed} ->
+            {stop, closed, State}
+    end.
 
 new_stream(Stream, #{flags := Flags}, Conn) ->
     {ok, #{
