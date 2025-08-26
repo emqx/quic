@@ -342,6 +342,13 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
                  QUICER_CERTIFICATE_FILE_PROTECTED);
       cc->CertificateFileProtected = NULL;
     }
+  else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12 == cc->Type && cc->CertificatePkcs12)
+    {
+      free((char *)cc->CertificatePkcs12->Asn1Blob);
+      free((char *)cc->CertificatePkcs12->PrivateKeyPassword);
+      CxPlatFree(cc->CertificatePkcs12, QUICER_CERTIFICATE_PKCS12);
+      cc->CertificatePkcs12 = NULL;
+    }
 
   if (cc->CaCertificateFile)
     {
