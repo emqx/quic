@@ -734,7 +734,7 @@ ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
   /*                  QUIC_STREAM_OPTS end                        */          \
   ATOM(ATOM_CERT, cert);                                                      \
   ATOM(ATOM_CERTFILE, certfile);                                              \
-  ATOM(ATOM_CERTKEYASN1, certkeyasn1);                                              \
+  ATOM(ATOM_CERTKEYASN1, certkeyasn1);                                        \
   ATOM(ATOM_KEY, key);                                                        \
   ATOM(ATOM_KEYFILE, keyfile);                                                \
   ATOM(ATOM_PASSWORD, password);                                              \
