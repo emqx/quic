@@ -1006,7 +1006,7 @@ tc_conn_custom_verify(Config) ->
     receive
         listener_ready ->
             %% WHEN: client connect with custom_verify
-            {ok, Conn, Cert} = quicer:connect(
+            {ok, Conn, {Cert, _}} = quicer:connect(
                 "localhost",
                 Port,
                 [{custom_verify, true} | default_conn_opts_client_cert(Config, "ca")],
@@ -1038,7 +1038,7 @@ tc_conn_custom_verify_fail(Config) ->
     receive
         listener_ready ->
             %% WHEN: client connect with custom_verify
-            {ok, Conn, Cert} = quicer:connect(
+            {ok, Conn, {Cert, _}} = quicer:connect(
                 "localhost", Port, [{custom_verify, true} | default_conn_opts(Config)], 5000
             ),
             %% THEN: client recvs a cert.
@@ -1069,7 +1069,7 @@ tc_conn_custom_verify_bad_client_cert(Config) ->
     receive
         listener_ready ->
             %% GIVEN: client connect with custom_verify but BAD client cert
-            {ok, Conn, Cert} = quicer:connect(
+            {ok, Conn, {Cert, _}} = quicer:connect(
                 "localhost",
                 Port,
                 [{custom_verify, true} | default_conn_opts_bad_client_cert(Config, "ca")],
@@ -1104,7 +1104,7 @@ tc_conn_custom_verify_bad_server_cert(Config) ->
     ),
     receive
         listener_ready ->
-            {ok, Conn, Cert} = quicer:connect(
+            {ok, Conn, {Cert, _}} = quicer:connect(
                 "localhost", Port, [{custom_verify, true} | default_conn_opts(Config)], 5000
             ),
             _ = public_key:pkix_decode_cert(Cert, otp),
@@ -1182,7 +1182,7 @@ simple_conn_server_custom_verify(Owner, Config, Port) ->
     Owner ! listener_ready,
     {ok, Conn} = quicer:accept(L, [], 1000),
     case quicer:handshake(Conn) of
-        {ok, Conn, Cert} ->
+        {ok, Conn, {Cert, _}} ->
             _ = public_key:pkix_decode_cert(Cert, otp),
             ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
             simple_conn_server_loop(L, Conn, Owner);
@@ -1195,7 +1195,7 @@ simple_conn_server_custom_verify_fail(Owner, Config, Port) ->
     Owner ! listener_ready,
     {ok, Conn} = quicer:accept(L, [], 1000),
     case quicer:handshake(Conn) of
-        {ok, Conn, Cert} ->
+        {ok, Conn, {Cert, _}} ->
             _ = public_key:pkix_decode_cert(Cert, otp),
             ok = quicer:complete_cert_validation(Conn, false, ?QUIC_TLS_ALERT_CODE_BAD_CERTIFICATE),
             receive
