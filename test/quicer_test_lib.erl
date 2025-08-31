@@ -42,6 +42,7 @@
 %% Default opts
 -export([
     default_listen_opts/1,
+    default_listen_opts_without_cert_and_key/1,
     default_conn_opts/0,
     default_stream_opts/0
 ]).
@@ -64,9 +65,16 @@
 default_listen_opts(Config) ->
     DataDir = ?config(data_dir, Config),
     [
-        {verify, none},
         {certfile, filename:join(DataDir, "server.pem")},
-        {keyfile, filename:join(DataDir, "server.key")},
+        {keyfile, filename:join(DataDir, "server.key")}
+        | default_listen_opts_without_cert_and_key(Config)
+    ].
+
+%% Basic default listener opts without cert or key.
+-spec default_listen_opts_without_cert_and_key(proplists:proplist()) -> proplists:proplist().
+default_listen_opts_without_cert_and_key(Config) ->
+    [
+        {verify, none},
         {alpn, ["sample"]},
         {idle_timeout_ms, 10000},
         % QUIC_SERVER_RESUME_AND_ZERORTT
@@ -195,6 +203,8 @@ gen_host_cert(H, CaName, Path, Opts) ->
     HPEM = filename(Path, "~s.pem", [H]),
     HPEM2 = filename(Path, "~s_renewed.pem", [H]),
     HEXT = filename(Path, "~s.extfile", [H]),
+    HPKCS12 = filename(Path, "~s.p12", [H]),
+
     PasswordArg =
         case maps:get(password, Opts, undefined) of
             undefined ->
@@ -222,10 +232,12 @@ gen_host_cert(H, CaName, Path, Opts) ->
     CERT_Cmd2 = cert_sign_cmd(
         HEXT, HCSR2, ca_cert_name(Path, CaName), ca_key_name(Path, CaName), HPEM2
     ),
+    CERT_Cmdp12 = key_and_cert_to_pkcs12(HKey, HPEM, HPKCS12),
     ct:pal(os:cmd(CSR_Cmd)),
     ct:pal(os:cmd(CSR_Cmd2)),
     ct:pal(os:cmd(CERT_Cmd)),
     ct:pal(os:cmd(CERT_Cmd2)),
+    ct:pal(os:cmd(CERT_Cmdp12)),
     file:delete(HEXT).
 
 cert_sign_cmd(ExtFile, CSRFile, CACert, CAKey, OutputCert) ->
@@ -255,6 +267,19 @@ csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN) ->
             "-addext keyUsage=digitalSignature,keyAgreement,keyCertSign "
             "-subj \"/C=SE/O=TEST/CN=~s\"",
             [PasswordArg, ECKeyFile, HKey, HCSR, CN, CN]
+        )
+    ).
+
+key_and_cert_to_pkcs12(KeyFile, CertFile, OutputFile) ->
+    lists:flatten(
+        % We ignore the password option, but it could be added.
+        io_lib:format(
+            "openssl pkcs12 -export -certpbe aes-256-cbc -keypbe aes-256-cbc -out ~s -inkey ~s -in ~s -passout pass:",
+            [
+                OutputFile,
+                KeyFile,
+                CertFile
+            ]
         )
     ).
 

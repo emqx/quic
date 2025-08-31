@@ -16,12 +16,79 @@ limitations under the License.
 #include "quicer_tls.h"
 
 /*
-** Build QUIC_CREDENTIAL_CONFIG from options, certfile, keyfile and password
+** Build QUIC_CREDENTIAL_CONFIG from options with an in-memory Certificate and
+*Private Key.
+** Should not be called directly, use `parse_cert_options` instead.
 */
 BOOLEAN
-parse_cert_options(ErlNifEnv *env,
-                   ERL_NIF_TERM options,
-                   QUIC_CREDENTIAL_CONFIG *CredConfig)
+parse_cert_options_in_memory(ErlNifEnv *env,
+                             ERL_NIF_TERM options,
+                             QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+  ERL_NIF_TERM asn1_term;
+  ERL_NIF_TERM password_term;
+  ErlNifBinary asn1_bin;
+  QUIC_CERTIFICATE_PKCS12 *CertInMem = NULL;
+
+  if (!CredConfig)
+    {
+      return FALSE;
+    }
+
+  if (!enif_get_map_value(env, options, ATOM_CERTKEYASN1, &asn1_term))
+    {
+      goto error;
+    }
+
+  if (enif_get_map_value(env, options, ATOM_PASSWORD, &password_term))
+    {
+      // @TODO add password support:
+      // https://github.com/microsoft/msquic/blob/9610803b6eed56f6b8e9506f2fb8cc702195a3a2/src/inc/msquic.h#L339
+      goto error;
+    }
+
+  if (!enif_inspect_binary(env, asn1_term, &asn1_bin))
+    {
+      goto error;
+    }
+
+  CertInMem = (QUIC_CERTIFICATE_PKCS12 *)CXPLAT_ALLOC_NONPAGED(
+      sizeof(QUIC_CERTIFICATE_PKCS12), QUICER_CERTIFICATE_PKCS12);
+  if (!CertInMem)
+    {
+      goto error;
+    }
+
+  char *allocated_asn1
+      = (char *)CXPLAT_ALLOC_NONPAGED(asn1_bin.size, QUIC_POOL_TEST);
+  if (!allocated_asn1)
+    {
+      goto error;
+    }
+  CxPlatCopyMemory(allocated_asn1, asn1_bin.data, asn1_bin.size);
+
+  // Tie it all together:
+  CertInMem->Asn1BlobLength = asn1_bin.size;
+  CertInMem->Asn1Blob = (uint8_t const *)allocated_asn1;
+  CertInMem->PrivateKeyPassword = NULL;
+  CredConfig->CertificatePkcs12 = CertInMem;
+  CredConfig->Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12;
+
+  return TRUE;
+error:
+  CXPLAT_FREE(CertInMem, QUICER_CERTIFICATE_PKCS12);
+  return FALSE;
+}
+
+/*
+** Build QUIC_CREDENTIAL_CONFIG from options with file based Certificate and
+*Private Key.
+** Should not be called directly, use `parse_cert_options` instead.
+*/
+BOOLEAN
+parse_cert_options_file(ErlNifEnv *env,
+                        ERL_NIF_TERM options,
+                        QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   char *password = NULL;
   char *certfile = NULL;
@@ -88,6 +155,50 @@ error:
   free(keyfile);
   free(password);
   return FALSE;
+}
+
+/*
+** Build QUIC_CREDENTIAL_CONFIG from options, certfile, keyfile and password.
+**
+** This function parses some options and then delegates to either
+** `parse_cert_options_in_memory` or `parse_cert_options_file`.
+*/
+BOOLEAN
+parse_cert_options(ErlNifEnv *env,
+                   ERL_NIF_TERM options,
+                   QUIC_CREDENTIAL_CONFIG *CredConfig)
+{
+  ERL_NIF_TERM dummy;
+  BOOLEAN result = FALSE;
+
+  if (!CredConfig)
+    {
+      return FALSE;
+    }
+
+  BOOLEAN has_keyfile = enif_get_map_value(env, options, ATOM_KEYFILE, &dummy);
+  BOOLEAN has_certfile
+      = enif_get_map_value(env, options, ATOM_CERTFILE, &dummy);
+  BOOLEAN has_certkeyasn1
+      = enif_get_map_value(env, options, ATOM_CERTKEYASN1, &dummy);
+
+  if (!has_certkeyasn1)
+    {
+      // No certkeyasn1, use certfile and keyfile.
+      result = parse_cert_options_file(env, options, CredConfig);
+    }
+  else if (has_certfile || has_keyfile)
+    {
+      // certkeyasn1 AND (certfile OR keyfile); error.
+      return FALSE;
+    }
+  else
+    {
+      // Only certkeyasn1.
+      result = parse_cert_options_in_memory(env, options, CredConfig);
+    }
+
+  return result;
 }
 
 /*
@@ -236,6 +347,14 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
       CxPlatFree(cc->CertificateFileProtected,
                  QUICER_CERTIFICATE_FILE_PROTECTED);
       cc->CertificateFileProtected = NULL;
+    }
+  else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12 == cc->Type
+           && cc->CertificatePkcs12)
+    {
+      free((char *)cc->CertificatePkcs12->Asn1Blob);
+      free((char *)cc->CertificatePkcs12->PrivateKeyPassword);
+      CxPlatFree(cc->CertificatePkcs12, QUICER_CERTIFICATE_PKCS12);
+      cc->CertificatePkcs12 = NULL;
     }
 
   if (cc->CaCertificateFile)
