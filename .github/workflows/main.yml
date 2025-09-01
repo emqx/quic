@@ -53,6 +53,11 @@ jobs:
           export QUICER_TLS_VER=sys
           make ci
 
+      - name: kill switch test
+        run: |
+          rm -rf priv/*
+          QUICER_NO_NIF=1 rebar3 shell --eval '{ok,fake}=quicer:open_lib(),halt()'
+
   mac-mesh:
     timeout-minutes: 60
     needs: pre-check
