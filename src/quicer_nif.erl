@@ -121,6 +121,13 @@
 
 -define(NONIF_SWITCH, "QUICER_NO_NIF").
 
+-hank([
+    {unnecessary_function_arguments, [
+        {open_lib, 1},
+        {reg_open, 1}
+    ]}
+]).
+
 -spec abi_version() -> abi_version().
 abi_version() ->
     ?QUICER_ABI_VERSION.
