@@ -119,7 +119,7 @@
 -include("quicer_types.hrl").
 -include("quicer_vsn.hrl").
 
--define(NONIF_SWITCH, "QUICER_NO_NIF").
+-define(NONIF_SWITCH, "QUICER_SKIP_NIF_LOAD").
 
 -hank([
     {unnecessary_function_arguments, [
@@ -145,8 +145,8 @@ init(ABIVsn) ->
     case os:getenv(?NONIF_SWITCH) of
         "1" ->
             io:format(
-                "~n~nWARN: Detected envvar ~s=1, ~p module is loaded but NOT functional. This is not encouraged and take your own risk!~n~n",
-                [?NONIF_SWITCH, ?MODULE]
+                "~n~nWARN: Detected env ~s=1, QUIC module is loaded but will NOT be functional. This is not encouraged and take your own risk!~n~n",
+                [?NONIF_SWITCH]
             ),
             ok;
         _ ->

@@ -56,7 +56,7 @@ jobs:
       - name: kill switch test
         run: |
           rm -rf priv/*
-          QUICER_NO_NIF=1 rebar3 shell --eval '{ok,fake}=quicer:open_lib(),halt()'
+          QUICER_SKIP_NIF_LOAD=1 rebar3 shell --eval '{ok,fake}=quicer:open_lib(),halt()'
 
   mac-mesh:
     timeout-minutes: 60
