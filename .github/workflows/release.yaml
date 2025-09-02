@@ -94,7 +94,6 @@ jobs:
           - debian13
           - debian12
           - debian11
-          - debian10
           - amzn2023
           - amzn2
           - el9
