@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-set -ueo
+set -ueo pipefail
 
 MSQUIC_VERSION="$1"
 TARGET_SO='priv/libquicer_nif.so'
@@ -25,19 +25,15 @@ build() {
     ./get-msquic.sh "$MSQUIC_VERSION"
     cmake -B c_build -G "${GENERATOR}"
     $MakeCmd -C c_build -j "$JOBS"
-    $MakeCmd -C c_build install
-    ## MacOS
-    if [ -f priv/libquicer_nif.dylib ]; then
-        # https://developer.apple.com/forums/thread/696460
-        # remove then copy avoid SIGKILL (Code Signature Invalid)
-        [ -f "$TARGET_SO" ] && rm "$TARGET_SO"
-        cp priv/libquicer_nif.dylib "$TARGET_SO"
-        echo "macOS"
-    fi
+
+    ## Need lttng shared lib "libmsquic.lttng.so"
+    [ "${QUIC_LOGGING_TYPE:-}" = "lttng" ]  \
+        && $MakeCmd -C c_build install
+    true
 }
 
 download() {
-    TAG="$(git describe --tags | head -1)"
+    TAG=${QUICER_VERSION:-"$(git describe --tags | head -1)"}
     URL="https://github.com/emqx/quic/releases/download/$TAG/$PKGNAME"
     mkdir -p _packages
     if [ ! -f "_packages/${PKGNAME}" ]; then
@@ -68,18 +64,6 @@ download() {
     return $res
 }
 
-# rebar3 deref softlinks while packaging
-# so we dref at here to keep one dynlib file to avoid dup files in EMQX package
-# - priv/libquicer_nif.so
-# - priv/libquicer_nif.so.1
-# - priv/libquicer_nif.so.504
-remove_dups() {
-    cp -L $TARGET_SO ${TARGET_SO}tmp
-    rm -f ${TARGET_SO}.*
-    rm -f ${TARGET_SO}-.*
-    mv ${TARGET_SO}tmp $TARGET_SO
-}
-
 release() {
     local variant=${1:-""}
     if [ -z "$PKGNAME" ]; then
@@ -89,11 +73,10 @@ release() {
     mkdir -p _packages
     PKGNAME="$(basename $PKGNAME .gz)${variant}.gz"
     TARGET_PKG="_packages/${PKGNAME}"
-    tar czvf "$TARGET_PKG" -C $(dirname "$TARGET_SO") \
+    tar czvf "$TARGET_PKG" --dereference -C $(dirname "$TARGET_SO") \
         --exclude include --exclude share --exclude .gitignore \
         --exclude lib \
         .
-        #$(basename $TARGET_SO).*
     # use openssl but not sha256sum command because in some macos env it does not exist
     if command -v openssl; then
         openssl dgst -sha256 "${TARGET_PKG}" | cut -d ' ' -f 2  > "${TARGET_PKG}.sha256"
@@ -115,7 +98,6 @@ else
             build
         else
             echo "QUICER: NOTE! nif library is downloaded from prebuilt releases, not compiled from source!"
-            remove_dups
         fi
     else
         build

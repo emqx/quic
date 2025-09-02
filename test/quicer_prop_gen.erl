@@ -167,7 +167,7 @@ valid_listen_opts() ->
 valid_listen_on() ->
     ?LET(
         Port,
-        range(1025, 65536),
+        range(1025, 65535),
         begin
             case gen_udp:open(Port, [{reuseaddr, true}]) of
                 {ok, S} ->

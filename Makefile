@@ -1,3 +1,4 @@
+include rel.mk
 REBAR := rebar3
 
 QUICER_VERSION ?= $(shell git describe --tags --always)

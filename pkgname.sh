@@ -27,7 +27,7 @@ case "$UNAMES" in
 esac
 
 ARCH="$(uname -m)"
-VSN="$(git describe --tags --exact-match | head -1)"
+VSN=${QUICER_VERSION:-"$(git describe --tags --exact-match | head -1)"}
 
 OPENSSL=${QUICER_TLS_VER:-openssl}
 

@@ -31,13 +31,14 @@ jobs:
           - openssl
           - sys
         os:
+          - macos-13
           - macos-14
           - macos-15
     runs-on: ${{ matrix.os }}
     steps:
 
       - name: Configure Homebrew cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        uses: actions/cache@v4
         with:
           path: |
             ~/Library/Caches/Homebrew/
@@ -75,10 +76,10 @@ jobs:
       fail-fast: false
       matrix:
         erlang:
-          - otp: 26.2.5.2-3
-            builder: 5.4-4:1.15.7-26.2.5.2-3
-          - otp: 27.2-2
-            builder: 5.4-4:1.17.3-27.2-2
+          - otp: 26.2.5.14-1
+            builder: 5.6-1:1.15.7-26.2.5.14-1
+          - otp: 27.3.4.2-2
+            builder: 5.6-1:1.18.3-27.3.4.2-2
         openssl:
           - openssl3
           - openssl
@@ -90,13 +91,20 @@ jobs:
           - ubuntu24.04
           - ubuntu22.04
           - ubuntu20.04
+          - debian13
           - debian12
           - debian11
-          - debian10
           - amzn2023
           - amzn2
           - el9
           - el8
+          - el7
+        exclude:
+          - os: el7
+            openssl: sys
+          - os: el7
+            openssl: openssl3
+
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
     steps:
@@ -114,7 +122,8 @@ jobs:
             ghcr.io/emqx/emqx-builder/${{ matrix.erlang.builder }}-${{ matrix.os }} \
               bash -euc '\
                 git config --global --add safe.directory /wd; \
-                grep -q "\"Amazon Linux 2\"" /etc/os-release && alternatives --set python /usr/bin/python2; \
+                grep -q "\"Amazon Linux 2\"\|\"CentOS-7\"" /etc/os-release && alternatives --set python /usr/bin/python2; \
+                export QUICER_TLS_VER; \
                 which yum && yum install -y perl-IPC-Cmd; \
                 make'
 
@@ -132,16 +141,40 @@ jobs:
       - emqx-linux
     if: github.event.inputs.ref_name || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
     steps:
+      - uses: actions/checkout@v4
+
+      # Download all artifacts from both jobs into packages/
       - uses: actions/download-artifact@v4
         with:
           pattern: 'quicer-*'
           path: packages
           merge-multiple: true
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: quicer ${{ github.event.inputs.ref_name || github.ref_name }} Released
-          tag_name: ${{ github.event.inputs.ref_name || github.ref_name }}
-          files: packages/*
-          draft: true
-          prerelease: false
+
+      # Check that packages/ exists and is not empty
+      - name: Check packages directory
+        run: |
+          if [ ! -d packages ] || [ -z "$(ls -A packages)" ]; then
+            echo "No artifacts found in packages/"
+            exit 1
+          fi
+
+      # Create the GitHub Release
+      - name: Create Release (empty)
+        run: |
+          gh release create "${{ github.event.inputs.ref_name || github.ref_name }}" --title "quicer ${{ github.event.inputs.ref_name || github.ref_name }} Released" --notes "Automated release" --draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release assets with delay
+        run: |
+          i=0
+          for f in packages/*; do
+            gh release upload "${{ github.event.inputs.ref_name || github.ref_name }}" "$f" --clobber
+            i=$((i+1))
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Sleeping to avoid rate limit..."
+              sleep 2
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

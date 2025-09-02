@@ -125,6 +125,10 @@ handle_stream_data(Stream, Bin, _Flags, #{is_unidir := false} = State) ->
     case quicer:send(Stream, Bin) of
         {ok, _} ->
             {ok, State};
+        {error, cancelled} ->
+            {stop, {shutdown, cancelled}, State};
+        {error, stm_send_error, aborted} ->
+            {stop, {shutdown, {stm_send_error, aborted}}, State};
         {error, closed} ->
             {stop, {shutdown, closed}, State}
     end;
@@ -185,5 +189,5 @@ stream_closed(
 handle_call(_Request, _From, S) ->
     {reply, {error, not_impl}, S}.
 
-handle_info(Info, S) ->
+handle_info(_Info, S) ->
     {ok, S}.
