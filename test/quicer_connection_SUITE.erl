@@ -1005,15 +1005,31 @@ tc_conn_custom_verify(Config) ->
     ),
     receive
         listener_ready ->
+            ConnOpts = default_conn_opts_client_cert(Config, "ca"),
+            {ok, CaCertPem} = file:read_file(proplists:get_value(cacertfile, ConnOpts)),
+            [{'Certificate', CaCertBin, not_encrypted}] = public_key:pem_decode(CaCertPem),
             %% WHEN: client connect with custom_verify
-            {ok, Conn, {Cert, _}} = quicer:connect(
+            {ok, Conn, {Cert, CertChainBin}} = quicer:connect(
                 "localhost",
                 Port,
-                [{custom_verify, true} | default_conn_opts_client_cert(Config, "ca")],
+                [{custom_verify, true} | ConnOpts],
                 5000
             ),
-            %% THEN: client recv a cert.
-            _ = public_key:pkix_decode_cert(Cert, otp),
+            Cert1 = public_key:pkix_decode_cert(Cert, otp),
+            CertsChain = lists:map(
+                fun(X) ->
+                    public_key:pkix_decode_cert(X, otp)
+                end,
+                CertChainBin
+            ),
+            %% THEN: CaCert in the cert path
+            ?assert(lists:member(public_key:pkix_decode_cert(CaCertBin, otp), CertsChain)),
+
+            %% WHEN: Performs a path validation
+            ResPath = public_key:pkix_path_validation(CaCertBin, [Cert1], []),
+            %% THEN: Path validation success
+            ?assertMatch({ok, _}, ResPath),
+
             %% THEN: client could accept the cert.
             ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
             {ok, {_, _}} = quicer:sockname(Conn),
@@ -1176,6 +1192,7 @@ simple_conn_server_loop(L, Conn, Owner) ->
     end.
 
 simple_conn_server_custom_verify(Owner, Config, Port) ->
+    ct:pal("~p", [default_listen_opts_client_cert(Config)]),
     {ok, L} = quicer:listen(Port, [
         {verify, verify_peer}, {custom_verify, true} | default_listen_opts_client_cert(Config)
     ]),
