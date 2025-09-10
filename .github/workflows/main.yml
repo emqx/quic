@@ -103,7 +103,7 @@ jobs:
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
           ulimit -c unlimited
           # run sudo for getting coredump
-          sudo make ci
+          sudo -E make ci
 
       - name: lldb bt
         if: failure()
