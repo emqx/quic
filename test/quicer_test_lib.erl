@@ -37,7 +37,9 @@
     report_active_connections/0,
     report_active_connections/1,
 
-    report_unhandled_messages/0
+    report_unhandled_messages/0,
+
+    read_ca_cert_bin/1
 ]).
 
 %% Default opts
@@ -521,6 +523,12 @@ shutdown_all_listeners() ->
         end,
         quicer:listeners()
     ).
+
+-spec read_ca_cert_bin(file:filename()) -> binary().
+read_ca_cert_bin(Filename) ->
+    {ok, CaCertPem} = file:read_file(Filename),
+    [{'Certificate', CaCertBin, not_encrypted}] = public_key:pem_decode(CaCertPem),
+    CaCertBin.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:
