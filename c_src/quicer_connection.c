@@ -1682,40 +1682,20 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
 
       i2d_X509(c_ctx->peer_cert, &tmp);
 
-      // Certificates Chain
-      ERL_NIF_TERM cert_chains = enif_make_list(env, 0);
-      if (chains)
-        {
-          STACK_OF(X509) *Chain = X509_STORE_CTX_get0_chain(chains);
-          int cert_cnt = sk_X509_num(Chain);
-          if (cert_cnt > 0)
-            {
-              for (int i = 0; i < cert_cnt; i++)
-                {
-                  ERL_NIF_TERM cert_in_chain;
-                  unsigned char *cert_bin
-                      = enif_make_new_binary(env, len, &cert_in_chain);
-                  tmp = cert_bin;
-                  i2d_X509(sk_X509_value(Chain, i), &tmp);
-                  cert_chains
-                      = enif_make_list_cell(env, cert_in_chain, cert_chains);
-                }
-            }
-        }
-
-      ERL_NIF_TERM report
-          = make_event(env,
-                       ATOM_PEER_CERT_RECEIVED,
-                       ConnHandle,
-                       enif_make_tuple2(env, DerCert, cert_chains));
+      ERL_NIF_TERM report = make_event(
+          env,
+          ATOM_PEER_CERT_RECEIVED,
+          ConnHandle,
+          enif_make_tuple2(env, DerCert, x509_ctx_to_cert_chain(env, chains)));
 
       if (!enif_send(NULL, &c_ctx->owner->Pid, NULL, report))
         {
           // @TODO check if this is ok
           return QUIC_STATUS_UNREACHABLE;
         }
+
       return QUIC_STATUS_PENDING;
-    }
+    } // end of custom_verify
 
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_CTX *x509_ctx

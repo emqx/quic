@@ -609,3 +609,46 @@ complete_cert_validation(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
 }
+
+/*
+** Return a list of TLS cert from x509 store ctx
+**
+** @NOTE, assuming caller will clean the eterms in env for errors
+*/
+ERL_NIF_TERM
+x509_ctx_to_cert_chain(ErlNifEnv *env, X509_STORE_CTX *ctx)
+{
+  CXPLAT_FRE_ASSERT(ctx);
+
+  STACK_OF(X509) *chain = X509_STORE_CTX_get0_chain(ctx);
+  ERL_NIF_TERM echains = enif_make_list(env, 0);
+
+  int cnt = sk_X509_num(chain);
+
+  for (int i = 0; i < cnt; i++)
+    {
+      ERL_NIF_TERM cert;
+      X509 *curr = sk_X509_value(chain, i);
+      unsigned char *tmp;
+
+      // Validation and Getting the len for binary alloc
+      int len = i2d_X509(curr, NULL);
+
+      if (len < 0)
+        {
+          // unlikely
+          return enif_make_int(env, len);
+        }
+      unsigned char *data = enif_make_new_binary(env, len, &cert);
+
+      // note, using tmp is mandatory, see doc for i2d_X509
+      tmp = data;
+
+      // no return val check, already checked above.
+      i2d_X509(curr, &tmp);
+
+      echains = enif_make_list_cell(env, cert, echains);
+    }
+
+  return echains;
+}
