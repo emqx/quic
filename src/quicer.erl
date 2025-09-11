@@ -396,6 +396,7 @@ close_listener(Listener, Timeout) ->
     timeout()
 ) ->
     {ok, connection_handle()}
+    | {ok, connection_handle(), cert_and_chain()}
     | {error, conn_open_error | config_error | conn_start_error | timeout | nst_not_found}
     | {error, transport_down, transport_shutdown_props()}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
@@ -418,8 +419,8 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
                 {quic, transport_shutdown, H, Reason} ->
                     flush(closed, H),
                     {error, transport_down, Reason};
-                {quic, peer_cert_received, H, Cert} ->
-                    {ok, H, Cert}
+                {quic, peer_cert_received, H, Certs} ->
+                    {ok, H, Certs}
             end;
         {error, _} = Err ->
             Err
@@ -458,7 +459,9 @@ handshake(Conn) ->
     handshake(Conn, 5000).
 
 -spec handshake(connection_handle(), timeout()) ->
-    {ok, connection_handle()} | {error, any()}.
+    {ok, connection_handle()}
+    | {ok, connection_handle(), cert_and_chain()}
+    | {error, any()}.
 handshake(Conn, Timeout) ->
     case async_handshake(Conn) of
         {error, _} = E ->
@@ -467,7 +470,7 @@ handshake(Conn, Timeout) ->
             receive
                 {quic, connected, Conn, _} -> {ok, Conn};
                 {quic, closed, Conn, _Flags} -> {error, closed};
-                {quic, peer_cert_received, Conn, Cert} -> {ok, Conn, Cert}
+                {quic, peer_cert_received, Conn, CertAndChain} -> {ok, Conn, CertAndChain}
             after Timeout ->
                 {error, timeout}
             end
@@ -1088,7 +1091,7 @@ peername(Handle) ->
 %% @doc Peer Cert in DER-encoded binary
 %% mimic {@link ssl:peername/1}
 -spec peercert(connection_handle() | stream_handle()) ->
-    {ok, CertDerEncoded :: binary()} | {error, any()}.
+    {ok, cert()} | {error, any()}.
 peercert(Handle) ->
     quicer_nif:peercert(Handle).
 
