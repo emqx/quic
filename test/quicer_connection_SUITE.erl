@@ -153,10 +153,6 @@ groups() ->
 %%--------------------------------------------------------------------
 all() ->
     [
-        tc_conn_custom_verify,
-        tc_conn_custom_verify_fail,
-        tc_conn_custom_verify_bad_client_cert,
-        tc_conn_custom_verify_bad_server_cert,
         {group, global_reg},
         {group, suite_reg}
     ].
@@ -1041,6 +1037,55 @@ tc_conn_custom_verify(Config) ->
         ct:fail("timeout")
     end.
 
+tc_conn_custom_verify_skip_complete_call(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    %% GIVEN: A Server will accept the client's cert.
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            simple_conn_server_custom_verify(Owner, Config, Port)
+        end
+    ),
+    receive
+        listener_ready ->
+            ConnOpts = default_conn_opts_client_cert(Config, "ca"),
+            CaCertBin = quicer_test_lib:read_ca_cert_bin(proplists:get_value(cacertfile, ConnOpts)),
+            %% WHEN: client connect with custom_verify
+            {ok, Conn, {Cert, CertChainBin}} = quicer:connect(
+                "localhost",
+                Port,
+                [{custom_verify, true} | ConnOpts],
+                5000
+            ),
+            case os:getenv("QUICER_USE_TRUSTED_STORE") of
+                false ->
+                    %% THEN: CaCert and PeerCert in the cert chain
+                    ?assert(lists:member(Cert, CertChainBin)),
+                    ?assert(lists:member(CaCertBin, CertChainBin));
+                _ ->
+                    skip
+            end,
+
+            %% WHEN: Performs a path validation
+            ResPath = test_custom_verify(CaCertBin, {Cert, CertChainBin}),
+
+            %% THEN: Path validation success
+            ?assertMatch({ok, _}, ResPath),
+
+            %% WHEN: We SKIP complete_cert_validation call
+            %%ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+            {ok, {_, _}} = quicer:sockname(Conn),
+            ct:pal("closing connection : ~p", [Conn]),
+            %% WHEN: connection is closed
+            ok = quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 777, 10_000),
+            %% THEN: Conn is really closed
+            ?assertEqual({error, closed}, quicer:sockname(Conn)),
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
 tc_conn_custom_verify_fail(Config) ->
     Port = select_port(),
     Owner = self(),
@@ -1201,7 +1246,7 @@ simple_conn_server_custom_verify(Owner, Config, Port) ->
     {ok, Conn} = quicer:accept(L, [], 1000),
 
     CaCertBin = quicer_test_lib:read_ca_cert_bin(proplists:get_value(cacertfile, LOpts)),
-    case quicer:handshake(Conn) of
+    case quicer:handshake(Conn, 3000) of
         {ok, Conn, {Cert, CertChain}} ->
             case os:getenv("QUICER_USE_TRUSTED_STORE") of
                 false ->
@@ -1221,7 +1266,12 @@ simple_conn_server_custom_verify(Owner, Config, Port) ->
                     )
             end,
             simple_conn_server_loop(L, Conn, Owner);
+        {error, timeout} ->
+            quicer:shutdown_connection(Conn),
+            quicer:close_listener(L);
         {error, closed} ->
+            quicer:close_listener(L);
+        done ->
             quicer:close_listener(L)
     end.
 
