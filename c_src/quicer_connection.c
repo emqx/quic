@@ -121,12 +121,9 @@ peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   CXPLAT_FRE_ASSERT(1 == argc);
   ERL_NIF_TERM ctx = argv[0];
-  ERL_NIF_TERM DerCert;
   ERL_NIF_TERM res = ATOM_UNDEFINED;
   void *q_ctx;
   QuicerConnCTX *c_ctx;
-  int len = 0;
-  unsigned char *tmp;
 
   if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
@@ -155,26 +152,7 @@ peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
-  if ((len = i2d_X509(c_ctx->peer_cert, NULL)) < 0)
-    {
-      // unlikely to happen
-      res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
-      goto exit;
-    }
-
-  unsigned char *data = enif_make_new_binary(env, len, &DerCert);
-
-  if (!data)
-    {
-      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-      goto exit;
-    }
-
-  // note, using tmp is mandatory, see doc for i2d_X590
-  tmp = data;
-
-  i2d_X509(c_ctx->peer_cert, &tmp);
-  res = SUCCESS(DerCert);
+  res = SUCCESS(x509_cert_to_ebinary(env, c_ctx->peer_cert));
 
 exit:
   enif_mutex_unlock(c_ctx->lock);
@@ -1660,27 +1638,7 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
     {
       ErlNifEnv *env = c_ctx->env;
       ERL_NIF_TERM ConnHandle = enif_make_resource(env, c_ctx);
-      ERL_NIF_TERM DerCert;
-      int len = 0;
-      unsigned char *tmp;
-
-      if ((len = i2d_X509(c_ctx->peer_cert, NULL)) < 0)
-        {
-          // unlikely to happen
-          return QUIC_STATUS_INTERNAL_ERROR;
-        }
-
-      unsigned char *data = enif_make_new_binary(env, len, &DerCert);
-
-      if (!data)
-        {
-          return QUIC_STATUS_OUT_OF_MEMORY;
-        }
-
-      // note, using tmp is mandatory, see doc for i2d_X509
-      tmp = data;
-
-      i2d_X509(c_ctx->peer_cert, &tmp);
+      ERL_NIF_TERM DerCert = x509_cert_to_ebinary(env, c_ctx->peer_cert);
 
       ERL_NIF_TERM report = make_event(
           env,

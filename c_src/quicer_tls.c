@@ -611,6 +611,43 @@ complete_cert_validation(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 }
 
 /*
+** Return a cert in binary eterm or atom for error
+** This is a helper
+*/
+ERL_NIF_TERM
+x509_cert_to_ebinary(ErlNifEnv *env, X509 *x)
+{
+  ERL_NIF_TERM cert;
+  unsigned char *tmp;
+
+  // Validation and Getting the len for binary alloc
+  int len = i2d_X509(x, NULL);
+
+  if (len < 0)
+    {
+      // Should not happen, maybe dead code here
+      CXPLAT_FRE_ASSERT(true);
+      return ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+    }
+
+  unsigned char *data = enif_make_new_binary(env, len, &cert);
+
+  if (!data)
+    {
+      // unlikely
+      return ATOM_QUIC_STATUS_OUT_OF_MEMORY;
+    }
+
+  // note, using tmp is mandatory, see doc for i2d_X509
+  tmp = data;
+
+  // no return val check, already checked above.
+  i2d_X509(x, &tmp);
+
+  return cert;
+}
+
+/*
 ** Return a list of TLS cert from x509 store ctx
 **
 ** @NOTE, assuming caller will clean the eterms in env for errors
@@ -627,26 +664,9 @@ x509_ctx_to_cert_chain(ErlNifEnv *env, X509_STORE_CTX *ctx)
 
   for (int i = 0; i < cnt; i++)
     {
-      ERL_NIF_TERM cert;
       X509 *curr = sk_X509_value(chain, i);
-      unsigned char *tmp;
-
-      // Validation and Getting the len for binary alloc
-      int len = i2d_X509(curr, NULL);
-
-      if (len < 0)
-        {
-          // unlikely
-          return enif_make_int(env, len);
-        }
-      unsigned char *data = enif_make_new_binary(env, len, &cert);
-
-      // note, using tmp is mandatory, see doc for i2d_X509
-      tmp = data;
-
-      // no return val check, already checked above.
-      i2d_X509(curr, &tmp);
-
+      CXPLAT_FRE_ASSERT(curr);
+      ERL_NIF_TERM cert = x509_cert_to_ebinary(env, curr);
       echains = enif_make_list_cell(env, cert, echains);
     }
 
