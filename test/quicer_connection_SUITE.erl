@@ -1494,6 +1494,7 @@ default_conn_opts(Config) ->
     default_conn_opts() ++ Config.
 
 test_custom_verify(CaCertBin, {Cert, []}) ->
+    %% For self-validation with QUICER_USE_TRUSTED_STORE=1
     public_key:pkix_path_validation(CaCertBin, [Cert], []);
 test_custom_verify(CaCertBin, {_, Chain}) ->
     public_key:pkix_path_validation(CaCertBin, Chain, []).

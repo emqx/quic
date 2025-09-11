@@ -216,6 +216,16 @@ Or use quicer:recv/2 to receive in passive mode
 
 This message notifies the connection owner that quic connection is established ( the TLS handshake is done ).
 
+### Peer Certificate Received
+```erlang
+{quic, peer_cert_received, connection_handle(), cert_and_chain()}
+```
+
+With `custom_verify` enabled, Quicer triggers this event when a peer certificate is received. 
+The application uses `cert_and_chain()` for custom verification, then must call 
+`quicer:complete_cert_validation/3` with a positive or negative result and a reason code.
+
+The `cert_and_chain()` is a two elements tuple:  A peer cert and the cert chain from TLS context.
 
 ### Transport Shutdown
 

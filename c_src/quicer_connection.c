@@ -1648,7 +1648,7 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
 
       if (!enif_send(NULL, &c_ctx->owner->Pid, NULL, report))
         {
-          // @TODO check if this is ok
+          // handshake should fail, thus NO Pending cert validation..
           return QUIC_STATUS_UNREACHABLE;
         }
 

@@ -258,8 +258,8 @@ SYNC call in non-callback-context
 #+end_verse
 
 
-| MsQuic Event                                          | Erlang Msg                                                                 |
-|-------------------------------------------------------+----------------------------------------------------------------------------|
+| MsQuic Event                                          | Erlang Msg                                                                |
+|-------------------------------------------------------+---------------------------------------------------------------------------|
 | QUIC_CONNECTION_EVENT_CONNECTED                       | {quic, connected, connection_handle()}  @TODO more flags                  |
 | QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT | {quic, transport_shutdown, connection_handle(), atom_status()}            |
 | QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER      | {quic, shutdown, connection_handle(), ErrorCode::integer()}               |
@@ -269,14 +269,15 @@ SYNC call in non-callback-context
 | QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED             | {quic, new_stream, stream_handle(), new_stream_props()} stream            |
 | QUIC_CONNECTION_EVENT_STREAMS_AVAILABLE               | {quic, streams_available, connection_handle(), BidirStmCnt, UniDirStmCnt} |
 | QUIC_CONNECTION_EVENT_PEER_NEEDS_STREAMS              | {quic, peer_needs_streams, connection_handle()}                           |
-| QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED         | -                                                                          |
+| QUIC_CONNECTION_EVENT_IDEAL_PROCESSOR_CHANGED         | -                                                                         |
 | QUIC_CONNECTION_EVENT_DATAGRAM_STATE_CHANGED          | {quic, dgram_max_len, integer()} @TODO with handle                        |
 | QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED               | {quic, dgram, binary()}          @TODO with handle                        |
 | QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED     | {quic, send_dgram_completed, connection_handle()}                         |
 | QUIC_CONNECTION_EVENT_RESUMED                         | {quic, connection_resumed, connection_handle, false \vert binary()}       |
 | QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED      | {quic, nst_received, connection_handle(), Ticket::binary()}               |
-| QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | {quic, peer_cert_received, connection_handle(), Cert::binary()}            |
-|-------------------------------------------------------+----------------------------------------------------------------------------|
+| QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED       | {quic, peer_cert_received, connection_handle(), cert_and_chain()          |
+|                                                       |                                                                           |
+|-------------------------------------------------------+---------------------------------------------------------------------------|
 
 
 ** Stream Events
