@@ -37,6 +37,7 @@
 %% Connection Callbacks
 -export([
     new_conn/3,
+    peer_cert_received/3,
     connected/3,
     transport_shutdown/3,
     shutdown/3,
@@ -75,6 +76,11 @@ new_conn(Conn, #{version := _Vsn}, #{stream_opts := SOpts} = S) ->
         {error, _} = Error ->
             {stop, Error, S#{conn => Conn}}
     end.
+
+peer_cert_received(Conn, Certs, S) ->
+    ok = do_verify_cert(Certs),
+    ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+    {ok, S}.
 
 connected(_Conn, _Flags, S) ->
     {ok, S}.
@@ -161,3 +167,6 @@ handle_info({'EXIT', _Pid, _Reason}, State) ->
     {ok, State};
 handle_info(_, State) ->
     {ok, State}.
+
+do_verify_cert(_Certs) ->
+    ok.

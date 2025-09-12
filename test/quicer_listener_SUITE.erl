@@ -460,6 +460,76 @@ tc_close_listener_dealloc(Config) ->
             quicer:close_listener(L)
     end.
 
+tc_get_listener_opt_custom_verify(Config) ->
+    Port = select_port(),
+    {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+    {ok, false} = quicer:getopt(L, custom_verify),
+    ok = quicer:setopt(L, custom_verify, true),
+    {ok, true} = quicer:getopt(L, custom_verify),
+    ok = quicer:close_listener(L).
+
+tc_set_listener_opt_custom_verify_failed(Config) ->
+    Port = select_port(),
+    %% GIVEN: start listener with custom_verify = false (default)
+    {ok, L} = quicer:listen(Port, default_listener_opts(Config, verify_peer)),
+    {ok, false} = quicer:getopt(L, custom_verify),
+    spawn_link(fun() ->
+        %% WHEN: set listener custom_verify = true
+        ok = quicer:setopt(L, custom_verify, true),
+        {ok, H} = quicer:accept(L, [], 2000),
+        %% THEN: handshake return Certs
+        {ok, H, _Certs} = quicer:handshake(H, 3000),
+        %% WHEN: complete certs verify failed.
+        ok = quicer:complete_cert_validation(
+            H, false, ?QUIC_TLS_ALERT_CODE_UNSUPPORTED_CERTIFICATE
+        ),
+        timer:sleep(1000)
+    end),
+    ClientConnOpts = default_conn_opts_verify(Config, 'ca'),
+    {ok, Conn} = quicer:connect("localhost", Port, ClientConnOpts, 3000),
+    {ok, Stream} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stream, <<"ping">>),
+    receive
+        %% THEN: transport_shutdown with reason unsupported_certificate
+        {quic, transport_shutdown, Conn, #{status := unsupported_certificate}} -> ok
+    after 1000 ->
+        quicer_test_lib:report_unhandled_messages(),
+        ct:fail("connection is still connected")
+    end,
+    ok = quicer:stop_listener(L),
+    ok = quicer:close_listener(L).
+
+tc_set_listener_opt_custom_verify_success(Config) ->
+    Port = select_port(),
+    %% GIVEN: start listener with custom_verify = false (default)
+    {ok, L} = quicer:listen(Port, default_listener_opts(Config, verify_peer)),
+    {ok, false} = quicer:getopt(L, custom_verify),
+    spawn_link(fun() ->
+        %% WHEN: set listener custom_verify = true
+        ok = quicer:setopt(L, custom_verify, true),
+        {ok, H} = quicer:accept(L, [], 2000),
+        %% THEN: handshake return Certs
+        {ok, H, _Certs} = quicer:handshake(H, 3000),
+        %% WHEN: complete certs verify success.
+        ok = quicer:complete_cert_validation(
+            H, true, ?QUIC_TLS_ALERT_CODE_SUCCESS
+        ),
+        timer:sleep(1000)
+    end),
+    ClientConnOpts = default_conn_opts_verify(Config, 'ca'),
+    {ok, Conn} = quicer:connect("localhost", Port, ClientConnOpts, 3000),
+    {ok, Stream} = quicer:start_stream(Conn, []),
+    {ok, 4} = quicer:send(Stream, <<"ping">>),
+    receive
+        %% THEN: transport_shutdown with reason unsupported_certificate
+        {quic, transport_shutdown, Conn, #{status := R}} ->
+            ct:fail("transport unexpected shutdown due to ~p", [R]),
+            ok
+    after 1000 ->
+        quicer_test_lib:report_unhandled_messages()
+    end,
+    quicer:close_listener(L).
+
 tc_stop_start_listener(Config) ->
     Port = select_port(),
     LConf = default_listen_opts(Config),
@@ -1137,10 +1207,14 @@ default_listener_opts(Config, Verify) ->
 default_conn_opts_verify(Config, Ca) ->
     DataDir = ?config(data_dir, Config),
     CACertFile = filename:join(DataDir, Ca) ++ ".pem",
+    CertFile = filename:join(DataDir, "client.pem"),
+    KeyFile = filename:join(DataDir, "client.key"),
     [
         {verify, verify_peer},
         {cacertfile, CACertFile},
+        {certfile, CertFile},
+        {keyfile, KeyFile},
         {alpn, ["sample"]},
-        %% {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
+        {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
         {idle_timeout_ms, 5000}
     ].

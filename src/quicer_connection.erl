@@ -73,6 +73,9 @@
 %% Handle connection handshake done
 %%      callback is suggested to accept new streams @see quicer:accept_stream/3
 
+-callback peer_cert_received(connection_handle(), cert_and_chain(), cb_state()) -> cb_ret().
+%% Handle certifcate received from peer for custom cert/certchain verification.
+
 -callback transport_shutdown(connection_handle(), transport_shutdown_props(), cb_state()) ->
     cb_ret().
 %% Handle connection shutdown due to transport error with error reason.
@@ -138,6 +141,8 @@
     handle_continue/2,
     %% require newer MsQuic
     peer_needs_streams/3,
+    %% when custom_verify = true
+    peer_cert_received/3,
     %% client only
     nst_received/3,
     %% because dgram could be off
@@ -456,6 +461,18 @@ handle_info(
     }),
     %% @TODO add option to unlink from supervisor
     default_cb_ret(M:connected(C, Props, CbState), State#{is_resumed => IsResumed});
+handle_info(
+    {quic, peer_cert_received, C, Certs},
+    #{
+        conn := C,
+        callback := M,
+        callback_state := CbState
+    } = State
+) ->
+    ?tp_ignore_side_effects_in_prod(debug, #{
+        module => ?MODULE, conn => C, certs => Certs, event => peer_cert_received
+    }),
+    default_cb_ret(M:peer_cert_received(C, Certs, CbState), State);
 handle_info(
     {quic, transport_shutdown, C, DownInfo},
     #{
