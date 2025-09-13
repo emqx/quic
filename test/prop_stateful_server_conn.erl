@@ -94,6 +94,7 @@ initial_state() ->
 %%
 command(#{handle := Handle}) ->
     frequency([
+        {50, {call, quicer, complete_cert_validation, [Handle, boolean(), integer()]}},
         {200, {call, quicer, handshake, [Handle, 1000]}},
         {100, {call, quicer, handshake, [Handle, valid_quicer_settings(), 1000]}},
         {100, {call, quicer, getopt, [Handle, ?LET({Opt, _}, conn_opt(), Opt)]}},
@@ -331,6 +332,8 @@ postcondition(
     {error, _}
 ) ->
     ConnState =/= connected;
+postcondition(_State, {call, quicer, complete_cert_validation, _}, _) ->
+    true;
 postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
     false.
 

@@ -60,9 +60,15 @@ prop_client_state_test() ->
 %% @doc Initial model value at system start. Should be deterministic.
 initial_state() ->
     %% net_kernel:start([?MODULE, shortnames]),
-    {ok, H} = quicer:connect("localhost", 14568, default_conn_opts(), 10000),
+    {H, State} =
+        case quicer:connect("localhost", 14568, default_conn_opts(), 10000) of
+            {ok, H} ->
+                {H, connected};
+            {ok, H, _Certs} ->
+                {H, verify_pending}
+        end,
     #{
-        state => connected,
+        state => State,
         handle => H,
         owner => self(),
         me => self(),
@@ -74,6 +80,7 @@ initial_state() ->
 %%
 command(#{handle := Handle}) ->
     frequency([
+        {50, {call, quicer, complete_cert_validation, [Handle, boolean(), integer()]}},
         {100, {call, quicer, getopt, [Handle, ?LET({Opt, _}, conn_opt(), Opt)]}},
         {100,
             {call, quicer, async_accept_stream, [Handle, ?LET(Opts, quicer_acceptor_opts(), Opts)]}},
@@ -105,6 +112,8 @@ command(#{handle := Handle}) ->
 
 %% @doc Determines whether a command should be valid under the
 %% current state.
+precondition(#{state := verify_pending}, {call, quicer, complete_cert_validation, _Args}) ->
+    true;
 precondition(#{state := connected}, {call, _Mod, _Fun, _Args}) ->
     true;
 precondition(#{state := closed}, {call, _Mod, _Fun, _Args}) ->
@@ -195,6 +204,8 @@ postcondition(_State, {call, quicer, controlling_process, [_, _]}, ok) ->
     true;
 postcondition(_State, {call, quicer, get_conn_owner, _}, {ok, Pid}) when is_pid(Pid) ->
     true;
+postcondition(_State, {call, quicer, complete_cert_validation, _}, _) ->
+    true;
 postcondition(
     #{owner := Owner, state := connected},
     {call, quicer, controlling_process, [_, _]},
@@ -255,6 +266,15 @@ postcondition(_State, {call, _Mod, _Fun, _Args} = _Call, _Res) ->
 %% accordingly for the test to proceed.
 next_state(State, Res, Call) ->
     step_calls(do_next_state(State, Res, Call)).
+do_next_state(
+    #{state := verify_pending} = State, _Res, {call, quicer, complete_cert_validation, [_, IsOK, _]}
+) ->
+    NewState =
+        case IsOK of
+            true -> connected;
+            false -> closed
+        end,
+    State#{state := NewState};
 do_next_state(#{state := connected} = State, _Res, {call, quicer, close_connection, _Args}) ->
     State#{state := closed};
 do_next_state(#{state := connected} = State, _Res, {call, quicer, shutdown_connection, _Args}) ->

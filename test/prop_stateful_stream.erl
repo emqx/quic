@@ -83,8 +83,15 @@ prop_stateful_server_stream_test() ->
                     receive
                         {quic, new_conn, C, _} ->
                             case quicer:handshake(C) of
-                                {ok, C} -> C;
-                                Err -> error({quicer:get_conn_rid(C), Err})
+                                {ok, C} ->
+                                    C;
+                                {ok, C, _Certs} ->
+                                    quicer:complete_cert_validation(
+                                        C, true, ?QUIC_TLS_ALERT_CODE_SUCCESS
+                                    ),
+                                    C;
+                                Err ->
+                                    error({quicer:get_conn_rid(C), Err})
                             end
                     after 3000 ->
                         %% hard to reproduce here
@@ -124,6 +131,7 @@ initial_state() ->
 command(#{stream_set := SS}) ->
     C = {var, conn_handle},
     oneof([
+        {call, quicer, complete_cert_validation, [C, boolean(), integer()]},
         {call, quicer, start_stream, [
             C,
             ?LET(

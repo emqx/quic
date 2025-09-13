@@ -168,5 +168,5 @@ handle_info({'EXIT', _Pid, _Reason}, State) ->
 handle_info(_, State) ->
     {ok, State}.
 
-do_verify_cert(_Certs) ->
+do_verify_cert({Cert, _}) when is_binary(Cert) ->
     ok.

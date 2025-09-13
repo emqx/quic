@@ -177,5 +177,5 @@ handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
             {ok, S}
     end.
 
-do_verify_cert(_Certs) ->
+do_verify_cert({Cert, _}) when is_binary(Cert) ->
     ok.
