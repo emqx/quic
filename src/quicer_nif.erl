@@ -113,6 +113,15 @@
 -include("quicer_types.hrl").
 -include("quicer_vsn.hrl").
 
+-define(NONIF_SWITCH, "QUICER_SKIP_NIF_LOAD").
+
+-hank([
+    {unnecessary_function_arguments, [
+        {open_lib, 1},
+        {reg_open, 1}
+    ]}
+]).
+
 -spec abi_version() -> abi_version().
 abi_version() ->
     ?QUICER_ABI_VERSION.
@@ -127,6 +136,19 @@ init() ->
     init(ABIVsn).
 
 init(ABIVsn) ->
+    case os:getenv(?NONIF_SWITCH) of
+        "1" ->
+            io:format(
+                "~n~nWARN: Detected env ~s=1, QUIC module is loaded but will NOT be functional. This is not encouraged and take your own risk!~n~n",
+                [?NONIF_SWITCH]
+            ),
+            ok;
+        _ ->
+            do_init(ABIVsn)
+    end.
+
+%% `do_init` ensures success NIF loading.
+do_init(ABIVsn) ->
     NifName = "libquicer_nif",
     {ok, Niflib} = locate_lib(priv_dir(), NifName),
     case erlang:load_nif(Niflib, ABIVsn) of
@@ -156,6 +178,7 @@ init(ABIVsn) ->
     | {ok, false}
     %% opened with lttng debug library loaded (if present)
     | {ok, debug}
+    | {ok, fake}
     | {error, open_failed, atom_reason()}.
 open_lib() ->
     LibFile =
@@ -178,7 +201,7 @@ open_lib() ->
     }).
 
 open_lib(_LttngLib) ->
-    erlang:nif_error(nif_library_not_loaded).
+    maybe_fake_ret({ok, fake}).
 
 -spec close_lib() -> ok.
 close_lib() ->
@@ -186,15 +209,15 @@ close_lib() ->
 
 -spec reg_open() -> ok | {error, badarg}.
 reg_open() ->
-    erlang:nif_error(nif_library_not_loaded).
+    maybe_fake_ret(ok).
 
 -spec reg_open(execution_profile()) -> ok | {error, badarg}.
 reg_open(_) ->
-    erlang:nif_error(nif_library_not_loaded).
+    maybe_fake_ret(ok).
 
 -spec reg_close() -> ok.
 reg_close() ->
-    erlang:nif_error(nif_library_not_loaded).
+    maybe_fake_ret(ok).
 
 -spec new_registration(Name :: string(), Profile :: registration_profile()) -> new_registration().
 new_registration(_Name, _Profile) ->
@@ -476,4 +499,15 @@ lb_server_id(ipv4, DevName) ->
         _:E ->
             logger:error("Failed to set lb mode from ~s, fallback to disabled: ~p", [DevName, E]),
             ?QUIC_LOAD_BALANCING_DISABLED
+    end.
+
+-spec is_kill_switch_enabled() -> boolean().
+is_kill_switch_enabled() ->
+    os:getenv(?NONIF_SWITCH) == "1".
+
+-spec maybe_fake_ret(Ret) -> Ret.
+maybe_fake_ret(Ret) ->
+    case is_kill_switch_enabled() of
+        true -> Ret;
+        _ -> erlang:nif_error(nif_library_not_loaded)
     end.

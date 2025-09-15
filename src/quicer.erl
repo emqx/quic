@@ -194,6 +194,7 @@ abi_version() ->
     | {ok, false}
     %% opened with lttng debug library loaded (if present)
     | {ok, debug}
+    | {ok, fake}
     | {error, open_failed, atom_reason()}.
 open_lib() ->
     quicer_nif:open_lib().
