@@ -1532,6 +1532,10 @@ get_connection_opt(ErlNifEnv *env,
                             elevel);
       goto Exit;
     }
+  else if (IS_SAME_TERM(optname, ATOM_CUSTOM_VERIFY))
+    {
+      return SUCCESS(c_ctx->custom_verify == TRUE ? ATOM_TRUE : ATOM_FALSE);
+    }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
     {
       Param = QUIC_PARAM_CONN_QUIC_VERSION;
@@ -1687,7 +1691,7 @@ get_connection_opt(ErlNifEnv *env,
 
   if (isMalloc == TRUE)
     {
-      free(Buffer);
+      CXPLAT_FREE(Buffer, QUICER_OPT_BUFF);
     }
 
 Exit:
@@ -1724,6 +1728,12 @@ set_connection_opt(ErlNifEnv *env,
                             optname,
                             optval,
                             elevel);
+      goto Exit;
+    }
+  else if (IS_SAME_TERM(optname, ATOM_CUSTOM_VERIFY))
+    {
+      c_ctx->custom_verify = IS_SAME_TERM(optval, ATOM_TRUE);
+      res = ATOM_OK;
       goto Exit;
     }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_CONN_QUIC_VERSION))
@@ -2063,6 +2073,12 @@ get_listener_opt(ErlNifEnv *env,
                             elevel);
       goto Exit;
     }
+
+  else if (IS_SAME_TERM(optname, ATOM_CUSTOM_VERIFY))
+    {
+      res = SUCCESS(l_ctx->custom_verify == TRUE ? ATOM_TRUE : ATOM_FALSE);
+      goto Exit;
+    }
   else if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_LOCAL_ADDRESS))
     {
 
@@ -2151,6 +2167,12 @@ set_listener_opt(ErlNifEnv *env,
                             optname,
                             optval,
                             elevel);
+      goto Exit;
+    }
+  if (IS_SAME_TERM(optname, ATOM_CUSTOM_VERIFY))
+    {
+      l_ctx->custom_verify = IS_SAME_TERM(optval, ATOM_TRUE);
+      res = ATOM_OK;
       goto Exit;
     }
   if (IS_SAME_TERM(optname, ATOM_QUIC_PARAM_LISTENER_CIBIR_ID))

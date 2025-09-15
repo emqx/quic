@@ -152,6 +152,7 @@
         keyfile => file:filename(),
         password => string(),
         verify => none | peer,
+        custom_verify => boolean(),
         %% get NST from last connection, for reconnect.
         handle => connection_handle(),
         nst => binary(),
@@ -463,6 +464,11 @@
     len := integer(),
     flags := integer()
 }.
+
+%% Der encoded.
+-type cert() :: binary().
+-type cert_and_chain() :: {cert(), cert_chain()}.
+-type cert_chain() :: [cert()].
 
 %% @doc QUIC Application error code, not protocol error code.
 %% The app error code will be passed to the peer while shutdown the connection.

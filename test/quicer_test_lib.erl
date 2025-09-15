@@ -32,11 +32,14 @@
     flush/1,
     ensure_server_exit_normal/1,
     ensure_server_exit_normal/2,
+    ensure_server_exit_abnormal/1,
 
     report_active_connections/0,
     report_active_connections/1,
 
-    report_unhandled_messages/0
+    report_unhandled_messages/0,
+
+    read_ca_cert_bin/1
 ]).
 
 %% Default opts
@@ -422,6 +425,19 @@ ensure_server_exit_normal(MonRef, Timeout) ->
         ct:fail("server still running", [])
     end.
 
+-spec ensure_server_exit_abnormal(reference()) -> ok.
+ensure_server_exit_abnormal(MonRef) ->
+    ensure_server_exit_abnormal(MonRef, 5000).
+ensure_server_exit_abnormal(MonRef, Timeout) ->
+    receive
+        {'DOWN', MonRef, process, _, normal} ->
+            ct:fail("server exits normally which is undesired", []);
+        {'DOWN', MonRef, process, _, _Other} ->
+            ok
+    after Timeout ->
+        ct:fail("server still running", [])
+    end.
+
 -spec report_active_connections() -> _.
 report_active_connections() ->
     report_active_connections(fun ct:comment/2).
@@ -507,6 +523,12 @@ shutdown_all_listeners() ->
         end,
         quicer:listeners()
     ).
+
+-spec read_ca_cert_bin(file:filename()) -> binary().
+read_ca_cert_bin(Filename) ->
+    {ok, CaCertPem} = file:read_file(Filename),
+    [{'Certificate', CaCertBin, not_encrypted}] = public_key:pem_decode(CaCertPem),
+    CaCertBin.
 
 %%%_* Emacs ====================================================================
 %%% Local Variables:

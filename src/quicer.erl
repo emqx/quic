@@ -93,6 +93,7 @@
     negotiated_protocol/1,
     peername/1,
     peercert/1,
+    complete_cert_validation/3,
     listeners/0,
     listener/1,
     controlling_process/2,
@@ -395,6 +396,7 @@ close_listener(Listener, Timeout) ->
     timeout()
 ) ->
     {ok, connection_handle()}
+    | {ok, connection_handle(), cert_and_chain()}
     | {error, conn_open_error | config_error | conn_start_error | timeout | nst_not_found}
     | {error, transport_down, transport_shutdown_props()}.
 connect(Host, Port, Opts, Timeout) when is_list(Opts) ->
@@ -416,7 +418,9 @@ connect(Host, Port, Opts, Timeout) when is_map(Opts) ->
                     {ok, H};
                 {quic, transport_shutdown, H, Reason} ->
                     flush(closed, H),
-                    {error, transport_down, Reason}
+                    {error, transport_down, Reason};
+                {quic, peer_cert_received, H, Certs} ->
+                    {ok, H, Certs}
             end;
         {error, _} = Err ->
             Err
@@ -455,7 +459,9 @@ handshake(Conn) ->
     handshake(Conn, 5000).
 
 -spec handshake(connection_handle(), timeout()) ->
-    {ok, connection_handle()} | {error, any()}.
+    {ok, connection_handle()}
+    | {ok, connection_handle(), cert_and_chain()}
+    | {error, any()}.
 handshake(Conn, Timeout) ->
     case async_handshake(Conn) of
         {error, _} = E ->
@@ -463,7 +469,8 @@ handshake(Conn, Timeout) ->
         ok ->
             receive
                 {quic, connected, Conn, _} -> {ok, Conn};
-                {quic, closed, Conn, _Flags} -> {error, closed}
+                {quic, closed, Conn, _Flags} -> {error, closed};
+                {quic, peer_cert_received, Conn, CertAndChain} -> {ok, Conn, CertAndChain}
             after Timeout ->
                 {error, timeout}
             end
@@ -1084,9 +1091,13 @@ peername(Handle) ->
 %% @doc Peer Cert in DER-encoded binary
 %% mimic {@link ssl:peername/1}
 -spec peercert(connection_handle() | stream_handle()) ->
-    {ok, CertDerEncoded :: binary()} | {error, any()}.
+    {ok, cert()} | {error, any()}.
 peercert(Handle) ->
     quicer_nif:peercert(Handle).
+
+-spec complete_cert_validation(connection_handle(), boolean(), integer()) -> ok | {error, any()}.
+complete_cert_validation(Conn, IsAccepted, TlsAlert) ->
+    quicer_nif:complete_cert_validation(Conn, IsAccepted, TlsAlert).
 
 %% @doc Return true if stream open flags has unidirectional flag set
 -spec is_unidirectional(stream_open_flags()) -> boolean().

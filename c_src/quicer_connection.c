@@ -121,12 +121,9 @@ peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
   CXPLAT_FRE_ASSERT(1 == argc);
   ERL_NIF_TERM ctx = argv[0];
-  ERL_NIF_TERM DerCert;
   ERL_NIF_TERM res = ATOM_UNDEFINED;
   void *q_ctx;
   QuicerConnCTX *c_ctx;
-  int len = 0;
-  unsigned char *tmp;
 
   if (enif_get_resource(env, ctx, ctx_stream_t, &q_ctx))
     {
@@ -155,26 +152,7 @@ peercert1(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
-  if ((len = i2d_X509(c_ctx->peer_cert, NULL)) < 0)
-    {
-      // unlikely to happen
-      res = ERROR_TUPLE_2(ATOM_ERROR_INTERNAL_ERROR);
-      goto exit;
-    }
-
-  unsigned char *data = enif_make_new_binary(env, len, &DerCert);
-
-  if (!data)
-    {
-      res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-      goto exit;
-    }
-
-  // note, using tmp is mandatory, see doc for i2d_X590
-  tmp = data;
-
-  i2d_X509(c_ctx->peer_cert, &tmp);
-  res = SUCCESS(DerCert);
+  res = SUCCESS(x509_cert_to_ebinary(env, c_ctx->peer_cert));
 
 exit:
   enif_mutex_unlock(c_ctx->lock);
@@ -784,6 +762,16 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 #endif // QUICER_USE_TRUSTED_STORE
 
+  ERL_NIF_TERM is_custom_verify = ATOM_FALSE;
+  if (enif_get_map_value(env, eoptions, ATOM_CUSTOM_VERIFY, &is_custom_verify)
+      && IS_SAME_TERM(ATOM_TRUE, is_custom_verify))
+    {
+      c_ctx->custom_verify = TRUE;
+    }
+  else
+    {
+      c_ctx->custom_verify = FALSE;
+    }
   // Convert eoptions to Configuration
   ERL_NIF_TERM estatus = ClientLoadConfiguration(
       env, &eoptions, Registration, &(c_ctx->config_ctx->Configuration));
@@ -1637,6 +1625,7 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
   assert(QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED == Event->Type);
   // Validate against CA certificates using OpenSSL API:s
   X509 *cert = (X509 *)Event->PEER_CERTIFICATE_RECEIVED.Certificate;
+  X509_STORE_CTX *chains = Event->PEER_CERTIFICATE_RECEIVED.Chain;
 
   // Preserve cert in ctx
   if (c_ctx->peer_cert)
@@ -1644,6 +1633,28 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
       X509_free(c_ctx->peer_cert);
     }
   c_ctx->peer_cert = X509_dup(cert);
+
+  if (c_ctx->custom_verify)
+    {
+      ErlNifEnv *env = c_ctx->env;
+      ERL_NIF_TERM ConnHandle = enif_make_resource(env, c_ctx);
+      ERL_NIF_TERM DerCert = x509_cert_to_ebinary(env, c_ctx->peer_cert);
+
+      ERL_NIF_TERM report = make_event(
+          env,
+          ATOM_PEER_CERT_RECEIVED,
+          ConnHandle,
+          enif_make_tuple2(env, DerCert, x509_ctx_to_cert_chain(env, chains)));
+
+      if (!enif_send(NULL, &c_ctx->owner->Pid, NULL, report))
+        {
+          // handshake should fail, thus NO Pending cert validation..
+          return QUIC_STATUS_UNREACHABLE;
+        }
+
+      return QUIC_STATUS_PENDING;
+    } // end of custom_verify
+
 #if defined(QUICER_USE_TRUSTED_STORE)
   X509_STORE_CTX *x509_ctx
       = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;

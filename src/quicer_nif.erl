@@ -47,6 +47,7 @@
     setopt/4,
     controlling_process/2,
     peercert/1,
+    complete_cert_validation/3,
     enable_sig_buffer/1,
     flush_stream_buffered_sigs/1,
     count_reg_conns/0,
@@ -411,6 +412,10 @@ controlling_process(_H, _P) ->
 -spec peercert(connection_handle() | stream_handle()) ->
     {ok, CertDerEncoded :: binary()} | {error, any()}.
 peercert(_Handle) ->
+    erlang:nif_error(nif_library_not_loaded).
+
+-spec complete_cert_validation(connection_handle(), boolean(), integer()) -> ok | {error, any()}.
+complete_cert_validation(_Conn, _IsAccepted, _TlsAlert) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec get_conn_owner(connection_handle()) -> get_owner().

@@ -215,10 +215,34 @@ parse_verify_options(ErlNifEnv *env,
 {
 
   BOOLEAN verify = load_verify(env, &options, FALSE);
+  ERL_NIF_TERM tmp_term;
+  BOOLEAN custom_verify = FALSE;
+
+  if (enif_get_map_value(env, options, ATOM_CUSTOM_VERIFY, &tmp_term))
+    {
+      if (IS_SAME_TERM(tmp_term, ATOM_TRUE))
+        {
+          custom_verify = TRUE;
+        }
+    }
 
   if (is_verify)
     {
       *is_verify = verify;
+    }
+
+  if (custom_verify)
+    {
+      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
+      if (is_server)
+        {
+          CredConfig->Flags
+              |= QUIC_CREDENTIAL_FLAG_REQUIRE_CLIENT_AUTHENTICATION;
+        }
+      if (is_verify)
+        {
+          *is_verify = TRUE; // custom verify is always enabled
+        }
     }
 
   if (!verify)
@@ -525,4 +549,126 @@ exit:
 #endif // QUICER_USE_TRUSTED_STORE
   free_certificate(CredConfig);
   return ret;
+}
+
+ERL_NIF_TERM
+complete_cert_validation(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
+{
+  QuicerConnCTX *c_ctx;
+  QUIC_STATUS Status;
+  BOOLEAN result = FALSE;
+  int alert_code = 0;
+
+  if (argc != 3)
+    {
+      return enif_make_badarg(env);
+    }
+
+  if (!enif_get_resource(env, argv[0], ctx_connection_t, (void **)&c_ctx))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!c_ctx->Connection)
+    {
+      // already closed
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+
+  if (IS_SAME_TERM(argv[1], ATOM_TRUE))
+    {
+      result = TRUE;
+    }
+  else if (IS_SAME_TERM(argv[1], ATOM_FALSE))
+    {
+      result = FALSE;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (!enif_get_int(env, argv[2], &alert_code))
+    {
+      return ERROR_TUPLE_2(ATOM_BADARG);
+    }
+
+  if (get_conn_handle(c_ctx))
+    {
+      Status = MsQuic->ConnectionCertificateValidationComplete(
+          c_ctx->Connection, result, (QUIC_TLS_ALERT_CODES)alert_code);
+      put_conn_handle(c_ctx);
+      if (QUIC_FAILED(Status))
+        {
+          return ERROR_TUPLE_2(ATOM_STATUS(Status));
+        }
+      return ATOM_OK;
+    }
+  else
+    {
+      return ERROR_TUPLE_2(ATOM_CLOSED);
+    }
+}
+
+/*
+** Return a cert in binary eterm or atom for error
+** This is a helper
+*/
+ERL_NIF_TERM
+x509_cert_to_ebinary(ErlNifEnv *env, X509 *x)
+{
+  ERL_NIF_TERM cert;
+  unsigned char *tmp;
+
+  // Validation and Getting the len for binary alloc
+  int len = i2d_X509(x, NULL);
+
+  if (len < 0)
+    {
+      // Should not happen, maybe dead code here
+      CXPLAT_FRE_ASSERT(true);
+      return ATOM_QUIC_STATUS_BAD_CERTIFICATE;
+    }
+
+  unsigned char *data = enif_make_new_binary(env, len, &cert);
+
+  if (!data)
+    {
+      // unlikely
+      return ATOM_QUIC_STATUS_OUT_OF_MEMORY;
+    }
+
+  // note, using tmp is mandatory, see doc for i2d_X509
+  tmp = data;
+
+  // no return val check, already checked above.
+  i2d_X509(x, &tmp);
+
+  return cert;
+}
+
+/*
+** Return a list of TLS cert from x509 store ctx
+**
+** @NOTE, assuming caller will clean the eterms in env for errors
+*/
+ERL_NIF_TERM
+x509_ctx_to_cert_chain(ErlNifEnv *env, X509_STORE_CTX *ctx)
+{
+  CXPLAT_FRE_ASSERT(ctx);
+
+  STACK_OF(X509) *chain = X509_STORE_CTX_get0_chain(ctx);
+  ERL_NIF_TERM echains = enif_make_list(env, 0);
+
+  int cnt = sk_X509_num(chain);
+
+  for (int i = 0; i < cnt; i++)
+    {
+      X509 *curr = sk_X509_value(chain, i);
+      CXPLAT_FRE_ASSERT(curr);
+      ERL_NIF_TERM cert = x509_cert_to_ebinary(env, curr);
+      echains = enif_make_list_cell(env, cert, echains);
+    }
+
+  return echains;
 }

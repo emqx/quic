@@ -50,6 +50,7 @@
     %-| {key, file:filename()}. %% @FIXME reflect in types
     | {keyfile, file:filename()}
     | {verify, none | peer | verify_peer | verify_none}
+    | {custom_verify, boolean()}
     | {cacertfile, file:filename()}
     | {password, string()}
     | {sslkeylogfile, file:filename()}
@@ -134,7 +135,8 @@
     | {certfile, file:filename()}
     | {keyfile, file:filename()}
     | {password, string()}
-    | {verify, none | peer}
+    | {verify, none | peer | verify_peer | verify_none}
+    | {custom_verify, boolean()}
     | {nst, binary()}
     | {cacertfile, file:filename()}
     | {sslkeylogfile, file:filename()}

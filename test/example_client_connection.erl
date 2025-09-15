@@ -38,6 +38,7 @@
     peer_address_changed/3,
     streams_available/3,
     peer_needs_streams/3,
+    peer_cert_received/3,
     resumed/3,
     nst_received/3,
     new_stream/3,
@@ -95,6 +96,11 @@ resumed(_Conn, _Data, S) ->
 
 nst_received(_Conn, Data, S) ->
     {ok, S#{nst => Data}}.
+
+peer_cert_received(Conn, Certs, S) ->
+    do_verify_cert(Certs),
+    ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS),
+    {ok, S}.
 
 new_stream(
     Stream,
@@ -170,3 +176,6 @@ handle_info({quic, Sig, Stream, _} = Msg, #{streams := Streams} = S) when
             %% garbage signals from already dead stream (such like crashed owner)
             {ok, S}
     end.
+
+do_verify_cert({Cert, _}) when is_binary(Cert) ->
+    ok.
