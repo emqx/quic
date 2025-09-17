@@ -19,6 +19,7 @@ build() {
     fi
     if [ "$(uname -s)" = 'Darwin' ]; then
         JOBS="$(sysctl -n hw.ncpu)"
+        export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
     else
         JOBS="$(nproc)"
     fi
