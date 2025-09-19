@@ -83,6 +83,10 @@
 ]).
 
 -export([abi_version/0]).
+-export([
+    is_kill_switch_enabled/0,
+    kill_switch_name/0
+]).
 
 %% for test
 -export([init/1]).
@@ -145,10 +149,7 @@ init() ->
 init(ABIVsn) ->
     case os:getenv(?NONIF_SWITCH) of
         "1" ->
-            io:format(
-                "~n~nWARN: Detected env ~s=1, QUIC module is loaded but will NOT be functional. This is not encouraged and take your own risk!~n~n",
-                [?NONIF_SWITCH]
-            ),
+            %% Warning will be printed after the load.
             ok;
         _ ->
             do_init(ABIVsn)
@@ -541,3 +542,7 @@ maybe_fake_ret(Ret) ->
         true -> Ret;
         _ -> erlang:nif_error(nif_library_not_loaded)
     end.
+
+-spec kill_switch_name() -> string().
+kill_switch_name() ->
+    ?NONIF_SWITCH.
