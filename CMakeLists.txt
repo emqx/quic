@@ -213,10 +213,15 @@ set_target_properties(quicer_nif
 include(GNUInstallDirs)
 install(TARGETS quicer_nif LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/priv/)
 
+# Calculate relative path for symlink to avoid absolute path issues during packaging
+file(RELATIVE_PATH QUICER_NIF_RELATIVE_PATH 
+     "${PROJECT_SOURCE_DIR}/priv" 
+     "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libquicer_nif.so")
+
 add_custom_command(
     TARGET quicer_nif POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-    ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libquicer_nif.so
+    ${QUICER_NIF_RELATIVE_PATH}
     ${PROJECT_SOURCE_DIR}/priv/libquicer_nif.so)
 
 ## workaround for emqx forked rebar3
