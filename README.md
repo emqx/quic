@@ -121,6 +121,12 @@ firefox doc/index.html
 make ci
 ```
 
+## Fuzzing
+
+This project uses [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/) for continuous fuzzing to find bugs and security vulnerabilities. Fuzz tests run automatically via GitHub Actions on pull requests and daily.
+
+For more information on running fuzz tests locally and contributing new fuzz targets, see [fuzz/README.md](./fuzz/README.md).
+
 # Troubleshooting 
 
 ### Log to `stdout`
