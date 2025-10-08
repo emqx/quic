@@ -1,0 +1,11 @@
+# Fuzz artifacts
+*.o
+*.a
+crash-*
+leak-*
+timeout-*
+oom-*
+
+# Build output
+build/
+out/

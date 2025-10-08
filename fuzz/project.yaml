@@ -1,0 +1,11 @@
+homepage: "https://github.com/emqx/quic"
+language: c
+primary_contact: "emqx-support@emqx.io"
+main_repo: "https://github.com/emqx/quic"
+file_github_issue: true
+sanitizers:
+  - address
+  - undefined
+  - memory
+architectures:
+  - x86_64
