@@ -45,7 +45,8 @@ jobs:
           output-sarif: true
 
       - name: Upload Crash
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        # v4.3.3
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         if: failure() && steps.run.outcome == 'failure'
         with:
           name: ${{ matrix.sanitizer }}-artifacts
@@ -84,7 +85,8 @@ jobs:
           sanitizer: ${{ matrix.sanitizer }}
 
       - name: Upload Crash
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        # v4.3.3
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         if: failure() && steps.run.outcome == 'failure'
         with:
           name: ${{ matrix.sanitizer }}-batch-artifacts

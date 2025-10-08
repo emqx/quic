@@ -27,7 +27,8 @@ cmake -B c_build \
     -DQUIC_BUILD_TEST=OFF \
     -DQUIC_BUILD_TOOLS=OFF \
     -DQUIC_BUILD_PERF=OFF \
-    -DQUIC_TLS_SECRETS_SUPPORT=ON
+    -DQUIC_TLS_SECRETS_SUPPORT=ON \
+    -DQUIC_ENABLE_LOGGING=OFF
 
 make -C c_build -j$(nproc) inc platform core warnings logging
 
@@ -37,7 +38,8 @@ for fuzz_target in fuzz/*.c; do
     
     $CC $CFLAGS -c "$fuzz_target" -o "/tmp/${target_name}.o" \
         -I${SRC}/quicer/msquic/src/inc \
-        -I${SRC}/quicer/c_build
+        -I${SRC}/quicer/c_build \
+        -DQUIC_API_ENABLE_PREVIEW_FEATURES=1
     
     $CXX $CXXFLAGS $LIB_FUZZING_ENGINE "/tmp/${target_name}.o" \
         -o "$OUT/${target_name}" \
