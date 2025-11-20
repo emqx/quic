@@ -2340,7 +2340,7 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
           NULL, QUIC_PARAM_GLOBAL_PERF_COUNTERS, &Length, &counters);
       if (QUIC_SUCCEEDED(status))
         {
-          ERL_NIF_TERM eCounters[30] = {
+          ERL_NIF_TERM eCounters[31] = {
             /* clang-format off */
             enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_CREATED]),
             enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_HANDSHAKE_FAIL]),
@@ -2371,11 +2371,12 @@ get_global_opt(ErlNifEnv *env, HQUIC Handle, ERL_NIF_TERM optname)
             enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PATH_VALIDATED]),
             enif_make_uint64(env, counters[QUIC_PERF_COUNTER_PATH_FAILURE]),
             enif_make_uint64(env, counters[QUIC_PERF_COUNTER_SEND_STATELESS_RESET]),
-            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_SEND_STATELESS_RETRY])
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_SEND_STATELESS_RETRY]),
+            enif_make_uint64(env, counters[QUIC_PERF_COUNTER_CONN_LOAD_REJECT])
 
             /* clang-format on */
           };
-          res = SUCCESS(enif_make_list_from_array(env, eCounters, 30));
+          res = SUCCESS(enif_make_list_from_array(env, eCounters, 31));
         }
       else
         {

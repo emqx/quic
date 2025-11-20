@@ -1283,7 +1283,8 @@ perf_counters() ->
         path_validated,
         path_failure,
         send_stateless_reset,
-        send_stateless_retry
+        send_stateless_retry,
+        conn_load_reject
     ],
     case
         quicer_nif:getopt(
