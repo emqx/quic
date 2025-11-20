@@ -276,6 +276,9 @@ retry_connect(Host, Port, Opts, Timeout, Retries) ->
         {error, _} when Retries > 1 ->
             timer:sleep(100),
             retry_connect(Host, Port, Opts, Timeout, Retries - 1);
+        {error, transport_down, _} when Retries > 1 ->
+            timer:sleep(100),
+            retry_connect(Host, Port, Opts, Timeout, Retries - 1);
         {error, Reason} ->
             {error, Reason}
     end.
