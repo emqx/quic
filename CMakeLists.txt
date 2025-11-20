@@ -164,6 +164,15 @@ add_subdirectory(msquic)
 
 add_library(quicer_static STATIC ${SOURCES})
 target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/include/ msquic/src/inc/)
+
+if (OPENSSL_INCLUDE_DIR)
+  target_include_directories(quicer_static PRIVATE ${OPENSSL_INCLUDE_DIR})
+else()
+  if (NOT DEFINED QUIC_TLS)
+    set(QUIC_TLS "openssl")
+  endif()
+  target_include_directories(quicer_static PRIVATE "c_build/_deps/opensslquic-build/${QUIC_TLS}/include")
+endif()
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
   # note, the value of ${ATOMIC} and %{NUMA} will be set by msquic
   if (NUMA)
@@ -173,7 +182,7 @@ if (CMAKE_SYSTEM_NAME MATCHES Linux)
   endif()
   target_link_libraries(quicer_static PRIVATE core platform inc warnings logging ${ATOMIC} ${MY_NUMA} "-Wl,--no-gc-sections")
 elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
-  target_link_libraries(quicer_static PRIVATE core platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
+  target_link_libraries(quicer_static PRIVATE core msquic_platform inc warnings "-Wl,-undefined,dynamic_lookup -Wl,-dead_strip")
 endif()
 
 # @todo clean compiler warnings in the code

@@ -56,6 +56,21 @@ patch_2_3_8()
     done
 }
 
+patch_2_4_15()
+{
+    # Patch 1 is included in v2.4.15
+    local patch_2="https://github.com/microsoft/msquic/commit/e0201eb4e007e7524aef007be67f2281f949f102.patch"
+    local patch_3="https://github.com/microsoft/msquic/commit/b16a14a72e8c74407ee4a079a1f57efe0246f739.patch"
+    local patch_4="https://github.com/microsoft/msquic/pull/4717/commits/9261dacc1dd9a67f6fa8d5fbe663082508b4c605.patch"
+    if [ ! -d "$patch_dir" ]; then
+        ln -s ../msquic_patches "$patch_dir"
+    fi
+    echo "Patching Msquic 2.4.15"
+    for p in patch_2 patch_3 patch_4; do
+        do_patch "${!p}"
+    done
+}
+
 if [ ! -d msquic ]; then
     git clone https://github.com/microsoft/msquic.git -b "$VERSION" --recursive --depth 1 --shallow-submodules msquic
 fi
@@ -83,5 +98,8 @@ case $VERSION in
         ;;
     v2.3.8)
         patch_2_3_8
+        ;;
+    v2.4.15)
+        patch_2_4_15
         ;;
 esac
