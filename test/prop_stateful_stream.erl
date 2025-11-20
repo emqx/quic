@@ -42,7 +42,7 @@ prop_stateful_client_stream_test() ->
             commands(?MODULE),
             begin
                 flush_quic_msgs(),
-                {ok, H} = quicer:connect("localhost", 14571, default_conn_opts(), 10000),
+                {ok, H} = retry_connect("localhost", 14571, default_conn_opts(), 10000, 10),
                 {History, State, Result} = run_commands(?MODULE, Cmds, [{conn_handle, H}]),
                 quicer:async_shutdown_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
                 ?WHENFAIL(
@@ -266,6 +266,19 @@ remote_stream() ->
 
 stop_client_user(#{client_user := Pid}) ->
     Pid ! stop.
+
+retry_connect(_Host, _Port, _Opts, _Timeout, 0) ->
+    {error, max_retries_exceeded};
+retry_connect(Host, Port, Opts, Timeout, Retries) ->
+    case quicer:connect(Host, Port, Opts, Timeout) of
+        {ok, H} ->
+            {ok, H};
+        {error, _} when Retries > 1 ->
+            timer:sleep(100),
+            retry_connect(Host, Port, Opts, Timeout, Retries - 1);
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 flush_quic_msgs() ->
     receive
