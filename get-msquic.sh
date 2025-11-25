@@ -71,6 +71,17 @@ patch_2_4_15()
     done
 }
 
+patch_2_5_5()
+{
+    local patch_4="https://github.com/microsoft/msquic/pull/4717/commits/9261dacc1dd9a67f6fa8d5fbe663082508b4c605.patch"
+    if [ ! -d "$patch_dir" ]; then
+        ln -s ../msquic_patches "$patch_dir"
+    fi
+    echo "Patching Msquic 2.5.5"
+    for p in patch_4; do
+        do_patch "${!p}"
+    done
+}
 if [ ! -d msquic ]; then
     git clone https://github.com/microsoft/msquic.git -b "$VERSION" --recursive --depth 1 --shallow-submodules msquic
 fi
@@ -101,5 +112,8 @@ case $VERSION in
         ;;
     v2.4.15)
         patch_2_4_15
+        ;;
+    v2.5.5)
+        patch_2_5_5
         ;;
 esac
