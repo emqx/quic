@@ -40,10 +40,10 @@ if (DEFINED ENV{QUICER_TLS_VER})
     ## Link to sys libcrypto, auto openssl vsn
     find_package(OpenSSL REQUIRED)
     ## MsQuic 2.5+ uses 'quictls' instead of 'openssl' or 'openssl3'
-    set(QUIC_TLS "quictls" CACHE STRING "QUIC_TLS")
+    set(QUIC_TLS_LIB "quictls" CACHE STRING "QUIC_TLS_LIB")
     set(QUIC_USE_SYSTEM_LIBCRYPTO "ON")
   else()
-    set(QUIC_TLS $ENV{QUICER_TLS_VER} CACHE STRING "QUIC_TLS")
+    set(QUIC_TLS_LIB $ENV{QUICER_TLS_VER} CACHE STRING "QUIC_TLS_LIB")
   endif()
 
 endif()
@@ -165,10 +165,10 @@ target_include_directories(quicer_static PRIVATE ${Erlang_OTP_ROOT_DIR}/usr/incl
 if (OPENSSL_INCLUDE_DIR)
   target_include_directories(quicer_static PRIVATE ${OPENSSL_INCLUDE_DIR})
 else()
-  if (NOT DEFINED QUIC_TLS)
-    set(QUIC_TLS "quictls")
+  if (NOT DEFINED QUIC_TLS_LIB)
+    set(QUIC_TLS_LIB "quictls")
   endif()
-  target_include_directories(quicer_static PRIVATE "${PROJECT_BINARY_DIR}/_deps/opensslquic-build/${QUIC_TLS}/include")
+  target_include_directories(quicer_static PRIVATE "${PROJECT_BINARY_DIR}/_deps/opensslquic-build/${QUIC_TLS_LIB}/include")
 endif()
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
   # note, the value of ${ATOMIC} and %{NUMA} will be set by msquic
@@ -196,7 +196,7 @@ if (OPENSSL_INCLUDE_DIR)
   # for sys crypto
   target_include_directories(quicer_nif PUBLIC ${OPENSSL_INCLUDE_DIR})
 else()
-  target_include_directories(quicer_nif PUBLIC "${PROJECT_BINARY_DIR}/_deps/opensslquic-build/${QUIC_TLS}/include")
+  target_include_directories(quicer_nif PUBLIC "${PROJECT_BINARY_DIR}/_deps/opensslquic-build/${QUIC_TLS_LIB}/include")
 endif()
 
 if (CMAKE_SYSTEM_NAME MATCHES Linux)
