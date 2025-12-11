@@ -256,6 +256,12 @@ postcondition(
 ->
     true;
 postcondition(
+    #{state := S}, {call, quicer, negotiated_protocol, [_]}, {error, invalid_state}
+) when
+    S =:= accepted orelse S =:= closed
+->
+    true;
+postcondition(
     #{state := accepted}, {call, quicer, async_csend, [_]}, {error, stm_send_error, aborted}
 ) ->
     true;
