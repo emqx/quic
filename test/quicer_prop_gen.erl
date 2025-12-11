@@ -271,17 +271,17 @@ latin1_string() -> ?SUCHTHAT(S, string(), io_lib:printable_latin1_list(S)).
 valid_server_listen_opts() ->
     [
         {alpn, ["proper"]},
-        {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
-        {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"}
+        {cacertfile, "./msquic/submodules/quictls/test/certs/rootCA.pem"},
+        {certfile, "./msquic/submodules/quictls/test/certs/servercert.pem"},
+        {keyfile, "./msquic/submodules/quictls/test/certs/serverkey.pem"}
     ].
 
 valid_client_conn_opts() ->
     [
         {alpn, ["proper"]},
-        {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
-        {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"}
+        {cacertfile, "./msquic/submodules/quictls/test/certs/rootCA.pem"},
+        {certfile, "./msquic/submodules/quictls/test/certs/servercert.pem"},
+        {keyfile, "./msquic/submodules/quictls/test/certs/serverkey.pem"}
     ].
 
 valid_csend_stream_opts() ->

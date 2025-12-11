@@ -400,9 +400,9 @@ select_port() ->
 default_listen_opts() ->
     [
         {conn_acceptors, 32},
-        {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
-        {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"},
+        {cacertfile, "./msquic/submodules/quictls/test/certs/rootCA.pem"},
+        {certfile, "./msquic/submodules/quictls/test/certs/servercert.pem"},
+        {keyfile, "./msquic/submodules/quictls/test/certs/serverkey.pem"},
         {alpn, ["prop"]},
         {verify, none},
         {idle_timeout_ms, 0},
@@ -420,8 +420,8 @@ default_conn_opts() ->
         %% {sslkeylogfile, "/tmp/SSLKEYLOGFILE"},
         {verify, none},
         {idle_timeout_ms, 5000},
-        {cacertfile, "./msquic/submodules/openssl/test/certs/rootCA.pem"},
-        {certfile, "./msquic/submodules/openssl/test/certs/servercert.pem"},
-        {keyfile, "./msquic/submodules/openssl/test/certs/serverkey.pem"},
+        {cacertfile, "./msquic/submodules/quictls/test/certs/rootCA.pem"},
+        {certfile, "./msquic/submodules/quictls/test/certs/servercert.pem"},
+        {keyfile, "./msquic/submodules/quictls/test/certs/serverkey.pem"},
         {datagram_receive_enabled, true}
     ].
