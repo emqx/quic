@@ -72,8 +72,7 @@ jobs:
         rebar3:
           - '3.23.0'
         openssl:
-          - openssl3
-          - openssl
+          - quictls
           - sys
     runs-on: ${{ matrix.os }}
     steps:
@@ -137,9 +136,7 @@ jobs:
           - '26.2.5.14'
           - '27.3'
         openssl:
-          - openssl3
-          - openssl
-          - sys
+          - quictls
         rebar3:
           - '3.23.0'
         build_type:
