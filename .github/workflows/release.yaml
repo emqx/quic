@@ -27,9 +27,7 @@ jobs:
         rebar3:
           - '3.23.0'
         openssl:
-          - openssl3
-          - openssl
-          - sys
+          - quictls
         os:
           - macos-13
           - macos-14
@@ -81,9 +79,7 @@ jobs:
           - otp: 27.3.4.2-3
             builder: 5.6-2:1.18.3-27.3.4.2-3
         openssl:
-          - openssl3
-          - openssl
-          - sys
+          - quictls
         arch:
           - amd64
           - arm64
@@ -99,11 +95,6 @@ jobs:
           - el9
           - el8
           - el7
-        exclude:
-          - os: el7
-            openssl: sys
-          - os: el7
-            openssl: openssl3
 
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
