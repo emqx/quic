@@ -78,6 +78,9 @@ jobs:
             builder: 5.6-2:1.15.7-26.2.5.14-1
           - otp: 27.3.4.2-3
             builder: 5.6-2:1.18.3-27.3.4.2-3
+          - otp: 28.2-2
+            builder: 6.0-9:1.19.1-28.2-2
+
         openssl:
           - quictls
         arch:
