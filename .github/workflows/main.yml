@@ -69,6 +69,7 @@ jobs:
           - macos-15
         otp:
           - '27'
+          - '28'
         rebar3:
           - '3.23.0'
         openssl:
@@ -135,6 +136,7 @@ jobs:
           - '25.3.2.9'
           - '26.2.5.14'
           - '27.3'
+          - '28.3'
         openssl:
           - quictls
         rebar3:
