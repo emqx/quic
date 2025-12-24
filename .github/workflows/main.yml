@@ -69,8 +69,9 @@ jobs:
           - macos-15
         otp:
           - '27'
+          - '28'
         rebar3:
-          - '3.23.0'
+          - '3.25.1'
         openssl:
           - quictls
           - sys
@@ -132,13 +133,13 @@ jobs:
       matrix:
         # https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt
         otp:
-          - '25.3.2.9'
           - '26.2.5.14'
           - '27.3'
+          - '28.3'
         openssl:
           - quictls
         rebar3:
-          - '3.23.0'
+          - '3.25.1'
         build_type:
           - RelWithDebInfo
           - Debug
