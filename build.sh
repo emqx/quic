@@ -24,7 +24,18 @@ build() {
         JOBS="$(nproc)"
     fi
     ./get-msquic.sh "$MSQUIC_VERSION"
-    cmake -B c_build -G "${GENERATOR}"
+
+    CMAKE_EXTRA_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64"
+    MIX_TARGET="${MIX_TARGET:-arm64-apple-darwin}"
+
+    # Check if a MIX_TARGET is set.
+    case "$MIX_TARGET" in
+        "x86_64-apple-darwin")
+            CMAKE_EXTRA_ARGS="-DCMAKE_OSX_ARCHITECTURES=x86_64"
+            ;;
+    esac
+    
+    cmake -B c_build -G "${GENERATOR}" ${CMAKE_EXTRA_ARGS}
     $MakeCmd -C c_build -j "$JOBS"
 
     ## Need lttng shared lib "libmsquic.lttng.so"
