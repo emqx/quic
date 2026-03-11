@@ -93,7 +93,7 @@
 -callback local_address_changed(connection_handle(), quicer_addr(), cb_state()) -> cb_ret().
 %% Handle Local Addr Changed, currently not in use.
 
--callback peer_address_changed(connection_handle(), quicer_addr(), cb_state) -> cb_ret().
+-callback peer_address_changed(connection_handle(), quicer_addr(), cb_state()) -> cb_ret().
 %% Handle Peer Addr Changed
 
 -callback streams_available(
