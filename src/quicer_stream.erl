@@ -81,19 +81,7 @@
 -export_type([cb_state/0, cb_ret/0]).
 
 -type cb_state() :: term().
-%% ok and update cb_state
--type cb_ret() ::
-    {ok, cb_state()}
-    %% error handling per callback
-    | {error, Reason :: term(), cb_state()}
-    %% ok but also hibernate process
-    | {hibernate, cb_state()}
-    %% split callback work with Continue
-    | {{continue, Continue :: term()}, cb_state()}
-    %% ok but also hibernate process
-    | {timeout(), cb_state()}
-    %% terminate with reason
-    | {stop, Reason :: term(), cb_state()}.
+-type cb_ret() :: quicer_lib:cb_ret().
 
 %% API
 
