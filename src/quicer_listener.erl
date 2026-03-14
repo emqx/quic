@@ -76,8 +76,7 @@
 -spec start_link(
     Name :: listener_name(),
     ListenOn :: quicer:listen_on(),
-    Options ::
-        {quicer:listener_opts(), quicer:conn_opts(), quicer:stream_opts()}
+    Options :: quicer:listener_opts()
 ) ->
     {ok, Pid :: pid()}
     | {error, Error :: {already_started, pid()}}
