@@ -66,6 +66,9 @@
 -callback handle_call(Req :: term(), gen_server:from(), cb_state()) -> cb_ret().
 %% Handle API call with callback state.
 
+-callback handle_cast(Req :: term(), cb_state()) -> cb_ret().
+%% Handle cast with callback state.
+
 -callback handle_continue(Cont :: term(), cb_state()) -> cb_ret().
 %% Handle continue from other callbacks with callback state.
 
@@ -73,7 +76,7 @@
 %% Handle unhandled info with callback state.
 
 -optional_callbacks([
-    post_handoff/3, handle_stream_data/4, handle_call/3, handle_info/2, handle_continue/2
+    post_handoff/3, handle_stream_data/4, handle_call/3, handle_cast/2, handle_info/2, handle_continue/2
 ]).
 
 -import(quicer_lib, [default_cb_ret/2]).
@@ -366,8 +369,13 @@ handle_call(
     | {noreply, state(), Timeout :: timeout()}
     | {noreply, state(), hibernate}
     | {stop, Reason :: term(), state()}.
-handle_cast(_Request, State) ->
-    {noreply, State}.
+handle_cast(Request, #{callback := M, callback_state := CBState} = State) ->
+    case erlang:function_exported(M, handle_cast, 2) of
+        true ->
+            default_cb_ret(M:handle_cast(Request, CBState), State);
+        false ->
+            {noreply, State}
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
