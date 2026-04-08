@@ -763,6 +763,42 @@ tc_conn_controlling_process(Config) ->
         ct:fail("timeout")
     end.
 
+tc_conn_shutdown_error_code(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    ErrorCode = 1 bsl 62 - 1,
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+            Owner ! listener_ready,
+            {ok, Conn} = quicer:accept(L, [], 5000),
+            {ok, Conn} = quicer:handshake(Conn),
+            ok = quicer:async_shutdown_connection(
+                Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, ErrorCode
+            ),
+            receive
+                done -> ok
+            end,
+            quicer:close_listener(L)
+        end
+    ),
+    receive
+        listener_ready ->
+            {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(Config), 5000),
+            receive
+                {quic, shutdown, Conn, ErrorCode} ->
+                    ok;
+                {quic, shutdown, Conn, Other} ->
+                    ct:fail("Unexpected ErrorCode ~p", [Other])
+            after 5000 ->
+                ct:fail("Timeout waiting for shutdown")
+            end,
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
 tc_conn_opt_ideal_processor(Config) ->
     Port = select_port(),
     Owner = self(),
@@ -1230,7 +1266,7 @@ simple_conn_server_loop(L, Conn, Owner) ->
             CertResp = quicer:peercert(Conn),
             Owner ! {self(), peercert, CertResp},
             simple_conn_server_loop(L, Conn, Owner);
-        {quic, shutdown, Conn} ->
+        {quic, shutdown, Conn, _ErrorCode} ->
             quicer:close_connection(Conn),
             quicer:close_listener(L)
     end.

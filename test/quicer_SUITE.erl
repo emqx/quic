@@ -136,6 +136,7 @@
     tc_stream_send_with_fin_passive/1,
     tc_stream_send_shutdown_complete/1,
     tc_conn_and_stream_shared_owner/1,
+    tc_stream_shutdown_error_code/1,
 
     tc_get_stream_0rtt_length/1,
     tc_get_stream_ideal_sndbuff_size/1,
@@ -2617,6 +2618,46 @@ tc_stream_send_shutdown_complete(Config) ->
     SPid ! done,
     ensure_server_exit_normal(Ref).
 
+tc_stream_shutdown_error_code(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    ErrorCode = 1 bsl 62 - 1,
+    {SPid, Ref} = spawn_monitor(
+        fun() ->
+            {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
+            Owner ! listener_ready,
+            {ok, Conn} = quicer:accept(L, [], 5000),
+            {ok, Conn} = quicer:handshake(Conn),
+            {ok, Stm} = quicer:accept_stream(Conn, []),
+            receive
+                {quic, peer_send_aborted, Stm, ErrorCode0} ->
+                    Owner ! {self(), ErrorCode0};
+                Other ->
+                    Owner ! {self(), {fail, Other}}
+            end,
+            quicer:close_listener(L),
+            ok
+        end
+    ),
+    receive
+        listener_ready ->
+            {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+            {ok, Stm} = quicer:start_stream(Conn, []),
+            ok = quicer:async_shutdown_stream(Stm, ?QUIC_STREAM_SHUTDOWN_FLAG_ABORT, ErrorCode),
+            receive
+                {SPid, ErrorCode} ->
+                    ok;
+                {SPid, {fail, ServerOther}} ->
+                    ct:fail("Server got unexpected msg: ~p", [ServerOther])
+            after 5000 ->
+                ct:fail("Timeout waiting for server result")
+            end,
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
+    after 1000 ->
+        ct:fail("timeout")
+    end.
+
 tc_conn_opt_sslkeylogfile(Config) ->
     Port = select_port(),
     TargetFName = "SSLKEYLOGFILE",
@@ -3589,7 +3630,7 @@ simple_conn_server_loop(L, Conn, Owner) ->
             CertResp = quicer:peercert(Conn),
             Owner ! {self(), peercert, CertResp},
             simple_conn_server_loop(L, Conn, Owner);
-        {quic, shutdown, Conn} ->
+        {quic, shutdown, Conn, _ErrorCode} ->
             quicer:close_connection(Conn),
             quicer:close_listener(L)
     end.

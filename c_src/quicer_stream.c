@@ -819,7 +819,8 @@ shutdown_stream3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QUIC_STATUS Status;
   ERL_NIF_TERM ret = ATOM_OK;
   QuicerStreamCTX *s_ctx;
-  uint32_t app_errcode = 0, flags = 0;
+  uint32_t flags = 0;
+  ErlNifUInt64 app_errcode = 0;
 
   CXPLAT_FRE_ASSERT(3 == argc);
 
@@ -834,7 +835,7 @@ shutdown_stream3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
 
-  if (!enif_get_uint(env, argv[2], &app_errcode))
+  if (!enif_get_uint64(env, argv[2], &app_errcode))
     {
       ret = ERROR_TUPLE_2(ATOM_BADARG);
     }
