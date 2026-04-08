@@ -1229,16 +1229,16 @@ handle_connection_event_shutdown_initiated_by_transport(
 
 static QUIC_STATUS
 handle_connection_event_shutdown_initiated_by_peer(
-    QuicerConnCTX *c_ctx, __unused_parm__ QUIC_CONNECTION_EVENT *Event)
+    QuicerConnCTX *c_ctx, QUIC_CONNECTION_EVENT *Event)
 {
   assert(QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER == Event->Type);
   assert(c_ctx->Connection);
   ErlNifEnv *env = c_ctx->env;
-  ERL_NIF_TERM report
-      = make_event(env,
-                   ATOM_SHUTDOWN,
-                   enif_make_resource(env, c_ctx),
-                   ATOM_STATUS(Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode));
+  ERL_NIF_TERM report = make_event(
+      env,
+      ATOM_SHUTDOWN,
+      enif_make_resource(env, c_ctx),
+      enif_make_uint64(env, Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode));
   enif_send(NULL, &(c_ctx->owner->Pid), NULL, report);
   return QUIC_STATUS_SUCCESS;
 }
