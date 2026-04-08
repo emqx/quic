@@ -76,7 +76,12 @@
 %% Handle unhandled info with callback state.
 
 -optional_callbacks([
-    post_handoff/3, handle_stream_data/4, handle_call/3, handle_cast/2, handle_info/2, handle_continue/2
+    post_handoff/3,
+    handle_stream_data/4,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    handle_continue/2
 ]).
 
 -import(quicer_lib, [default_cb_ret/2]).
