@@ -461,7 +461,7 @@ extern ERL_NIF_TERM ATOM_QUIC_SEND_ECN_CONGESTION_COUNT;
 
 #define ETERM_INT(i) enif_make_int(env, i)
 
-#define ETERM_UINT_64(i) enif_make_int(env, (uint64_t)i)
+#define ETERM_UINT_64(I) enif_make_uint64(env, (uint64_t)I)
 
 #define ETERM_BOOL(i) ((i) > 0 ? ATOM_TRUE : ATOM_FALSE)
 

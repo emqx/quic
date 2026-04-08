@@ -784,11 +784,11 @@ encode_parm_to_eterm(ErlNifEnv *env,
         }
       else if (BufferLength == sizeof(uint32_t))
         {
-          res = SUCCESS(ETERM_INT(*(uint32_t *)Buffer));
+          res = SUCCESS(ETERM_UINT_64(*(uint32_t *)Buffer));
         }
       else if (BufferLength == sizeof(uint16_t))
         {
-          res = SUCCESS(ETERM_INT(*(uint16_t *)Buffer));
+          res = SUCCESS(ETERM_UINT_64(*(uint16_t *)Buffer));
         }
     }
   else if ((QUICER_PARAM_HANDLE_TYPE_CONN == Type
