@@ -129,6 +129,9 @@
 
 -callback handle_call(Req :: term(), From :: gen_server:from(), cb_state()) -> cb_ret().
 
+-callback handle_cast(Req :: term(), cb_state()) -> cb_ret().
+%% Handle cast with callback state.
+
 -callback handle_info(Info :: term(), cb_state()) -> cb_ret().
 %% handle unhandled info with callback state.
 
@@ -137,6 +140,7 @@
 
 -optional_callbacks([
     handle_call/3,
+    handle_cast/2,
     handle_info/2,
     handle_continue/2,
     %% require newer MsQuic
@@ -408,8 +412,13 @@ handle_call(Request, From, #{callback_state := CBState, callback := M} = State) 
     | {noreply, NewState :: term(), Timeout :: timeout()}
     | {noreply, NewState :: term(), hibernate}
     | {stop, Reason :: term(), NewState :: term()}.
-handle_cast(_Request, State) ->
-    {noreply, State}.
+handle_cast(Request, #{callback := M, callback_state := CBState} = State) ->
+    case erlang:function_exported(M, handle_cast, 2) of
+        true ->
+            default_cb_ret(M:handle_cast(Request, CBState), State);
+        false ->
+            {noreply, State}
+    end.
 
 %%--------------------------------------------------------------------
 %% @private

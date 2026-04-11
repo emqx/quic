@@ -45,6 +45,7 @@
     dgram_state_changed/3
 ]).
 
+-export([handle_call/3, handle_cast/2]).
 -export([handle_info/2]).
 
 start_link(Host, Port, {_COpts, _SOpts} = Opts) ->
@@ -155,6 +156,19 @@ peer_needs_streams(C, bidi_streams, S) ->
     {ok, Current} = quicer:getopt(C, local_bidi_stream_count),
     ok = quicer:setopt(C, settings, #{peer_bidi_stream_count => Current + 1}),
     {ok, S}.
+
+handle_call({set_foo, Value}, _From, State) ->
+    {reply, ok, State#{foo => Value}};
+handle_call(get_foo, _From, State) ->
+    {reply, maps:get(foo, State, undefined), State};
+handle_call(_Request, _From, State) ->
+    {reply, {error, not_impl}, State}.
+
+handle_cast(ping, State) ->
+    ?tp(debug, #{module => ?MODULE, event => handle_cast_ping}),
+    {ok, State};
+handle_cast(_Request, State) ->
+    {ok, State}.
 
 handle_info({'EXIT', _Pid, _Reason}, State) ->
     {ok, State};
