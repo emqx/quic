@@ -20,15 +20,66 @@
 -include("quicer.hrl").
 
 %% https://github.com/AdRoll/rebar3_hank/issues/155
--hank([{unused_macros, [{"MASK", 1}]}]).
+-hank([{unused_macros, [{"MASK", 1}, {"TLS_OPTS", 0}, {"QUIC_SETTINGS_OPTS", 0}]}]).
 
 -define(BIT(Bits), (1 bsl (Bits))).
 -define(MASK(Bits), (?BIT(Bits) - 1)).
 
 -export_type([handle/0]).
 
+-define(TLS_OPTS,
+    cert => file:filename(),
+    certfile => file:filename(),
+    key => file:filename(),
+    keyfile => file:filename(),
+    password => string(),
+    verify => none | peer | verify_peer | verify_none,
+    cacertfile => file:filename(),
+    sslkeylogfile => file:filename()
+).
+
+-define(QUIC_SETTINGS_OPTS,
+    max_bytes_per_key => uint64(),
+    handshake_idle_timeout_ms => uint64(),
+    idle_timeout_ms => uint64(),
+    %% for client only
+    tls_client_max_send_buffer => uint32(),
+    %% for server only
+    tls_server_max_send_buffer => uint32(),
+    stream_recv_window_default => uint32(),
+    stream_recv_buffer_default => uint32(),
+    conn_flow_control_window => uint32(),
+    %, max_worker_queue_delay_us => uint32()
+    max_stateless_operations => uint32(),
+    initial_window_packets => uint32(),
+    send_idle_timeout_ms => uint32(),
+    initial_rtt_ms => uint32(),
+    max_ack_delay_ms => uint32(),
+    disconnect_timeout_ms => uint32(),
+    keep_alive_interval_ms => uint32(),
+    congestion_control_algorithm => uint16(),
+    peer_bidi_stream_count => uint16(),
+    peer_unidi_stream_count => uint16(),
+    retry_memory_limit => uint16(),
+    load_balancing_mode => uint16(),
+    max_operations_per_drain => uint8(),
+    send_buffering_enabled => uint8(),
+    pacing_enabled => uint8(),
+    migration_enabled => uint8(),
+    datagram_receive_enabled => uint8(),
+    server_resumption_level => uint8(),
+    %  internal, not exposed
+    %, version_negotiation_ext_enabled => uint8()
+    minimum_mtu => uint16(),
+    maximum_mtu => uint16(),
+    mtu_discovery_search_complete_timeout_us => uint64(),
+    mtu_discovery_missing_probe_count => uint8(),
+    max_binding_stateless_operations => uint16(),
+    stateless_operation_expiration_ms => uint16()
+).
+
 %% @doc Other user defined opts may be used in callbacks
--type user_opts() :: #{_ => _}.
+-type user_opts() :: #{dynamic() => dynamic()}.
 
 %% Msquic Status Code Translation
 -type atom_reason() ::
@@ -78,20 +129,13 @@
 -type quic_handle_level() :: quic_tls | quic_configuration | false.
 
 -type listen_on() :: inet:port_number() | string().
--type listen_opts() :: listen_security_opts() | quic_settings().
--type listen_security_opts() :: #{
+-type listen_opts() :: #{
     alpn := [alpn()],
-    cert := file:filename(),
-    certfile := file:filename(),
-    key := file:filename(),
-    keyfile := file:filename(),
-    verify => none | peer | verify_peer | verify_none,
-    cacertfile => file:filename(),
-    password => string(),
-    sslkeylogfile => file:filename(),
     allow_insecure => boolean(),
     quic_registration => reg_handle(),
-    conn_acceptors => non_neg_integer()
+    conn_acceptors => non_neg_integer(),
+    ?TLS_OPTS,
+    ?QUIC_SETTINGS_OPTS
 }.
 
 -type uint64() :: 0..?MASK(64).
@@ -100,79 +144,36 @@
 -type uint16() :: 0..?MASK(16).
 -type uint8() :: 0..?MASK(8).
 
--type quic_settings() :: #{
-    max_bytes_per_key => uint64(),
-    handshake_idle_timeout_ms => uint64(),
-    idle_timeout_ms => uint64(),
-    %% for client only
-    tls_client_max_send_buffer => uint32(),
-    %% for server only
-    tls_server_max_send_buffer => uint32(),
-    stream_recv_window_default => uint32(),
-    stream_recv_buffer_default => uint32(),
-    conn_flow_control_window => uint32(),
-    %, max_worker_queue_delay_us => uint32()
-    max_stateless_operations => uint32(),
-    initial_window_packets => uint32(),
-    send_idle_timeout_ms => uint32(),
-    initial_rtt_ms => uint32(),
-    max_ack_delay_ms => uint32(),
-    disconnect_timeout_ms => uint32(),
-    keep_alive_interval_ms => uint32(),
-    congestion_control_algorithm => uint16(),
-    peer_bidi_stream_count => uint16(),
-    peer_unidi_stream_count => uint16(),
-    retry_memory_limit => uint16(),
-    load_balancing_mode => uint16(),
-    max_operations_per_drain => uint8(),
-    send_buffering_enabled => uint8(),
-    pacing_enabled => uint8(),
-    migration_enabled => uint8(),
-    datagram_receive_enabled => uint8(),
-    server_resumption_level => uint8(),
-    %  internal, not exposed
-    %, version_negotiation_ext_enabled => uint8()
-    minimum_mtu => uint16(),
-    maximum_mtu => uint16(),
-    mtu_discovery_search_complete_timeout_us => uint64(),
-    mtu_discovery_missing_probe_count => uint8(),
-    max_binding_stateless_operations => uint16(),
-    stateless_operation_expiration_ms => uint16()
-}.
+-type quic_settings() :: #{?QUIC_SETTINGS_OPTS}.
 -type alpn() :: string().
 
--type conn_opts() ::
-    quic_settings()
-    | #{
-        alpn := [string()],
-        conn_callback => module(),
-        cert => file:filename(),
-        certfile => file:filename(),
-        key => file:filename(),
-        keyfile => file:filename(),
-        password => string(),
-        verify => none | peer,
-        custom_verify => boolean(),
-        %% get NST from last connection, for reconnect.
-        handle => connection_handle(),
-        nst => binary(),
-        cacertfile => file:filename(),
-        sslkeylogfile => file:filename(),
-        handshake_idle_timeout_ms => non_neg_integer(),
-        quic_event_mask => uint32(),
-        disable_1rtt_encryption => boolean(),
-        %% Not working well
-        local_address => string(),
-        local_bidi_stream_count => uint16(),
-        local_peer_unidi_stream_count => uint16(),
-        %% for Application defined options
-        _ => _
-    }.
+-type conn_opts() :: #{
+    alpn := [string()],
+    conn_callback => module(),
+    custom_verify => boolean(),
+    %% get NST from last connection, for reconnect.
+    handle => connection_handle(),
+    nst => binary(),
+    handshake_idle_timeout_ms => non_neg_integer(),
+    quic_event_mask => uint32(),
+    disable_1rtt_encryption => boolean(),
+    %% Not working well
+    local_address => string(),
+    local_bidi_stream_count => uint16(),
+    local_peer_unidi_stream_count => uint16(),
+    ?TLS_OPTS,
+    ?QUIC_SETTINGS_OPTS,
+    %% for Application defined options
+    dynamic() => dynamic()
+}.
 -type conn_shutdown_flag() ::
     ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE
     | ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT.
 
--type acceptor_opts() :: quic_settings() | #{active => boolean()}.
+-type acceptor_opts() :: #{
+    active => boolean(),
+    ?QUIC_SETTINGS_OPTS
+}.
 
 -type active_n() :: boolean() | once | integer().
 
@@ -187,7 +188,7 @@
     ideal_send_buffer_size => uint64(),
     '0rtt_length' => uint64(),
     %% for Application defined options
-    _ => _
+    dynamic() => dynamic()
     %% @TODO expand
 }.
 
