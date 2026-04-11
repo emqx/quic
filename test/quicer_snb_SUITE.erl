@@ -58,7 +58,11 @@
     tc_multi_streams_example_server_1/1,
     tc_multi_streams_example_server_2/1,
     tc_multi_streams_example_server_3/1,
-    tc_passive_recv_1/1
+    tc_passive_recv_1/1,
+    tc_handle_cast_conn/1,
+    tc_handle_cast_stream/1,
+    tc_handle_call_conn/1,
+    tc_handle_call_stream/1
 ]).
 
 -include_lib("common_test/include/ct.hrl").
@@ -222,7 +226,12 @@ all() ->
         tc_multi_streams_example_server_1,
         tc_multi_streams_example_server_2,
         tc_multi_streams_example_server_3,
-        tc_passive_recv_1
+        tc_passive_recv_1,
+        %% handle_cast and handle_call
+        tc_handle_cast_conn,
+        tc_handle_cast_stream,
+        tc_handle_call_conn,
+        tc_handle_call_stream
     ].
 
 %%--------------------------------------------------------------------
@@ -3314,6 +3323,208 @@ tc_passive_recv_1(Config) ->
                 ])
             )
         end
+    ),
+    ok.
+
+tc_handle_cast_conn(Config) ->
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 1}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+    ?my_check_trace(
+        #{timetrap => 10000},
+        begin
+            {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
+            {ok, ClientConnPid} = example_client_connection:start_link(
+                "localhost",
+                Port,
+                {default_conn_opts(), default_stream_opts()}
+            ),
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, event := connected, module := example_client_connection},
+                5000,
+                1000
+            ),
+            gen_server:cast(ClientConnPid, ping),
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, event := handle_cast_ping, module := example_client_connection},
+                1000
+            ),
+            gen_server:stop(ClientConnPid)
+        end,
+        fun(_Result, _Trace) -> ok end
+    ),
+    ok.
+
+tc_handle_cast_stream(Config) ->
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 1}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+    ?my_check_trace(
+        #{timetrap => 10000},
+        begin
+            {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
+            {ok, ClientConnPid} = example_client_connection:start_link(
+                "localhost",
+                Port,
+                {default_conn_opts(), default_stream_opts()}
+            ),
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, event := connected, module := example_client_connection},
+                5000,
+                1000
+            ),
+            %% Wait for the remote stream data so the receiver's callback_state is initialized
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, dir := remote_unidir, module := example_client_stream},
+                5000,
+                1000
+            ),
+            {_Sender, Receiver} = maps:get(
+                master_stream_pair, quicer_connection:get_cb_state(ClientConnPid)
+            ),
+            ?assert(is_process_alive(Receiver)),
+            gen_server:cast(Receiver, ping),
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, event := handle_cast_ping, module := example_client_stream},
+                1000
+            ),
+            gen_server:stop(ClientConnPid)
+        end,
+        fun(_Result, _Trace) -> ok end
+    ),
+    ok.
+
+tc_handle_call_conn(Config) ->
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 1}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+    ?my_check_trace(
+        #{timetrap => 10000},
+        begin
+            {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
+            {ok, ClientConnPid} = example_client_connection:start_link(
+                "localhost",
+                Port,
+                {default_conn_opts(), default_stream_opts()}
+            ),
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, event := connected, module := example_client_connection},
+                5000,
+                1000
+            ),
+            undefined = gen_server:call(ClientConnPid, get_foo),
+            ok = gen_server:call(ClientConnPid, {set_foo, bar}),
+            bar = gen_server:call(ClientConnPid, get_foo),
+            ok = gen_server:call(ClientConnPid, {set_foo, baz}),
+            baz = gen_server:call(ClientConnPid, get_foo),
+            gen_server:stop(ClientConnPid)
+        end,
+        fun(_Result, _Trace) -> ok end
+    ),
+    ok.
+
+tc_handle_call_stream(Config) ->
+    ServerConnCallback = example_server_connection,
+    ServerStreamCallback = example_server_stream,
+    Port = select_port(),
+    application:ensure_all_started(quicer),
+    ListenerOpts = [
+        {conn_acceptors, 32},
+        {peer_bidi_stream_count, 0},
+        {peer_unidi_stream_count, 1}
+        | default_listen_opts(Config)
+    ],
+    ConnectionOpts = [
+        {conn_callback, ServerConnCallback},
+        {stream_acceptors, 2}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, ServerStreamCallback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+    ?my_check_trace(
+        #{timetrap => 10000},
+        begin
+            {ok, _QuicApp} = quicer:spawn_listener(mqtt, Port, Options),
+            {ok, ClientConnPid} = example_client_connection:start_link(
+                "localhost",
+                Port,
+                {default_conn_opts(), default_stream_opts()}
+            ),
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, event := connected, module := example_client_connection},
+                5000,
+                1000
+            ),
+            %% Wait for the remote stream data so the receiver's callback_state is initialized
+            {ok, _} = ?block_until(
+                #{?snk_kind := debug, dir := remote_unidir, module := example_client_stream},
+                5000,
+                1000
+            ),
+            {_Sender, Receiver} = maps:get(
+                master_stream_pair, quicer_connection:get_cb_state(ClientConnPid)
+            ),
+            ?assert(is_process_alive(Receiver)),
+            undefined = gen_server:call(Receiver, get_foo),
+            ok = gen_server:call(Receiver, {set_foo, bar}),
+            bar = gen_server:call(Receiver, get_foo),
+            gen_server:stop(ClientConnPid)
+        end,
+        fun(_Result, _Trace) -> ok end
     ),
     ok.
 
