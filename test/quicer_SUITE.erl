@@ -2621,7 +2621,7 @@ tc_stream_send_shutdown_complete(Config) ->
 tc_stream_shutdown_error_code(Config) ->
     Port = select_port(),
     Owner = self(),
-    ErrorCode = 1 bsl 62 - 1,
+    ErrorCode = (1 bsl 62) - 1,
     {SPid, Ref} = spawn_monitor(
         fun() ->
             {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
@@ -2635,6 +2635,8 @@ tc_stream_shutdown_error_code(Config) ->
                 Other ->
                     Owner ! {self(), {fail, Other}}
             end,
+            quicer:close_stream(Stm),
+            quicer:shutdown_connection(Conn, 0),
             quicer:close_listener(L),
             ok
         end

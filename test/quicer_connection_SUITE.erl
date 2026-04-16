@@ -766,7 +766,7 @@ tc_conn_controlling_process(Config) ->
 tc_conn_shutdown_error_code(Config) ->
     Port = select_port(),
     Owner = self(),
-    ErrorCode = 1 bsl 62 - 1,
+    ErrorCode = (1 bsl 62) - 1,
     {SPid, Ref} = spawn_monitor(
         fun() ->
             {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
@@ -778,6 +778,12 @@ tc_conn_shutdown_error_code(Config) ->
             ),
             receive
                 done -> ok
+            end,
+            receive
+                {quic, closed, Conn, _Flags} ->
+                    ok
+            after 1000 ->
+                ok
             end,
             quicer:close_listener(L)
         end
