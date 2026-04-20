@@ -3363,7 +3363,11 @@ tc_handle_cast_conn(Config) ->
             ),
             gen_server:cast(ClientConnPid, ping),
             {ok, _} = ?block_until(
-                #{?snk_kind := debug, event := handle_cast_ping, module := example_client_connection},
+                #{
+                    ?snk_kind := debug,
+                    event := handle_cast_ping,
+                    module := example_client_connection
+                },
                 1000
             ),
             gen_server:stop(ClientConnPid)
