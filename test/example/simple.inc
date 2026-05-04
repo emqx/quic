@@ -4,7 +4,7 @@
 
 [shell server]
     !erl -sname s -pa ../../_build/default/lib/quicer/ebin -s qt s
-    ?$eprompt
+    ?qt server ready
 
 
 [shell client]

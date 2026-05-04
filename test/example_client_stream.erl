@@ -31,6 +31,7 @@
     peer_accepted/3,
     passive/3,
     handle_call/3,
+    handle_cast/2,
     handle_info/2
 ]).
 
@@ -175,8 +176,18 @@ stream_closed(
 ->
     {stop, normal, S}.
 
+handle_call({set_foo, Value}, _From, State) ->
+    {reply, ok, State#{foo => Value}};
+handle_call(get_foo, _From, State) ->
+    {reply, maps:get(foo, State, undefined), State};
 handle_call(_Request, _From, S) ->
     {reply, {error, not_impl}, S}.
+
+handle_cast(ping, State) ->
+    ?tp(debug, #{module => ?MODULE, event => handle_cast_ping}),
+    {ok, State};
+handle_cast(_Request, State) ->
+    {ok, State}.
 
 handle_info(_, S) ->
     {ok, S}.

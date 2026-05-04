@@ -108,7 +108,7 @@ top_site() ->
                alpn => ["sample"]
               },
 
-  {ok, L} = quicer:listen(Port, LOptions),
+  {ok, L} = listen_with_retry(Port, LOptions),
   {ok, Conn} = quicer:accept(L, #{active => false}, infinity),
   {ok, Conn} = quicer:handshake(Conn),
   top_loop(Conn).
@@ -160,6 +160,21 @@ c_opts() ->
     peer_bidi_stream_count => 64000,
     handshake_idle_timeout_ms => 3 * ?INTERVAL,
     idle_timeout_ms => 3 * ?INTERVAL}.
+
+listen_with_retry(Port, Options) ->
+  listen_with_retry(Port, Options, 20).
+listen_with_retry(Port, Options, 0) ->
+  quicer:listen(Port, Options);
+listen_with_retry(Port, Options, N) ->
+  case quicer:listen(Port, Options) of
+    {ok, _} = Ok -> Ok;
+    {error, _} ->
+      timer:sleep(500),
+      listen_with_retry(Port, Options, N - 1);
+    {error, _, _} ->
+      timer:sleep(500),
+      listen_with_retry(Port, Options, N - 1)
+  end.
 
 nat_site() ->
   Port = 4567,
