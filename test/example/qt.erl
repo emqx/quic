@@ -53,10 +53,36 @@ s() ->
                peer_bidi_stream_count => 64000,
                alpn => ["sample"]
               },
-  proc_lib:spawn_link(fun() ->
-                          {ok, L} = quicer:listen(Port, LOptions),
-                          listener(L)
-                      end).
+  Parent = self(),
+  Pid = proc_lib:spawn_link(
+          fun() ->
+              {ok, L} = listen_with_retry(Port, LOptions),
+              io:format("qt server ready\n"),
+              Parent ! {self(), ready},
+              listener(L)
+          end),
+  receive
+    {Pid, ready} ->
+      ok
+  after 10000 ->
+      exit(server_start_timeout)
+  end,
+  Pid.
+
+listen_with_retry(Port, Options) ->
+  listen_with_retry(Port, Options, 20).
+listen_with_retry(Port, Options, 0) ->
+  quicer:listen(Port, Options);
+listen_with_retry(Port, Options, N) ->
+  case quicer:listen(Port, Options) of
+    {ok, _} = Ok -> Ok;
+    {error, _} ->
+      timer:sleep(500),
+      listen_with_retry(Port, Options, N - 1);
+    {error, _, _} ->
+      timer:sleep(500),
+      listen_with_retry(Port, Options, N - 1)
+  end.
 
 
 listener(L) ->
@@ -414,6 +440,10 @@ client(Conns, Streams, CNo, SNo) ->
       client(C2, S2, CNo, SNo);
     {ok, exit} ->
       exit(normal);
+    {error, interrupted} = Err ->
+      io:format("ERR ~p~n", [Err]),
+      close_all(Conns, Streams),
+      client([], [], CNo, SNo);
     Err ->
       io:format("ERR ~p~n", [Err]),
       client(Conns, Streams, CNo, SNo)
@@ -464,6 +494,20 @@ flush(Conns, Streams) ->
   after 10 ->
       {Conns, Streams}
   end.
+
+
+close_all(Conns, Streams) ->
+  lists:foreach(
+    fun({Stm, _, _}) ->
+        _ = quicer:close_stream(Stm),
+        ok
+    end, Streams),
+  lists:foreach(
+    fun({Conn, _}) ->
+        _ = quicer:close_connection(Conn),
+        ok
+    end, Conns),
+  ok.
 
 
 check_processes() ->
