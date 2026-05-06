@@ -6,6 +6,40 @@ MSQUIC_VERSION="$1"
 TARGET_SO='priv/libquicer_nif.so'
 PKGNAME="$(./pkgname.sh)"
 
+detect_macos_arch() {
+    local arch=""
+
+    # The NIF must match the architecture of the running Erlang VM. Prefer
+    # Erlang's own target triplet so Rosetta shells don't accidentally choose
+    # the host/shell architecture instead of the VM architecture.
+    if command -v erl >/dev/null 2>&1; then
+        arch="$(erl -noshell -eval 'io:format("~s", [erlang:system_info(system_architecture)]), halt().' 2>/dev/null | cut -d- -f1 || true)"
+    fi
+
+    case "$arch" in
+        aarch64 | arm64)
+            echo arm64
+            ;;
+        x86_64 | amd64)
+            echo x86_64
+            ;;
+        *)
+            arch="$(uname -m)"
+            case "$arch" in
+                aarch64 | arm64)
+                    echo arm64
+                    ;;
+                x86_64 | amd64)
+                    echo x86_64
+                    ;;
+                *)
+                    echo "$arch"
+                    ;;
+            esac
+            ;;
+    esac
+}
+
 build() {
     # default: 4 concurrent jobs
     JOBS=4
@@ -19,7 +53,10 @@ build() {
     fi
     if [ "$(uname -s)" = 'Darwin' ]; then
         JOBS="$(sysctl -n hw.ncpu)"
-        export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        export CMAKE_OSX_ARCHITECTURES="${CMAKE_OSX_ARCHITECTURES:-$(detect_macos_arch)}"
+        if [ -z "${SDKROOT:-}" ]; then
+            export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        fi
     else
         JOBS="$(nproc)"
     fi
