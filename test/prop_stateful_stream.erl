@@ -34,7 +34,9 @@ prop_stateful_client_stream_test() ->
     process_flag(trap_exit, true),
     ?SETUP(
         fun() ->
-            {ok, _} = listener_start_link(?MODULE),
+            LPort = quicer_test_lib:select_free_port(quic),
+            put(prop_client_port, LPort),
+            {ok, _} = listener_start_link(?MODULE, LPort),
             fun() -> listener_stop(?MODULE) end
         end,
         ?FORALL(
@@ -42,7 +44,9 @@ prop_stateful_client_stream_test() ->
             commands(?MODULE),
             begin
                 flush_quic_msgs(),
-                {ok, H} = retry_connect("localhost", 14571, default_conn_opts(), 10000, 10),
+                {ok, H} = retry_connect(
+                    "localhost", get(prop_client_port), default_conn_opts(), 10000, 10
+                ),
                 {History, State, Result} = run_commands(?MODULE, Cmds, [{conn_handle, H}]),
                 quicer:async_shutdown_connection(H, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0),
                 ?WHENFAIL(
@@ -59,7 +63,7 @@ prop_stateful_client_stream_test() ->
 prop_stateful_server_stream_test(opts) ->
     [{numtests, 10000}].
 prop_stateful_server_stream_test() ->
-    Port = 14570,
+    Port = quicer_test_lib:select_free_port(quic),
     process_flag(trap_exit, true),
     ?SETUP(
         fun() ->
@@ -274,10 +278,10 @@ retry_connect(Host, Port, Opts, Timeout, Retries) ->
         {ok, H} ->
             {ok, H};
         {error, _} when Retries > 1 ->
-            timer:sleep(100),
+            timer:sleep(500),
             retry_connect(Host, Port, Opts, Timeout, Retries - 1);
         {error, transport_down, _} when Retries > 1 ->
-            timer:sleep(100),
+            timer:sleep(500),
             retry_connect(Host, Port, Opts, Timeout, Retries - 1);
         {error, Reason} ->
             {error, Reason}
@@ -294,9 +298,8 @@ flush_quic_msgs() ->
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% Listener helper %%%
 %%%%%%%%%%%%%%%%%%%%%%%
-listener_start_link(ListenerName) ->
+listener_start_link(ListenerName, LPort) ->
     application:ensure_all_started(quicer),
-    LPort = 14571,
     ListenerOpts = default_listen_opts(),
     ConnectionOpts = [
         {conn_callback, example_server_connection},

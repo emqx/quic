@@ -186,6 +186,8 @@ tc_conn_basic(Config) ->
             ok;
         {'DOWN', Ref, process, Pid, Error} ->
             ct:fail({run_error, Error})
+    after 10000 ->
+        ct:fail("timeout waiting for DOWN from run process")
     end.
 
 run_tc_conn_basic(Config) ->
@@ -258,6 +260,8 @@ tc_conn_basic_verify_peer_no_cacert(Config) ->
     ),
     receive
         listener_ready -> ok
+    after 1000 ->
+        ct:fail("timeout waiting for listener_ready")
     end,
 
     %% ErrorCode is different per platform
@@ -678,7 +682,9 @@ run_tc_conn_client_bad_cert(Config) ->
                         Other = flush([]),
                         ct:fail("Unexpected Msg ~p", [Other])
                     end,
-                    ensure_server_exit_normal(Ref)
+                    ensure_server_exit_normal(Ref);
+                Error ->
+                    ct:fail({start_stream_error, Error})
             end
     after 1000 ->
         ct:fail("timeout")
