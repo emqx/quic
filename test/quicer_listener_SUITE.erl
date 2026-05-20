@@ -456,8 +456,13 @@ tc_close_listener_dealloc(Config) ->
         exit(L)
     end),
     receive
-        {'DOWN', Ref, process, Pid, L} ->
-            quicer:close_listener(L)
+        {'DOWN', Ref, process, Pid, Listener} ->
+            quicer:close_listener(Listener)
+    after 2000 ->
+        ct:pal(
+            "WARNING: tc_close_listener_dealloc timed out waiting for DOWN, possible listener leak"
+        ),
+        ok
     end.
 
 tc_get_listener_opt_custom_verify(Config) ->
@@ -718,6 +723,8 @@ tc_listener_conf_reload(Config) ->
             {quic, new_stream, Stream2R, #{is_orphan := true}} ->
                 quicer:setopt(Stream2R, active, true),
                 Stream2R
+        after 5000 ->
+            ct:fail("timeout waiting for orphan stream")
         end,
 
     receive
@@ -800,6 +807,8 @@ tc_listener_conf_reload_listen_on(Config) ->
             {quic, new_stream, Stream2R, #{is_orphan := true}} ->
                 quicer:setopt(Stream2R, active, true),
                 Stream2R
+        after 5000 ->
+            ct:fail("timeout waiting for orphan stream")
         end,
     receive
         {quic, <<"ping_from_conn_2">>, Stream2Remote, _} -> ok
@@ -882,6 +891,8 @@ tc_listener_conf_reload_listen_on_neg(Config) ->
             {quic, new_stream, Stream2R, #{is_orphan := true}} ->
                 quicer:setopt(Stream2R, active, true),
                 Stream2R
+        after 5000 ->
+            ct:fail("timeout waiting for orphan stream")
         end,
 
     receive
@@ -1015,10 +1026,14 @@ tc_listener_closed_when_owner_die_and_gc(Config) ->
         Me ! {started, self()},
         receive
             done -> ok
+        after 20000 ->
+            ok
         end
     end),
     receive
         {started, Pid} -> ok
+    after 5000 ->
+        ct:fail("timeout waiting for started message")
     end,
     {error, listener_start_error, {unknown_quic_status, Reason}} =
         quicer:listen(Port, default_listen_opts(Config)),
@@ -1029,6 +1044,8 @@ tc_listener_closed_when_owner_die_and_gc(Config) ->
     receive
         {'DOWN', MRef, process, Pid, normal} ->
             ok
+    after 5000 ->
+        ct:fail("timeout waiting for owner DOWN")
     end,
     %% Then port is released and new listener can be started
     {ok, L} = snabbkaffe:retry(
@@ -1048,12 +1065,15 @@ tc_listener_stopped_when_owner_die(Config) ->
         Me ! {started, self(), L},
         receive
             done -> ok
+        after 20000 ->
+            ok
         end
     end),
     %% Given a Listener Handle owned by another process
-    receive
-        {started, Pid, L0} -> ok
-    end,
+    {Pid, L0} =
+        receive
+            {started, Pid_, L0_} -> {Pid_, L0_}
+        end,
     {error, listener_start_error, {unknown_quic_status, Reason}} =
         quicer:listen(Port, default_listen_opts(Config)),
     ?assert(Reason == 91 orelse Reason == 41),

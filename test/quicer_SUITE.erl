@@ -426,7 +426,7 @@ tc_stream_client_send_seq(Config) ->
     end.
 
 tc_stream_client_send_iolist(Config) ->
-    Port = 4569,
+    Port = select_free_port(quic),
     Owner = self(),
     {SPid, Ref} = spawn_monitor(fun() -> ping_pong_server(Owner, Config, Port) end),
     receive
@@ -3775,6 +3775,8 @@ active_recv(Stream, Len, BinList) ->
             receive
                 {quic, Bin, Stream, _} when is_binary(Bin) ->
                     active_recv(Stream, Len, [Bin | BinList])
+            after 10000 ->
+                ct:fail({active_recv_timeout, expected, Len, got, iolist_size(BinList)})
             end
     end.
 
@@ -3793,11 +3795,17 @@ retry_with(Fun, Retry, ErrorInfo) ->
 flush_streams_available(Conn) ->
     receive
         {quic, streams_available, Conn, #{bidi_streams := _, unidi_streams := _}} -> ok
+    after 2000 ->
+        ct:pal("WARNING: flush_streams_available timed out for ~p", [Conn]),
+        ok
     end.
 
 flush_datagram_state_changed(Conn) ->
     receive
         {quic, dgram_state_changed, Conn, _} -> ok
+    after 2000 ->
+        ct:pal("WARNING: flush_datagram_state_changed timed out for ~p", [Conn]),
+        ok
     end.
 
 filename(Path, F, A) ->

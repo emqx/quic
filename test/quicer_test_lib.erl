@@ -491,6 +491,11 @@ reset_global_reg() ->
     retry_reg_open().
 
 retry_reg_close() ->
+    retry_reg_close(20).
+
+retry_reg_close(0) ->
+    ct:fail("Failed to close global registration after retries, check for resource leaks");
+retry_reg_close(RetryLeft) ->
     case quicer:reg_close() of
         ok ->
             ok;
@@ -504,7 +509,7 @@ retry_reg_close() ->
                 ]
             ),
             timer:sleep(50),
-            retry_reg_close()
+            retry_reg_close(RetryLeft - 1)
     end.
 
 retry_reg_open() ->

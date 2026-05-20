@@ -150,7 +150,7 @@ handle_stream_data(
                 )
             of
                 {ok, StreamProc} ->
-                    catch quicer_stream:send(StreamProc, Bin),
+                    _ = catch quicer_stream:send(StreamProc, Bin),
                     {ok, State#{peer_stream := StreamProc}};
                 {error, {_, _}} ->
                     {ok, State};
