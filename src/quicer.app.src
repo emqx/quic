@@ -26,6 +26,7 @@
     {links, [{"Github", "https://github.com/emqx/quic"}]},
     {include_files, [
         "CMakeLists.txt",
+        "MSQUIC_VERSION",
         "Makefile",
         "get-msquic.sh",
         "build.sh",

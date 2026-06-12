@@ -4,6 +4,11 @@ REBAR := rebar3
 QUICER_VERSION ?= $(shell git describe --tags --always)
 export QUICER_VERSION
 
+# Single source of truth for the msquic version. Also read by
+# .clusterfuzzlite/{Dockerfile,build.sh} and anything calling get-msquic.sh.
+MSQUIC_VERSION ?= $(shell cat $(CURDIR)/MSQUIC_VERSION)
+export MSQUIC_VERSION
+
 .PHONY: all
 all: compile
 
@@ -12,7 +17,7 @@ default: build-nif
 
 .PHONY: build-nif
 build-nif:
-	./build.sh 'v2.5.7'
+	./build.sh '${MSQUIC_VERSION}'
 
 compile:
 	$(REBAR) compile
