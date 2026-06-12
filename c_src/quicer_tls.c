@@ -375,7 +375,13 @@ free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
   else if (QUIC_CREDENTIAL_TYPE_CERTIFICATE_PKCS12 == cc->Type
            && cc->CertificatePkcs12)
     {
-      free((char *)cc->CertificatePkcs12->Asn1Blob);
+      // Asn1Blob is allocated with CXPLAT_ALLOC_NONPAGED in
+      // parse_cert_options_in_memory(); it must be freed with the matching
+      // allocator, not libc free().
+      if (cc->CertificatePkcs12->Asn1Blob)
+        {
+          CXPLAT_FREE((void *)cc->CertificatePkcs12->Asn1Blob, QUIC_POOL_TEST);
+        }
       free((char *)cc->CertificatePkcs12->PrivateKeyPassword);
       CxPlatFree(cc->CertificatePkcs12, QUICER_CERTIFICATE_PKCS12);
       cc->CertificatePkcs12 = NULL;

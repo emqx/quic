@@ -92,6 +92,28 @@ if (DEFINED ENV{QUICER_USE_SANITIZERS})
   add_link_options(-O1 -fno-omit-frame-pointer -fsanitize=address,leak,undefined)
 endif()
 
+# libFuzzer / ClusterFuzzLite harnesses (see test/fuzz/ and FUZZING.md).
+# Opt-in: cmake -DBUILD_FUZZERS=ON. Under OSS-Fuzz/ClusterFuzzLite the engine
+# and sanitizer flags arrive via CFLAGS/CXXFLAGS/$LIB_FUZZING_ENGINE instead.
+option(BUILD_FUZZERS "Build libFuzzer harnesses under test/fuzz" OFF)
+# Set by .clusterfuzzlite/build.sh: the CFL/OSS-Fuzz infra already injects the
+# fuzzing engine and sanitizer through CFLAGS/CXXFLAGS/$LIB_FUZZING_ENGINE, so
+# we must NOT add our own here (it would clash with e.g. memory sanitizer).
+option(FUZZ_CFLITE "Fuzzers built under ClusterFuzzLite/OSS-Fuzz" OFF)
+if (BUILD_FUZZERS)
+  # Export quicer_fuzz_init_atoms() and add coverage instrumentation to every
+  # target defined below (quicer_static and the msquic subdirectory).
+  add_compile_definitions(QUICER_FUZZ)
+  if (NOT FUZZ_CFLITE)
+    add_compile_options(-fsanitize=fuzzer-no-link)
+    add_link_options(-fsanitize=fuzzer-no-link)
+    if (NOT DEFINED ENV{QUICER_USE_SANITIZERS})
+      add_compile_options(-O1 -fno-omit-frame-pointer -fsanitize=address,undefined)
+      add_link_options(-O1 -fno-omit-frame-pointer -fsanitize=address,undefined)
+    endif()
+  endif()
+endif()
+
 set(QUIC_BUILD_TEST "OFF")
 set(QUIC_BUILD_TOOLS "OFF")
 set(QUIC_BUILD_PERF "OFF")
@@ -234,4 +256,8 @@ add_custom_command(
 ## For none-emqx rebar3, it should be just a noop of 'Up-to-date' instead of 'installing'
 if (DEFINED ENV{REBAR_DEPS_DIR})
 install(TARGETS quicer_nif LIBRARY DESTINATION $ENV{REBAR_DEPS_DIR}/quicer/priv/)
+endif()
+
+if (BUILD_FUZZERS)
+  add_subdirectory(test/fuzz)
 endif()

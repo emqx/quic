@@ -368,7 +368,7 @@ load_alpn(ErlNifEnv *env,
     }
 
   if (!enif_get_list_length(env, alpn_list, alpn_buffer_length)
-      || alpn_buffer_length == 0)
+      || *alpn_buffer_length == 0)
     {
       return false;
     }
@@ -398,6 +398,11 @@ load_alpn(ErlNifEnv *env,
         }
       len++; // for '\0'
       char *str = malloc(len * sizeof(char));
+
+      if (!str)
+        {
+          goto exit;
+        }
 
       if (enif_get_string(env, head, str, len, ERL_NIF_LATIN1) <= 0)
         {
