@@ -1088,6 +1088,19 @@ init_atoms(ErlNifEnv *env)
 #undef ATOM
 }
 
+#ifdef QUICER_FUZZ
+// Exported entry point for the libFuzzer harnesses under test/fuzz/.
+// It lets a harness intern the atom table (ATOM_TRUE, ATOM_CERTFILE, ...)
+// without running the full on_load() (which would open msquic, registrations,
+// resource types, etc.). Compiled only when -DQUICER_FUZZ is set, so it has
+// zero effect on the production NIF.
+void
+quicer_fuzz_init_atoms(ErlNifEnv *env)
+{
+  init_atoms(env);
+}
+#endif // QUICER_FUZZ
+
 static void
 open_resources(ErlNifEnv *env)
 {

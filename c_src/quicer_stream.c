@@ -879,7 +879,12 @@ recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 
   unsigned char *dest = bin->data;
 
-  for (uint32_t i = 0; size > 0; ++i)
+  // Defense in depth: msquic guarantees TotalBufferLength == sum of buffer
+  // lengths and at most 2 buffers, but never read past the fixed Buffers[]
+  // array even if that invariant is violated.
+  for (uint32_t i = 0;
+       size > 0 && i < s_ctx->BufferCount && i < ARRAYSIZE(s_ctx->Buffers);
+       ++i)
     {
       if (s_ctx->Buffers[i].Length <= size)
         { // copy whole buffer

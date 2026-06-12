@@ -1,0 +1,8 @@
+# ClusterFuzzLite project configuration for quicer.
+# https://google.github.io/clusterfuzzlite/
+language: c
+fuzzing_engines:
+  - libfuzzer
+sanitizers:
+  - address
+  - undefined
