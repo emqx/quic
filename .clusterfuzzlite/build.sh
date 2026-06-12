@@ -12,6 +12,10 @@ cd "$SRC/quicer"
 # erl_nif.h header location (erlang-dev). Avoids invoking `erl`.
 export Erlang_OTP_ROOT_DIR=/usr/lib/erlang
 
+if [ ! -d msquic ]; then
+    ./get-msquic.sh "$(cat MSQUIC_VERSION)"
+fi
+
 BUILD_DIR="$WORK/build_fuzz"
 mkdir -p "$BUILD_DIR"
 
