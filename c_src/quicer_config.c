@@ -1425,14 +1425,27 @@ set_stream_opt(ErlNifEnv *env,
       enif_mutex_lock(s_ctx->lock);
 
       if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
-          && !IS_SAME_TERM(ATOM_FALSE, optval) && s_ctx->TotalBufferLength > 0)
+          && !IS_SAME_TERM(ATOM_FALSE, optval))
         {
-          // Trigger callback of event recv.
+          // Switching from passive to active: msquic receives may have been
+          // disabled (e.g. by a partial passive recv, or when an {active, N}
+          // count was exhausted).
+          // Re-enable them unconditionally.
+          //
+          // Order matters: enable BEFORE completing the pending recv. In
+          // single recv-buffer mode, StreamReceiveSetEnabled(TRUE) will NOT
+          // queue a recv flush while a read is still pending
+          // (ReadPendingLength > 0). By enabling first and then completing
+          // recv with 0, the completion itself drives the flush
+          // (QuicStreamReceiveComplete re-flushes once ReceiveEnabled is
+          // TRUE), so delivery does not depend on the enable-time flush guard.
+          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
           if (s_ctx->is_recv_pending)
             {
+              // Complete the pending recv (consuming 0 bytes) so the data is
+              // re-indicated now that receives are re-enabled.
               MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
             }
-          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
         }
       if (!set_owner_recv_mode(s_ctx->owner, env, optval))
         {

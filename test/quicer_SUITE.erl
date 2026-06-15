@@ -68,6 +68,8 @@
     %% , tc_stream_sendrecv_large_data_passive_2/1
     tc_stream_sendrecv_large_data_active/1,
     tc_stream_passive_switch_to_active/1,
+    tc_stream_passive_partial_recv_switch_to_active_n/1,
+    tc_stream_passive_pending_switch_to_active_n/1,
     tc_stream_active_switch_to_passive/1,
     tc_stream_controlling_process/1,
     tc_stream_controlling_process_demon/1,
@@ -579,6 +581,66 @@ tc_stream_passive_switch_to_active(Config) ->
             ensure_server_exit_normal(Ref)
     after 6000 ->
         ct:fail("timeout")
+    end.
+
+%% @doc A partial passive recv must not strand the remaining data when switching to {active, N}.
+tc_stream_passive_partial_recv_switch_to_active_n(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready ->
+            %% GIVEN: a passive stream that has received a single 10-byte frame,
+            %%        of which only 1 byte is consumed by a passive recv. The
+            %%        partial completion pauses msquic receives and leaves 9
+            %%        bytes buffered.
+            {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+            {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+            {ok, 10} = quicer:send(Stm, <<"0123456789">>),
+            {ok, <<"0">>} = quicer:recv(Stm, 1),
+            %% WHEN: the stream is switched to active mode.
+            ok = quicer:setopt(Stm, active, 3),
+            %% THEN: the buffered remaining 9 bytes are delivered as active messages.
+            <<"123456789">> = recv_active_bytes(Stm, 9, 5000),
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
+    after 6000 ->
+        ct:fail("timeout")
+    end.
+
+%% @doc A pending (un-recv'd) passive receive must be delivered after switching to {active, N}.
+tc_stream_passive_pending_switch_to_active_n(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready ->
+            %% GIVEN: a passive stream with received data left pending, i.e. the
+            %%        owner never calls recv, so the recv callback pends it
+            %%        (is_recv_pending = TRUE) without signalling the owner.
+            {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+            {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+            {ok, 10} = quicer:send(Stm, <<"0123456789">>),
+            timer:sleep(300),
+            %% WHEN: the stream is switched to active mode.
+            ok = quicer:setopt(Stm, active, 3),
+            %% THEN: the pending receive is completed and re-indicated as active messages.
+            <<"0123456789">> = recv_active_bytes(Stm, 10, 5000),
+            SPid ! done,
+            ensure_server_exit_normal(Ref)
+    after 6000 ->
+        ct:fail("timeout")
+    end.
+
+%% Collect `N' bytes worth of active-mode stream data messages for `Stm'.
+recv_active_bytes(_Stm, 0, _Timeout) ->
+    <<>>;
+recv_active_bytes(Stm, N, Timeout) when N > 0 ->
+    receive
+        {quic, Bin, Stm, _Props} when is_binary(Bin) ->
+            <<Bin/binary, (recv_active_bytes(Stm, N - byte_size(Bin), Timeout))/binary>>
+    after Timeout ->
+        ct:fail("timeout waiting for ~p more active bytes on ~p", [N, Stm])
     end.
 
 tc_stream_active_switch_to_passive(Config) ->

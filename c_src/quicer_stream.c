@@ -785,14 +785,16 @@ recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       TP_NIF_3(more, (uintptr_t)s_ctx->Stream, size_req);
       s_ctx->is_wait_for_data = TRUE;
 
-      // Finish the stream recv callback
-      if (s_ctx->is_recv_pending)
-        {
-          MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-        }
       //
-      // Ensure stream recv is enabled while it is in passive mode.
-      // because we are waiting for more data
+      // Ensure stream recv is enabled while it is in passive mode,
+      // because we are waiting for more data.
+      //
+      // Enable BEFORE finishing any pending recv callback: in single
+      // recv-buffer mode StreamReceiveSetEnabled(TRUE) won't flush while a
+      // read is still pending, so we let the completion drive the flush
+      // instead (see the matching note in set_stream_opt). On this branch
+      // is_recv_pending is normally FALSE, so the completion is just a safety
+      // net.
       //
       if (QUIC_FAILED(status
                       = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))
@@ -800,12 +802,14 @@ recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           res = ERROR_TUPLE_2(ATOM_STATUS(status));
           goto Exit;
         }
-      else
+      // Finish the stream recv callback
+      if (s_ctx->is_recv_pending)
         {
-          // NIF caller will get {ok, not_ready}
-          // this is an ack to its call
-          res = SUCCESS(ATOM_ERROR_NOT_READY);
+          MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
         }
+      // NIF caller will get {ok, not_ready}
+      // this is an ack to its call
+      res = SUCCESS(ATOM_ERROR_NOT_READY);
     }
 
 Exit:
