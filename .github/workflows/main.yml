@@ -53,6 +53,14 @@ jobs:
           export QUICER_TLS_VER=sys
           make ci
 
+      - name: Archive CT Logs
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        if: failure()
+        with:
+          name: linux-ct-logs-${{ matrix.otp }}-precheck
+          path: _build/test/
+          retention-days: 2
+
       - name: kill switch test
         run: |
           rm -rf priv/*
