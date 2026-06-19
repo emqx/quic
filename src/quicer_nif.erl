@@ -16,6 +16,7 @@
 -module(quicer_nif).
 -export([
     open_lib/0,
+    open_lib/1,
     close_lib/0,
     reg_open/0,
     reg_open/1,
