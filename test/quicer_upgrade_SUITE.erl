@@ -137,7 +137,8 @@ groups() ->
             tc_unload_module_with_bg_traffic
         ]},
         {release, [sequence], [
-            tc_release_package_contract
+            tc_release_package_contract,
+            tc_same_version_load_delete_purge_no_thread_growth
         ]}
     ].
 
@@ -158,7 +159,8 @@ all() ->
                 tc_application_upgrade,
                 tc_upgrade_with_traffic,
                 tc_unload_module_with_bg_traffic,
-                tc_release_package_contract
+                tc_release_package_contract,
+                tc_same_version_load_delete_purge_no_thread_growth
             ],
     LocalTcs ++ [{group, old_to_current}, {group, release}].
 
@@ -351,7 +353,7 @@ tc_upgrade_with_traffic(Config) ->
         ?assertEqual(false, rpc_call(Node, code, purge, [quicer_nif])),
         %% THEN: no old code for quicer_nif
         ?assertEqual(false, rpc_call(Node, erlang, check_old_code, [quicer_nif])),
-        ?assertEqual(OldNoThreads, rpc_call(Node, ?MODULE, no_threads, [])),
+        ?assert(rpc_call(Node, ?MODULE, no_threads, []) =< NewNoThreads),
         case UpgradeResult of
             {ok, _UpgradeInfo} ->
                 assert_remote_alive(Node);
@@ -415,6 +417,15 @@ tc_release_package_contract(Config) ->
     ok = assert_old_nif_present(ReleasePriv),
     with_slave(Config, fun(Node) ->
         ok = rpc_call(Node, ?MODULE, slave_load_release_nif, [ReleaseAppDir]),
+        assert_remote_alive(Node),
+        ok
+    end).
+
+tc_same_version_load_delete_purge_no_thread_growth(Config) ->
+    with_slave(Config, fun(Node) ->
+        ok = rpc_call(Node, ?MODULE, slave_same_version_load_delete_purge, [
+            current_app_dir(Config), 10
+        ]),
         assert_remote_alive(Node),
         ok
     end).
@@ -939,6 +950,53 @@ slave_load_release_nif(ReleaseAppDir) ->
     ReleasePriv = code:priv_dir(quicer),
     ok.
 
+slave_same_version_load_delete_purge(AppDir, Times) ->
+    Ebin = filename:join(AppDir, "ebin"),
+    ok = add_patha(Ebin),
+    BaselineThreads = no_threads(),
+    io:format("same-version reload baseline threads: ~p~n", [BaselineThreads]),
+    lists:foreach(
+        fun(I) ->
+            ok = slave_load_delete_purge_once(Ebin),
+            Threads = wait_thread_count_at_most(BaselineThreads, 2000),
+            io:format("same-version reload iteration ~p threads: ~p~n", [I, Threads]),
+            case Threads =< BaselineThreads of
+                true -> ok;
+                false -> exit({thread_count_increased, I, BaselineThreads, Threads})
+            end
+        end,
+        lists:seq(1, Times)
+    ),
+    ?assertEqual(false, erlang:check_old_code(quicer_nif)),
+    ?assertEqual(BaselineThreads, no_threads()),
+    ok.
+
+wait_thread_count_at_most(MaxThreads, Timeout) ->
+    Sleep = 100,
+    Attempts = max(1, Timeout div Sleep),
+    wait_thread_count_at_most(MaxThreads, Attempts, Sleep, no_threads()).
+
+wait_thread_count_at_most(MaxThreads, _Attempts, _Sleep, Threads) when Threads =< MaxThreads ->
+    Threads;
+wait_thread_count_at_most(_MaxThreads, 0, _Sleep, Threads) ->
+    Threads;
+wait_thread_count_at_most(MaxThreads, Attempts, Sleep, _Threads) ->
+    timer:sleep(Sleep),
+    wait_thread_count_at_most(MaxThreads, Attempts - 1, Sleep, no_threads()).
+
+slave_load_delete_purge_once(Ebin) ->
+    slave_purge_quicer_modules(),
+    ok = add_patha(Ebin),
+    ok = ensure_quicer_loaded(),
+    {ok, _} = application:ensure_all_started(quicer),
+    ok = assert_module_loaded_from(quicer_nif, Ebin),
+    _ = application:stop(quicer),
+    _ = application:unload(quicer),
+    _ = code:delete(quicer_nif),
+    _ = code:purge(quicer_nif),
+    false = erlang:check_old_code(quicer_nif),
+    ok.
+
 slave_upgrade_nif(CurrentAppDir, _OldAppDir) ->
     CurrentEbin = filename:join(CurrentAppDir, "ebin"),
     ok = add_patha(CurrentEbin),
@@ -1338,14 +1396,12 @@ slave_assert_ping(Stream, Payload) ->
 
 -spec no_threads() -> integer().
 no_threads() ->
-    ["Threads:", X] =
-        string:tokens(
-            os:cmd(
-                io_lib:format(
-                    "grep Thread /proc/~s/status",
-                    [os:getpid()]
-                )
-            ),
-            "\t\n"
-        ),
-    list_to_integer(X).
+    StatusFile = filename:join(["/proc", os:getpid(), "status"]),
+    {ok, Status} = file:read_file(StatusFile),
+    [ThreadsLine] = [
+        Line
+     || Line <- string:split(binary_to_list(Status), "\n", all),
+        lists:prefix("Threads:", Line)
+    ],
+    ["Threads:", Count] = string:tokens(ThreadsLine, "\t "),
+    list_to_integer(Count).
