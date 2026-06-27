@@ -43,6 +43,10 @@ jobs:
         with:
           otp-version: ${{ matrix.otp }}
           rebar3-version: ${{ matrix.rebar3 }}
+      - name: Start epmd
+        run: |
+          epmd -daemon
+          epmd -names
       - name: release build with debug log off
         run: |
           echo "github ref: ${{ github.event.ref }}"
@@ -101,6 +105,10 @@ jobs:
           export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
           brew install erlang@${{ matrix.otp }}
           echo "$(brew --prefix erlang@${{ matrix.otp }})/bin" >> $GITHUB_PATH
+      - name: Start epmd
+        run: |
+          epmd -daemon
+          epmd -names
       - name: release build
         env:
           QUICER_TLS_VER: ${{ matrix.openssl }}
@@ -165,6 +173,10 @@ jobs:
         with:
           otp-version: ${{ matrix.otp }}
           rebar3-version: ${{ matrix.rebar3 }}
+      - name: Start epmd
+        run: |
+          epmd -daemon
+          epmd -names
       - name: release build with debug log off
         env:
           CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
