@@ -327,7 +327,8 @@ tc_upgrade_with_traffic(Config) ->
     with_slave(Config, fun(Node) ->
         Port = select_free_port(quic),
         {ok, OldVsn} = rpc_call(Node, ?MODULE, slave_start_old_application, []),
-        OldNoThreads = rpc_call(Node, ?MODULE, no_threads, []),
+        CheckThreads = rpc_call(Node, ?MODULE, thread_count_check_supported, []),
+        OldNoThreads = maybe_no_threads(Node, CheckThreads),
         %% GIVEN: slave node is running traffic
         ?assertEqual(OldVsn, old_version()),
         {ok, Pair} = rpc_call(Node, ?MODULE, slave_start_ping_pair, [Config, Port]),
@@ -340,12 +341,12 @@ tc_upgrade_with_traffic(Config) ->
         ),
         ct:pal("upgrade-with-traffic NIF reload result: ~p", [UpgradeResult]),
         timer:sleep(1000),
-        NewNoThreads = rpc_call(Node, ?MODULE, no_threads, []),
+        NewNoThreads = maybe_no_threads(Node, CheckThreads),
 
         assert_remote_alive(Node),
         %% THEN: old code is still in use and new code spawn more worker treads
         ?assertEqual(true, rpc_call(Node, erlang, check_old_code, [quicer_nif])),
-        ?assertEqual(NewNoThreads, OldNoThreads + erlang:system_info(schedulers)),
+        maybe_assert_thread_growth(OldNoThreads, NewNoThreads),
         %% WHEN: we purge the code after stopped the traffic and the listener.
         ok = rpc_call(Node, ?MODULE, slave_stop_ping_pair, [Pair]),
         ct:pal("rpc slave_stop_ping_pair ok"),
@@ -353,7 +354,7 @@ tc_upgrade_with_traffic(Config) ->
         ?assertEqual(false, rpc_call(Node, code, purge, [quicer_nif])),
         %% THEN: no old code for quicer_nif
         ?assertEqual(false, rpc_call(Node, erlang, check_old_code, [quicer_nif])),
-        ?assert(rpc_call(Node, ?MODULE, no_threads, []) =< NewNoThreads),
+        maybe_assert_thread_count_at_most(Node, CheckThreads, NewNoThreads),
         case UpgradeResult of
             {ok, _UpgradeInfo} ->
                 assert_remote_alive(Node);
@@ -929,6 +930,21 @@ assert_remote_alive(Node) ->
     true = rpc_call(Node, erlang, is_alive, []),
     ok.
 
+maybe_no_threads(Node, true) ->
+    rpc_call(Node, ?MODULE, no_threads, []);
+maybe_no_threads(_Node, false) ->
+    unsupported.
+
+maybe_assert_thread_growth(unsupported, unsupported) ->
+    ok;
+maybe_assert_thread_growth(OldNoThreads, NewNoThreads) ->
+    ?assertEqual(NewNoThreads, OldNoThreads + erlang:system_info(schedulers)).
+
+maybe_assert_thread_count_at_most(_Node, false, _MaxThreads) ->
+    ok;
+maybe_assert_thread_count_at_most(Node, true, MaxThreads) ->
+    ?assert(rpc_call(Node, ?MODULE, no_threads, []) =< MaxThreads).
+
 %% Functions executed on the slave node.
 
 slave_load_old_quicer() ->
@@ -953,21 +969,37 @@ slave_load_release_nif(ReleaseAppDir) ->
 slave_same_version_load_delete_purge(AppDir, Times) ->
     Ebin = filename:join(AppDir, "ebin"),
     ok = add_patha(Ebin),
-    BaselineThreads = no_threads(),
+    CheckThreads = thread_count_check_supported(),
+    BaselineThreads =
+        case CheckThreads of
+            true -> no_threads();
+            false -> unsupported
+        end,
     io:format("same-version reload baseline threads: ~p~n", [BaselineThreads]),
     lists:foreach(
         fun(I) ->
             ok = slave_load_delete_purge_once(Ebin),
-            Threads = wait_thread_count_at_most(BaselineThreads, 2000),
-            io:format("same-version reload iteration ~p threads: ~p~n", [I, Threads]),
-            case Threads =< BaselineThreads of
-                true -> ok;
-                false -> exit({thread_count_increased, I, BaselineThreads, Threads})
-            end
+            ok = maybe_assert_same_version_thread_count(I, BaselineThreads)
         end,
         lists:seq(1, Times)
     ),
     ?assertEqual(false, erlang:check_old_code(quicer_nif)),
+    ok = maybe_assert_final_thread_count(BaselineThreads),
+    ok.
+
+maybe_assert_same_version_thread_count(_I, unsupported) ->
+    ok;
+maybe_assert_same_version_thread_count(I, BaselineThreads) ->
+    Threads = wait_thread_count_at_most(BaselineThreads, 2000),
+    io:format("same-version reload iteration ~p threads: ~p~n", [I, Threads]),
+    case Threads =< BaselineThreads of
+        true -> ok;
+        false -> exit({thread_count_increased, I, BaselineThreads, Threads})
+    end.
+
+maybe_assert_final_thread_count(unsupported) ->
+    ok;
+maybe_assert_final_thread_count(BaselineThreads) ->
     ?assertEqual(BaselineThreads, no_threads()),
     ok.
 
@@ -1396,6 +1428,7 @@ slave_assert_ping(Stream, Payload) ->
 
 -spec no_threads() -> integer().
 no_threads() ->
+    true = thread_count_check_supported(),
     StatusFile = filename:join(["/proc", os:getpid(), "status"]),
     {ok, Status} = file:read_file(StatusFile),
     [ThreadsLine] = [
@@ -1405,3 +1438,6 @@ no_threads() ->
     ],
     ["Threads:", Count] = string:tokens(ThreadsLine, "\t "),
     list_to_integer(Count).
+
+thread_count_check_supported() ->
+    os:type() =:= {unix, linux}.
