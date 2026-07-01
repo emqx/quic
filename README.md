@@ -25,7 +25,7 @@ Project Status: Preview
 
 ``` erlang
 {deps, [
-    {quicer, {git, "https://github.com/emqx/quic.git", {tag, "0.2.4"}}},
+    {quicer, {git, "https://github.com/emqx/quic.git", {tag, "0.4.4"}}},
     ...
 ```
 
@@ -34,7 +34,7 @@ Project Status: Preview
 ``` elixir
 defp deps do
   [
-    {:quicer, git: "https://github.com/emqx/quic.git", tag: "0.2.4"},
+    {:quicer, git: "https://github.com/emqx/quic.git", tag: "0.4.4"},
     ...
   ]
 end
@@ -153,6 +153,10 @@ Client could specify the connect param `sslkeylogfile` to record tls secrets for
         5000
     )
 ```
+
+# Hot upgrade
+
+Supports patch-level hot upgrades only (e.g., a.b.x -> a.b.y).
 
 # License
 Apache License Version 2.0
