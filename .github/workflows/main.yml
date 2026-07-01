@@ -43,6 +43,10 @@ jobs:
         with:
           otp-version: ${{ matrix.otp }}
           rebar3-version: ${{ matrix.rebar3 }}
+      - name: Start epmd
+        run: |
+          epmd -daemon
+          epmd -names
       - name: release build with debug log off
         run: |
           echo "github ref: ${{ github.event.ref }}"
@@ -52,6 +56,19 @@ jobs:
           export CMAKE_BUILD_TYPE=Debug
           export QUICER_TLS_VER=sys
           make ci
+
+      - name: gdb bt
+        if: failure()
+        run: |
+          set -x
+          which gdb || sudo apt install gdb
+          corefile=$(find _build/test -name core)
+          if [ -n "$corefile" ]; then
+          echo "found corefile: $corefile";
+          gdb -ex bt $(erl -noshell -eval 'io:format(code:root_dir()),halt()')/erts-*/bin/beam.smp "${corefile}"
+          else
+          echo "No coredump found"
+          fi
 
       - name: Archive CT Logs
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
@@ -101,6 +118,10 @@ jobs:
           export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
           brew install erlang@${{ matrix.otp }}
           echo "$(brew --prefix erlang@${{ matrix.otp }})/bin" >> $GITHUB_PATH
+      - name: Start epmd
+        run: |
+          epmd -daemon
+          epmd -names
       - name: release build
         env:
           QUICER_TLS_VER: ${{ matrix.openssl }}
@@ -141,7 +162,7 @@ jobs:
       matrix:
         # https://builds.hex.pm/builds/otp/ubuntu-22.04/builds.txt
         otp:
-          - '26.2.5.14'
+          - '26.2.5.21'
           - '27.3'
           - '28.3'
         openssl:
@@ -165,6 +186,10 @@ jobs:
         with:
           otp-version: ${{ matrix.otp }}
           rebar3-version: ${{ matrix.rebar3 }}
+      - name: Start epmd
+        run: |
+          epmd -daemon
+          epmd -names
       - name: release build with debug log off
         env:
           CMAKE_BUILD_TYPE: ${{ matrix.build_type }}
