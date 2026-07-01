@@ -131,13 +131,18 @@ groups() ->
     [
         {old_to_current, [sequence], [
             tc_upgrade_basic_nif_reload,
+            tc_application_upgrade_with_conn,
+            tc_application_upgrade_with_listener,
             tc_upgrade_soft_and_hard_purge,
             tc_application_upgrade,
             tc_upgrade_with_traffic,
             tc_unload_module_with_bg_traffic
         ]},
         {release, [sequence], [
-            tc_release_package_contract,
+            tc_release_package_contract
+        ]},
+        {same_version_upgrade, [sequence], [
+            tc_same_version_upgrade_basic_nif_reload,
             tc_same_version_load_delete_purge_no_thread_growth
         ]}
     ].
@@ -157,12 +162,15 @@ all() ->
                 tc_upgrade_basic_nif_reload,
                 tc_upgrade_soft_and_hard_purge,
                 tc_application_upgrade,
+                tc_application_upgrade_with_conn,
+                tc_application_upgrade_with_listener,
                 tc_upgrade_with_traffic,
                 tc_unload_module_with_bg_traffic,
                 tc_release_package_contract,
+                tc_same_version_upgrade_basic_nif_reload,
                 tc_same_version_load_delete_purge_no_thread_growth
             ],
-    LocalTcs ++ [{group, old_to_current}, {group, release}].
+    LocalTcs ++ [{group, old_to_current}, {group, release}, {group, same_version_upgrade}].
 
 %%--------------------------------------------------------------------
 %% @spec TestCase(Config0) ->
@@ -276,6 +284,7 @@ tc_upgrade_basic_nif_reload(Config) ->
         ?assertEqual(1, maps:get(abi_version, Info)),
         %% THEN: 'old' code exists
         true = rpc_call(Node, erlang, check_old_code, [quicer_nif]),
+        assert_remote_schedulers_not_blocked(Node),
         ok
     end).
 
@@ -301,6 +310,67 @@ tc_upgrade_soft_and_hard_purge(Config) ->
         %% THEN: old code is purged.
         false = rpc_call(Node, erlang, check_old_code, [quicer_nif]),
         assert_remote_alive(Node),
+        assert_remote_schedulers_not_blocked(Node),
+        ok
+    end).
+
+tc_application_upgrade_with_conn(Config) ->
+    with_slave(Config, fun(Node) ->
+        %% GIVEN: when slave runs old vsn app
+        {ok, OldVsn} = rpc_call(Node, ?MODULE, slave_start_old_application, []),
+        ?assertEqual(old_version(Config), OldVsn),
+
+        {ok, Conn1} = rpc_call(Node, quicer, open_connection, []),
+        {ok, Conn2} = rpc_call(Node, quicer, open_connection, []),
+        {ok, Cnts} = rpc_call(Node, quicer, perf_counters, []),
+        ?assertEqual(2, proplists:get_value(conn_active, Cnts)),
+        _ = rpc_call(Node, quicer, close_connection, [
+            Conn1, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0, 1000
+        ]),
+        _ = rpc_call(Node, quicer, close_connection, [
+            Conn2, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0, 1000
+        ]),
+        {ok, Cnts2} = rpc_call(Node, quicer, perf_counters, []),
+        ?assertEqual(0, proplists:get_value(conn_active, Cnts2)),
+
+        %% WHEN: upgrade app with release handler
+        {ok, UpgradeInfo} = rpc_call(
+            Node,
+            ?MODULE,
+            slave_upgrade_application,
+            [current_app_dir(Config), old_app_dir(Config)]
+        ),
+        assert_remote_alive(Node),
+        %% THEN: app vsn is switched to new
+        ?assertEqual(current_version(Config), maps:get(vsn, UpgradeInfo)),
+        ?assertEqual(current_priv_dir(Config), maps:get(priv_dir, UpgradeInfo)),
+        assert_remote_schedulers_not_blocked(Node),
+        ok
+    end).
+
+tc_application_upgrade_with_listener(Config) ->
+    with_slave(Config, fun(Node) ->
+        %% GIVEN: when slave runs old vsn app
+        {ok, OldVsn} = rpc_call(Node, ?MODULE, slave_start_old_application, []),
+        ?assertEqual(old_version(Config), OldVsn),
+        LConfig = quicer_test_lib:default_listen_opts(Config),
+        Port = quicer_test_lib:select_free_port(udp),
+        {ok, L} = rpc_call(Node, quicer, listen, [Port, LConfig]),
+
+        rpc_call(Node, ?MODULE, slave_stop_all_listeners, []),
+
+        %% WHEN: upgrade app with release handler
+        {ok, UpgradeInfo} = rpc_call(
+            Node,
+            ?MODULE,
+            slave_upgrade_application,
+            [current_app_dir(Config), old_app_dir(Config)]
+        ),
+        assert_remote_alive(Node),
+        %% THEN: app vsn is switched to new
+        ?assertEqual(current_version(Config), maps:get(vsn, UpgradeInfo)),
+        ?assertEqual(current_priv_dir(Config), maps:get(priv_dir, UpgradeInfo)),
+        assert_remote_schedulers_not_blocked(Node),
         ok
     end).
 
@@ -320,6 +390,7 @@ tc_application_upgrade(Config) ->
         %% THEN: app vsn is switched to new
         ?assertEqual(current_version(Config), maps:get(vsn, UpgradeInfo)),
         ?assertEqual(current_priv_dir(Config), maps:get(priv_dir, UpgradeInfo)),
+        assert_remote_schedulers_not_blocked(Node),
         ok
     end).
 
@@ -350,8 +421,16 @@ tc_upgrade_with_traffic(Config) ->
         %% WHEN: we purge the code after stopped the traffic and the listener.
         ok = rpc_call(Node, ?MODULE, slave_stop_ping_pair, [Pair]),
         ct:pal("rpc slave_stop_ping_pair ok"),
+
+        timer:sleep(3000),
+
+        %%% @WHEN: conns and listeners are killed.
+        rpc_call(Node, ?MODULE, slave_stop_all_conns, []),
+        rpc_call(Node, ?MODULE, slave_stop_all_listeners, []),
+
         %% THEN: purge success and no killed process.
-        ?assertEqual(false, rpc_call(Node, code, purge, [quicer_nif])),
+        ?assertEqual(1, rpc:call(Node, quicer, get_registration_refcnt, [global], 60000)),
+        ?assertEqual(false, rpc:call(Node, code, purge, [quicer_nif], 60000)),
         %% THEN: no old code for quicer_nif
         ?assertEqual(false, rpc_call(Node, erlang, check_old_code, [quicer_nif])),
         maybe_assert_thread_count_at_most(Node, CheckThreads, NewNoThreads),
@@ -419,6 +498,30 @@ tc_release_package_contract(Config) ->
     with_slave(Config, fun(Node) ->
         ok = rpc_call(Node, ?MODULE, slave_load_release_nif, [ReleaseAppDir]),
         assert_remote_alive(Node),
+        assert_remote_schedulers_not_blocked(Node),
+        ok
+    end).
+
+tc_same_version_upgrade_basic_nif_reload(Config) ->
+    SameAppDir = same_version_app_dir(Config),
+    ok = copy_app_dir(current_app_dir(Config), SameAppDir),
+    with_slave(Config, fun(Node) ->
+        CurrentPriv = rpc_call(Node, ?MODULE, slave_load_current_quicer, [current_app_dir(Config)]),
+        assert_remote_alive(Node),
+        ?assertEqual(current_priv_dir(Config), CurrentPriv),
+        {ok, Info} = rpc_call(
+            Node,
+            ?MODULE,
+            slave_upgrade_nif,
+            [SameAppDir, current_app_dir(Config)]
+        ),
+        assert_remote_alive(Node),
+        ?assertEqual(filename:join(SameAppDir, "priv"), maps:get(priv_dir, Info)),
+        ?assertEqual(1, maps:get(abi_version, Info)),
+        true = rpc_call(Node, erlang, check_old_code, [quicer_nif]),
+        true = rpc_call(Node, code, soft_purge, [quicer_nif]),
+        false = rpc_call(Node, erlang, check_old_code, [quicer_nif]),
+        assert_remote_schedulers_not_blocked(Node),
         ok
     end).
 
@@ -428,6 +531,7 @@ tc_same_version_load_delete_purge_no_thread_growth(Config) ->
             current_app_dir(Config), 10
         ]),
         assert_remote_alive(Node),
+        assert_remote_schedulers_not_blocked(Node),
         ok
     end).
 
@@ -527,11 +631,18 @@ old_app_dir(Config) ->
 current_app_dir(Config) ->
     ?config(current_quicer_app_dir, Config).
 
+same_version_app_dir(Config) ->
+    filename:join([?config(priv_dir, Config), "same_version_upgrade", "quicer"]).
+
 old_priv_dir(Config) ->
     filename:join(old_app_dir(Config), "priv").
 
 current_priv_dir(Config) ->
     filename:join(current_app_dir(Config), "priv").
+
+copy_app_dir(From, To) ->
+    ok = ensure_clean_dir(To),
+    copy_dir_files(From, To).
 
 env_or_default(Name, Default) ->
     case os:getenv(Name) of
@@ -920,7 +1031,7 @@ rpc_call(Node, M, F, A) ->
 rpc_call(Node, M, F, A, Timeout) ->
     case rpc:call(Node, M, F, A, Timeout) of
         {badrpc, Reason} ->
-            ct:fail({rpc_failed, Node, M, F, A, Reason});
+            ct:fail("~p", [{rpc_failed, Node, M, F, A, Reason}]);
         Result ->
             Result
     end.
@@ -928,6 +1039,10 @@ rpc_call(Node, M, F, A, Timeout) ->
 assert_remote_alive(Node) ->
     pong = net_adm:ping(Node),
     true = rpc_call(Node, erlang, is_alive, []),
+    ok.
+
+assert_remote_schedulers_not_blocked(Node) ->
+    ok = rpc_call(Node, ?MODULE, assert_schedulers_not_blocked, []),
     ok.
 
 maybe_no_threads(Node, true) ->
@@ -953,6 +1068,17 @@ slave_load_old_quicer() ->
     {ok, _} = application:ensure_all_started(quicer),
     OldEbin = code:lib_dir(quicer, ebin),
     ok = assert_module_loaded_from(quicer_nif, OldEbin),
+    code:priv_dir(quicer).
+
+slave_load_current_quicer(CurrentAppDir) ->
+    slave_purge_quicer_modules(),
+    CurrentEbin = filename:join(CurrentAppDir, "ebin"),
+    CurrentPriv = filename:join(CurrentAppDir, "priv"),
+    ok = add_patha(CurrentEbin),
+    ok = ensure_quicer_loaded(),
+    {ok, _} = application:ensure_all_started(quicer),
+    ok = assert_module_loaded_from(quicer_nif, CurrentEbin),
+    CurrentPriv = code:priv_dir(quicer),
     code:priv_dir(quicer).
 
 slave_load_release_nif(ReleaseAppDir) ->
@@ -1066,14 +1192,18 @@ slave_start_old_application() ->
     {ok, Vsn}.
 
 slave_upgrade_application(CurrentAppDir, OldAppDir) ->
+    io:format("upgrade_app start ~p", [OldAppDir]),
     CurrentEbin = filename:join(CurrentAppDir, "ebin"),
     OldEbin = filename:join(OldAppDir, "ebin"),
     case release_handler:upgrade_app(quicer, CurrentAppDir) of
-        {ok, _Unpurged} ->
+        {ok, Unpurged} ->
+            io:format("upgrade_app success ~p", [Unpurged]),
             ok;
         {error, {old_processes, _} = Reason} ->
+            io:format("upgrade_app failed ~p", [Reason]),
             exit(Reason);
         {error, Reason} ->
+            io:format("upgrade_app failed ~p", [Reason]),
             exit({upgrade_app_failed, Reason})
     end,
     ok = add_patha(CurrentEbin),
@@ -1323,17 +1453,20 @@ slave_ping_pair_loop(Server, Conn, Stream) ->
             slave_ping_pair_loop(Server, Conn, Stream);
         {stop, From, Ref} ->
             From ! {Ref, ok},
-            slave_ping_pair_stopped();
+            slave_ping_pair_stopped(Server);
         {'EXIT', Server, Reason} ->
             slave_ping_pair_loop({exited, Server, Reason}, Conn, Stream);
         {'EXIT', _Pid, _Reason} ->
             slave_ping_pair_loop(Server, Conn, Stream)
     end.
 
-slave_ping_pair_stopped() ->
+%% Park,  to keep slave node alive.
+slave_ping_pair_stopped(Server) ->
+    io:format("is client running old code: ~p", [erlang:check_process_code(self(), quicer_nif)]),
+    io:format("is server running old code: ~p", [erlang:check_process_code(Server, quicer_nif)]),
     receive
         _Any ->
-            slave_ping_pair_stopped()
+            slave_ping_pair_stopped(Server)
     end.
 
 slave_start_ping_server(Config, Port) ->
@@ -1410,8 +1543,13 @@ slave_ping_server_loop(Listener, Conn, Stream) ->
         stop ->
             io:format("server loop stop"),
             _ = quicer:close_connection(Conn),
+            %            _ = quicer:stop_listener(Listener),
             _ = quicer:close_listener(Listener),
-            ok
+            io:format("server listener stopped"),
+            %% long parking
+            receive
+                unblock -> ok
+            end
     end.
 
 slave_assert_ping(Stream, Payload) ->
@@ -1425,6 +1563,23 @@ slave_assert_ping(Stream, Payload) ->
         Error ->
             {error, {send_failed, Error}}
     end.
+
+slave_stop_all_listeners() ->
+    lists:foreach(
+        fun(L) ->
+            _ = quicer:stop_listener(L),
+            _ = quicer:close_listener(L)
+        end,
+        quicer:get_listeners(global)
+    ).
+
+slave_stop_all_conns() ->
+    lists:foreach(
+        fun(C) ->
+            _ = quicer:close_connection(C, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0, 1000)
+        end,
+        quicer:get_connections(global)
+    ).
 
 -spec no_threads() -> integer().
 no_threads() ->
@@ -1441,3 +1596,38 @@ no_threads() ->
 
 thread_count_check_supported() ->
     os:type() =:= {unix, linux}.
+
+assert_schedulers_not_blocked() ->
+    Parent = self(),
+    Workers = [
+        begin
+            {Pid, MonitorRef} = spawn_opt(
+                fun() ->
+                    Parent ! {scheduler_probe, self(), Scheduler, erlang:system_info(scheduler_id)}
+                end,
+                [monitor, {scheduler, Scheduler}]
+            ),
+            {Scheduler, Pid, MonitorRef}
+        end
+     || Scheduler <- lists:seq(1, erlang:system_info(schedulers_online))
+    ],
+    lists:foreach(fun collect_scheduler_probe/1, Workers),
+    ok.
+
+collect_scheduler_probe({Scheduler, Pid, MonitorRef}) ->
+    receive
+        {scheduler_probe, Pid, Scheduler, Scheduler} ->
+            ok;
+        {scheduler_probe, Pid, Scheduler, ActualScheduler} ->
+            exit({scheduler_probe_wrong_scheduler, Scheduler, ActualScheduler})
+    after 5000 ->
+        exit({scheduler_probe_timeout, Scheduler})
+    end,
+    receive
+        {'DOWN', MonitorRef, process, Pid, normal} ->
+            ok;
+        {'DOWN', MonitorRef, process, Pid, Reason} ->
+            exit({scheduler_probe_exit, Scheduler, Reason})
+    after 5000 ->
+        exit({scheduler_probe_down_timeout, Scheduler})
+    end.
