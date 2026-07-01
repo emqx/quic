@@ -94,6 +94,19 @@ end_per_group(_GroupName, _Config) ->
 %% Reason = term()
 %% @end
 %%--------------------------------------------------------------------
+init_per_testcase(Name, Config) when
+    Name =:= tc_unload_module_with_bg_traffic orelse
+        Name =:= tc_upgrade_with_traffic orelse
+        Name =:= tc_application_upgrade_on_ct_node
+->
+    Current = lists:sublist(string:tokens(current_version(Config), "."), 2),
+    case lists:sublist(string:tokens(old_version(), "."), 2) of
+        Current ->
+            Config;
+        _ ->
+            %% skip if mismatch current major, minor
+            {skip, "unsupported_upgrade_path "}
+    end;
 init_per_testcase(TestCase, Config) ->
     case erlang:function_exported(?MODULE, TestCase, 2) of
         false ->
@@ -131,9 +144,11 @@ groups() ->
     [
         {old_to_current, [sequence], [
             tc_upgrade_basic_nif_reload,
+            tc_code_upgrade_on_ct_node,
             tc_application_upgrade_with_conn,
             tc_application_upgrade_with_listener,
             tc_upgrade_soft_and_hard_purge,
+            tc_application_upgrade_on_ct_node,
             tc_application_upgrade,
             tc_upgrade_with_traffic,
             tc_unload_module_with_bg_traffic
@@ -160,8 +175,10 @@ all() ->
         quicer_test_lib:all_tcs(?MODULE) --
             [
                 tc_upgrade_basic_nif_reload,
+                tc_code_upgrade_on_ct_node,
                 tc_upgrade_soft_and_hard_purge,
                 tc_application_upgrade,
+                tc_application_upgrade_on_ct_node,
                 tc_application_upgrade_with_conn,
                 tc_application_upgrade_with_listener,
                 tc_upgrade_with_traffic,
@@ -288,6 +305,43 @@ tc_upgrade_basic_nif_reload(Config) ->
         ok
     end).
 
+tc_code_upgrade_on_ct_node(Config) ->
+    try
+        %% GIVEN: CT node runs old vsn quicer
+        {ok, OldVsn} = local_start_old_application(Config),
+        ?assertEqual(old_version(Config), OldVsn),
+        ?assertEqual(old_priv_dir(Config), code:priv_dir(quicer)),
+        {ok, Conn} = quicer:open_connection(),
+        %% note, reg refcnt is bumped.
+        ?assertEqual(2, quicer:get_registration_refcnt(global)),
+        %_ = quicer:close_connection(Conn),
+        ?assertEqual(false, erlang:check_old_code(quicer_nif)),
+        %% WHEN we close the old conn with old code
+        _ = quicer:close_connection(Conn),
+        %% WHEN: CT node loads current quicer_nif from a different app dir
+        {ok, Info} = local_upgrade_nif(Config),
+        %% THEN: quicer_nif is loaded from current code and old code is visible
+        ?assertEqual(current_priv_dir(Config), maps:get(priv_dir, Info)),
+        ?assertEqual(1, maps:get(abi_version, Info)),
+        ?assertEqual(true, erlang:check_old_code(quicer_nif)),
+        ok = assert_schedulers_not_blocked(),
+        %% note, reg refcnt starts from 1 due to the new code loaded, new VMA.
+        ?assertEqual(1, quicer:get_registration_refcnt(global)),
+        ?assertEqual(1, quicer:get_registration_refcnt(global)),
+        {ok, Conn2} = quicer:open_connection(),
+        %% WHEN we close the new conn with new code
+        _ = quicer:close_connection(Conn2),
+        %% WHEN: old code is soft-purged
+        ?assertEqual(true, code:soft_purge(quicer_nif)),
+        %% WHEN: old code is purged
+        ?assertEqual(false, code:purge(quicer_nif)),
+        %% THEN: no old quicer_nif code remains
+        false = erlang:check_old_code(quicer_nif),
+        ok
+    after
+        local_cleanup_quicer(Config)
+    end.
+
 tc_upgrade_soft_and_hard_purge(Config) ->
     with_slave(Config, fun(Node) ->
         _ = rpc_call(Node, ?MODULE, slave_load_old_quicer, []),
@@ -355,7 +409,7 @@ tc_application_upgrade_with_listener(Config) ->
         ?assertEqual(old_version(Config), OldVsn),
         LConfig = quicer_test_lib:default_listen_opts(Config),
         Port = quicer_test_lib:select_free_port(udp),
-        {ok, L} = rpc_call(Node, quicer, listen, [Port, LConfig]),
+        {ok, _L} = rpc_call(Node, quicer, listen, [Port, LConfig]),
 
         rpc_call(Node, ?MODULE, slave_stop_all_listeners, []),
 
@@ -373,6 +427,23 @@ tc_application_upgrade_with_listener(Config) ->
         assert_remote_schedulers_not_blocked(Node),
         ok
     end).
+
+tc_application_upgrade_on_ct_node(Config) ->
+    try
+        %% GIVEN: CT node runs old vsn app from the prepared old dir
+        {ok, OldVsn} = local_start_old_application(Config),
+        ?assertEqual(old_version(Config), OldVsn),
+        %% WHEN: CT node upgrades app with release_handler
+        {ok, UpgradeInfo} = local_upgrade_application(Config),
+        %% THEN: app vsn is switched to new on the CT node
+        ?assertEqual(current_version(Config), maps:get(vsn, UpgradeInfo)),
+        ?assertEqual(current_priv_dir(Config), maps:get(priv_dir, UpgradeInfo)),
+        ok = assert_schedulers_not_blocked(),
+        ?assertEqual(false, erlang:check_old_code(quicer_nif)),
+        ok
+    after
+        local_cleanup_quicer(Config)
+    end.
 
 tc_application_upgrade(Config) ->
     with_slave(Config, fun(Node) ->
@@ -411,25 +482,16 @@ tc_upgrade_with_traffic(Config) ->
             [current_app_dir(Config), old_app_dir(Config), 5000]
         ),
         ct:pal("upgrade-with-traffic NIF reload result: ~p", [UpgradeResult]),
-        timer:sleep(1000),
         NewNoThreads = maybe_no_threads(Node, CheckThreads),
-
         assert_remote_alive(Node),
         %% THEN: old code is still in use and new code spawn more worker treads
         ?assertEqual(true, rpc_call(Node, erlang, check_old_code, [quicer_nif])),
         maybe_assert_thread_growth(OldNoThreads, NewNoThreads),
         %% WHEN: we purge the code after stopped the traffic and the listener.
         ok = rpc_call(Node, ?MODULE, slave_stop_ping_pair, [Pair]),
+        ?assertEqual(1, rpc_call(Node, quicer, get_registration_refcnt, [global])),
         ct:pal("rpc slave_stop_ping_pair ok"),
-
-        timer:sleep(3000),
-
-        %%% @WHEN: conns and listeners are killed.
-        rpc_call(Node, ?MODULE, slave_stop_all_conns, []),
-        rpc_call(Node, ?MODULE, slave_stop_all_listeners, []),
-
         %% THEN: purge success and no killed process.
-        ?assertEqual(1, rpc:call(Node, quicer, get_registration_refcnt, [global], 60000)),
         ?assertEqual(false, rpc:call(Node, code, purge, [quicer_nif], 60000)),
         %% THEN: no old code for quicer_nif
         ?assertEqual(false, rpc_call(Node, erlang, check_old_code, [quicer_nif])),
@@ -643,6 +705,57 @@ current_priv_dir(Config) ->
 copy_app_dir(From, To) ->
     ok = ensure_clean_dir(To),
     copy_dir_files(From, To).
+
+local_start_old_application(Config) ->
+    slave_purge_quicer_modules(),
+    OldEbin = filename:join(old_app_dir(Config), "ebin"),
+    ok = add_patha(OldEbin),
+    ok = ensure_quicer_loaded(),
+    {ok, _} = application:ensure_all_started(quicer),
+    ok = assert_module_loaded_from(quicer_nif, OldEbin),
+    {ok, Vsn} = application:get_key(quicer, vsn),
+    {ok, Vsn}.
+
+local_upgrade_nif(Config) ->
+    CurrentEbin = filename:join(current_app_dir(Config), "ebin"),
+    ok = add_patha(CurrentEbin),
+    case code:load_file(quicer_nif) of
+        {module, quicer_nif} -> ok;
+        {error, not_purged} -> ok
+    end,
+    ok = assert_module_loaded_from(quicer_nif, CurrentEbin),
+    {ok, #{
+        priv_dir => code:priv_dir(quicer),
+        abi_version => quicer:abi_version(),
+        loaded => code:is_loaded(quicer_nif)
+    }}.
+
+local_upgrade_application(Config) ->
+    CurrentAppDir = current_app_dir(Config),
+    OldAppDir = old_app_dir(Config),
+    CurrentEbin = filename:join(CurrentAppDir, "ebin"),
+    OldEbin = filename:join(OldAppDir, "ebin"),
+    case release_handler:upgrade_app(quicer, CurrentAppDir) of
+        {ok, _Unpurged} ->
+            ok;
+        {error, Reason} ->
+            ct:fail({local_upgrade_app_failed, Reason})
+    end,
+    ok = add_patha(CurrentEbin),
+    ok = assert_module_loaded_from(quicer_nif, CurrentEbin),
+    ok = assert_no_modules_loaded_from(OldEbin),
+    ok = assert_no_old_code(quicer_modules()),
+    {ok, Vsn} = application:get_key(quicer, vsn),
+    {ok, #{
+        vsn => Vsn,
+        priv_dir => code:priv_dir(quicer),
+        loaded => code:is_loaded(quicer_nif)
+    }}.
+
+local_cleanup_quicer(Config) ->
+    _ = catch slave_purge_quicer_modules(),
+    _ = code:add_patha(filename:join(current_app_dir(Config), "ebin")),
+    ok.
 
 env_or_default(Name, Default) ->
     case os:getenv(Name) of
@@ -1062,6 +1175,9 @@ maybe_assert_thread_count_at_most(Node, true, MaxThreads) ->
 
 %% Functions executed on the slave node.
 
+slave_sticky_quicer() ->
+    code:stick_dir(code:lib_dir(quicer) ++ "/ebin/").
+
 slave_load_old_quicer() ->
     slave_purge_quicer_modules(),
     ok = ensure_quicer_loaded(),
@@ -1420,54 +1536,77 @@ slave_stop_ping_pair(Pid) ->
             io:format("traffic pair stop reply ~p from ~p~n", [Result, Pid]),
             erlang:demonitor(Ref, [flush]),
             Result;
-        {'DOWN', Ref, process, Pid, _Reason} ->
-            io:format("traffic pair went down before stop reply ~p~n", [Pid]),
+        {'DOWN', Ref, process, Pid, Reason} ->
+            io:format("traffic pair went down before stop reply ~p reason=~p~n", [Pid, Reason]),
+            %exit({traffic_pair_down_before_stop_reply, Reason})
             ok
     after 30000 ->
         io:format("traffic pair stop timeout ~p~n", [Pid]),
         erlang:demonitor(Ref, [flush]),
         exit(Pid, kill),
-        ok
+        exit({traffic_pair_stop_timeout, Pid})
     end.
 
 slave_ping_pair_controller(Parent, Config, Port) ->
     process_flag(trap_exit, true),
     ListenOn = "127.0.0.1:" ++ integer_to_list(Port),
     try
+        slave_stop_trace(Config, controller_start, #{port => Port}),
         {ok, Listener} = quicer:listen(ListenOn, default_listen_opts(Config)),
         Server = spawn_link(fun() -> slave_ping_server_acceptor(Listener) end),
         {ok, Conn} = quicer:connect("127.0.0.1", Port, default_conn_opts(), 5000),
         {ok, Stream} = quicer:start_stream(Conn, [{active, true}]),
         ok = slave_assert_ping(Stream, <<"before-upgrade">>),
         Parent ! {self(), ready},
-        slave_ping_pair_loop(Server, Conn, Stream)
+        slave_ping_pair_loop(Config, Server, Conn, Stream)
     catch
         Class:Reason:Stacktrace ->
+            slave_stop_trace(Config, controller_failed, {Class, Reason, Stacktrace}),
             Parent ! {self(), failed, {Class, Reason, Stacktrace}}
     end.
 
-slave_ping_pair_loop(Server, Conn, Stream) ->
+slave_ping_pair_loop(Config, Server, Conn, Stream) ->
     receive
         {ping, From, Ref, Payload} ->
             From ! {Ref, slave_assert_ping(Stream, Payload)},
-            slave_ping_pair_loop(Server, Conn, Stream);
+            slave_ping_pair_loop(Config, Server, Conn, Stream);
         {stop, From, Ref} ->
-            From ! {Ref, ok},
-            slave_ping_pair_stopped(Server);
+            From ! {Ref, slave_ping_pair_stopped(Config, Server, Conn, Stream)};
         {'EXIT', Server, Reason} ->
-            slave_ping_pair_loop({exited, Server, Reason}, Conn, Stream);
+            slave_ping_pair_loop(Config, {exited, Server, Reason}, Conn, Stream);
         {'EXIT', _Pid, _Reason} ->
-            slave_ping_pair_loop(Server, Conn, Stream)
+            slave_ping_pair_loop(Config, Server, Conn, Stream)
     end.
 
 %% Park,  to keep slave node alive.
-slave_ping_pair_stopped(Server) ->
-    io:format("is client running old code: ~p", [erlang:check_process_code(self(), quicer_nif)]),
-    io:format("is server running old code: ~p", [erlang:check_process_code(Server, quicer_nif)]),
-    receive
-        _Any ->
-            slave_ping_pair_stopped(Server)
-    end.
+slave_ping_pair_stopped(Config, Server, Conn, Stream) ->
+    ClientOldCode = erlang:check_process_code(self(), quicer_nif),
+    ServerOldCode = server_running_old_code(Server),
+    slave_stop_trace(Config, stop_enter, #{
+        client_old_code => ClientOldCode, server_old_code => ServerOldCode
+    }),
+    io:format("is client running old code: ~p", [ClientOldCode]),
+    io:format("is server running old code: ~p", [ServerOldCode]),
+    slave_stop_ping_pair_resources(Config, Server, Conn, Stream),
+    slave_stop_trace(Config, before_gc, ok),
+    erlang:garbage_collect(),
+    slave_stop_trace(Config, after_gc, ok),
+    ok.
+%% receive
+%%     _Any ->
+%%         slave_ping_pair_stopped(Server)
+%% end.
+
+server_running_old_code({exited, _Server, _Reason}) ->
+    false;
+server_running_old_code(Server) when is_pid(Server) ->
+    erlang:check_process_code(Server, quicer_nif).
+
+slave_stop_trace(Config, Step, Data) ->
+    Line = io_lib:format("~p ~p~n", [Step, Data]),
+    File = filename:join(?config(priv_dir, Config), "peer_stop_trace.log"),
+    _ = catch file:write_file(File, Line, [append]),
+    ok.
 
 slave_start_ping_server(Config, Port) ->
     Parent = self(),
@@ -1517,12 +1656,32 @@ slave_ping_server(Parent, Config, Port) ->
             Parent ! {self(), failed, Reason}
     end.
 
-slave_stop_ping_pair_resources(Server, Conn, Stream) ->
-    _ = catch quicer:close_stream(Stream),
-    _ = catch quicer:close_connection(Conn),
-    catch exit(Server, shutdown),
-    timer:sleep(3000),
+slave_stop_ping_pair_resources(Config, Server, Conn, Stream) ->
+    slave_stop_trace(Config, before_close_stream, Stream),
+    CloseStream = catch quicer:close_stream(Stream, 1000),
+    slave_stop_trace(Config, after_close_stream, CloseStream),
+    slave_stop_trace(Config, before_close_connection, Conn),
+    CloseConn = catch quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT, 0, 1000),
+    slave_stop_trace(Config, after_close_connection, CloseConn),
+    ok = slave_stop_ping_server(Config, Server),
     ok.
+
+slave_stop_ping_server(Config, {exited, Server, Reason}) ->
+    slave_stop_trace(Config, server_already_exited, {Server, Reason}),
+    ok;
+slave_stop_ping_server(Config, Server) when is_pid(Server) ->
+    Ref = erlang:monitor(process, Server),
+    slave_stop_trace(Config, before_server_stop, Server),
+    Server ! stop,
+    receive
+        {'DOWN', Ref, process, Server, Reason} ->
+            slave_stop_trace(Config, after_server_stop, Reason),
+            ok
+    after 5000 ->
+        erlang:demonitor(Ref, [flush]),
+        slave_stop_trace(Config, server_stop_timeout, Server),
+        exit({ping_server_stop_timeout, Server})
+    end.
 
 slave_ping_server_loop(Listener, Conn, Stream) ->
     receive
@@ -1546,10 +1705,7 @@ slave_ping_server_loop(Listener, Conn, Stream) ->
             %            _ = quicer:stop_listener(Listener),
             _ = quicer:close_listener(Listener),
             io:format("server listener stopped"),
-            %% long parking
-            receive
-                unblock -> ok
-            end
+            ok
     end.
 
 slave_assert_ping(Stream, Payload) ->
@@ -1570,7 +1726,7 @@ slave_stop_all_listeners() ->
             _ = quicer:stop_listener(L),
             _ = quicer:close_listener(L)
         end,
-        quicer:get_listeners(global)
+        quicer:get_listeners()
     ).
 
 slave_stop_all_conns() ->
