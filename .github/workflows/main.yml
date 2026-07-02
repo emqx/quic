@@ -54,7 +54,7 @@ jobs:
           sudo sysctl -w kernel.core_pattern=core
           ulimit -c unlimited
           export CMAKE_BUILD_TYPE=Debug
-          export QUICER_TLS_VER=sys
+          export QUICER_TLS_VER=quictls
           make ci
 
       - name: gdb bt
