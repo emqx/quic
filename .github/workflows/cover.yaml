@@ -1,6 +1,10 @@
 on: ["push", "pull_request"]
 
-name: Test Coveralls
+name: Test Coverage
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   run-cover:
@@ -47,6 +51,15 @@ jobs:
         git-branch: ${{ github.ref_name }}
         git-commit: ${{ github.sha }}
 
+    - name: Codecov C
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      with:
+        use_oidc: true
+        files: coverage/proper-lcov.info,coverage/lcov.info
+        flags: c-lcov-${{ matrix.openssl }}
+        disable_search: true
+        fail_ci_if_error: false
+
     - name: Run cover with feature switches
       env:
         QUICER_TLS_VER: ${{ matrix.openssl }}
@@ -65,6 +78,29 @@ jobs:
         parallel: true
         git-branch: ${{ github.ref_name }}
         git-commit: ${{ github.sha }}
+
+    - name: Codecov C with feature switches
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      with:
+        use_oidc: true
+        files: coverage/proper-lcov.info,coverage/lcov.info
+        flags: c-lcov-feature-${{ matrix.openssl }}
+        disable_search: true
+        fail_ci_if_error: false
+
+    - name: Generate Codecov Erlang report
+      run: |
+        rm -f codecov.json
+        rebar3 codecov analyze path="_build/test/cover"
+
+    - name: Codecov Erlang
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+      with:
+        use_oidc: true
+        files: codecov.json
+        flags: erlang-${{ matrix.openssl }}
+        disable_search: true
+        fail_ci_if_error: false
 
     - name: Coveralls Erl
       env:

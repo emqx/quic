@@ -10,6 +10,7 @@ Project Status: Preview
 ![CI](https://github.com/emqx/quic/workflows/ci/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Coverage Status](https://coveralls.io/repos/emqx/quic/badge.png?branch=main)](https://coveralls.io/r/emqx/quic?branch=main)
+[![codecov](https://codecov.io/gh/emqx/quic/branch/main/graph/badge.svg)](https://codecov.io/gh/emqx/quic)
 
 ## OS Support
 
