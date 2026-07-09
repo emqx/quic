@@ -75,13 +75,6 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
 
       c_ctx->Connection = Event->NEW_CONNECTION.Connection;
 
-#if defined(QUICER_USE_TRUSTED_STORE)
-      if (l_ctx->trusted_store)
-        {
-          X509_STORE_up_ref(l_ctx->trusted_store);
-          c_ctx->trusted = l_ctx->trusted_store;
-        }
-#endif // QUICER_USE_TRUSTED_STORE
       CXPLAT_DBG_ASSERT(l_ctx->config_ctx);
 
       // Keep resource for c_ctx
@@ -286,12 +279,7 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   // Start build CredConfig from with listen opts
   QUIC_CREDENTIAL_CONFIG CredConfig;
 
-#if defined(QUICER_USE_TRUSTED_STORE)
-  X509_STORE *trusted_store = NULL;
-  ret = eoptions_to_cred_config(env, options, &CredConfig, &trusted_store);
-#else
-  ret = eoptions_to_cred_config(env, options, &CredConfig, NULL);
-#endif // QUICER_USE_TRUSTED_STORE
+  ret = eoptions_to_cred_config(env, options, &CredConfig);
 
   if (!IS_SAME_TERM(ret, ATOM_OK))
     {
@@ -304,14 +292,8 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!l_ctx)
     {
       free_certificate(&CredConfig);
-#if defined(QUICER_USE_TRUSTED_STORE)
-      X509_STORE_free(trusted_store);
-#endif // QUICER_USE_TRUSTED_STORE
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
-#if defined(QUICER_USE_TRUSTED_STORE)
-  l_ctx->trusted_store = trusted_store;
-#endif // QUICER_USE_TRUSTED_STORE
 
   // *********  ANY ERROR below this line should goto `exit-*`   **************
 
@@ -448,9 +430,6 @@ listen2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   return OK_TUPLE_2(listenHandle);
 
 exit: // errors..
-#if defined(QUICER_USE_TRUSTED_STORE)
-  X509_STORE_free(trusted_store);
-#endif // QUICER_USE_TRUSTED_STORE
   free_certificate(&CredConfig);
   l_ctx->is_closed = TRUE;
   put_listener_handle(l_ctx);
@@ -573,12 +552,7 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   QUIC_CREDENTIAL_CONFIG CredConfig = { 0 };
-#if defined(QUICER_USE_TRUSTED_STORE)
-  X509_STORE *trusted_store = NULL;
-  ret = eoptions_to_cred_config(env, options, &CredConfig, &trusted_store);
-#else
-  ret = eoptions_to_cred_config(env, options, &CredConfig, NULL);
-#endif // QUICER_USE_TRUSTED_STORE
+  ret = eoptions_to_cred_config(env, options, &CredConfig);
 
   if (!IS_SAME_TERM(ret, ATOM_OK))
     {
@@ -614,10 +588,6 @@ start_listener3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   QuicerConfigCTX *old_config_ctx = l_ctx->config_ctx;
 
-#if defined(QUICER_USE_TRUSTED_STORE)
-  X509_STORE_free(l_ctx->trusted_store);
-  l_ctx->trusted_store = trusted_store;
-#endif // QUICER_USE_TRUSTED_STORE
   // Now we swap the config
 
   if (!load_alpn(env, &options, &alpn_buffer_length, &alpn_buffers))

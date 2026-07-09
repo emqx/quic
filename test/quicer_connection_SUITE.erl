@@ -1058,14 +1058,9 @@ tc_conn_custom_verify(Config) ->
                 [{custom_verify, true} | ConnOpts],
                 5000
             ),
-            case os:getenv("QUICER_USE_TRUSTED_STORE") of
-                false ->
-                    %% THEN: CaCert and PeerCert in the cert chain
-                    ?assert(lists:member(Cert, CertChainBin)),
-                    ?assert(lists:member(CaCertBin, CertChainBin));
-                _ ->
-                    skip
-            end,
+            %% THEN: CaCert and PeerCert in the cert chain
+            ?assert(lists:member(Cert, CertChainBin)),
+            ?assert(lists:member(CaCertBin, CertChainBin)),
 
             %% WHEN: Performs a path validation
             ResPath = test_custom_verify(CaCertBin, {Cert, CertChainBin}),
@@ -1105,14 +1100,9 @@ tc_conn_custom_verify_skip_complete_call(Config) ->
                 [{custom_verify, true} | ConnOpts],
                 5000
             ),
-            case os:getenv("QUICER_USE_TRUSTED_STORE") of
-                false ->
-                    %% THEN: CaCert and PeerCert in the cert chain
-                    ?assert(lists:member(Cert, CertChainBin)),
-                    ?assert(lists:member(CaCertBin, CertChainBin));
-                _ ->
-                    skip
-            end,
+            %% THEN: CaCert and PeerCert in the cert chain
+            ?assert(lists:member(Cert, CertChainBin)),
+            ?assert(lists:member(CaCertBin, CertChainBin)),
 
             %% WHEN: Performs a path validation
             ResPath = test_custom_verify(CaCertBin, {Cert, CertChainBin}),
@@ -1296,14 +1286,9 @@ simple_conn_server_custom_verify(Owner, Config, Port) ->
     CaCertBin = quicer_test_lib:read_ca_cert_bin(proplists:get_value(cacertfile, LOpts)),
     case quicer:handshake(Conn, 3000) of
         {ok, Conn, {Cert, CertChain}} ->
-            case os:getenv("QUICER_USE_TRUSTED_STORE") of
-                false ->
-                    %% THEN: CaCert and PeerCert in the cert chain
-                    ?assert(lists:member(Cert, CertChain)),
-                    ?assert(lists:member(CaCertBin, CertChain));
-                _ ->
-                    skip
-            end,
+            %% THEN: CaCert and PeerCert in the cert chain
+            ?assert(lists:member(Cert, CertChain)),
+            ?assert(lists:member(CaCertBin, CertChain)),
             case test_custom_verify(CaCertBin, {Cert, CertChain}) of
                 {ok, _} ->
                     ok = quicer:complete_cert_validation(Conn, true, ?QUIC_TLS_ALERT_CODE_SUCCESS);
@@ -1592,7 +1577,6 @@ default_conn_opts(Config) ->
     default_conn_opts() ++ Config.
 
 test_custom_verify(CaCertBin, {Cert, []}) ->
-    %% For self-validation with QUICER_USE_TRUSTED_STORE=1
     public_key:pkix_path_validation(CaCertBin, [Cert], []);
 test_custom_verify(CaCertBin, {_, Chain}) ->
     public_key:pkix_path_validation(CaCertBin, Chain, []).

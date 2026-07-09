@@ -739,29 +739,6 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto ErrorNoLock;
     }
 
-#ifdef QUICER_USE_TRUSTED_STORE
-  // parse opt cacertfile
-  char *cacertfile = NULL;
-  if (!parse_cacertfile_option(env, eoptions, &cacertfile))
-    {
-      // TLS opt error not file content error
-      res = ERROR_TUPLE_2(ATOM_CACERTFILE);
-      goto ErrorNoLock;
-    }
-
-  if (cacertfile)
-    {
-      if (!build_trustedstore(cacertfile, &c_ctx->trusted))
-        {
-          free(cacertfile);
-          res = ERROR_TUPLE_2(ATOM_CERT_ERROR);
-          goto ErrorNoLock;
-        }
-      free(cacertfile);
-      cacertfile = NULL;
-    }
-#endif // QUICER_USE_TRUSTED_STORE
-
   ERL_NIF_TERM is_custom_verify = ATOM_FALSE;
   if (enif_get_map_value(env, eoptions, ATOM_CUSTOM_VERIFY, &is_custom_verify)
       && IS_SAME_TERM(ATOM_TRUE, is_custom_verify))
@@ -1656,25 +1633,7 @@ handle_connection_event_peer_certificate_received(QuicerConnCTX *c_ctx,
       return QUIC_STATUS_PENDING;
     } // end of custom_verify
 
-#if defined(QUICER_USE_TRUSTED_STORE)
-  X509_STORE_CTX *x509_ctx
-      = (X509_STORE_CTX *)Event->PEER_CERTIFICATE_RECEIVED.Chain;
-
-  if (cert == NULL)
-    return QUIC_STATUS_BAD_CERTIFICATE;
-
-  STACK_OF(X509) *untrusted = X509_STORE_CTX_get0_untrusted(x509_ctx);
-
-  X509_STORE_CTX *ctx = X509_STORE_CTX_new();
-  X509_STORE_CTX_init(ctx, c_ctx->trusted, cert, untrusted);
-  int res = X509_verify_cert(ctx);
-  X509_STORE_CTX_free(ctx);
-
-  if (res <= 0)
-    return QUIC_STATUS_BAD_CERTIFICATE;
-  else
-#endif // QUICER_USE_TRUSTED_STORE
-    return QUIC_STATUS_SUCCESS;
+  return QUIC_STATUS_SUCCESS;
 
   /* @TODO validate SNI */
 }

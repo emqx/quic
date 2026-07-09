@@ -60,34 +60,6 @@ jobs:
         disable_search: true
         fail_ci_if_error: false
 
-    - name: Run cover with feature switches
-      env:
-        QUICER_TLS_VER: ${{ matrix.openssl }}
-      run: |
-        sudo apt-get install lcov
-        export QUICER_USE_TRUSTED_STORE=1
-        export QUICER_TLS_VER
-        make cover
-
-    - name: Coveralls C
-      uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63 # v2.3.0
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        flag-name: run-c-lcov-feature-${{ matrix.openssl }}
-        files: coverage/proper-lcov.info coverage/lcov.info
-        parallel: true
-        git-branch: ${{ github.ref_name }}
-        git-commit: ${{ github.sha }}
-
-    - name: Codecov C with feature switches
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-      with:
-        use_oidc: true
-        files: coverage/proper-lcov.info,coverage/lcov.info
-        flags: c-lcov-feature-${{ matrix.openssl }}
-        disable_search: true
-        fail_ci_if_error: false
-
     - name: Generate Codecov Erlang report
       run: |
         rm -f codecov.json

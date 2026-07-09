@@ -34,9 +34,6 @@ parse_cacertfile_option(ErlNifEnv *env,
                         ERL_NIF_TERM options,
                         char **cacertfile);
 
-BOOLEAN
-build_trustedstore(const char *cacertfile, X509_STORE **trusted_store);
-
 void free_certificate(QUIC_CREDENTIAL_CONFIG *cc);
 
 void parse_sslkeylogfile_option(ErlNifEnv *env,
@@ -46,8 +43,7 @@ void parse_sslkeylogfile_option(ErlNifEnv *env,
 ERL_NIF_TERM
 eoptions_to_cred_config(ErlNifEnv *env,
                         ERL_NIF_TERM eoptions,
-                        QUIC_CREDENTIAL_CONFIG *CredConfig,
-                        X509_STORE **trusted_store);
+                        QUIC_CREDENTIAL_CONFIG *CredConfig);
 
 void set_conn_sslkeylogfile(QuicerConnCTX *c_ctx, char *keylogfile);
 

@@ -200,16 +200,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
   // ---- server-side credential config ----
   {
     QUIC_CREDENTIAL_CONFIG CredConfig;
-#if defined(QUICER_USE_TRUSTED_STORE)
-    X509_STORE *trusted = NULL;
-    ERL_NIF_TERM r = eoptions_to_cred_config(env, opts, &CredConfig, &trusted);
-    if (trusted)
-      {
-        X509_STORE_free(trusted);
-      }
-#else
-    ERL_NIF_TERM r = eoptions_to_cred_config(env, opts, &CredConfig, NULL);
-#endif
+    ERL_NIF_TERM r = eoptions_to_cred_config(env, opts, &CredConfig);
     if (IS_SAME_TERM(r, ATOM_OK))
       {
         free_certificate(&CredConfig);

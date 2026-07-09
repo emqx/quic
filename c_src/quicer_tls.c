@@ -262,17 +262,11 @@ parse_verify_options(ErlNifEnv *env,
           ERL_NIF_TERM tmp;
           if (enif_get_map_value(env, options, ATOM_CACERTFILE, &tmp))
             {
-#if defined(QUICER_USE_TRUSTED_STORE)
-              // cacertfile is set, use it for self validation.
-              CredConfig->Flags
-                  |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-#else
               // cacertfile is set, use it for OpenSSL validation.
               CredConfig->Flags
                   |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
               CredConfig->CaCertificateFile = str_from_map(
                   env, ATOM_CACERTFILE, &options, NULL, PATH_MAX + 1);
-#endif // QUICER_USE_TRUSTED_STORE
               CredConfig->Flags
                   |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
             }
@@ -311,42 +305,6 @@ parse_cacertfile_option(ErlNifEnv *env,
   *cacertfile = tmp;
   return TRUE;
 }
-
-#if defined(QUICER_USE_TRUSTED_STORE)
-BOOLEAN
-build_trustedstore(const char *cacertfile, X509_STORE **trusted_store)
-{
-  X509_STORE *store = NULL;
-  X509_LOOKUP *lookup = NULL;
-
-  if (cacertfile == NULL)
-    {
-      return FALSE;
-    }
-
-  store = X509_STORE_new();
-  if (store == NULL)
-    {
-      return FALSE;
-    }
-
-  lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
-  if (lookup == NULL)
-    {
-      X509_STORE_free(store);
-      return FALSE;
-    }
-
-  if (!X509_LOOKUP_load_file(lookup, cacertfile, X509_FILETYPE_PEM))
-    {
-      X509_STORE_free(store);
-      return FALSE;
-    }
-
-  *trusted_store = store;
-  return TRUE;
-}
-#endif // QUICER_USE_TRUSTED_STORE
 
 void
 free_certificate(QUIC_CREDENTIAL_CONFIG *cc)
@@ -463,25 +421,17 @@ set_conn_sslkeylogfile(QuicerConnCTX *c_ctx, char *keylogfile)
 ** Convert eterm options (a map) to QUIC_CREDENTIAL_CONFIG
 **
 ** @NOTE We zero reset CredConfig
-** @NOTE Also build trusted store if needed
 */
 ERL_NIF_TERM
 eoptions_to_cred_config(ErlNifEnv *env,
                         ERL_NIF_TERM eoptions,
-                        QUIC_CREDENTIAL_CONFIG *CredConfig,
-                        X509_STORE **trusted_store)
+                        QUIC_CREDENTIAL_CONFIG *CredConfig)
 {
   BOOLEAN is_verify = FALSE;
   char *cacertfile = NULL;
   ERL_NIF_TERM ret = ATOM_OK;
 
   CXPLAT_FRE_ASSERT(CredConfig);
-
-#if defined(QUICER_USE_TRUSTED_STORE)
-  CXPLAT_FRE_ASSERT(trusted_store);
-#else
-  CXPLAT_FRE_ASSERT(trusted_store == NULL);
-#endif // QUICER_USE_TRUSTED_STORE
 
   CxPlatZeroMemory(CredConfig, sizeof(QUIC_CREDENTIAL_CONFIG));
 
@@ -515,33 +465,18 @@ eoptions_to_cred_config(ErlNifEnv *env,
     { // === START of verify peer with cacertfile === //
 
       CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_INDICATE_CERTIFICATE_RECEIVED;
-
-#if defined(QUICER_USE_TRUSTED_STORE)
-      // We do our own verification with the cacert in trusted_store
-      // @see QUIC_CONNECTION_EVENT_PEER_CERTIFICATE_RECEIVED
-      CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-      if (!build_trustedstore(cacertfile, trusted_store))
-        {
-          ret = ATOM_CERT_ERROR;
-          goto exit;
-        }
-      free(cacertfile);
-      cacertfile = NULL;
-#else
       CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_SET_CA_CERTIFICATE_FILE;
       CredConfig->CaCertificateFile = cacertfile;
+      cacertfile = NULL;
 #if defined(__APPLE__)
       // This seems only needed for macOS
       CredConfig->Flags
           |= QUIC_CREDENTIAL_FLAG_USE_TLS_BUILTIN_CERTIFICATE_VALIDATION;
 #endif // __APPLE__
-#endif // QUICER_USE_TRUSTED_STORE
     }  // === END of verify peer with cacertfile === //
   else
     { // NO verify peer
-#if !defined(QUICER_USE_TRUSTED_STORE)
       CredConfig->Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-#endif // QUICER_USE_TRUSTED_STORE
       // since we don't use cacertfile, free it
       free(cacertfile);
       cacertfile = NULL;
@@ -549,10 +484,8 @@ eoptions_to_cred_config(ErlNifEnv *env,
   return ATOM_OK;
 
 exit:
-#if defined(QUICER_USE_TRUSTED_STORE)
   free(cacertfile);
   cacertfile = NULL;
-#endif // QUICER_USE_TRUSTED_STORE
   free_certificate(CredConfig);
   return ret;
 }

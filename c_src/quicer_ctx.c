@@ -70,9 +70,6 @@ init_l_ctx()
   l_ctx->config_ctx = NULL;
   l_ctx->acceptor_queue = AcceptorQueueNew();
   l_ctx->lock = enif_mutex_create("quicer:l_ctx");
-#if defined(QUICER_USE_TRUSTED_STORE)
-  l_ctx->trusted_store = NULL;
-#endif
   l_ctx->is_closed = TRUE;
   l_ctx->allow_insecure = FALSE;
   CxPlatListInitializeHead(&l_ctx->RegistrationLink);
@@ -83,13 +80,6 @@ init_l_ctx()
 void
 deinit_l_ctx(QuicerListenerCTX *l_ctx)
 {
-#if defined(QUICER_USE_TRUSTED_STORE)
-  if (l_ctx->trusted_store)
-    {
-      X509_STORE_free(l_ctx->trusted_store);
-    }
-#endif // QUICER_USE_TRUSTED_STORE
-
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
   CXPLAT_FREE(l_ctx->ssl_keylogfile, QUICER_TRACE);
   enif_mutex_destroy(l_ctx->lock);
@@ -123,9 +113,6 @@ init_c_ctx()
   c_ctx->acceptor_queue = AcceptorQueueNew();
   c_ctx->Connection = NULL;
   c_ctx->lock = enif_mutex_create("quicer:c_ctx");
-#if defined(QUICER_USE_TRUSTED_STORE)
-  c_ctx->trusted = NULL;
-#endif // QUICER_USE_TRUSTED_STORE
   c_ctx->TlsSecrets = NULL;
   c_ctx->ResumptionTicket = NULL;
   c_ctx->event_mask = 0;
@@ -142,13 +129,6 @@ void
 deinit_c_ctx(QuicerConnCTX *c_ctx)
 {
   enif_free_env(c_ctx->env);
-#if defined(QUICER_USE_TRUSTED_STORE)
-  if (c_ctx->trusted != NULL)
-    {
-      X509_STORE_free(c_ctx->trusted);
-      c_ctx->trusted = NULL;
-    }
-#endif // QUICER_USE_TRUSTED_STORE
   // @note, for the conn failed to get opened/started
   if (c_ctx->config_ctx)
     {
@@ -171,16 +151,8 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
 void
 destroy_c_ctx(QuicerConnCTX *c_ctx)
 {
-// Since enif_release_resource is async call,
-// we should demon the owner now!
-#if defined(QUICER_USE_TRUSTED_STORE)
-  if (c_ctx->trusted != NULL)
-    {
-      X509_STORE_free(c_ctx->trusted);
-      c_ctx->trusted = NULL;
-    }
-#endif // QUICER_USE_TRUSTED_STORE
-
+  // Since enif_release_resource is async call,
+  // we should demon the owner now!
   if (c_ctx->is_monitored)
     {
       enif_demonitor_process(c_ctx->env, c_ctx, &c_ctx->owner_mon);
