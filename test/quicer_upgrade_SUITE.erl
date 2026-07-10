@@ -96,14 +96,14 @@ end_per_group(_GroupName, _Config) ->
 %%--------------------------------------------------------------------
 init_per_testcase(Name, Config) when
     Name =:= tc_unload_module_with_bg_traffic orelse
-        Name =:= tc_upgrade_with_traffic orelse
-        Name =:= tc_application_upgrade_on_ct_node
+        Name =:= tc_upgrade_with_traffic
 ->
-    Current = lists:sublist(string:tokens(current_version(Config), "."), 2),
-    case lists:sublist(string:tokens(old_version(), "."), 2) of
-        Current ->
+    New = current_version(Config),
+    Old = old_version(Config),
+    case is_allowed_upgrade(New, Old) of
+        true ->
             Config;
-        _ ->
+        false ->
             %% skip if mismatch current major, minor
             {skip, "unsupported_upgrade_path "}
     end;
@@ -154,7 +154,8 @@ groups() ->
             tc_unload_module_with_bg_traffic
         ]},
         {release, [sequence], [
-            tc_release_package_contract
+            tc_release_package_contract,
+            tc_release_appup_src_upgrade
         ]},
         {same_version_upgrade, [sequence], [
             tc_same_version_upgrade_basic_nif_reload,
@@ -184,6 +185,7 @@ all() ->
                 tc_upgrade_with_traffic,
                 tc_unload_module_with_bg_traffic,
                 tc_release_package_contract,
+                tc_release_appup_src_upgrade,
                 tc_same_version_upgrade_basic_nif_reload,
                 tc_same_version_load_delete_purge_no_thread_growth
             ],
@@ -440,6 +442,7 @@ tc_application_upgrade_on_ct_node(Config) ->
         ?assertEqual(current_priv_dir(Config), maps:get(priv_dir, UpgradeInfo)),
         ok = assert_schedulers_not_blocked(),
         ?assertEqual(false, erlang:check_old_code(quicer_nif)),
+        ?assertEqual(true, code:delete(quicer_nif)),
         ok
     after
         local_cleanup_quicer(Config)
@@ -560,6 +563,31 @@ tc_release_package_contract(Config) ->
     with_slave(Config, fun(Node) ->
         ok = rpc_call(Node, ?MODULE, slave_load_release_nif, [ReleaseAppDir]),
         assert_remote_alive(Node),
+        assert_remote_schedulers_not_blocked(Node),
+        ok
+    end).
+
+tc_release_appup_src_upgrade(Config) ->
+    ReleaseAppDir = release_appup_src_app_dir(Config),
+    ok = copy_app_dir(current_app_dir(Config), ReleaseAppDir),
+    New = current_version(Config),
+    Old = old_version(Config),
+    {ok, Appup} = render_appup_src(New),
+    ok = write_term_file(filename:join([ReleaseAppDir, "ebin", "quicer.appup"]), Appup),
+    ok = assert_appup_matches_old_version(Appup, Old),
+    with_slave(Config, fun(Node) ->
+        {ok, OldVsn} = rpc_call(Node, ?MODULE, slave_start_old_application, []),
+        ?assertEqual(Old, OldVsn),
+        {ok, UpgradeInfo} = rpc_call(
+            Node,
+            ?MODULE,
+            slave_upgrade_application_with_appup_src,
+            [ReleaseAppDir, old_app_dir(Config)]
+        ),
+        assert_remote_alive(Node),
+        ?assertEqual(New, maps:get(vsn, UpgradeInfo)),
+        ?assertEqual(filename:join(ReleaseAppDir, "priv"), maps:get(priv_dir, UpgradeInfo)),
+        ?assertEqual(not is_allowed_upgrade(New, Old), maps:get(sticky, UpgradeInfo)),
         assert_remote_schedulers_not_blocked(Node),
         ok
     end).
@@ -695,6 +723,9 @@ current_app_dir(Config) ->
 
 same_version_app_dir(Config) ->
     filename:join([?config(priv_dir, Config), "same_version_upgrade", "quicer"]).
+
+release_appup_src_app_dir(Config) ->
+    filename:join([?config(priv_dir, Config), "release_appup_src", "quicer"]).
 
 old_priv_dir(Config) ->
     filename:join(old_app_dir(Config), "priv").
@@ -999,6 +1030,35 @@ appup_instructions([]) ->
     [];
 appup_instructions(Modules) ->
     [{load_module, Module} || Module <- Modules].
+
+render_appup_src(Vsn) ->
+    AppupSrc = filename:join([repo_root(), "src", "quicer.appup.src"]),
+    {ok, Bin} = file:read_file(AppupSrc),
+    {ok, Tokens, _EndLine} = erl_scan:string(binary_to_list(Bin)),
+    {ok, Exprs} = erl_parse:parse_exprs(Tokens),
+    Bindings = erl_eval:add_binding('VSN', Vsn, erl_eval:new_bindings()),
+    {value, Appup, _NewBindings} = erl_eval:exprs(Exprs, Bindings),
+    {ok, Appup}.
+
+repo_root() ->
+    Info = ?MODULE:module_info(compile),
+    Source = proplists:get_value(source, Info),
+    filename:dirname(filename:dirname(Source)).
+
+assert_appup_matches_old_version({ToVsn, UpFrom, DownTo}, OldVsn) ->
+    ?assert(is_list(ToVsn)),
+    ?assertMatch([{_, _} | _], UpFrom),
+    ?assertMatch([{_, _} | _], DownTo),
+    ?assertNotEqual(false, matching_appup_instructions(OldVsn, UpFrom)),
+    ok.
+
+matching_appup_instructions(Vsn, VsnInstructions) ->
+    lists:search(
+        fun({Regex, _Instructions}) ->
+            re:run(Vsn, Regex, [{capture, none}]) =:= match
+        end,
+        VsnInstructions
+    ).
 
 read_app_file(File) ->
     {ok, [App]} = file:consult(File),
@@ -1333,6 +1393,26 @@ slave_upgrade_application(CurrentAppDir, OldAppDir) ->
         loaded => code:is_loaded(quicer_nif)
     }}.
 
+slave_upgrade_application_with_appup_src(CurrentAppDir, OldAppDir) ->
+    io:format("upgrade_app with appup.src start ~p", [OldAppDir]),
+    CurrentEbin = filename:join(CurrentAppDir, "ebin"),
+    case release_handler:upgrade_app(quicer, CurrentAppDir) of
+        {ok, Unpurged} ->
+            io:format("upgrade_app with appup.src success, Unpurged ~p", [Unpurged]),
+            ok;
+        {error, Reason} ->
+            io:format("upgrade_app with appup.src failed ~p", [Reason]),
+            exit({upgrade_appup_src_failed, Reason})
+    end,
+    ok = add_patha(CurrentEbin),
+    {ok, Vsn} = application:get_key(quicer, vsn),
+    {ok, #{
+        vsn => Vsn,
+        priv_dir => code:priv_dir(quicer),
+        loaded => code:is_loaded(quicer_nif),
+        sticky => code:is_sticky(quicer_nif)
+    }}.
+
 slave_restart_quicer() ->
     _ = application:stop(quicer),
     _ = application:unload(quicer),
@@ -1398,6 +1478,7 @@ slave_purge_quicer_modules() ->
     _ = application:unload(quicer),
     lists:foreach(
         fun(Module) ->
+            _ = code:unstick_mod(Module),
             _ = code:purge(Module),
             _ = code:delete(Module),
             _ = code:purge(Module),
@@ -1786,4 +1867,13 @@ collect_scheduler_probe({Scheduler, Pid, MonitorRef}) ->
             exit({scheduler_probe_exit, Scheduler, Reason})
     after 5000 ->
         exit({scheduler_probe_down_timeout, Scheduler})
+    end.
+
+is_allowed_upgrade(New, Old) ->
+    Current = lists:sublist(string:tokens(New, "."), 2),
+    case lists:sublist(string:tokens(Old, "."), 2) of
+        Current ->
+            true;
+        _ ->
+            false
     end.

@@ -504,7 +504,7 @@ retry_reg_close(RetryLeft) ->
                 "Failed to close global registration refcnt: ~p, Conns: ~p, Listeners: ~p~nretry....",
                 [
                     N,
-                    quicer:get_connections(),
+                    lists:map(fun quicer:sockname/1, quicer:get_connections()),
                     quicer:get_listeners()
                 ]
             ),
