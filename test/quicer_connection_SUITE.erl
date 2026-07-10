@@ -1578,7 +1578,5 @@ echo_server_stm_loop(L, Conn, Stms) ->
 default_conn_opts(Config) ->
     default_conn_opts() ++ Config.
 
-test_custom_verify(CaCertBin, {Cert, []}) ->
-    public_key:pkix_path_validation(CaCertBin, [Cert], []);
 test_custom_verify(CaCertBin, {_, Chain}) ->
     public_key:pkix_path_validation(CaCertBin, Chain, []).
