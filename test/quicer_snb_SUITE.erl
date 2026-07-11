@@ -54,6 +54,7 @@
     tc_conn_stop_notify_acceptor/1,
     tc_accept_stream_active_once/1,
     tc_accept_stream_active_N/1,
+    tc_passive_recv_continue_during_handoff/1,
     tc_multi_streams/1,
     tc_multi_streams_example_server_1/1,
     tc_multi_streams_example_server_2/1,
@@ -221,6 +222,7 @@ all() ->
         tc_conn_stop_notify_acceptor,
         tc_accept_stream_active_once,
         tc_accept_stream_active_N,
+        tc_passive_recv_continue_during_handoff,
         %% multistreams
         tc_multi_streams,
         tc_multi_streams_example_server_1,
@@ -317,6 +319,67 @@ tc_app_echo_server(Config) ->
 
     quicer:close_stream(Stm),
     quicer:close_connection(Conn),
+    ok = quicer:terminate_listener(mqtt).
+
+%% A passive recv registers the current owner as waiting for data.  Once the
+%% handoff signal buffer is enabled, the resulting `continue' notification
+%% must follow the signal-buffer path and be flushed to the new owner.  The
+%% receive callback tracepoint makes the otherwise very small handoff window
+%% deterministic: controlling_process/2 waits for that callback to release the
+%% stream lock before changing the owner.
+tc_passive_recv_continue_during_handoff(Config) ->
+    Port = select_port(),
+    ListenerOpts = [{conn_acceptors, 32} | default_listen_opts(Config)],
+    ConnectionOpts = [
+        {conn_callback, quicer_server_conn_callback},
+        {stream_acceptors, 32}
+        | default_conn_opts()
+    ],
+    StreamOpts = [
+        {stream_callback, quicer_echo_server_stream_callback}
+        | default_stream_opts()
+    ],
+    Options = {ListenerOpts, ConnectionOpts, StreamOpts},
+    {ok, _QuicApp} = quicer_start_listener(mqtt, Port, Options),
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+    {ok, StreamRid} = quicer:get_stream_rid(Stm),
+    Parent = self(),
+    NewOwner = spawn(fun() -> forward_owner_messages(Parent) end),
+    ?my_check_trace(
+        #{timetrap => 5000},
+        begin
+            %% Register a passive receive before entering the handoff
+            %% signal-buffer phase.
+            {ok, not_ready} = quicer_nif:recv(Stm, 4),
+            ok = quicer_nif:enable_sig_buffer(Stm),
+            {ok, 4} = quicer:async_send(Stm, <<"ping">>),
+            {ok, _} = ?block_until(
+                #{
+                    ?snk_kind := debug,
+                    context := "callback",
+                    function := "handle_stream_event_recv",
+                    tag := "handle_stream_event_recv",
+                    resource_id := StreamRid,
+                    mark := 0
+                },
+                1000,
+                3000
+            ),
+            ok = quicer:controlling_process(Stm, NewOwner),
+            receive
+                {new_owner, {quic, continue, Stm, undefined}} ->
+                    new_owner;
+                {quic, continue, Stm, undefined} ->
+                    old_owner
+            after 1000 ->
+                timeout
+            end
+        end,
+        fun(Owner, _Trace) -> ?assertEqual(new_owner, Owner) end
+    ),
+    quicer:close_connection(Conn),
+    NewOwner ! stop,
     ok = quicer:terminate_listener(mqtt).
 
 tc_slow_conn(Config) ->
@@ -3535,6 +3598,15 @@ tc_handle_call_stream(Config) ->
 %%% Internal Helpers
 default_stream_opts() ->
     [].
+
+forward_owner_messages(Parent) ->
+    receive
+        stop ->
+            ok;
+        Msg ->
+            Parent ! {new_owner, Msg},
+            forward_owner_messages(Parent)
+    end.
 
 default_conn_opts() ->
     [
