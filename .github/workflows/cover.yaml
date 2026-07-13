@@ -46,16 +46,6 @@ jobs:
         export QUICER_TLS_VER
         make cover
 
-    - name: Coveralls C
-      uses: coverallsapp/github-action@648a8eb78e6d50909eff900e4ec85cab4524a45b # v2.3.6
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        flag-name: run-c-lcov-${{ matrix.openssl }}
-        files: coverage/proper-lcov.info coverage/lcov.info
-        parallel: true
-        git-branch: ${{ github.ref_name }}
-        git-commit: ${{ github.sha }}
-
     - name: Codecov C
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
       with:
@@ -78,20 +68,3 @@ jobs:
         flags: erlang-${{ matrix.openssl }}
         disable_search: true
         fail_ci_if_error: false
-
-    - name: Coveralls Erl
-      env:
-        COVERALLS_FLAG_NAME: erlang-${{ matrix.openssl }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: rebar3 as test coveralls send
-
-  finalize:
-    needs: run-cover
-    name: finalize
-    runs-on: ubuntu-latest
-    steps:
-    - name: Coveralls Finished
-      uses: coverallsapp/github-action@648a8eb78e6d50909eff900e4ec85cab4524a45b # v2.3.6
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        parallel-finished: true
