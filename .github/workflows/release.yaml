@@ -106,6 +106,45 @@ jobs:
             openssl: sys
           - os: el7
             openssl: openssl3
+        ## el10 builder images only exist since emqx-builder 6.1 and
+        ## (as of now) only for otp 27, hence include instead of matrix os
+        include:
+          - erlang:
+              otp: 27.3.4.2-8
+              builder: 6.1-8:1.18.3-27.3.4.2-8
+            os: el10
+            arch: amd64
+            openssl: sys
+          - erlang:
+              otp: 27.3.4.2-8
+              builder: 6.1-8:1.18.3-27.3.4.2-8
+            os: el10
+            arch: arm64
+            openssl: sys
+          - erlang:
+              otp: 27.3.4.2-8
+              builder: 6.1-8:1.18.3-27.3.4.2-8
+            os: el10
+            arch: amd64
+            openssl: openssl3
+          - erlang:
+              otp: 27.3.4.2-8
+              builder: 6.1-8:1.18.3-27.3.4.2-8
+            os: el10
+            arch: arm64
+            openssl: openssl3
+          - erlang:
+              otp: 27.3.4.2-8
+              builder: 6.1-8:1.18.3-27.3.4.2-8
+            os: el10
+            arch: amd64
+            openssl: openssl
+          - erlang:
+              otp: 27.3.4.2-8
+              builder: 6.1-8:1.18.3-27.3.4.2-8
+            os: el10
+            arch: arm64
+            openssl: openssl
 
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
