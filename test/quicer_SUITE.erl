@@ -1227,7 +1227,10 @@ tc_getopt_statistics_v2(Config) ->
             {recv_total_stream_bytes, _},
             {recv_decryption_failures, _},
             {recv_valid_ack_frames, _},
-            {key_update_count, _}
+            {key_update_count, _},
+            {send_congestion_window, _},
+            {dest_cid_update_count, _},
+            {send_ecn_congestion_count, _}
         ],
         Stats
     ),
