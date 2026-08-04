@@ -572,7 +572,7 @@ encode_parm_to_eterm(ErlNifEnv *env,
       QUIC_STATISTICS_V2 *statics = (QUIC_STATISTICS_V2 *)Buffer;
       ERL_NIF_TERM term = enif_make_list(
           env,
-          36,
+          39,
           STAT_TUPLE_U64(ATOM_QUIC_CORRELATION_ID, CorrelationId),
           STAT_TUPLE_U32(ATOM_QUIC_VERSION_NEGOTIATION, VersionNegotiation),
           STAT_TUPLE_U32(ATOM_QUIC_STATELESS_RETRY, StatelessRetry),
