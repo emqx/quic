@@ -1450,6 +1450,12 @@ set_stream_opt(ErlNifEnv *env,
               // Complete the pending recv (consuming 0 bytes) so the data is
               // re-indicated now that receives are re-enabled.
               MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
+              // The pending recv is completed; without this reset every later
+              // passive->active transition on the stream would issue a
+              // StreamReceiveComplete with no receive outstanding, which
+              // corrupts msquic's receive accounting and can permanently
+              // silence the stream.
+              s_ctx->is_recv_pending = FALSE;
             }
         }
       if (!set_owner_recv_mode(s_ctx->owner, env, optval))
