@@ -80,8 +80,13 @@ jobs:
           - otp: 28.4.1-4
             builder: 6.1-8:1.19.1-28.4.1-4
 
+        ## quictls: bundled, builds everywhere.
+        ## sys: links the distro libcrypto, so the NIF picks up the distro's
+        ## security updates. msquic requires OpenSSL >= 3.0 for it, so the
+        ## distros below that are excluded rather than built.
         openssl:
           - quictls
+          - sys
         arch:
           - amd64
           - arm64
@@ -98,6 +103,19 @@ jobs:
           - el9
           - el8
           - el7
+        exclude:
+          ## OpenSSL 1.1.1
+          - openssl: sys
+            os: ubuntu20.04
+          - openssl: sys
+            os: debian11
+          - openssl: sys
+            os: el8
+          ## OpenSSL 1.0.2
+          - openssl: sys
+            os: amzn2
+          - openssl: sys
+            os: el7
 
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
