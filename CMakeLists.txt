@@ -35,15 +35,34 @@ else()
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
+## QUICER_TLS_VER selects where libcrypto comes from:
+##   sys     : link the libcrypto provided by the system (needs OpenSSL >= 3.0)
+##   quictls : build and link the bundled quictls submodule
+##   auto    : sys when the system provides OpenSSL >= 3.0, quictls otherwise
+##
+## build.sh resolves 'auto' before calling cmake so that the pre-built package
+## name matches what is built. Resolve it here too, for direct cmake calls.
 if (DEFINED ENV{QUICER_TLS_VER})
-  if ($ENV{QUICER_TLS_VER} STREQUAL "sys")
+  set(QUICER_TLS_VER $ENV{QUICER_TLS_VER})
+
+  if (QUICER_TLS_VER STREQUAL "auto")
+    find_package(OpenSSL)
+    if (OPENSSL_FOUND AND NOT OPENSSL_VERSION VERSION_LESS "3.0")
+      set(QUICER_TLS_VER "sys")
+    else()
+      set(QUICER_TLS_VER "quictls")
+    endif()
+    message(STATUS "QUICER_TLS_VER=auto resolved to '${QUICER_TLS_VER}'")
+  endif()
+
+  if (QUICER_TLS_VER STREQUAL "sys")
     ## Link to sys libcrypto, auto openssl vsn
     find_package(OpenSSL REQUIRED)
     ## MsQuic 2.5+ uses 'quictls' instead of 'openssl' or 'openssl3'
     set(QUIC_TLS_LIB "quictls" CACHE STRING "QUIC_TLS_LIB")
     set(QUIC_USE_SYSTEM_LIBCRYPTO "ON")
   else()
-    set(QUIC_TLS_LIB $ENV{QUICER_TLS_VER} CACHE STRING "QUIC_TLS_LIB")
+    set(QUIC_TLS_LIB ${QUICER_TLS_VER} CACHE STRING "QUIC_TLS_LIB")
   endif()
 
 endif()

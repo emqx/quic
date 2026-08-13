@@ -121,6 +121,28 @@ firefox doc/index.html
 make ci
 ```
 
+## Selecting the TLS backend
+
+`QUICER_TLS_VER` selects where libcrypto comes from:
+
+| Value | Behaviour |
+| --- | --- |
+| `quictls` | Build and link the bundled quictls submodule. Works on any supported system. |
+| `sys` | Link the libcrypto provided by the system. Requires OpenSSL 3.0 or newer; the build fails on older systems. |
+| `auto` | Use `sys` when the system provides OpenSSL >= 3.0, `quictls` otherwise. |
+
+Prefer `sys` where it is available: the NIF then picks up the distribution's
+libcrypto security updates without rebuilding quicer. Use `auto` to get that
+on modern systems while still building on distributions that ship OpenSSL
+1.1.1 or older, such as Ubuntu 20.04, Debian 11, EL8, EL7 and Amazon Linux 2.
+
+``` sh
+QUICER_TLS_VER=auto make
+```
+
+The value is part of the pre-built package name, so `sys` and `quictls`
+artifacts are published and cached independently.
+
 # Troubleshooting 
 
 ### Log to `stdout`

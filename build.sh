@@ -4,6 +4,16 @@ set -ueo pipefail
 
 MSQUIC_VERSION="$1"
 TARGET_SO='priv/libquicer_nif.so'
+
+## Resolve 'auto' before anything reads QUICER_TLS_VER: the package name
+## carries the TLS backend, and the pre-built package is downloaded before
+## cmake runs, so both must see the same concrete value.
+if [ "${QUICER_TLS_VER:-}" = 'auto' ]; then
+    QUICER_TLS_VER="$(./tls-ver.sh)"
+    export QUICER_TLS_VER
+    echo "QUICER: QUICER_TLS_VER=auto resolved to '${QUICER_TLS_VER}'"
+fi
+
 PKGNAME="$(./pkgname.sh)"
 
 detect_macos_arch() {

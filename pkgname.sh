@@ -29,7 +29,15 @@ esac
 ARCH="$(uname -m)"
 VSN=${QUICER_VERSION:-"$(git describe --tags --exact-match | head -1)"}
 
+## The TLS backend is part of the package name: a NIF linked against the
+## system libcrypto is not interchangeable with one linked against the
+## bundled quictls. build.sh resolves 'auto' before calling this script;
+## resolve it here too so the script is correct when called on its own.
 OPENSSL=${QUICER_TLS_VER:-openssl}
+if [ "$OPENSSL" = 'auto' ]; then
+    OPENSSL="$(dirname "$0")/tls-ver.sh"
+    OPENSSL="$($OPENSSL)"
+fi
 
 if [ -z "$VSN" ]; then
     exit 0
