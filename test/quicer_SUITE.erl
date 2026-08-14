@@ -68,6 +68,10 @@
     %% , tc_stream_sendrecv_large_data_passive_2/1
     tc_stream_sendrecv_large_data_active/1,
     tc_stream_passive_switch_to_active/1,
+    tc_stream_passive_switch_to_active2/1,
+    tc_stream_passive_switch_to_active_race/1,
+    tc_stream_passive_switch_to_active_while_recv_pend/1,
+    %tc_stream_passive_switch_to_active_with_recv_pending/1,
     tc_stream_passive_partial_recv_switch_to_active_n/1,
     tc_stream_passive_pending_switch_to_active_n/1,
     tc_stream_active_switch_to_passive/1,
@@ -582,6 +586,184 @@ tc_stream_passive_switch_to_active(Config) ->
     after 6000 ->
         ct:fail("timeout")
     end.
+
+tc_stream_passive_switch_to_active2(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready ->
+            ok
+    after 6000 ->
+        ct:fail("timeout")
+    end,
+
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+    {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+    %% add delay to ensure pending.
+    timer:sleep(500),
+    {ok, <<"ping_passive">>} = quicer:recv(Stm, 0),
+    {ok, 12} = quicer:send(Stm, <<"ping_active2">>),
+    %% add delay to ensure pending.
+    timer:sleep(500),
+    ok = quicer:setopt(Stm, active, 1),
+    ok = quicer:setopt(Stm, active, false),
+    ok = quicer:setopt(Stm, active, 1),
+    receive
+        {quic, <<"ping_active2">>, Stm, _} -> ok
+    end,
+    {ok, 12} = quicer:send(Stm, <<"ping_active3">>),
+    receive
+        {quic, passive, Stm, _} ->
+            ok = quicer:setopt(Stm, active, 1)
+    end,
+    receive
+        {quic, <<"ping_active3">>, Stm, _} -> ok
+    after 1000 ->
+        receive
+            {quic, Other, Stm, _} when is_binary(Other) ->
+                ct:fail("received ~p~n", [Other])
+        end
+    end,
+    SPid ! done,
+    ensure_server_exit_normal(Ref).
+
+tc_stream_passive_switch_to_active_race(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 6000 ->
+        ct:fail("timeout")
+    end,
+
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+    {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+    {ok, <<"ping_passive">>} = quicer:recv(Stm, 0),
+    {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
+    quicer:setopt(Stm, active, true),
+    quicer:setopt(Stm, active, true),
+    quicer:setopt(Stm, active, true),
+    quicer:setopt(Stm, active, true),
+    receive
+        {quic, <<"ping_active_2">>, Stm, _} -> ok
+    end,
+    quicer:setopt(Stm, active, 100),
+    {ok, 13} = quicer:send(Stm, <<"ping_active_3">>),
+    receive
+        {quic, <<"ping_active_3">>, Stm, _} -> ok
+    end,
+    SPid ! done,
+    ensure_server_exit_normal(Ref).
+
+tc_stream_passive_switch_to_active_while_recv_pend(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 6000 ->
+        ct:fail("timeout")
+    end,
+
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+
+    {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+    {ok, 12} = quicer:send(Stm, <<"ping_passive">>),
+    {ok, <<"ping">>} = quicer:recv(Stm, 4),
+    timer:sleep(50),
+
+    %% GIVEN: A stream is changed from passive active_n mode, n=10 when it has recv pending.
+    quicer:setopt(Stm, active, 10),
+    receive
+        {quic, <<"_passive">>, Stm, _} -> ok
+    after 1000 ->
+        receive
+            {quic, Other, Stm, _} when is_binary(Other) ->
+                ct:fail("recv ~p~n", [Other])
+        after 0 ->
+            ct:fail("NO recv ~n", [])
+        end
+    end,
+
+    %% WHEN: send after setopts active to true 100 times
+    [quicer:setopt(Stm, active, true) || _ <- lists:seq(1, 100)],
+    {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+
+    %% THEN: it should still receive
+    receive
+        {quic, <<"ping_active">>, Stm, _} -> ok
+    after 1000 ->
+        receive
+            {quic, Other2, Stm, _} when is_binary(Other2) ->
+                ct:fail("recv ~p~n", [Other2])
+        after 0 ->
+            ct:fail("NO recv2 ~n", [])
+        end
+    end,
+    quicer:setopt(Stm, active, 100),
+    {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
+    receive
+        {quic, <<"ping_active_2">>, Stm, _} -> ok
+    end,
+    SPid ! done,
+    ensure_server_exit_normal(Ref).
+
+tc_stream_passive_switch_to_active_with_recv_pending(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 6000 ->
+        ct:fail("timeout")
+    end,
+
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+
+    %% GIVEN: stream in passive mode.
+    {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+    {ok, 15} = quicer:send(Stm, <<"ping_passiveeee">>),
+    timer:sleep(100),
+
+    %% WHEN: stream is changed to active_n mode, n=1
+    ok = quicer:setopt(Stm, active, true),
+    {ok, 0} = quicer:send(Stm, <<"">>),
+    {error, einval} = quicer:recv(Stm, 0),
+    receive
+        {quic, <<"ping_passiveeee">>, Stm, _} -> ok
+    after 1000 ->
+        receive
+            {quic, Other, Stm, _} when is_binary(Other) ->
+                ct:fail("recv ~p~n", [Other])
+        after 0 ->
+            ct:fail("NO recv ~n", [])
+        end
+    end,
+
+    timer:sleep(1000),
+    {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+
+    receive
+        {quic, <<"ping_active">>, Stm, _} -> ok
+    after 1000 ->
+        receive
+            {quic, Other2, Stm, _} when is_binary(Other2) ->
+                ct:fail("recv ~p~n", [Other2])
+        after 0 ->
+            ct:fail("NO recv2 ~n", [])
+        end
+    end,
+    quicer:setopt(Stm, active, 100),
+    {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
+    receive
+        {quic, <<"ping_active_2">>, Stm, _} -> ok
+    end,
+    SPid ! done,
+    ensure_server_exit_normal(Ref).
 
 %% @doc A partial passive recv must not strand the remaining data when switching to {active, N}.
 tc_stream_passive_partial_recv_switch_to_active_n(Config) ->
