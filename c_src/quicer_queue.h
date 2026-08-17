@@ -41,6 +41,7 @@ limitations under the License.
 #define QUICER_CERTIFICATE_PKCS12 'C0rQ' // Cr0a QUICER_CERTIFICATE_PKCS12
 #define QUICER_RESUME_TICKET 'C0rQ'      // 'Qr0c'  QUICER_RESUME_TICKET
 #define QUICER_CACERTFILE 'D0rQ'         // 'Qr0d'  QUICER_CACERTFILE
+#define QUICER_RECV_SEG 'E0rQ'           // 'Qr0e'  QUICER_RECV_SEG
 
 typedef enum ACCEPTOR_RECV_MODE
 {

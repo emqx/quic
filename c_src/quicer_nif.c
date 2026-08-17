@@ -1306,6 +1306,20 @@ openLib(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto exit;
     }
 
+  {
+    // The NIF receive path requires multi-receive mode on every stream;
+    // make it the library-wide default so even connections without an
+    // applied configuration (e.g. pre-handshake) get it.
+    QUIC_SETTINGS default_settings = { 0 };
+    default_settings.StreamMultiReceiveEnabled = TRUE;
+    default_settings.IsSet.StreamMultiReceiveEnabled = TRUE;
+    status = MsQuic->SetParam(NULL,
+                              QUIC_PARAM_GLOBAL_SETTINGS,
+                              sizeof(default_settings),
+                              &default_settings);
+    assert(QUIC_SUCCEEDED(status));
+  }
+
   TP_NIF_3(success, 0, 2);
 
   res = SUCCESS(ATOM_TRUE);

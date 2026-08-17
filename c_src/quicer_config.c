@@ -17,6 +17,7 @@ limitations under the License.
 #include "quicer_config.h"
 #include "quicer_internal.h"
 #include "quicer_queue.h"
+#include "quicer_stream.h"
 #include "quicer_tls.h"
 #include <msquichelper.h>
 
@@ -1282,6 +1283,11 @@ create_settings(ErlNifEnv *env,
       Settings->IsSet.PeerBidiStreamCount = TRUE;
     }
 
+  // The NIF receive path (recv chain + cumulative StreamReceiveComplete)
+  // requires msquic multi-receive mode on every stream.
+  Settings->StreamMultiReceiveEnabled = TRUE;
+  Settings->IsSet.StreamMultiReceiveEnabled = TRUE;
+
   return true;
 }
 
@@ -1432,30 +1438,14 @@ set_stream_opt(ErlNifEnv *env,
       if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active
           && !IS_SAME_TERM(ATOM_FALSE, optval))
         {
-          // Switching from passive to active: msquic receives may have been
-          // disabled (e.g. by a partial passive recv, or when an {active, N}
-          // count was exhausted).
-          // Re-enable them unconditionally.
-          //
-          // Order matters: enable BEFORE completing the pending recv. In
-          // single recv-buffer mode, StreamReceiveSetEnabled(TRUE) will NOT
-          // queue a recv flush while a read is still pending
-          // (ReadPendingLength > 0). By enabling first and then completing
-          // recv with 0, the completion itself drives the flush
-          // (QuicStreamReceiveComplete re-flushes once ReceiveEnabled is
-          // TRUE), so delivery does not depend on the enable-time flush guard.
-          MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
-          if (s_ctx->is_recv_pending)
+          // Switching from passive to active: deliver data still pinned in
+          // the recv chain (multi-receive mode never re-indicates it), then
+          // re-enable receives, which may have been disabled when an
+          // {active, N} count was exhausted.
+          stream_deliver_recv_chain(env, s_ctx);
+          if (s_ctx->Stream && !s_ctx->is_shutdown_complete)
             {
-              // Complete the pending recv (consuming 0 bytes) so the data is
-              // re-indicated now that receives are re-enabled.
-              MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
-              // The pending recv is completed; without this reset every later
-              // passive->active transition on the stream would issue a
-              // StreamReceiveComplete with no receive outstanding, which
-              // corrupts msquic's receive accounting and can permanently
-              // silence the stream.
-              s_ctx->is_recv_pending = FALSE;
+              MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE);
             }
         }
       if (!set_owner_recv_mode(s_ctx->owner, env, optval))

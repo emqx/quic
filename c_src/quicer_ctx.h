@@ -148,6 +148,21 @@ typedef struct QuicerConnCTX
   void *reserved3;
 } QuicerConnCTX;
 
+// One msquic RECEIVE indication that has not been fully consumed by the
+// app (multi-receive mode). Buffer descriptors point into msquic-owned
+// receive chunks; they stay valid until StreamReceiveComplete covers them
+// or the stream handle is closed.
+typedef struct QuicerRecvSeg
+{
+  struct QuicerRecvSeg *next;
+  uint64_t abs_offset;   // stream offset of this segment's first byte
+  uint64_t offset;       // bytes of this segment already consumed
+  uint64_t total;        // total bytes in this segment
+  uint32_t flags;        // QUIC_RECEIVE_FLAGS of the indication
+  uint32_t buffer_count; // entries in buffers[]
+  QUIC_BUFFER buffers[];
+} QuicerRecvSeg;
+
 typedef struct QuicerStreamCTX
 {
   uint32_t magic;
@@ -166,11 +181,15 @@ typedef struct QuicerStreamCTX
   // Set once
   ERL_NIF_TERM eHandle;
   ErlNifMutex *lock;
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ QUIC_BUFFER Buffers[2];
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint64_t TotalBufferLength;
-  _CTX_CALLBACK_WRITE_ _CTX_NIF_READ_ uint32_t BufferCount;
+  // FIFO of uncompleted RECEIVE indications, protected by lock
+  QuicerRecvSeg *recv_head;
+  QuicerRecvSeg *recv_tail;
+  uint64_t recv_avail; // unconsumed bytes across the whole chain
   _CTX_CALLBACK_READ_ BOOLEAN is_wait_for_data;
-  _CTX_CALLBACK_WRITE_ BOOLEAN is_recv_pending;
+  // SHUTDOWN_COMPLETE seen; only StreamClose may be called on the handle.
+  // (is_closed can not be used for this: it starts TRUE and stays TRUE for
+  // locally initiated streams.)
+  BOOLEAN is_shutdown_complete;
   BOOLEAN is_closed;
   // Track lifetime of Stream handle
   CXPLAT_REF_COUNT ref_count;
@@ -212,6 +231,9 @@ void destroy_config_ctx(QuicerConfigCTX *config_ctx);
 QuicerStreamCTX *init_s_ctx();
 void deinit_s_ctx(QuicerStreamCTX *s_ctx);
 void destroy_s_ctx(QuicerStreamCTX *s_ctx);
+// Free the recv chain without completing; caller must hold s_ctx->lock
+// (or be the last owner in deinit).
+void stream_recv_chain_free(QuicerStreamCTX *s_ctx);
 
 QuicerStreamSendCTX *init_send_ctx();
 void destroy_send_ctx(QuicerStreamSendCTX *send_ctx);
