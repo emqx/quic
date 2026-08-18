@@ -200,12 +200,10 @@ init_s_ctx()
   s_ctx->imm_env = enif_alloc_env();
   s_ctx->lock = enif_mutex_create("quicer:s_ctx");
   s_ctx->is_wait_for_data = FALSE;
-  s_ctx->Buffers[0].Buffer = NULL;
-  s_ctx->Buffers[0].Length = 0;
-  s_ctx->Buffers[1].Buffer = NULL;
-  s_ctx->Buffers[1].Length = 0;
-  s_ctx->TotalBufferLength = 0;
-  s_ctx->is_recv_pending = FALSE;
+  s_ctx->recv_head = NULL;
+  s_ctx->recv_tail = NULL;
+  s_ctx->recv_avail = 0;
+  s_ctx->is_shutdown_complete = FALSE;
   s_ctx->is_closed = TRUE; // init
   s_ctx->event_mask = 0;
   s_ctx->sig_queue = NULL;
@@ -216,9 +214,25 @@ init_s_ctx()
 void
 deinit_s_ctx(QuicerStreamCTX *s_ctx)
 {
+  stream_recv_chain_free(s_ctx);
   cleanup_owner_signals(s_ctx);
   enif_mutex_destroy(s_ctx->lock);
   enif_free_env(s_ctx->env);
+}
+
+void
+stream_recv_chain_free(QuicerStreamCTX *s_ctx)
+{
+  QuicerRecvSeg *seg = s_ctx->recv_head;
+  while (seg)
+    {
+      QuicerRecvSeg *next = seg->next;
+      CXPLAT_FREE(seg, QUICER_RECV_SEG);
+      seg = next;
+    }
+  s_ctx->recv_head = NULL;
+  s_ctx->recv_tail = NULL;
+  s_ctx->recv_avail = 0;
 }
 
 void

@@ -51,6 +51,9 @@ ERL_NIF_TERM send3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
 ERL_NIF_TERM recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 
+// Caller holds s_ctx->lock; NIF call context only.
+void stream_deliver_recv_chain(ErlNifEnv *env, struct QuicerStreamCTX *s_ctx);
+
 ERL_NIF_TERM
 shutdown_stream3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]);
 

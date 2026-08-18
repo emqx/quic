@@ -57,8 +57,6 @@ static QUIC_STATUS
 handle_stream_event_send_shutdown_complete(QuicerStreamCTX *s_ctx,
                                            QUIC_STREAM_EVENT *Event);
 
-static void reset_stream_recv(QuicerStreamCTX *s_ctx);
-
 static int
 signal_or_buffer(QuicerStreamCTX *s_ctx, ErlNifPid *owner, ERL_NIF_TERM sig);
 
@@ -740,13 +738,15 @@ recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
     }
 
   TP_NIF_3(start, (uintptr_t)s_ctx->Stream, size_req);
-  enif_mutex_lock(s_ctx->lock);
 
-  if (!s_ctx->Stream)
+  // Hold a handle ref: chain buffers point into msquic recv chunks that
+  // are freed by StreamClose.
+  if (!LOCAL_REFCNT(get_stream_handle(s_ctx)))
     {
-      res = ERROR_TUPLE_2(ATOM_CLOSED);
-      goto Exit;
+      return ERROR_TUPLE_2(ATOM_CLOSED);
     }
+
+  enif_mutex_lock(s_ctx->lock);
 
   if (ACCEPTOR_RECV_MODE_PASSIVE != s_ctx->owner->active)
     {
@@ -754,31 +754,28 @@ recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       goto Exit;
     }
 
-  // We have checked that the Stream is not closed/closing
-  // it is safe to use the s_ctx->Stream in following MsQuic API calls
-
-  if (s_ctx->is_recv_pending && s_ctx->TotalBufferLength > 0)
+  if (s_ctx->recv_avail > 0)
     {
-      //
-      // Buffer is ready
-      //
       uint64_t size_consumed = recvbuffer_flush(
           s_ctx,
           &bin,
-          size_req > s_ctx->TotalBufferLength ? s_ctx->TotalBufferLength
-                                              : size_req);
+          size_req > s_ctx->recv_avail ? s_ctx->recv_avail : size_req);
       TP_NIF_3(consume, (uintptr_t)s_ctx->Stream, size_consumed);
-      reset_stream_recv(s_ctx);
 
-      if (size_consumed > 0)
+      s_ctx->is_wait_for_data = FALSE;
+
+      // Cumulative completion; in multi-receive mode msquic drains
+      // size_consumed bytes from the front of the pending data.
+      if (!s_ctx->is_shutdown_complete)
         {
-          s_ctx->is_wait_for_data = FALSE;
+          MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
         }
 
-      // call only when is_recv_pending is TRUE
-      MsQuic->StreamReceiveComplete(s_ctx->Stream, size_consumed);
-
       res = SUCCESS(enif_make_binary(env, &bin));
+    }
+  else if (s_ctx->is_shutdown_complete)
+    {
+      res = ERROR_TUPLE_2(ATOM_CLOSED);
     }
   else
     { // want more data in buffer
@@ -786,26 +783,14 @@ recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       s_ctx->is_wait_for_data = TRUE;
 
       //
-      // Ensure stream recv is enabled while it is in passive mode,
-      // because we are waiting for more data.
-      //
-      // Enable BEFORE finishing any pending recv callback: in single
-      // recv-buffer mode StreamReceiveSetEnabled(TRUE) won't flush while a
-      // read is still pending, so we let the completion drive the flush
-      // instead (see the matching note in set_stream_opt). On this branch
-      // is_recv_pending is normally FALSE, so the completion is just a safety
-      // net.
+      // Receives may have been disabled (an exhausted {active, N} count
+      // calls StreamReceiveSetEnabled(FALSE)); re-enable while waiting.
       //
       if (QUIC_FAILED(status
                       = MsQuic->StreamReceiveSetEnabled(s_ctx->Stream, TRUE)))
         {
           res = ERROR_TUPLE_2(ATOM_STATUS(status));
           goto Exit;
-        }
-      // Finish the stream recv callback
-      if (s_ctx->is_recv_pending)
-        {
-          MsQuic->StreamReceiveComplete(s_ctx->Stream, 0);
         }
       // NIF caller will get {ok, not_ready}
       // this is an ack to its call
@@ -814,6 +799,7 @@ recv2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 Exit:
   enif_mutex_unlock(s_ctx->lock);
+  LOCAL_REFCNT(put_stream_handle(s_ctx));
   return res;
 }
 
@@ -857,49 +843,82 @@ shutdown_stream3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   return ret;
 }
 
+// Copy req_len bytes (all unconsumed bytes when req_len is 0) from the
+// front of the recv chain into a fresh binary, popping fully consumed
+// segments. Caller holds s_ctx->lock and must complete the returned
+// length to msquic (or be on a path where the stream is gone).
 static uint64_t
 recvbuffer_flush(QuicerStreamCTX *s_ctx, ErlNifBinary *bin, uint64_t req_len)
 {
   // note, make sure ownership of bin should be transferred, after call
-  uint64_t size = 0;
-  assert(req_len <= s_ctx->TotalBufferLength);
-
-  if (req_len == 0)
-    { // we need more data than buffer has
-      size = s_ctx->TotalBufferLength;
-    }
-  else
-    { // buffer size is larger than we want
-      size = req_len;
-    }
+  uint64_t size = (req_len == 0 || req_len > s_ctx->recv_avail)
+                      ? s_ctx->recv_avail
+                      : req_len;
 
   enif_alloc_binary(size, bin);
   assert(size == bin->size);
   assert(size > 0);
 
   unsigned char *dest = bin->data;
+  uint64_t remaining = size;
 
-  // Defense in depth: msquic guarantees TotalBufferLength == sum of buffer
-  // lengths and at most 2 buffers, but never read past the fixed Buffers[]
-  // array even if that invariant is violated.
-  for (uint32_t i = 0;
-       size > 0 && i < s_ctx->BufferCount && i < ARRAYSIZE(s_ctx->Buffers);
-       ++i)
+  while (remaining > 0)
     {
-      if (s_ctx->Buffers[i].Length <= size)
-        { // copy whole buffer
-          CxPlatCopyMemory(
-              dest, s_ctx->Buffers[i].Buffer, s_ctx->Buffers[i].Length);
-          dest += s_ctx->Buffers[i].Length;
-          size -= s_ctx->Buffers[i].Length;
+      QuicerRecvSeg *seg = s_ctx->recv_head;
+      assert(seg);
+      uint64_t skip = seg->offset;
+      for (uint32_t i = 0; remaining > 0 && i < seg->buffer_count; ++i)
+        {
+          uint64_t blen = seg->buffers[i].Length;
+          if (skip >= blen)
+            {
+              skip -= blen;
+              continue;
+            }
+          uint64_t n = blen - skip;
+          if (n > remaining)
+            {
+              n = remaining;
+            }
+          CxPlatCopyMemory(dest, seg->buffers[i].Buffer + skip, n);
+          dest += n;
+          remaining -= n;
+          seg->offset += n;
+          skip = 0;
+        }
+      if (seg->offset == seg->total)
+        {
+          s_ctx->recv_head = seg->next;
+          if (!s_ctx->recv_head)
+            {
+              s_ctx->recv_tail = NULL;
+            }
+          CXPLAT_FREE(seg, QUICER_RECV_SEG);
         }
       else
-        { // copy part of the buffer, end of copy
-          CxPlatCopyMemory(dest, s_ctx->Buffers[i].Buffer, size);
-          size = 0;
+        {
+          assert(remaining == 0);
         }
     }
-  return bin->size;
+
+  s_ctx->recv_avail -= size;
+  return size;
+}
+
+// Copy the whole event payload into a fresh binary (active mode; the
+// event buffers are only valid during the callback).
+static void
+recvbuffer_copy_event(QUIC_STREAM_EVENT *Event, ErlNifBinary *bin)
+{
+  enif_alloc_binary(Event->RECEIVE.TotalBufferLength, bin);
+  unsigned char *dest = bin->data;
+  for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i)
+    {
+      CxPlatCopyMemory(dest,
+                       Event->RECEIVE.Buffers[i].Buffer,
+                       Event->RECEIVE.Buffers[i].Length);
+      dest += Event->RECEIVE.Buffers[i].Length;
+    }
 }
 
 QUIC_STATUS
@@ -916,13 +935,6 @@ handle_stream_event_recv(HQUIC Stream,
   assert(Event->RECEIVE.BufferCount > 0
          || Event->RECEIVE.Flags == QUIC_RECEIVE_FLAG_FIN);
 
-  s_ctx->Buffers[0].Buffer = Event->RECEIVE.Buffers[0].Buffer;
-  s_ctx->Buffers[0].Length = Event->RECEIVE.Buffers[0].Length;
-  s_ctx->Buffers[1].Buffer = Event->RECEIVE.Buffers[1].Buffer;
-  s_ctx->Buffers[1].Length = Event->RECEIVE.Buffers[1].Length;
-  s_ctx->BufferCount = Event->RECEIVE.BufferCount;
-  s_ctx->TotalBufferLength = Event->RECEIVE.TotalBufferLength;
-
   if (Event->RECEIVE.Flags != 0)
     {
       TP_CB_3(event_recv_flag, (uintptr_t)Stream, Event->RECEIVE.Flags);
@@ -935,14 +947,44 @@ handle_stream_event_recv(HQUIC Stream,
 
   if (ACCEPTOR_RECV_MODE_PASSIVE == s_ctx->owner->active)
     { // passive receive
-      /* important:
-         for passive receive, it is not ok to call
-         MsQuic->StreamReceiveSetEnabled to enable receiving
-         because it can cause busy spinning:
-         trigger event and handle event in a loop
-      */
+      // Append to the recv chain and keep the buffers pinned (multi-receive
+      // mode: returning PENDING does not stop further indications, and
+      // StreamReceiveComplete drains cumulatively from the front).
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 0);
-      s_ctx->is_recv_pending = TRUE;
+
+      uint32_t bcount = Event->RECEIVE.BufferCount;
+      QuicerRecvSeg *seg = CXPLAT_ALLOC_NONPAGED(
+          sizeof(QuicerRecvSeg) + bcount * sizeof(QUIC_BUFFER),
+          QUICER_RECV_SEG);
+      if (!seg)
+        {
+          MsQuic->StreamShutdown(Stream,
+                                 QUIC_STREAM_SHUTDOWN_FLAG_ABORT,
+                                 QUIC_STATUS_OUT_OF_MEMORY);
+          return QUIC_STATUS_SUCCESS;
+        }
+      seg->next = NULL;
+      seg->abs_offset = Event->RECEIVE.AbsoluteOffset;
+      seg->offset = 0;
+      seg->total = Event->RECEIVE.TotalBufferLength;
+      seg->flags = Event->RECEIVE.Flags;
+      seg->buffer_count = bcount;
+      for (uint32_t i = 0; i < bcount; ++i)
+        {
+          seg->buffers[i] = Event->RECEIVE.Buffers[i];
+        }
+
+      if (s_ctx->recv_tail)
+        {
+          s_ctx->recv_tail->next = seg;
+        }
+      else
+        {
+          s_ctx->recv_head = seg;
+        }
+      s_ctx->recv_tail = seg;
+      s_ctx->recv_avail += seg->total;
+
       status = QUIC_STATUS_PENDING;
 
       if (s_ctx->is_wait_for_data)
@@ -961,12 +1003,15 @@ handle_stream_event_recv(HQUIC Stream,
                                      QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL,
                                      QUIC_STATUS_UNREACHABLE);
             }
+          // one wake-up per recv call; further indications just grow the
+          // chain until the owner reads
+          s_ctx->is_wait_for_data = FALSE;
         }
     }
   else
     { // active receive
       TP_CB_3(handle_stream_event_recv, (uintptr_t)Stream, 1);
-      recvbuffer_flush(s_ctx, &bin, (uint64_t)0);
+      recvbuffer_copy_event(Event, &bin);
       BOOLEAN is_report_passive = FALSE;
       ERL_NIF_TERM eHandle = enif_make_copy(env, s_ctx->eHandle);
       ERL_NIF_TERM props_name[] = { ATOM_ABS_OFFSET, ATOM_LEN, ATOM_FLAGS };
@@ -1127,6 +1172,11 @@ handle_stream_event_shutdown_complete(QuicerStreamCTX *s_ctx,
           Event->SHUTDOWN_COMPLETE.ConnectionShutdown);
   assert(env);
 
+  // From here on only StreamClose may be called on the handle. Chain data
+  // stays readable (recv chunks live until StreamClose) but must no longer
+  // be completed to msquic.
+  s_ctx->is_shutdown_complete = TRUE;
+
   ERL_NIF_TERM props_name[] = {
     ATOM_IS_CONN_SHUTDOWN,   ATOM_IS_APP_CLOSING, ATOM_IS_SHUTDOWN_BY_APP,
     ATOM_IS_CLOSED_REMOTELY, ATOM_ERROR,          ATOM_STATUS
@@ -1231,16 +1281,53 @@ get_stream_rid1(ErlNifEnv *env, int args, const ERL_NIF_TERM argv[])
   return SUCCESS(enif_make_ulong(env, (unsigned long)s_ctx->Stream));
 }
 
-static void
-reset_stream_recv(QuicerStreamCTX *s_ctx)
+// Deliver all pinned chain data to the owner as one active-mode data
+// message, completing it to msquic. Used on passive->active transitions:
+// in multi-receive mode msquic never re-indicates data that was left
+// pending, so it must be pushed out here. Caller holds s_ctx->lock and
+// runs in a NIF call context (env is the call env).
+void
+stream_deliver_recv_chain(ErlNifEnv *env, QuicerStreamCTX *s_ctx)
 {
-  s_ctx->Buffers[0].Buffer = NULL;
-  s_ctx->Buffers[0].Length = 0;
-  s_ctx->Buffers[1].Buffer = NULL;
-  s_ctx->Buffers[1].Length = 0;
+  ErlNifBinary bin;
 
-  s_ctx->is_recv_pending = FALSE;
-  s_ctx->TotalBufferLength = 0;
+  if (s_ctx->recv_avail == 0)
+    {
+      return;
+    }
+
+  uint64_t abs_offset
+      = s_ctx->recv_head->abs_offset + s_ctx->recv_head->offset;
+  // Every segment is fully drained below, so OR-ing their indication
+  // flags (FIN, 0-RTT) is exact.
+  uint32_t flags = 0;
+  for (QuicerRecvSeg *seg = s_ctx->recv_head; seg; seg = seg->next)
+    {
+      flags |= seg->flags;
+    }
+  uint64_t len = recvbuffer_flush(s_ctx, &bin, 0);
+
+  ErlNifEnv *menv = enif_alloc_env();
+  ERL_NIF_TERM eHandle = enif_make_copy(menv, s_ctx->eHandle);
+  ERL_NIF_TERM props_name[] = { ATOM_ABS_OFFSET, ATOM_LEN, ATOM_FLAGS };
+  ERL_NIF_TERM props_value[] = { enif_make_uint64(menv, abs_offset),
+                                 enif_make_uint64(menv, len),
+                                 enif_make_int(menv, (int)flags) };
+  ERL_NIF_TERM report = make_event_with_props(menv,
+                                              enif_make_binary(menv, &bin),
+                                              eHandle,
+                                              props_name,
+                                              props_value,
+                                              3);
+  enif_send(env, &(s_ctx->owner->Pid), menv, report);
+  enif_free_env(menv);
+
+  s_ctx->is_wait_for_data = FALSE;
+
+  if (s_ctx->Stream && !s_ctx->is_shutdown_complete)
+    {
+      MsQuic->StreamReceiveComplete(s_ctx->Stream, len);
+    }
 }
 
 ERL_NIF_TERM
