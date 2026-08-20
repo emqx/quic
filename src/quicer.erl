@@ -777,19 +777,38 @@ send(Stream, Data) ->
     | {error, badarg | not_enough_mem | closed}
     | {error, stream_send_error, atom_reason()}.
 send(Stream, Data, Flag) when is_integer(Flag) ->
-    %% This is an sync send, set flag ?QUICER_SEND_FLAG_SYNC
-    case quicer_nif:send(Stream, Data, Flag bor ?QUICER_SEND_FLAG_SYNC) of
-        %% @todo make ref
-        {ok, _Len} = OK ->
-            receive
-                {quic, send_complete, Stream, false} ->
-                    OK;
-                {quic, send_complete, Stream, true} ->
-                    {error, cancelled}
-            end;
-        E ->
-            E
+    case is_zero_len_send_noop(Data, Flag) of
+        true ->
+            {ok, 0};
+        false ->
+            %% This is an sync send, set flag ?QUICER_SEND_FLAG_SYNC
+            case quicer_nif:send(Stream, Data, Flag bor ?QUICER_SEND_FLAG_SYNC) of
+                %% @todo make ref
+                {ok, _Len} = OK ->
+                    receive
+                        {quic, send_complete, Stream, false} ->
+                            OK;
+                        {quic, send_complete, Stream, true} ->
+                            {error, cancelled}
+                    end;
+                E ->
+                    E
+            end
     end.
+
+%% A zero-length send without FIN or START transmits nothing, and handing
+%% it to msquic can permanently wedge the stream send path when the stream
+%% has been switched from passive to active mode with a receive pending
+%% (see #441). Treat it as a no-op instead.
+is_zero_len_send_noop(Data, Flag) ->
+    (Flag band (?QUIC_SEND_FLAG_FIN bor ?QUIC_SEND_FLAG_START)) =:= 0 andalso
+        try iolist_size(Data) of
+            0 -> true;
+            _ -> false
+        catch
+            %% not iodata; let the NIF report badarg
+            _:_ -> false
+        end.
 
 %% @doc async variant of {@link send/3}
 %% If QUICER_SEND_FLAG_SYNC is set , the caller should expect to receive
@@ -801,7 +820,15 @@ send(Stream, Data, Flag) when is_integer(Flag) ->
     | {error, badarg | not_enough_mem | closed}
     | {error, stream_send_error, atom_reason()}.
 async_send(Stream, Data, Flag) ->
-    quicer_nif:send(Stream, Data, Flag).
+    case is_zero_len_send_noop(Data, Flag) of
+        true ->
+            %% preserve the completion contract for sync callers
+            (Flag band ?QUICER_SEND_FLAG_SYNC) =/= 0 andalso
+                (self() ! {quic, send_complete, Stream, false}),
+            {ok, 0};
+        false ->
+            quicer_nif:send(Stream, Data, Flag)
+    end.
 
 %% @doc async variant of {@link send/2}
 %% Caller should NOT expect to receive
