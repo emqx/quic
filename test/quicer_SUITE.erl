@@ -71,7 +71,8 @@
     tc_stream_passive_switch_to_active2/1,
     tc_stream_passive_switch_to_active_race/1,
     tc_stream_passive_switch_to_active_while_recv_pend/1,
-    %tc_stream_passive_switch_to_active_with_recv_pending/1,
+    tc_stream_passive_switch_to_active_with_recv_pending/1,
+    tc_stream_pend_switch_then_empty_send/1,
     tc_stream_passive_partial_recv_switch_to_active_n/1,
     tc_stream_passive_pending_switch_to_active_n/1,
     tc_stream_active_switch_to_passive/1,
@@ -761,6 +762,40 @@ tc_stream_passive_switch_to_active_with_recv_pending(Config) ->
     {ok, 13} = quicer:send(Stm, <<"ping_active_2">>),
     receive
         {quic, <<"ping_active_2">>, Stm, _} -> ok
+    end,
+    SPid ! done,
+    ensure_server_exit_normal(Ref).
+
+%% @doc A zero-length send must be a no-op: handing it to msquic after a
+%% pended passive receive was switched to active mode permanently wedged
+%% the stream send path (nothing sent afterwards reached the peer and the
+%% connection died of idle timeout). Deterministic root cause of the
+%% flakiness in tc_stream_passive_switch_to_active_with_recv_pending.
+tc_stream_pend_switch_then_empty_send(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> echo_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 6000 -> ct:fail("timeout")
+    end,
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stm} = quicer:start_stream(Conn, [{active, false}]),
+    {ok, 15} = quicer:send(Stm, <<"ping_passiveeee">>),
+    %% let the echo arrive and pend in the passive recv callback
+    timer:sleep(100),
+    ok = quicer:setopt(Stm, active, true),
+    {ok, 0} = quicer:send(Stm, <<"">>),
+    %% the pended data is re-indicated and delivered
+    receive
+        {quic, <<"ping_passiveeee">>, Stm, _} -> ok
+    after 1000 -> ct:fail("pended data not delivered")
+    end,
+    %% data sent after the zero-length send must still reach the peer
+    {ok, 11} = quicer:send(Stm, <<"ping_active">>),
+    receive
+        {quic, <<"ping_active">>, Stm, _} -> ok
+    after 1000 -> ct:fail("send path wedged after zero-length send")
     end,
     SPid ! done,
     ensure_server_exit_normal(Ref).
