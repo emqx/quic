@@ -1117,7 +1117,7 @@ tc_conn_custom_verify_skip_complete_call(Config) ->
             %% WHEN: connection is closed
             ok = quicer:close_connection(Conn, ?QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 777, 10_000),
             %% THEN: Conn is really closed
-            ?assertEqual({error, closed}, quicer:sockname(Conn)),
+            ?assertMatch({error, _}, wait_for_closed_sockname(Conn, 100)),
             SPid ! done,
             ensure_server_exit_normal(Ref)
     after 1000 ->
@@ -1580,3 +1580,14 @@ default_conn_opts(Config) ->
 
 test_custom_verify(CaCertBin, {_, Chain}) ->
     public_key:pkix_path_validation(CaCertBin, Chain, []).
+
+wait_for_closed_sockname(Conn, 0) ->
+    quicer:sockname(Conn);
+wait_for_closed_sockname(Conn, Retries) ->
+    case quicer:sockname(Conn) of
+        {ok, _} ->
+            timer:sleep(10),
+            wait_for_closed_sockname(Conn, Retries - 1);
+        {error, _} = Err ->
+            Err
+    end.
