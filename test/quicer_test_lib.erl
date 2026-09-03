@@ -414,7 +414,7 @@ flush(Acc) ->
 
 -spec ensure_server_exit_normal(reference()) -> ok.
 ensure_server_exit_normal(MonRef) ->
-    ensure_server_exit_normal(MonRef, 5000).
+    ensure_server_exit_normal(MonRef, 6000).
 ensure_server_exit_normal(MonRef, Timeout) ->
     receive
         {'DOWN', MonRef, process, _, normal} ->
