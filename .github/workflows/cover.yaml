@@ -47,7 +47,7 @@ jobs:
         make cover
 
     - name: Codecov C
-      uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         use_oidc: true
         files: coverage/proper-lcov.info,coverage/lcov.info
@@ -61,7 +61,7 @@ jobs:
         rebar3 codecov analyze path="_build/test/cover"
 
     - name: Codecov Erlang
-      uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
       with:
         use_oidc: true
         files: codecov.json
