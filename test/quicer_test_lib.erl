@@ -200,6 +200,8 @@ gen_host_cert(H, CaName, Path) ->
 gen_host_cert(H, CaName, Path, Opts) ->
     ECKeyFile = eckey_name(Path),
     CN = str(H),
+    %% Tests connect using localhost or a loopback IP, regardless of the fixture name.
+    SAN = "DNS:" ++ CN ++ ",DNS:localhost,IP:127.0.0.1,IP:::1",
     HKey = filename(Path, "~s.key", [H]),
     HCSR = filename(Path, "~s.csr", [H]),
     HCSR2 = filename(Path, "~s.csr", [H]),
@@ -221,12 +223,12 @@ gen_host_cert(H, CaName, Path, Opts) ->
         "keyUsage=digitalSignature,keyAgreement,keyCertSign\n"
         "basicConstraints=CA:TRUE \n"
         "~s \n"
-        "subjectAltName=DNS:~s\n",
-        [maps:get(ext, Opts, ""), CN]
+        "subjectAltName=~s\n",
+        [maps:get(ext, Opts, ""), SAN]
     ),
 
-    CSR_Cmd = csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN),
-    CSR_Cmd2 = csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR2, CN),
+    CSR_Cmd = csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN, SAN),
+    CSR_Cmd2 = csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR2, CN, SAN),
 
     CERT_Cmd = cert_sign_cmd(
         HEXT, HCSR, ca_cert_name(Path, CaName), ca_key_name(Path, CaName), HPEM
@@ -260,16 +262,16 @@ cert_sign_cmd(ExtFile, CSRFile, CACert, CAKey, OutputCert) ->
         )
     ).
 
-csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN) ->
+csr_cmd(PasswordArg, ECKeyFile, HKey, HCSR, CN, SAN) ->
     lists:flatten(
         io_lib:format(
             "openssl req -new ~s -newkey ec:~s "
             "-keyout ~s -out ~s "
-            "-addext \"subjectAltName=DNS:~s\" "
+            "-addext \"subjectAltName=~s\" "
             "-addext basicConstraints=CA:TRUE "
             "-addext keyUsage=digitalSignature,keyAgreement,keyCertSign "
             "-subj \"/C=SE/O=TEST/CN=~s\"",
-            [PasswordArg, ECKeyFile, HKey, HCSR, CN, CN]
+            [PasswordArg, ECKeyFile, HKey, HCSR, SAN, CN]
         )
     ).
 

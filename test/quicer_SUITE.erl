@@ -2016,8 +2016,9 @@ tc_setopt_conn_remote_addr(_Config) ->
     {ok, Conn} = quicer:open_connection(),
     ok = quicer:setopt(Conn, remote_address, "8.8.8.8:443"),
     ok = quicer:setopt(Conn, datagram_receive_enabled, false),
+    %% The TLS identity must match the Google Public DNS endpoint above.
     Res = quicer:connect(
-        "google.com",
+        "dns.google",
         443,
         [
             {verify, verify_peer},
