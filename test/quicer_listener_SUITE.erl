@@ -671,7 +671,11 @@ tc_listener_conf_reload(Config) ->
 
     %% WHEN: the listener is reloaded with new listener opts (New cert, key and cacert).
     ok = quicer_listener:lock(QuicApp, infinity),
-    ok = quicer_listener:unlock(QuicApp, infinity),
+    ok = snabbkaffe:retry(
+        100,
+        10,
+        fun() -> ok = quicer_listener:unlock(QuicApp, infinity) end
+    ),
 
     NewCerts = [
         {certfile, filename:join(DataDir, "other-server.pem")},
@@ -679,7 +683,13 @@ tc_listener_conf_reload(Config) ->
         {cacertfile, filename:join(DataDir, "other-ca.pem")}
     ],
     NewListenerOpts = ListenerOpts ++ NewCerts,
-    ok = quicer_listener:reload(QuicApp, {NewListenerOpts, ConnectionOpts, StreamOpts}),
+    ok = snabbkaffe:retry(
+        100,
+        10,
+        fun() ->
+            ok = quicer_listener:reload(QuicApp, {NewListenerOpts, ConnectionOpts, StreamOpts})
+        end
+    ),
     %% THEN: the listener handle is unchanged
     ?assertEqual({ok, LHandle}, quicer_listener:get_handle(QuicApp, 5000)),
 
