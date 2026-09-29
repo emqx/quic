@@ -677,15 +677,16 @@ run_tc_conn_client_bad_cert(Config) ->
                             Status =:= bad_certificate;
                             Status =:= cert_untrusted_root
                         ->
-                            _ = flush([])
+                            %% Keep the server's DOWN message for the exit check.
+                            ok
                     after 2000 ->
                         Other = flush([]),
                         ct:fail("Unexpected Msg ~p", [Other])
-                    end,
-                    ensure_server_exit_normal(Ref);
+                    end;
                 Error ->
                     ct:fail({start_stream_error, Error})
-            end
+            end,
+            ensure_server_exit_normal(Ref)
     after 1000 ->
         ct:fail("timeout")
     end.
