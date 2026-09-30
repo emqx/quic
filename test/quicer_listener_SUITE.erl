@@ -401,6 +401,13 @@ tc_open_listener_bind_v6(Config) ->
     ok = gen_udp:close(P),
     ok.
 
+tc_new_conn_without_sni(Config) ->
+    %% IP literals omit SNI, so MsQuic supplies a NULL ServerName.
+    check_new_conn_server_name(Config, "127.0.0.1", <<>>).
+
+tc_new_conn_with_sni(Config) ->
+    check_new_conn_server_name(Config, "localhost", <<"localhost">>).
+
 tc_set_listener_opt(Config) ->
     Port = select_port(),
     {ok, L} = quicer:listen(Port, default_listen_opts(Config)),
@@ -1219,6 +1226,37 @@ tc_count_conns(Config) ->
     quicer:terminate_listener(sample2).
 
 %%% Helpers
+
+check_new_conn_server_name(Config, Host, ExpectedServerName) ->
+    {ok, L} = quicer:listen(0, default_listen_opts(Config)),
+    try
+        {ok, {_, Port}} = quicer:sockname(L),
+        {ok, L} = quicer:async_accept(L, #{}),
+        {ok, ClientConn} = quicer:async_connect(Host, Port, default_conn_opts()),
+        try
+            receive
+                {quic, new_conn, ServerConn, Props} ->
+                    try
+                        ?assertEqual(ExpectedServerName, maps:get(server_name, Props)),
+                        ?assertEqual(<<"sample">>, maps:get(alpns, Props)),
+                        {ok, ServerConn} = quicer:handshake(ServerConn, 3000),
+                        receive
+                            {quic, connected, ClientConn, _} -> ok
+                        after 3000 ->
+                            ct:fail(client_not_connected)
+                        end
+                    after
+                        quicer:close_connection(ServerConn)
+                    end
+            after 3000 ->
+                ct:fail(no_new_connection)
+            end
+        after
+            quicer:close_connection(ClientConn)
+        end
+    after
+        quicer:close_listener(L)
+    end.
 
 select_port() ->
     Port = select_free_port(quic),
