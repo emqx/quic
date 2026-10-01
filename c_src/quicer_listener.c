@@ -122,12 +122,15 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
                        &addrStr_remote);
 
       ERL_NIF_TERM eserver_name;
-      CxPlatCopyMemory(
-          enif_make_new_binary(env,
-                               Event->NEW_CONNECTION.Info->ServerNameLength,
-                               &eserver_name),
-          Event->NEW_CONNECTION.Info->ServerName,
-          Event->NEW_CONNECTION.Info->ServerNameLength);
+      unsigned char *server_name = enif_make_new_binary(
+          env, Event->NEW_CONNECTION.Info->ServerNameLength, &eserver_name);
+      // SNI is optional; without it ServerName is NULL and its length is zero.
+      if (Event->NEW_CONNECTION.Info->ServerNameLength > 0)
+        {
+          CxPlatCopyMemory(server_name,
+                           Event->NEW_CONNECTION.Info->ServerName,
+                           Event->NEW_CONNECTION.Info->ServerNameLength);
+        }
 
       ERL_NIF_TERM ealpns;
       CxPlatCopyMemory(
