@@ -34,6 +34,7 @@
     tc_slow_conn/1,
     tc_stream_owner_down/1,
     tc_stream_acceptor_down/1,
+    tc_stream_owner_unreachable/1,
     tc_conn_owner_down/1,
     tc_conn_close_flag_1/1,
     tc_conn_close_flag_2/1,
@@ -202,6 +203,7 @@ all() ->
         tc_slow_conn,
         tc_stream_owner_down,
         tc_stream_acceptor_down,
+        tc_stream_owner_unreachable,
         tc_conn_owner_down,
         tc_conn_close_flag_1,
         tc_conn_close_flag_2,
@@ -670,6 +672,37 @@ tc_stream_acceptor_down(Config) ->
         end
     ),
     ok.
+
+tc_stream_owner_unreachable(Config) ->
+    ?my_check_trace(
+        #{timetrap => 15000},
+        begin
+            {ok, Listener} = quicer:listen(0, [
+                {peer_unidi_stream_count, 128} | default_listen_opts(Config)
+            ]),
+            {ok, {_, Port}} = quicer:getopt(Listener, local_address),
+            try
+                stream_owner_unreachable(Listener, Port, 20)
+            after
+                quicer:close_listener(Listener)
+            end,
+            ?retry(10, 100, ?assertEqual(1, quicer:get_registration_refcnt(global))),
+            ?assertEqual([], quicer:get_connections())
+        end,
+        fun(_Result, Trace) ->
+            Rejected = [
+                Event
+             || #{
+                    ?snk_kind := debug,
+                    context := "callback",
+                    function := "selected_owner_unreachable",
+                    tag := "owner_unreachable"
+                } = Event <- Trace
+            ],
+            ?assertMatch([_ | _], Rejected),
+            ct:pal("Rejected ~p peer streams", [length(Rejected)])
+        end
+    ).
 
 tc_conn_owner_down(Config) ->
     Port = select_port(),
@@ -3596,6 +3629,82 @@ tc_handle_call_stream(Config) ->
     ok.
 
 %%% Internal Helpers
+stream_owner_unreachable(_Listener, _Port, 0) ->
+    ct:fail("Peer stream rejection was not observed");
+stream_owner_unreachable(Listener, Port, Attempts) ->
+    Parent = self(),
+    {Owner, MRef} = spawn_monitor(fun() ->
+        {ok, Listener} = quicer_nif:async_accept(Listener, #{}),
+        Parent ! {self(), accepting},
+        Conn =
+            receive
+                {quic, new_conn, C, _} -> C
+            end,
+        {ok, Conn} = quicer:handshake(Conn),
+        Parent ! {self(), connected},
+        %% Exit while the remaining streams in the receive batch are accepted.
+        receive
+            {quic, new_stream, _, _} -> ok
+        end
+    end),
+    try
+        receive
+            {Owner, accepting} -> ok
+        after 1000 -> ct:fail("No connection acceptor")
+        end,
+        {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+        receive
+            {Owner, connected} -> ok
+        after 1000 -> ct:fail("Server handshake did not complete")
+        end,
+        Streams = [
+            begin
+                {ok, Stream} = quicer:start_stream(Conn, [
+                    {active, true}, {open_flag, ?QUIC_STREAM_OPEN_FLAG_UNIDIRECTIONAL}
+                ]),
+                Stream
+            end
+         || _ <- lists:seq(1, 128)
+        ],
+        %% Queue small streams together, then flush with the final send.
+        lists:foreach(
+            fun({Stream, N}) ->
+                Flags =
+                    case N of
+                        128 -> ?QUIC_SEND_FLAG_FIN;
+                        _ -> ?QUIC_SEND_FLAG_FIN bor ?QUIC_SEND_FLAG_DELAY_SEND
+                    end,
+                case quicer:async_send(Stream, <<0>>, Flags) of
+                    {ok, 1} -> ok;
+                    {error, closed} -> ok;
+                    {error, stream_send_error, invalid_state} -> ok
+                end
+            end,
+            lists:zip(Streams, lists:seq(1, 128))
+        ),
+        quicer_test_lib:ensure_server_exit_normal(MRef),
+        case quicer:shutdown_connection(Conn) of
+            ok -> ok;
+            {error, closed} -> ok
+        end,
+        ?retry(10, 100, ?assertEqual([], quicer:get_connections()))
+    after
+        exit(Owner, kill)
+    end,
+    case
+        ?block_until(
+            #{
+                ?snk_kind := debug,
+                function := "selected_owner_unreachable",
+                tag := "owner_unreachable"
+            },
+            100
+        )
+    of
+        {ok, _} -> ok;
+        timeout -> stream_owner_unreachable(Listener, Port, Attempts - 1)
+    end.
+
 default_stream_opts() ->
     [].
 

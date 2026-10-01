@@ -1859,11 +1859,23 @@ put_conn_handles(ErlNifEnv *env, ERL_NIF_TERM conn_handles)
 QUIC_STATUS
 selected_owner_unreachable(QuicerStreamCTX *s_ctx)
 {
+  ErlNifEnv *env = s_ctx ? s_ctx->env : NULL;
+  if (!s_ctx)
+    {
+      TP_CB_3(owner_unreachable, 0, 1);
+      return QUIC_STATUS_UNREACHABLE;
+    }
+  TP_CB_3(owner_unreachable, (uintptr_t)s_ctx->Stream, 0);
   s_ctx->is_closed = TRUE;
   // @NOTE: unset Stream handle to avoid double closing
   //        becasue we are rejecting it and MsQuic internally will
   //        close it.
   s_ctx->Stream = NULL;
+  // No stream callback is installed on rejection, so no shutdown-complete
+  // callback will release this stream's reference to the connection.
+  // Drop the resource terms in the callback environment before releasing it.
+  enif_clear_env(env);
+  put_stream_handle(s_ctx);
   return QUIC_STATUS_UNREACHABLE;
 }
 
