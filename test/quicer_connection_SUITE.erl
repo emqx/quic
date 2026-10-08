@@ -179,6 +179,29 @@ tc_open2(Config0) ->
     {ok, H} = quicer_nif:open_connection(Config),
     quicer:close_connection(H).
 
+tc_conn_reuse_invalid_config(Config) ->
+    %% Missing ALPN fails configuration loading after the reuse path locks.
+    %% Let the resource be collected when its owner exits, exercising mutex
+    %% destruction as well as the error return.
+    {Pid, Ref} = spawn_monitor(fun() ->
+        {ok, Conn} = quicer_nif:open_connection(maps:from_list(Config)),
+        ?assertEqual(
+            {error, alpn},
+            quicer_nif:async_connect("localhost", 443, #{handle => Conn})
+        ),
+        ?assertEqual({error, closed}, quicer:controlling_process(Conn, self()))
+    end),
+    ensure_server_exit_normal(Ref),
+    ?assertNot(is_process_alive(Pid)).
+
+tc_conn_new_invalid_config(Config) ->
+    %% The same configuration error on a fresh context must not unlock a
+    %% mutex that has not yet been acquired.
+    ?assertEqual(
+        {error, alpn},
+        quicer_nif:async_connect("localhost", 443, maps:from_list(Config))
+    ).
+
 tc_conn_basic(Config) ->
     {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_basic(Config) end),
     receive
