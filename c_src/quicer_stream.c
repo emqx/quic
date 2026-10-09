@@ -303,6 +303,7 @@ async_start_stream2(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (!s_ctx)
     {
+      put_conn_handle(c_ctx);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -494,6 +495,7 @@ csend4(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QuicerStreamCTX *s_ctx = init_s_ctx();
   if (!s_ctx)
     {
+      put_conn_handle(c_ctx);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 

@@ -74,6 +74,11 @@ init_l_ctx()
   l_ctx->allow_insecure = FALSE;
   CxPlatListInitializeHead(&l_ctx->RegistrationLink);
   CxPlatRefInitialize(&l_ctx->ref_count);
+  if (!l_ctx->acceptor_queue || !l_ctx->lock)
+    {
+      enif_release_resource(l_ctx);
+      return NULL;
+    }
   return l_ctx;
 }
 
@@ -82,7 +87,10 @@ deinit_l_ctx(QuicerListenerCTX *l_ctx)
 {
   AcceptorQueueDestroy(l_ctx->acceptor_queue);
   CXPLAT_FREE(l_ctx->ssl_keylogfile, QUICER_TRACE);
-  enif_mutex_destroy(l_ctx->lock);
+  if (l_ctx->lock)
+    {
+      enif_mutex_destroy(l_ctx->lock);
+    }
   enif_free_env(l_ctx->env);
 }
 
@@ -122,6 +130,11 @@ init_c_ctx()
   c_ctx->peer_cert = NULL;
   CxPlatListInitializeHead(&c_ctx->RegistrationLink);
   CxPlatRefInitialize(&c_ctx->ref_count);
+  if (!c_ctx->acceptor_queue || !c_ctx->lock)
+    {
+      enif_release_resource(c_ctx);
+      return NULL;
+    }
   return c_ctx;
 }
 
@@ -145,7 +158,10 @@ deinit_c_ctx(QuicerConnCTX *c_ctx)
     {
       X509_free(c_ctx->peer_cert);
     }
-  enif_mutex_destroy(c_ctx->lock);
+  if (c_ctx->lock)
+    {
+      enif_mutex_destroy(c_ctx->lock);
+    }
 }
 
 void
@@ -208,6 +224,12 @@ init_s_ctx()
   s_ctx->event_mask = 0;
   s_ctx->sig_queue = NULL;
   CxPlatRefInitialize(&s_ctx->ref_count);
+  if (!s_ctx->lock)
+    {
+      enif_free_env(s_ctx->imm_env);
+      enif_release_resource(s_ctx);
+      return NULL;
+    }
   return s_ctx;
 }
 
@@ -216,7 +238,10 @@ deinit_s_ctx(QuicerStreamCTX *s_ctx)
 {
   stream_recv_chain_free(s_ctx);
   cleanup_owner_signals(s_ctx);
-  enif_mutex_destroy(s_ctx->lock);
+  if (s_ctx->lock)
+    {
+      enif_mutex_destroy(s_ctx->lock);
+    }
   enif_free_env(s_ctx->env);
 }
 
@@ -259,6 +284,10 @@ init_send_ctx()
 void
 destroy_send_ctx(QuicerStreamSendCTX *send_ctx)
 {
+  if (!send_ctx)
+    {
+      return;
+    }
   enif_free_env(send_ctx->env);
   CXPLAT_FREE(send_ctx, QUICER_SEND_CTX);
 }
