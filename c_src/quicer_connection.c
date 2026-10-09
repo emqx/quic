@@ -641,6 +641,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   QuicerConnCTX *c_ctx = NULL;
   QuicerRegistrationCTX *r_ctx = NULL;
   BOOLEAN is_reuse_handle = FALSE;
+  BOOLEAN is_locked = FALSE;
 
   int port = 0;
   char host[256] = { 0 };
@@ -725,6 +726,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (is_reuse_handle)
     {
       enif_mutex_lock(c_ctx->lock);
+      is_locked = TRUE;
     }
 
   Registration = r_ctx->Registration;
@@ -736,7 +738,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (NULL == (c_ctx->config_ctx = init_config_ctx()))
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
-      goto ErrorNoLock;
+      goto Error;
     }
 
   ERL_NIF_TERM is_custom_verify = ATOM_FALSE;
@@ -756,7 +758,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!IS_SAME_TERM(ATOM_OK, estatus))
     {
       res = ERROR_TUPLE_2(estatus);
-      goto ErrorNoLock;
+      goto Error;
     }
 
   // Open Connection if not reused
@@ -777,6 +779,7 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
           res = parse_conn_resume_ticket(env, eoptions, c_ctx);
           // we could only lock it after resume ticket is set
           enif_mutex_lock(c_ctx->lock);
+          is_locked = TRUE;
           if (!IS_SAME_TERM(ATOM_OK, res))
             {
               goto Error;
@@ -858,8 +861,10 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   return SUCCESS(eHandle);
 
 Error:
-  enif_mutex_unlock(c_ctx->lock);
-ErrorNoLock:
+  if (is_locked)
+    {
+      enif_mutex_unlock(c_ctx->lock);
+    }
   if (is_reuse_handle)
     {
       // we get the handle at the begining of this function
