@@ -391,6 +391,7 @@ set_conn_sslkeylogfile(QuicerConnCTX *c_ctx, char *keylogfile)
 
   if (!TlsSecrets)
     {
+      CXPLAT_FREE(keylogfile, QUICER_TRACE);
       return;
     }
 
