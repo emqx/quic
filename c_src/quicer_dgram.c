@@ -72,6 +72,7 @@ send_dgram(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (!get_conn_handle(c_ctx))
     {
+      destroy_dgram_send_ctx(dgram_send_ctx);
       return ERROR_TUPLE_2(ATOM_CLOSED);
     }
   enif_mutex_lock(c_ctx->lock);

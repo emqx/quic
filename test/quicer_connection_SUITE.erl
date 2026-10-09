@@ -202,6 +202,29 @@ tc_conn_new_invalid_config(Config) ->
         quicer_nif:async_connect("localhost", 443, maps:from_list(Config))
     ).
 
+tc_dgram_closed_releases_payload(Config) ->
+    {ok, Conn} = quicer_nif:open_connection(maps:from_list(Config)),
+    %% Configuration failure closes the native handle without a network peer.
+    ?assertEqual(
+        {error, alpn},
+        quicer_nif:async_connect("localhost", 443, #{handle => Conn})
+    ),
+    Payload = crypto:strong_rand_bytes(65537),
+    Size = byte_size(Payload),
+    erlang:garbage_collect(),
+    {binary, Before} = process_info(self(), binary),
+    [{Address, Size, Refs}] = lists:usort([B || B = {_, N, _} <- Before, N =:= Size]),
+    lists:foreach(
+        fun(_) ->
+            ?assertEqual({error, closed}, quicer_nif:send_dgram(Conn, Payload, 0))
+        end,
+        lists:seq(1, 100)
+    ),
+    erlang:garbage_collect(),
+    {binary, After} = process_info(self(), binary),
+    %% A leaked send environment retains one payload reference per call.
+    ?assertEqual({Address, byte_size(Payload), Refs}, lists:keyfind(Address, 1, After)).
+
 tc_conn_basic(Config) ->
     {Pid, Ref} = spawn_monitor(fun() -> run_tc_conn_basic(Config) end),
     receive

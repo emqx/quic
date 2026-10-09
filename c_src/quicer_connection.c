@@ -572,6 +572,7 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
   if (!c_ctx)
     {
+      put_reg_handle(r_ctx);
       return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
     }
 
@@ -579,12 +580,14 @@ open_connectionX(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
   if (!c_ctx->owner)
     {
       res = ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+      put_reg_handle(r_ctx);
       goto exit;
     }
 
   if (!enif_self(env, &(c_ctx->owner->Pid)))
     {
       res = ERROR_TUPLE_2(ATOM_BAD_PID);
+      put_reg_handle(r_ctx);
       goto exit;
     }
 
@@ -691,6 +694,10 @@ async_connect3(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
       CXPLAT_FRE_ASSERT(!r_ctx);
 
       c_ctx = init_c_ctx();
+      if (!c_ctx)
+        {
+          return ERROR_TUPLE_2(ATOM_ERROR_NOT_ENOUGH_MEMORY);
+        }
 
       // Get Reg for c_ctx, quic_registration is optional
 
@@ -1319,12 +1326,18 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
   ErlNifEnv *env = c_ctx->env;
   ErlNifPid *acc_pid = NULL;
 
-  QuicerStreamCTX *s_ctx = init_s_ctx();
   BOOLEAN is_orphan = FALSE;
 
   if (!get_conn_handle(c_ctx))
     {
       return QUIC_STATUS_UNREACHABLE;
+    }
+
+  QuicerStreamCTX *s_ctx = init_s_ctx();
+  if (!s_ctx)
+    {
+      put_conn_handle(c_ctx);
+      return QUIC_STATUS_OUT_OF_MEMORY;
     }
 
   s_ctx->c_ctx = c_ctx;
@@ -1346,8 +1359,7 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
       acc = AcceptorAlloc();
       if (!acc)
         {
-          s_ctx->Stream = NULL;
-          return QUIC_STATUS_UNREACHABLE;
+          return selected_owner_unreachable(s_ctx);
         }
       // We must copy here, otherwise it will become double free
       // for Stream and Connection
@@ -1394,8 +1406,12 @@ handle_connection_event_peer_stream_started(QuicerConnCTX *c_ctx,
           props_value[1] = ATOM_TRUE;
 
           acc = AcceptorAlloc();
-          CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
           s_ctx->owner = acc;
+          if (!acc)
+            {
+              return selected_owner_unreachable(s_ctx);
+            }
+          CxPlatCopyMemory(acc, c_ctx->owner, sizeof(ACCEPTOR));
           // this is our protocol
           acc->active = ACCEPTOR_RECV_MODE_PASSIVE;
           acc_pid = &(acc->Pid);

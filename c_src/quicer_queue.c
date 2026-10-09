@@ -24,9 +24,7 @@ void
 AcceptorQueueInit(QUICER_ACCEPTOR_QUEUE *q)
 {
   q->Lock = enif_mutex_create("quicer:acceptQ");
-  enif_mutex_lock(q->Lock);
   CxPlatListInitializeHead(&q->List);
-  enif_mutex_unlock(q->Lock);
 }
 
 QUICER_ACCEPTOR_QUEUE *
@@ -38,6 +36,11 @@ AcceptorQueueNew()
       return NULL;
     }
   AcceptorQueueInit(q);
+  if (!q->Lock)
+    {
+      CXPLAT_FREE(q, QUICER_ACCEPTOR);
+      return NULL;
+    }
   return q;
 }
 
@@ -45,6 +48,10 @@ AcceptorQueueNew()
 void
 AcceptorQueueDestroy(QUICER_ACCEPTOR_QUEUE *q)
 {
+  if (!q)
+    {
+      return;
+    }
   enif_mutex_lock(q->Lock);
   while (!CxPlatListIsEmpty(&q->List))
     {
@@ -96,6 +103,10 @@ ACCEPTOR *
 AcceptorAlloc()
 {
   ACCEPTOR *acc = CXPLAT_ALLOC_NONPAGED(sizeof(ACCEPTOR), QUICER_ACCEPTOR);
+  if (!acc)
+    {
+      return NULL;
+    }
   CxPlatZeroMemory(acc, sizeof(ACCEPTOR));
   acc->active = ACCEPTOR_RECV_MODE_ACTIVE;
   acc->active_count = 0;

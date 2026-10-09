@@ -218,10 +218,13 @@ ServerListenerCallback(__unused_parm__ HQUIC Listener,
         {
           char *ssl_keylogfile
               = CXPLAT_ALLOC_NONPAGED(l_ctx->ssl_keylogfile_len, QUICER_TRACE);
-          strncpy(ssl_keylogfile,
-                  l_ctx->ssl_keylogfile,
-                  l_ctx->ssl_keylogfile_len);
-          set_conn_sslkeylogfile(c_ctx, ssl_keylogfile);
+          if (ssl_keylogfile)
+            {
+              strncpy(ssl_keylogfile,
+                      l_ctx->ssl_keylogfile,
+                      l_ctx->ssl_keylogfile_len);
+              set_conn_sslkeylogfile(c_ctx, ssl_keylogfile);
+            }
         }
 
       enif_clear_env(env);
