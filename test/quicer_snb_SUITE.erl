@@ -2896,7 +2896,7 @@ tc_multi_streams_example_server_1(Config) ->
     ListenerOpts = [
         {conn_acceptors, 32},
         {peer_bidi_stream_count, 10},
-        {peer_unidi_stream_count, 0}
+        {peer_unidi_stream_count, 1}
         | default_listen_opts(Config)
     ],
     ConnectionOpts = [
