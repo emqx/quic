@@ -79,6 +79,7 @@
     tc_stream_controlling_process/1,
     tc_stream_controlling_process_demon/1,
     tc_stream_get_owner_local/1,
+    tc_stream_handoff_init_error/1,
     tc_stream_get_owner_remote/1,
 
     tc_dgram_client_send/1,
@@ -3567,6 +3568,37 @@ tc_stream_get_owner_local(Config) ->
     SPid ! done,
     ensure_server_exit_normal(Ref),
     ok.
+
+tc_stream_handoff_init_error(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 1000 ->
+        ct:fail(listener_timeout)
+    end,
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {ok, Stream} = quicer:start_stream(Conn, [{active, false}]),
+    Reason = handoff_rejected,
+    try
+        ?assertEqual(
+            {error, {error, Reason}},
+            quicer_stream:start(
+                quicer_echo_server_stream_callback,
+                Stream,
+                Conn,
+                #{init_handoff_error => Reason},
+                #{},
+                []
+            )
+        )
+    after
+        quicer:close_stream(Stream),
+        quicer:close_connection(Conn),
+        SPid ! done,
+        ensure_server_exit_normal(Ref)
+    end.
 
 tc_stream_get_owner_remote(Config) ->
     Port = select_port(),
