@@ -309,8 +309,8 @@ init([Callback, Stream, Conn, StreamOpts, Props, PrevOwner]) ->
                 fpbuffer => maybe_buffer(StreamOpts)
             },
             {ok, State, {continue, {?post_init, PrevOwner}}};
-        {error, _} = E ->
-            {stop, E}
+        {error, Reason, _CBState} ->
+            {stop, {error, Reason}}
     end.
 
 %%--------------------------------------------------------------------
