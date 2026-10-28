@@ -740,8 +740,8 @@ async_accept_stream(Conn, Opts) when is_map(Opts) ->
 -spec start_stream(connection_handle(), stream_opts()) ->
     {ok, stream_handle()}
     | {error, badarg | internal_error | bad_pid | owner_dead}
-    | {error, stream_open_error, atom_reason()}
-    | {error, stream_start_error, atom_reason()}.
+    | {error, stm_open_error, atom_reason()}
+    | {error, stm_start_error, atom_reason()}.
 start_stream(Conn, Opts) when is_list(Opts) ->
     start_stream(Conn, maps:from_list(Opts));
 start_stream(Conn, Opts) when is_map(Opts) ->
@@ -752,7 +752,7 @@ start_stream(Conn, Opts) when is_map(Opts) ->
     {ok, stream_handle()}
     | {error, any()}
     | {error, stm_open_error, atom_reason()}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 
 async_csend(Conn, IoData, Opts, SendFlags) when is_list(Opts) ->
     async_csend(Conn, IoData, maps:from_list(Opts), SendFlags);
@@ -765,7 +765,7 @@ async_csend(Conn, IoData, Opts, SendFlags) ->
     {ok, BytesSent :: pos_integer()}
     | {error, cancelled}
     | {error, badarg | not_enough_mem | closed}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 send(Stream, Data) ->
     send(Stream, Data, ?QUICER_SEND_FLAG_SYNC).
 
@@ -775,7 +775,7 @@ send(Stream, Data) ->
     {ok, BytesSent :: pos_integer()}
     | {error, cancelled}
     | {error, badarg | not_enough_mem | closed}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 send(Stream, Data, Flag) when is_integer(Flag) ->
     case is_zero_len_send_noop(Data, Flag) of
         true ->
@@ -818,7 +818,7 @@ is_zero_len_send_noop(Data, Flag) ->
 -spec async_send(stream_handle(), iodata(), non_neg_integer()) ->
     {ok, BytesSent :: pos_integer()}
     | {error, badarg | not_enough_mem | closed}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 async_send(Stream, Data, Flag) ->
     case is_zero_len_send_noop(Data, Flag) of
         true ->
@@ -837,7 +837,7 @@ async_send(Stream, Data, Flag) ->
 -spec async_send(stream_handle(), iodata()) ->
     {ok, BytesSent :: pos_integer()}
     | {error, badarg | not_enough_mem | closed}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 async_send(Stream, Data) ->
     async_send(Stream, Data, ?QUIC_SEND_FLAG_NONE).
 

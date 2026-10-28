@@ -322,22 +322,22 @@ async_accept_stream(_Conn, _Opts) ->
 -spec start_stream(connection_handle(), stream_opts()) ->
     {ok, stream_handle()}
     | {error, badarg | internal_error | bad_pid | owner_dead | not_enough_mem}
-    | {error, stream_open_error, atom_reason()}
-    | {error, stream_start_error, atom_reason()}.
+    | {error, stm_open_error, atom_reason()}
+    | {error, stm_start_error, atom_reason()}.
 start_stream(_Conn, _Opts) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec csend(connection_handle(), iodata(), stream_opts(), send_flags()) ->
     {ok, BytesSent :: pos_integer()}
     | {error, badarg | not_enough_mem | closed}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 csend(_Conn, _Data, _Opts, _Flags) ->
     erlang:nif_error(nif_library_not_loaded).
 
 -spec send(stream_handle(), iodata(), send_flags()) ->
     {ok, BytesSent :: pos_integer()}
     | {error, badarg | not_enough_mem | closed}
-    | {error, stream_send_error, atom_reason()}.
+    | {error, stm_send_error, atom_reason()}.
 send(_Stream, _Data, _Flags) ->
     erlang:nif_error(nif_library_not_loaded).
 
