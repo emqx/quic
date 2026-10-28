@@ -608,7 +608,7 @@ handle_continue(
                     {noreply, State#{is_owner => true}}
             end;
         {error, owner_down} ->
-            {stop, owner_down, State}
+            {stop, {shutdown, owner_down}, State}
     end;
 handle_continue(
     Other,

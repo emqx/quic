@@ -48,6 +48,7 @@
     tc_open_listener_inval_reg/1,
 
     tc_stream_client_init/1,
+    tc_stream_handoff_owner_down/1,
     tc_stream_client_send_binary/1,
     tc_stream_client_send_iolist/1,
     tc_stream_client_async_send/1,
@@ -376,6 +377,59 @@ tc_stream_client_init(Config) ->
             ok = ensure_server_exit_normal(Ref)
     after 1000 ->
         ct:fail("timeout")
+    end.
+
+tc_stream_handoff_owner_down(Config) ->
+    Port = select_port(),
+    Owner = self(),
+    {SPid, Ref} = spawn_monitor(fun() -> simple_conn_server(Owner, Config, Port) end),
+    receive
+        listener_ready -> ok
+    after 1000 ->
+        ct:fail(listener_timeout)
+    end,
+    {ok, Conn} = quicer:connect("localhost", Port, default_conn_opts(), 5000),
+    {PrevOwner, PrevRef} = spawn_monitor(fun() ->
+        {ok, Stream} = quicer:start_stream(Conn, [{active, false}]),
+        {ok, StreamPid} = quicer_stream:start(
+            quicer_echo_server_stream_callback,
+            Stream,
+            Conn,
+            #{},
+            #{is_orphan => true, flags => 0},
+            []
+        ),
+        Owner ! {stream_waiting, self(), StreamPid},
+        receive
+            stop -> ok
+        end
+    end),
+    try
+        receive
+            {stream_waiting, PrevOwner, StreamPid} ->
+                StreamRef = monitor(process, StreamPid),
+                PrevOwner ! stop,
+                receive
+                    {'DOWN', StreamRef, process, StreamPid, Reason} ->
+                        ?assertEqual({shutdown, owner_down}, Reason)
+                after 1000 ->
+                    ct:fail(stream_stop_timeout)
+                end,
+                receive
+                    {'DOWN', PrevRef, process, PrevOwner, normal} -> ok
+                after 1000 ->
+                    ct:fail(owner_stop_timeout)
+                end;
+            {'DOWN', PrevRef, process, PrevOwner, Reason} ->
+                ct:fail({owner_start_failed, Reason})
+        after 1000 ->
+            ct:fail(stream_start_timeout)
+        end
+    after
+        exit(PrevOwner, shutdown),
+        quicer:close_connection(Conn),
+        SPid ! done,
+        ensure_server_exit_normal(Ref)
     end.
 
 tc_stream_client_send_binary(Config) ->
