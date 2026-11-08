@@ -126,6 +126,12 @@ jobs:
           QUICER_TLS_VER: ${{ matrix.openssl }}
         run: |
           export QUICER_TLS_VER
+          if [ "$QUICER_TLS_VER" = sys ]; then
+            # msquic requires OpenSSL 3.x; the Homebrew default is newer.
+            brew install openssl@3
+            OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
+            export OPENSSL_ROOT_DIR
+          fi
           wget https://github.com/erlang/rebar3/releases/download/${{ matrix.rebar3 }}/rebar3
           sudo mv rebar3 /usr/local/bin/ && sudo chmod +x /usr/local/bin/rebar3
           erl -eval 'erlang:display(erlang:system_info(system_version)),halt()'
