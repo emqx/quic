@@ -161,6 +161,9 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     # msquic src/core/packet.h (QuicPktNumEncode) which builds with -Werror;
     # demote this one diagnostic back to a warning
     add_compile_options(-Wno-error=maybe-uninitialized)
+    # GCC 14 and later make int-conversion an error. The lttng tracepoints
+    # that msquic generates pass pointers to ctf_integer fields.
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wno-error=int-conversion>)
 endif()
 
 # for lttng, quicer_tp.h
