@@ -10,6 +10,21 @@ on:
       ref_name:
         description: 'Tag to (re)release'
         required: false
+      linux_os:
+        description: |
+          JSON array of Linux distros to build, for example ["ubuntu26.04"].
+          Build a subset to add assets for a new distro to a release that
+          already exists, without rebuilding the assets it already has.
+          Empty builds every distro.
+        required: false
+        default: ''
+      skip_mac:
+        description: |
+          Skip the macOS builds. Set this when the release already has its
+          macOS assets.
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - "*"
@@ -18,6 +33,7 @@ on:
 
 jobs:
   mac:
+    if: ${{ !inputs.skip_mac }}
     strategy:
       fail-fast: false
       matrix:
@@ -76,11 +92,11 @@ jobs:
       matrix:
         erlang:
           - otp: 26.2.5.14-1
-            builder: 5.6-2:1.15.7-26.2.5.14-1
-          - otp: 27.3.4.2-3
-            builder: 5.6-2:1.18.3-27.3.4.2-3
-          - otp: 28.2-2
-            builder: 6.0-9:1.19.1-28.2-2
+            builder: 6.3-1:1.15.7-26.2.5.14-1
+          - otp: 27.3.4.2-9
+            builder: 6.3-1:1.18.3-27.3.4.2-9
+          - otp: 28.4.1-11
+            builder: 6.3-1:1.19.1-28.4.1-11
 
         openssl:
           - openssl3
@@ -89,62 +105,17 @@ jobs:
         arch:
           - amd64
           - arm64
-        os:
-          - ubuntu24.04
-          - ubuntu22.04
-          - ubuntu20.04
-          - debian13
-          - debian12
-          - debian11
-          - amzn2023
-          - amzn2
-          - el9
-          - el8
-          - el7
+        # The prebuilt file name carries the OTP major only, so one asset per
+        # (version, OTP major, TLS, distro, arch) serves every OTP patch release.
+        os: >-
+          ${{ fromJSON(github.event.inputs.linux_os || '["ubuntu26.04",
+          "ubuntu24.04", "ubuntu22.04", "ubuntu20.04", "debian13", "debian12",
+          "debian11", "amzn2023", "amzn2", "el10", "el9", "el8", "el7"]') }}
         exclude:
           - os: el7
             openssl: sys
           - os: el7
             openssl: openssl3
-        ## el10 builder images only exist since emqx-builder 6.1 and
-        ## (as of now) only for otp 27, hence include instead of matrix os
-        include:
-          - erlang:
-              otp: 27.3.4.2-8
-              builder: 6.1-8:1.18.3-27.3.4.2-8
-            os: el10
-            arch: amd64
-            openssl: sys
-          - erlang:
-              otp: 27.3.4.2-8
-              builder: 6.1-8:1.18.3-27.3.4.2-8
-            os: el10
-            arch: arm64
-            openssl: sys
-          - erlang:
-              otp: 27.3.4.2-8
-              builder: 6.1-8:1.18.3-27.3.4.2-8
-            os: el10
-            arch: amd64
-            openssl: openssl3
-          - erlang:
-              otp: 27.3.4.2-8
-              builder: 6.1-8:1.18.3-27.3.4.2-8
-            os: el10
-            arch: arm64
-            openssl: openssl3
-          - erlang:
-              otp: 27.3.4.2-8
-              builder: 6.1-8:1.18.3-27.3.4.2-8
-            os: el10
-            arch: amd64
-            openssl: openssl
-          - erlang:
-              otp: 27.3.4.2-8
-              builder: 6.1-8:1.18.3-27.3.4.2-8
-            os: el10
-            arch: arm64
-            openssl: openssl
 
     runs-on: ubuntu-22.04${{ matrix.arch == 'arm64' && '-arm' || '' }}
 
@@ -180,7 +151,14 @@ jobs:
     needs:
       - mac
       - emqx-linux
-    if: github.event.inputs.ref_name || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
+    # always(), because the mac job is skipped when skip_mac is set, and a
+    # skipped dependency skips this job unless the condition states otherwise.
+    if: >-
+      always()
+      && needs.emqx-linux.result == 'success'
+      && needs.mac.result != 'failure'
+      && needs.mac.result != 'cancelled'
+      && (github.event.inputs.ref_name || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')))
     steps:
       - uses: actions/checkout@v4
 
