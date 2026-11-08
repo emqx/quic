@@ -1,6 +1,12 @@
 name: ci
 on: [push, pull_request]
 
+# ubuntu-latest is moving to Ubuntu 26.04. setup-beam v1.18.2 cannot map
+# ImageOS=ubuntu26, and builds.hex.pm has no OTP 25 build for it. The
+# ubuntu-24.04 OTP builds run on 26.04.
+env:
+  ImageOS: ubuntu24
+
 jobs:
   formatting-check:
     name: Formatting Check
@@ -65,7 +71,6 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-14
           - macos-15
         otp:
           - '27'
@@ -173,7 +178,7 @@ jobs:
           export QUIC_ENABLE_LOGGING
           if [ "${QUIC_ENABLE_LOGGING}" == "ON" ] ; then
             export QUIC_LOGGING_TYPE=lttng
-            sudo apt-add-repository ppa:lttng/stable-2.13
+            sudo apt-add-repository ppa:lttng/stable-2.15
             sudo apt-get update
             sudo apt-get install -y lttng-tools  babeltrace liblttng-ust-dev lttng-modules-dkms-
             which lttng
