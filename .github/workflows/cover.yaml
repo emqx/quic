@@ -2,6 +2,12 @@ on: ["push", "pull_request"]
 
 name: Test Coveralls
 
+# ubuntu-latest is moving to Ubuntu 26.04. setup-beam v1.18.2 cannot map
+# ImageOS=ubuntu26, and builds.hex.pm has no OTP 25 build for it. The
+# ubuntu-24.04 OTP builds run on 26.04.
+env:
+  ImageOS: ubuntu24
+
 jobs:
   run-cover:
     name: Run Cover
