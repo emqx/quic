@@ -156,6 +156,13 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Ap
     endif()
 endif()
 
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    # GCC 14.3 (el10) reports a 'maybe-uninitialized' false positive in
+    # msquic src/core/packet.h (QuicPktNumEncode) which builds with -Werror;
+    # demote this one diagnostic back to a warning
+    add_compile_options(-Wno-error=maybe-uninitialized)
+endif()
+
 # for lttng, quicer_tp.h
 include_directories(c_src)
 # for templ files
