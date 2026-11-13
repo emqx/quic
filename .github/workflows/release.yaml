@@ -108,7 +108,7 @@ jobs:
         os: >-
           ${{ fromJSON(github.event.inputs.linux_os || '["ubuntu26.04",
           "ubuntu24.04", "ubuntu22.04", "ubuntu20.04", "debian13", "debian12",
-          "debian11", "amzn2023", "amzn2", "el9", "el8", "el7"]') }}
+          "debian11", "amzn2023", "amzn2", "el10", "el9", "el8", "el7"]') }}
         exclude:
           - os: el7
             openssl: sys
